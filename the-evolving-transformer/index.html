@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>The Evolving Transformer — One Codebase, Every Architecture</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --bg-nav: rgba(10,10,15,0.92);
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 14px;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+/* ── Light mode overrides ── */
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.hero {
+  padding: 120px 24px 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(108,140,255,0.12) 0%, rgba(167,139,250,0.06) 40%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 {
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  font-weight: 800;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+.hero-intro {
+  max-width: 780px;
+  margin: 0 auto 32px;
+  text-align: left;
+}
+.hero .subtitle {
+  font-size: 1.05rem;
+  color: var(--text-dim);
+  margin: 0 0 14px;
+  line-height: 1.65;
+}
+.hero .subtitle:last-child {
+  margin-bottom: 0;
+}
+.hero .subtitle strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Evolution timeline strip */
+.evo-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 0 auto 20px;
+  max-width: 700px;
+  flex-wrap: wrap;
+  padding: 0 24px;
+}
+.evo-node {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  text-decoration: none;
+}
+.evo-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.evo-node.active .evo-dot {
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(108,140,255,0.4);
+}
+.evo-node.future .evo-dot {
+  border-color: var(--border);
+  border-style: dashed;
+}
+.evo-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.evo-node.active .evo-label { color: var(--accent); }
+.evo-node.future .evo-label { color: var(--border); }
+.evo-arrow {
+  width: 24px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+.evo-arrow.future {
+  background: var(--border);
+  border-top: 1px dashed var(--border);
+  height: 0;
+}
+.hero-stats {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.hero-stat { text-align: center; }
+.hero-stat-val {
+  font-size: 2.2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: block;
+}
+.hero-stat-label {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Architecture cards */
+.arch-grid {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px 60px;
+  display: grid;
+  gap: 28px;
+}
+
+.arch-card {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+  color: inherit;
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+}
+.arch-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(108,140,255,0.1);
+  text-decoration: none;
+}
+.arch-card::after {
+  content: '→';
+  position: absolute;
+  right: 28px;
+  top: 28px;
+  font-size: 1.3rem;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.arch-card:hover::after { opacity: 1; }
+
+.arch-img-wrap {
+  width: 140px;
+  height: 140px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.arch-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  padding: 6px;
+}
+
+.arch-content { min-width: 0; }
+
+.arch-num {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--accent2);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: block;
+}
+.arch-card h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+.arch-year {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--accent3);
+  margin-bottom: 10px;
+  display: block;
+}
+.arch-card p {
+  font-size: 0.92rem;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+  line-height: 1.55;
+}
+
+.arch-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.arch-delta-tag {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(108,140,255,0.08);
+  color: var(--accent);
+  border: 1px solid rgba(108,140,255,0.15);
+}
+
+/* Coming soon card */
+.arch-card.coming-soon {
+  border-style: dashed;
+  opacity: 0.5;
+}
+.arch-card.coming-soon:hover {
+  border-color: var(--border);
+  transform: none;
+  box-shadow: none;
+  cursor: default;
+}
+.arch-card.coming-soon::after { display: none; }
+
+/* Fade in */
+.fade-in {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: all 0.55s ease;
+}
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 600px) {
+  .arch-card { grid-template-columns: 1fr; }
+  .arch-img-wrap { width: 100%; height: 180px; }
+  .arch-card h2 { font-size: 1.15rem; }
+  .evo-arrow { width: 12px; }
+}
+</style>
+<script>
+// ─── Series Visibility Guard ──────────────────────────────────────────────
+// Set to true when this series is ready to publish.
+// While false, any direct URL visit immediately redirects to the main page.
+const SERIES_LIVE = true;
+if (!SERIES_LIVE) { window.location.replace('../'); }
+</script>
+<script>
+/* Apply saved theme before paint to avoid flash */
+(function(){
+  var t = localStorage.getItem('tcw-theme');
+  if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+})();
+</script>
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  background: var(--bg-nav);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 2px;
+}
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: var(--border); }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px !important; }
+/* Theme toggle button */
+.theme-toggle {
+  margin-left: auto;
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px;
+  color: var(--text-dim); cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun  { display: block; }
+
+</style>
+<script>
+// ─── Chapter Release Control ──────────────────────────────────────────────
+// Add chapter folder names here to make them visible.
+// Empty array = everything hidden. Example: ['01-foo', '02-bar']
+const LIVE_CHAPTERS = ['01-attention-is-all-you-need', '02-gpt-2', '14-clip', '03-llama', '04-mistral-7b', '05-mixtral', '06-deepseek', '15-paligemma', '10-qwen3-next'];
+</script>
+<nav class="breadcrumb-nav">
+  <a href="../">The Context Window</a><span class="bc-sep">›</span><span class="bc-current">The Evolving Transformer</span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+    <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg class="icon-sun"  viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  </button>
+</nav>
+
+<div class="hero">
+  <h1>The Evolving Transformer</h1>
+  <div class="hero-intro">
+    <p class="subtitle">This is the series where I build landmark transformer architectures from scratch in PyTorch — one codebase that grows paper by paper. Not slides or pseudocode: runnable code, with the diffs that actually matter between each generation.</p>
+    <p class="subtitle">Full source for each chapter is on <a href="https://github.com/abhibisht89/llamasearch-blogs/tree/main/the-evolving-transformer" target="_blank" rel="noopener">GitHub</a> — <a href="https://github.com/abhibisht89/llamasearch-blogs" target="_blank" rel="noopener">abhibisht89/llamasearch-blogs</a>, folder <code>the-evolving-transformer/</code>.</p>
+    <p class="subtitle">The curated arc: <strong>Transformer</strong>, <strong>GPT-2</strong>, <strong>CLIP</strong>, <strong>LLaMA</strong>, <strong>Mistral</strong>, <strong>Mixtral</strong>, <strong>DeepSeek V2/V3</strong>, <strong>PaliGemma</strong>, and <strong>Qwen3-Next</strong> — <strong>9 stops</strong> where the architecture moved in a fundamental way, not just scale or training tricks.</p>
+    <p class="subtitle">I hope to release a matching <strong>YouTube series</strong> — one video per chapter — so you can follow the intuition alongside the code.</p>
+    <p class="subtitle">Chapters will <strong>drop here sequentially</strong> as they are ready. Only finished ones are linked below; the timeline is the full roadmap of models we plan to cover.</p>
+  </div>
+
+  <div class="evo-strip">
+    <a class="evo-node active" href="01-attention-is-all-you-need/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">Transformer</span></a>
+    <div class="evo-arrow"></div>
+    <a class="evo-node active" href="02-gpt-2/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">GPT-2</span></a>
+    <div class="evo-arrow"></div>
+    <a class="evo-node active" href="14-clip/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">CLIP</span></a>
+    <div class="evo-arrow"></div>
+    <a class="evo-node active" href="03-llama/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">LLaMA</span></a>
+    <div class="evo-arrow"></div>
+    <a class="evo-node active" href="04-mistral-7b/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">Mistral</span></a>
+    <div class="evo-arrow"></div>
+    <a class="evo-node active" href="05-mixtral/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">Mixtral</span></a>
+    <div class="evo-arrow"></div>
+    <a class="evo-node active" href="06-deepseek/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">DeepSeek</span></a>
+    <div class="evo-arrow"></div>
+    <a class="evo-node active" href="15-paligemma/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">PaliGemma</span></a>
+    <div class="evo-arrow"></div>
+    <a class="evo-node active" href="10-qwen3-next/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">Qwen3-Next</span></a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="hero-stat"><span class="hero-stat-val">9</span><span class="hero-stat-label">Chapters</span></div>
+    <div class="hero-stat"><span class="hero-stat-val">70+</span><span class="hero-stat-label">Components</span></div>
+    <div class="hero-stat"><span class="hero-stat-val">55+</span><span class="hero-stat-label">Deltas</span></div>
+  </div>
+</div>
+
+<div class="arch-grid">
+
+  <!-- ─── 01: Attention Is All You Need ─── -->
+  <a class="arch-card fade-in" data-chapter="01-attention-is-all-you-need" href="01-attention-is-all-you-need/">
+    <div class="arch-img-wrap">
+      <img src="images/the-transformer.webp" alt="Original Transformer architecture diagram">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 01 — THE BASELINE</span>
+      <h2>Attention Is All You Need</h2>
+      <span class="arch-year">2017 · Vaswani et al.</span>
+      <p>The encoder-decoder Transformer that started everything. Sinusoidal PE, multi-head attention, LayerNorm, ReLU FFN — all built from scratch in PyTorch.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">Encoder + Decoder</span>
+        <span class="arch-delta-tag">Sinusoidal PE</span>
+        <span class="arch-delta-tag">Multi-Head Attention</span>
+        <span class="arch-delta-tag">LayerNorm</span>
+        <span class="arch-delta-tag">ReLU FFN</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- ─── 02: GPT-2 ─── -->
+  <a class="arch-card fade-in" data-chapter="02-gpt-2" href="02-gpt-2/">
+    <div class="arch-img-wrap">
+      <img src="images/gpt-2-small.webp" alt="GPT-2 Small architecture">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 02 — 4 DELTAS</span>
+      <h2>GPT-2</h2>
+      <span class="arch-year">2019 · Radford et al. (OpenAI)</span>
+      <p>Decoder-only. Learned positional embedding replaces sinusoidal. Pre-norm (LayerNorm before sub-blocks). GELU replaces ReLU.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">Decoder-only</span>
+        <span class="arch-delta-tag">Learned PE</span>
+        <span class="arch-delta-tag">Pre-norm</span>
+        <span class="arch-delta-tag">GELU</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- ─── 03: CLIP ─── -->
+  <a class="arch-card fade-in" data-chapter="14-clip" href="14-clip/">
+    <div class="arch-img-wrap">
+      <img src="images/clip-vit-b32-architecture.webp" alt="CLIP">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 03 — MULTIMODAL</span>
+      <h2>CLIP</h2>
+      <span class="arch-year">2021 · Radford et al. (OpenAI)</span>
+      <p>Dual encoders map images and text into one contrastive space — patch ViT + causal text tower, L2-normalised dot products, symmetric InfoNCE.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">ViT patches</span>
+        <span class="arch-delta-tag">Causal text tower</span>
+        <span class="arch-delta-tag">B×B contrastive</span>
+        <span class="arch-delta-tag">Zero-shot labels</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- ─── 04: LLaMA ─── -->
+  <a class="arch-card fade-in" data-chapter="03-llama" href="03-llama/">
+    <div class="arch-img-wrap">
+      <img src="images/llama-3-8b.webp" alt="LLaMA architecture diagram">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 04 — 6 DELTAS</span>
+      <h2>LLaMA</h2>
+      <span class="arch-year">2023 · Touvron et al. (Meta)</span>
+      <p>RoPE replaces learned PE. RMSNorm replaces LayerNorm. SwiGLU replaces GELU. Grouped Query Attention. No bias, no embedding scaling.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">RoPE</span>
+        <span class="arch-delta-tag">RMSNorm</span>
+        <span class="arch-delta-tag">SwiGLU</span>
+        <span class="arch-delta-tag">GQA</span>
+        <span class="arch-delta-tag">No bias</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- ─── 05: Mistral 7B ─── -->
+  <a class="arch-card fade-in" data-chapter="04-mistral-7b" href="04-mistral-7b/">
+    <div class="arch-img-wrap">
+      <img src="images/mistral-7b.webp" alt="Mistral 7B architecture">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 05 — 2 DELTAS</span>
+      <h2>Mistral 7B</h2>
+      <span class="arch-year">2023 · Mistral AI</span>
+      <p>Sliding window attention (W=4096) replaces full causal. Rolling buffer KV cache bounds memory. Otherwise identical to LLaMA.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">Sliding window W=4096</span>
+        <span class="arch-delta-tag">Rolling buffer cache</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- ─── 06: Mixtral ─── -->
+  <a class="arch-card fade-in" data-chapter="05-mixtral" href="05-mixtral/">
+    <div class="arch-img-wrap">
+      <img src="images/mixtral-8x7b.webp" alt="Mixtral 8×7B">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 06 — SPARSE MOE</span>
+      <h2>Mixtral 8×7B</h2>
+      <span class="arch-year">2023 · Mistral AI</span>
+      <p>First sparse MoE at scale. Replace each dense FFN with 8 expert FFNs and a router that picks top-2 per token. ~46.7B stored, ~12.9B active.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">MoE (8 experts, top-2)</span>
+        <span class="arch-delta-tag">Router gating</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- ─── 07: DeepSeek V2 & V3 ─── -->
+  <a class="arch-card fade-in" data-chapter="06-deepseek" href="06-deepseek/">
+    <div class="arch-img-wrap">
+      <img src="images/deepseek-v3.png" alt="DeepSeek V2 and V3">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 07 — MLA + DEEPSEEKMOE</span>
+      <h2>DeepSeek V2 &amp; V3</h2>
+      <span class="arch-year">2024 · DeepSeek</span>
+      <p>V2 introduces MLA and DeepSeekMoE (236B, 21B active). V3 scales to 671B with auxiliary-loss-free routing, MTP, and FP8 training.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">MLA (V2)</span>
+        <span class="arch-delta-tag">DeepSeekMoE</span>
+        <span class="arch-delta-tag">Aux-loss-free (V3)</span>
+        <span class="arch-delta-tag">MTP + FP8 (V3)</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- ─── 08: PaliGemma ─── -->
+  <a class="arch-card fade-in" data-chapter="15-paligemma" href="15-paligemma/">
+    <div class="arch-img-wrap">
+      <img src="images/paligemma-3b.webp" alt="PaliGemma">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 08 — OPEN VLM</span>
+      <h2>PaliGemma</h2>
+      <span class="arch-year">2024 · Google DeepMind</span>
+      <p>SigLIP vision encoder + LinearProjector + Gemma decoder. Image patch tokens prepended as prefix; generative VLM via next-token prediction.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">All patches kept</span>
+        <span class="arch-delta-tag">LinearProjector</span>
+        <span class="arch-delta-tag">Visual prefix LM</span>
+        <span class="arch-delta-tag">Weight tying</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- ─── 09: Qwen3-Next — series finale ─── -->
+  <a class="arch-card fade-in" data-chapter="10-qwen3-next" href="10-qwen3-next/">
+    <div class="arch-img-wrap">
+      <img src="images/qwen3-next-80b-a3b.webp" alt="Qwen3-Next architecture">
+    </div>
+    <div class="arch-content">
+      <span class="arch-num">STOP 09 — SERIES FINALE</span>
+      <h2>Qwen3-Next 80B-A3B</h2>
+      <span class="arch-year">2025 · Alibaba</span>
+      <p>80B total / 3B active. Hybrid 3:1 Gated DeltaNet + Gated Attention. High-sparsity MoE + shared expert. MTP. 256K context.</p>
+      <div class="arch-deltas">
+        <span class="arch-delta-tag">Gated DeltaNet 3:1</span>
+        <span class="arch-delta-tag">Multi-token prediction</span>
+        <span class="arch-delta-tag">Partial RoPE</span>
+        <span class="arch-delta-tag">Hybrid attention</span>
+      </div>
+    </div>
+  </a>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+});
+</script>
+<script>
+// Apply chapter release control — hide chapters not yet in LIVE_CHAPTERS
+document.querySelectorAll('.arch-card[data-chapter]').forEach(card => {
+  if (!LIVE_CHAPTERS.includes(card.dataset.chapter)) {
+    card.style.display = 'none';
+  }
+});
+</script>
+<script>
+/* Dark / light mode toggle — reads/writes localStorage key 'tcw-theme' */
+(function(){
+  var btn  = document.getElementById('themeToggle');
+  var root = document.documentElement;
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      root.removeAttribute('data-theme');
+      localStorage.setItem('tcw-theme','dark');
+    } else {
+      root.setAttribute('data-theme','light');
+      localStorage.setItem('tcw-theme','light');
+    }
+  });
+})();
+</script>
+</body>
+</html>

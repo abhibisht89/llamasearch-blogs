@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Building a Simple Convolutional Neural Network (CNN) with PyTorch — The Archives · llamasearch</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+  --bg-nav: rgba(10,10,15,0.92); --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0;
+  --accent: #6c8cff; --accent2: #a78bfa; --accent3: #34d399;
+  --accent5: #fbbf24; --radius: 12px;
+  --mono: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+/* ── Light mode overrides ─── */
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans);
+       line-height: 1.8; font-size: 16px; overflow-x: hidden; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; color: var(--accent2); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.25; color: var(--text); }
+h1 { font-size: clamp(1.8rem,4vw,2.8rem); }
+h2 { font-size: 1.5rem; margin: 2em 0 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin: 1.8em 0 0.4em; }
+h4 { font-size: 1rem; margin: 1.4em 0 0.3em; color: var(--text); }
+p  { margin-bottom: 1em; color: var(--text-dim); }
+p strong, p em, li strong { color: var(--text); }
+ul,ol { margin: 0 0 1em 1.4em; color: var(--text-dim); }
+li { margin-bottom: 0.35em; }
+hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+pre { background: var(--bg-card-alt); border: 1px solid var(--border);
+      border-radius: 8px; padding: 18px 20px; overflow-x: auto;
+      font-family: var(--mono); font-size: 0.85rem; line-height: 1.6;
+      color: var(--text); margin: 1.2em 0; }
+code { font-family: var(--mono); background: var(--bg-card-alt);
+       padding: 2px 6px; border-radius: 4px; font-size: 0.88em;
+       color: var(--accent); }
+pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+blockquote { border-left: 3px solid var(--accent); padding: 12px 20px;
+             background: rgba(108,140,255,0.06); border-radius: 0 8px 8px 0;
+             margin: 1.2em 0; color: var(--text-dim); font-style: italic; }
+figure img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); }
+figcaption { font-size: 0.82rem; color: var(--text-dim); text-align: center; margin-top: 8px; }
+table { width: 100%; border-collapse: collapse; margin: 1.2em 0; font-size: 0.9rem; }
+th { background: var(--bg-card-alt); color: var(--text);
+     padding: 10px 14px; text-align: left; border: 1px solid var(--border); }
+td { padding: 9px 14px; border: 1px solid var(--border); color: var(--text-dim); }
+.container { max-width: 820px; margin: 0 auto; padding: 0 24px; }
+/* breadcrumb */
+.breadcrumb-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: var(--bg-nav); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); padding: 12px 24px;
+  font-size: 0.85rem; border-bottom: 1px solid var(--border);
+  font-family: var(--sans);
+}
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px; }
+/* hero */
+.hero { padding: 80px 24px 40px; }
+.hero .meta { font-family: var(--mono); font-size: 0.78rem;
+              color: var(--text-dim); margin-bottom: 14px; letter-spacing: 0.5px; }
+.hero h1 { margin-bottom: 0; }
+/* post body */
+.post-body { padding: 40px 24px 60px; }
+/* prev/next nav */
+.post-nav { display: flex; justify-content: space-between; gap: 16px;
+            padding: 24px 24px 48px; max-width: 820px; margin: 0 auto;
+            border-top: 1px solid var(--border); }
+.post-nav a { font-size: 0.88rem; color: var(--text-dim); }
+.post-nav a:hover { color: var(--accent); }
+@media (max-width: 600px) {
+  .hero { padding: 70px 16px 28px; }
+  .post-body { padding: 24px 16px 48px; }
+}
+
+/* ── Theme toggle ── */
+.theme-toggle {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 8px; cursor: pointer;
+  color: var(--text-dim); display: flex; align-items: center;
+  transition: border-color .2s, color .2s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun  { display: block; }
+/* Make breadcrumb nav a flex row so toggle sits on the right */
+.breadcrumb-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+</style>
+<script>
+/* Apply saved theme before paint to avoid flash */
+(function(){
+  var t = localStorage.getItem('tcw-theme');
+  if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+})();
+</script>
+</head>
+<body>
+
+<nav class="breadcrumb-nav">
+  <a href="../../../">The Context Window</a>
+  <span class="bc-sep">/</span>
+  <a href="../../">The Archives</a>
+  <span class="bc-sep">/</span>
+  <a href="../">2023</a>
+  <span class="bc-sep">/</span>
+  <span class="bc-current">Building a Simple Convolutional Neural Networ</span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+    <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg class="icon-sun"  viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  </button>
+</nav>
+
+<header class="hero container">
+  <div class="meta">Jun 06, 2023</div>
+  <h1>Building a Simple Convolutional Neural Network (CNN) with PyTorch</h1>
+</header>
+
+<article class="post-body container">
+<figure class="wp-block-image size-large"><img src="https://myl2ma.wordpress.com/wp-content/uploads/2025/02/d7e1f-1681909419729.jpeg?w=1024" alt="" class="wp-image-2048" /></figure>
+
+<p>In the world of deep learning, Convolutional Neural Networks (CNNs) have revolutionized computer vision tasks, including image classification. In this blog post, we will explore how to code a simple CNN using the PyTorch framework. By the end of this tutorial, you'll have a basic understanding of building and training a CNN.</p>
+
+<p>Let's start by importing the necessary libraries:</p>
+
+<pre class="wp-block-code"><code>import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torchvision import datasets
+from torchvision import transforms
+</code></pre>
+
+<p>We will be using the <code><strong>torch</strong></code> library for creating and training the neural network, as well as the <code><strong>torchvision</strong></code> library for loading the MNIST dataset.</p>
+
+<p class="has-medium-font-size"><strong>Creating the CNN Architecture</strong></p>
+
+<p>In this example, we will create a CNN with two convolutional layers, followed by max pooling, and a fully connected layer for classification.</p>
+
+<pre class="wp-block-code"><code>class CNN(nn.Module):
+    
+    def __init__(self, in_channels=1, num_classes=10):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.pool = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+        self.fc1 = nn.Linear(16 * 7 * 7, num_classes)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.pool(x)
+        x = F.relu(self.conv2(x))
+        x = self.pool(x)
+        x = x.reshape(x.shape&#091;0], -1)
+        x = self.fc1(x)
+        return x
+</code></pre>
+
+<p>The <code>CNN</code> class extends the <code><strong>nn.Module</strong></code> class, which is the base class for all neural network modules in PyTorch. We define the layers of our CNN in the <strong><code>__init__</code> </strong>method, and the forward pass operation is implemented in the <code><strong>forward</strong></code> method. Our CNN consists of two convolutional layers, each followed by a max pooling layer. Finally, we have a fully connected layer for classification.</p>
+
+<p><strong>Setting Up the Environment</strong> <strong>and</strong> <strong>hyperparameters</strong></p>
+
+<p>Before we proceed, we need to set up some environment configurations. We will define the device on which the network will be trained, whether it is a GPU or CPU. We will also set some hyperparameters for training the network.</p>
+
+<pre class="wp-block-code"><code># Set device
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+# Hyperparameters
+input_size = 784
+num_classes = 10
+learning_rate = 0.001
+batch_size = 64
+num_epochs = 2</code></pre>
+
+<p>Here, we check for the availability of a GPU and assign the appropriate device. We also specify the hyperparameters, including the input size, number of classes, learning rate, batch size, and number of epochs. The MNIST dataset is loaded using the <code><strong>datasets.MNIST</strong></code> class from torchvision and transformed into tensors.</p>
+
+<p class="has-large-font-size"><strong>Loading the Dataset</strong></p>
+
+<p>Next, we will load the MNIST dataset. PyTorch provides a convenient API to download and load common datasets like MNIST.</p>
+
+<pre class="wp-block-code"><code># Load the dataset
+train_dataset = datasets.MNIST(root='datasets/', train=True, transform=transforms.ToTensor(), download=True)
+train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+
+test_dataset = datasets.MNIST(root='datasets/', train=False, transform=transforms.ToTensor(), download=True)
+test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True)
+</code></pre>
+
+<p>We create two <code><strong>Dataset</strong></code> objects for training and testing, specifying the root directory for storing the dataset, whether it is for training or testing, and the transformation to be applied to the data (converting images to tensors). We also create two <code>DataLoader</code> objects, which allow us to iterate over the dataset in batches. The <code><strong>batch_size</strong></code> parameter determines the number of samples to be included in each batch, and <code><strong>shuffle=True</strong></code> shuffles the dataset before each epoch to ensure randomness in the training process.</p>
+
+<p class="has-large-font-size"><strong>Initializing the Network, Loss Function, and Optimizer</strong></p>
+
+<p>Now, we will initialize our neural network model, define the loss function, and choose an optimizer for training the network.</p>
+
+<pre class="wp-block-preformatted"># Initialize the network
+model = CNN().to(device)
+# Loss function and optimizer
+loss_fn = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)</pre>
+
+<p>We create an instance of our <code>CNN</code> class and move it to the chosen device using the <code><strong>.to(device)</strong></code> method. This ensures that the computations will be performed on either a GPU or CPU, depending on the availability. We use the <code><strong>nn.CrossEntropyLoss()</strong></code> function as our loss function since we are dealing with a classification task. The <code><strong>optim.Adam()</strong></code> function is used to initialize the Adam optimizer, which will update the weights of our model during training.</p>
+
+<p class="has-large-font-size"><strong>Training the Network</strong></p>
+
+<p>Now, let's train our CNN by iterating over the dataset for the specified number of epochs, performing forward and backward passes, and updating the model's weights.</p>
+
+<pre class="wp-block-code"><code># Train the network
+for epoch in range(num_epochs):
+    for batch_idx, (data, targets) in enumerate(train_loader):
+        # Get data to the device
+        data = data.to(device)
+        targets = targets.to(device)
+
+        # Forward pass
+        scores = model(data)
+        loss = loss_fn(scores, targets)
+
+        # Backward pass and optimization
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()</code></pre>
+
+<p>Within each epoch, we iterate over the batches in the training data. We move the data and targets to the device. Then, we compute the forward pass by passing the data through our CNN model and calculate the loss. Next, we perform the backward pass to compute the gradients of the loss with respect to the model's parameters. Finally, we update the model's parameters using the optimizer's <code><strong>step()</strong></code> method.</p>
+
+<p class="has-large-font-size"><strong>Evaluating the Model</strong></p>
+
+<p>After training the network, we want to evaluate its performance on both the training and testing datasets.</p>
+
+<pre class="wp-block-code"><code># Check accuracy on both train and test sets
+def check_accuracy(loader, model):
+    if loader.dataset.train:
+        print("Checking accuracy on the train dataset...")
+    else:
+        print("Checking accuracy on the test dataset...")
+
+    num_correct = 0
+    num_samples = 0
+    model.eval()
+
+    with torch.no_grad():
+        for x, y in loader:
+            x = x.to(device)
+            y = y.to(device)
+
+            scores = model(x)
+            _, preds = scores.max(1)
+            num_correct += (preds == y).sum()
+            num_samples += preds.size(0)
+
+        accuracy = float(num_correct) / float(num_samples) * 100
+        print("Accuracy: {:.2f}%".format(accuracy))
+
+    model.train()
+    return
+
+# Check accuracy on both train and test datasets
+check_accuracy(train_loader, model)
+check_accuracy(test_loader, model)
+
+</code></pre>
+
+<p>The <code><strong>check_accuracy</strong></code> function takes a data loader and a model as input and calculates the accuracy of the model's predictions on the given dataset. We iterate over the dataset, move the data to the device, reshape it, obtain the predicted scores from the model, calculate the number of correct predictions, and calculate the overall accuracy. The model is set to evaluation mode (<code><strong>model.eval()</strong></code>) to disable gradient computation and speed up inference.</p>
+
+<p class="has-large-font-size"><strong>Conclusion</strong></p>
+
+<p>Congratulations! You've successfully coded a simple Convolutional Neural Network using the PyTorch framework. We've covered the steps from defining the network architecture to training and evaluating the model. By understanding this example, you now have a solid foundation to build more complex CNN models and tackle various computer vision tasks.</p>
+
+<p>Feel free to experiment with different architectures, hyperparameters, and datasets to enhance your understanding and create more powerful CNNs. The possibilities are endless!</p>
+
+<p><strong>Happy coding</strong> and keep exploring the fascinating world of deep learning with PyTorch! 🚀🔬🤖</p>
+
+<p><strong>References:</strong><br>https://pytorch.org/<br>https://pytorch.org/tutorials/<br>https://www.youtube.com/watch?v=Jy4wM2X21u0&amp;list=PLhhyoLH6IjfxeoooqP9rhU3HJIAVAJ3Vz&amp;index=4&amp;ab_channel=AladdinPersson</p>
+
+<p></p>
+
+<p></p>
+
+<p></p>
+</article>
+
+<div class="post-nav">
+  <a href="../building-a-simple-neural-network-with-pytorch/">← Building a Simple Neural Network with PyTorch</a>
+  <a href="../building-a-simple-rnn-with-pytorch-a-step-by-step-guide/">Building a Simple RNN with PyTorch: A Step-by-Step Guid →</a>
+</div>
+
+
+
+<!-- ── Share ──────────────────────────────────────────────────────────────── -->
+<section class="share-section">
+  <p class="share-label">Share this post</p>
+  <div class="share-buttons">
+
+    <a class="share-btn share-x" id="share-x" href="#" target="_blank" rel="noopener">
+      <!-- Twitter icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      Twitter
+    </a>
+
+    <a class="share-btn share-reddit" id="share-reddit" href="#" target="_blank" rel="noopener">
+      <!-- Reddit icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+      </svg>
+      Reddit
+    </a>
+
+    <a class="share-btn share-linkedin" id="share-linkedin" href="#" target="_blank" rel="noopener">
+      <!-- LinkedIn icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.37V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.59 0 4.26 2.36 4.26 5.44v6.3zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.46C23.2 24 24 23.23 24 22.27V1.73C24 .77 23.2 0 22.23 0z"/>
+      </svg>
+      LinkedIn
+    </a>
+
+    <a class="share-btn share-facebook" id="share-facebook" href="#" target="_blank" rel="noopener">
+      <!-- Facebook icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+      </svg>
+      Facebook
+    </a>
+
+  </div>
+</section>
+
+<style>
+/* ── Share section ───────────────────────────────────────────────────────── */
+.share-section {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 24px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+.share-label {
+  font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8888a0;
+  margin-bottom: 14px;
+}
+.share-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  text-decoration: none;
+  border: 1px solid var(--border, #2a2a3a);
+  background: var(--bg-card, #12121a);
+  color: var(--text-dim, #8888a0);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+.share-btn svg {
+  width: 15px; height: 15px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+.share-btn:hover { text-decoration: none; }
+.share-x:hover       { border-color: var(--text, #e0e0e8); color: var(--text, #e0e0e8); }
+.share-reddit:hover  { border-color: #ff4500; color: #ff4500; }
+.share-linkedin:hover{ border-color: #0a66c2; color: #0a66c2; }
+.share-facebook:hover{ border-color: #1877f2; color: #1877f2; }
+</style>
+
+<script>
+/* Set share URLs using the current page URL and title */
+(function() {
+  var url   = encodeURIComponent(window.location.href);
+  var title = encodeURIComponent(document.title);
+  document.getElementById('share-x').href        = 'https://twitter.com/intent/tweet?url=' + url + '&text=' + title;
+  document.getElementById('share-reddit').href   = 'https://reddit.com/submit?url=' + url + '&title=' + title;
+  document.getElementById('share-linkedin').href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + url;
+  document.getElementById('share-facebook').href = 'https://www.facebook.com/sharer/sharer.php?u=' + url;
+})();
+</script>
+
+<!-- ── Comments ──────────────────────────────────────────────────────────── -->
+<section class="comments-section">
+  <h2>Comments</h2>
+  <script src="https://utteranc.es/client.js"
+          repo="abhibisht89/llamasearch-blogs"
+          issue-term="pathname"
+          label="💬 comment"
+          theme="github-dark"
+          crossorigin="anonymous"
+          async>
+  </script>
+</section>
+
+<style>
+/* ── Comments section styling ────────────────────────────────────────────── */
+.comments-section {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+.comments-section h2 {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8888a0;
+  margin-bottom: 24px;
+}
+/* Make the utterances iframe blend with the dark background */
+.utterances {
+  max-width: 100% !important;
+}
+</style>
+
+<script>
+/* Dark / light mode toggle — reads/writes localStorage key 'tcw-theme' */
+(function(){
+  var btn  = document.getElementById('themeToggle');
+  var root = document.documentElement;
+
+  /* Send theme to Utterances iframe */
+  function syncUtterances(theme) {
+    var frame = document.querySelector('.utterances-frame');
+    if (!frame) return;
+    frame.contentWindow.postMessage(
+      { type: 'set-theme', theme: theme === 'light' ? 'github-light' : 'github-dark' },
+      'https://utteranc.es'
+    );
+  }
+
+  /* When Utterances finishes loading it sends a resize message — use that
+     to set the correct theme in case the page loaded in light mode */
+  window.addEventListener('message', function(e) {
+    if (e.origin === 'https://utteranc.es') {
+      var isLight = root.getAttribute('data-theme') === 'light';
+      syncUtterances(isLight ? 'light' : 'dark');
+    }
+  });
+
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      root.removeAttribute('data-theme');
+      localStorage.setItem('tcw-theme','dark');
+      syncUtterances('dark');
+    } else {
+      root.setAttribute('data-theme','light');
+      localStorage.setItem('tcw-theme','light');
+      syncUtterances('light');
+    }
+  });
+})();
+</script>
+</body>
+</html>

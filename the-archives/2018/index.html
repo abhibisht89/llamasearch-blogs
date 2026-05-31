@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>2018 — The Archives · llamasearch</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+  --bg-nav: rgba(10,10,15,0.92); --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0;
+  --accent: #6c8cff; --accent2: #a78bfa; --accent3: #34d399;
+  --radius: 14px;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+/* ── Light mode overrides ─── */
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans);
+       line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+
+/* ── Breadcrumb ── */
+.breadcrumb-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: var(--bg-nav); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); padding: 12px 24px;
+  font-size: 0.85rem; border-bottom: 1px solid var(--border);
+  font-family: var(--sans);
+}
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px; }
+
+/* ── Hero ── */
+.hero {
+  padding: 80px 24px 48px; text-align: center;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -200px; left: 50%;
+  transform: translateX(-50%); width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 {
+  font-size: clamp(2.2rem, 5vw, 3.2rem); font-weight: 800;
+  margin-bottom: 10px; letter-spacing: -0.5px;
+}
+.hero .sub {
+  font-size: 0.9rem; color: var(--text-dim);
+  font-family: var(--mono); letter-spacing: 0.5px;
+}
+
+/* ── Blog cards — same as series chapter indexes ── */
+.blog-grid {
+  display: grid; gap: 14px;
+  padding: 32px 24px 100px;
+  max-width: 900px; margin: 0 auto;
+}
+.blog-card {
+  display: flex; align-items: center; gap: 20px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 24px;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  text-decoration: none; color: inherit;
+}
+.blog-card:hover {
+  border-color: var(--accent); transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(108,140,255,0.1); text-decoration: none;
+}
+.card-num {
+  font-family: var(--mono); font-size: 1.3rem; font-weight: 700;
+  color: var(--accent); min-width: 48px; height: 48px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(108,140,255,0.1); border-radius: 10px; flex-shrink: 0;
+}
+.card-content h3 { font-size: 1.05rem; color: var(--text); margin-bottom: 4px; }
+.card-date {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim);
+}
+@media (max-width: 600px) {
+  .blog-card { padding: 16px; gap: 14px; }
+  .card-num { font-size: 1rem; min-width: 40px; height: 40px; }
+  .card-content h3 { font-size: 0.95rem; }
+}
+
+/* ── Theme toggle ── */
+.theme-toggle {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 8px; cursor: pointer;
+  color: var(--text-dim); display: flex; align-items: center;
+  transition: border-color .2s, color .2s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun  { display: block; }
+/* Make breadcrumb nav a flex row so toggle sits on the right */
+.breadcrumb-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+</style>
+<script>
+/* Apply saved theme before paint to avoid flash */
+(function(){
+  var t = localStorage.getItem('tcw-theme');
+  if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+})();
+</script>
+</head>
+<body>
+<nav class="breadcrumb-nav">
+  <a href="../../">The Context Window</a>
+  <span class="bc-sep">/</span>
+  <a href="../">The Archives</a>
+  <span class="bc-sep">/</span>
+  <span class="bc-current">2018</span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+    <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg class="icon-sun"  viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  </button>
+</nav>
+<div class="hero">
+  <h1>2018</h1>
+  <p class="sub">53 posts</p>
+</div>
+<div class="blog-grid">
+  <a class="blog-card" href="some-key-learning-information-in-machine-learning/">
+    <div class="card-num">01</div>
+    <div class="card-content">
+      <h3>Some key learning information in machine learning</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="an-ai-bot-just-beat-another-pro-game-player-heres-why-thats/">
+    <div class="card-num">02</div>
+    <div class="card-content">
+      <h3>An AI Bot Just Beat Another Pro Game Player. Here's Why That's A Big Deal.</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="the-building-blocks-of-ai/">
+    <div class="card-num">03</div>
+    <div class="card-content">
+      <h3>The Building Blocks of AI:</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="a-complete-tutorial-to-learn-data-science-with-python-from-s/">
+    <div class="card-num">04</div>
+    <div class="card-content">
+      <h3>A Complete Tutorial to Learn Data Science with Python from Scratch</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="must-read-path-breaking-papers-about-image-classification/">
+    <div class="card-num">05</div>
+    <div class="card-content">
+      <h3>Must-read Path-breaking Papers About Image Classification:</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="keras-tutorial-deep-learning-in-python/">
+    <div class="card-num">06</div>
+    <div class="card-content">
+      <h3>Keras Tutorial: Deep Learning in Python</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="natural-language-processing-key-terms-explained/">
+    <div class="card-num">07</div>
+    <div class="card-content">
+      <h3>Natural Language Processing Key Terms, Explained:</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="a-github-repository-that-all-you-need-to-start-working-with/">
+    <div class="card-num">08</div>
+    <div class="card-content">
+      <h3>A GitHub repository that all you need to start working with Machine Learning:</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="machine-learning-crash-course/">
+    <div class="card-num">09</div>
+    <div class="card-content">
+      <h3>Machine Learning Crash Course</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="machine-learning-methods/">
+    <div class="card-num">10</div>
+    <div class="card-content">
+      <h3>Machine learning methods:</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="building-a-neural-network-from-scratch/">
+    <div class="card-num">11</div>
+    <div class="card-content">
+      <h3>Building a Neural Network from Scratch:</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="what-is-dropout-in-neural-networks/">
+    <div class="card-num">12</div>
+    <div class="card-content">
+      <h3>What is Dropout in Neural Networks?</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="transfer-learning-dont-try-to-be-a-hero/">
+    <div class="card-num">13</div>
+    <div class="card-content">
+      <h3>Transfer Learning ("DON'T TRY TO BE A HERO")</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="facebook-messenger-botpythonflaskwitaifacebook-messenger-pla/">
+    <div class="card-num">14</div>
+    <div class="card-content">
+      <h3>Facebook messenger bot(Python,Flask,Wit.ai,Facebook Messenger Platform)</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="railbota-bot-to-give-you-instant-information-about-your-pnr/">
+    <div class="card-num">15</div>
+    <div class="card-content">
+      <h3>Railbot(a bot to give you instant information about your PNR status) on facebook messenger</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="deep-learning-key-terms/">
+    <div class="card-num">16</div>
+    <div class="card-content">
+      <h3>Deep Learning Key Terms</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="how-to-start-your-career-as-a-data-scientist/">
+    <div class="card-num">17</div>
+    <div class="card-content">
+      <h3>How to start your career as a data scientist.</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="infographic-learning-plan-2018-for-transitioners-in-data-sci/">
+    <div class="card-num">18</div>
+    <div class="card-content">
+      <h3>Infographic – Learning Plan 2018 for Transitioners in data science</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="there-is-no-secret-ingredient-to-data-analysis-pandas/">
+    <div class="card-num">19</div>
+    <div class="card-content">
+      <h3>There is no secret ingredient! to data analysis : Pandas</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="neural-networks-using-keras-with-image-recognition-case-stud/">
+    <div class="card-num">20</div>
+    <div class="card-content">
+      <h3>Neural Networks using Keras (with Image recognition case study)</h3>
+      <div class="card-date">Jan 12, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="chatbots-walkthrough/">
+    <div class="card-num">21</div>
+    <div class="card-content">
+      <h3>Chatbots Walkthrough:</h3>
+      <div class="card-date">Jan 16, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="what-are-pipelines/">
+    <div class="card-num">22</div>
+    <div class="card-content">
+      <h3>What Are Pipelines</h3>
+      <div class="card-date">Jan 18, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="programming-in-tensorflow-and-keraspre-train-dogs-breed-data/">
+    <div class="card-num">23</div>
+    <div class="card-content">
+      <h3>Programming in TensorFlow and Keras(pre train dog's breed data set)</h3>
+      <div class="card-date">Jan 18, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="what-is-tf-idf/">
+    <div class="card-num">24</div>
+    <div class="card-content">
+      <h3>What is TF-IDF</h3>
+      <div class="card-date">Jan 19, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="how-does-ie-extract-information-from-text/">
+    <div class="card-num">25</div>
+    <div class="card-content">
+      <h3>HOW DOES IE EXTRACT INFORMATION FROM TEXT?</h3>
+      <div class="card-date">Feb 07, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="how-to-compute-tf-idf/">
+    <div class="card-num">26</div>
+    <div class="card-content">
+      <h3>How to Compute tf-idf:</h3>
+      <div class="card-date">Feb 09, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="predict-gender-based-on-first-name/">
+    <div class="card-num">27</div>
+    <div class="card-content">
+      <h3>Predict "Gender" based on "First Name"</h3>
+      <div class="card-date">Mar 24, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="text-summarize-model-demo/">
+    <div class="card-num">28</div>
+    <div class="card-content">
+      <h3>Text summarize model demo</h3>
+      <div class="card-date">Mar 24, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="question-and-answer-system-ir-in-beta/">
+    <div class="card-num">29</div>
+    <div class="card-content">
+      <h3>Question and Answer System (IR) in Beta</h3>
+      <div class="card-date">Mar 24, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="sentiment-classification-with-lstm-in-python-with-keras/">
+    <div class="card-num">30</div>
+    <div class="card-content">
+      <h3>Sentiment classification with LSTM in Python with Keras:</h3>
+      <div class="card-date">Mar 24, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="a-introduction-to-nlp-in-python-with-spacy-feel-the-power-of/">
+    <div class="card-num">31</div>
+    <div class="card-content">
+      <h3>A INTRODUCTION TO NLP IN PYTHON WITH SPACY, "Feel the power of C"</h3>
+      <div class="card-date">Mar 24, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="quick-data-exploration-with-pandas-profiling/">
+    <div class="card-num">32</div>
+    <div class="card-content">
+      <h3>Quick Data Exploration with pandas-profiling:</h3>
+      <div class="card-date">Mar 24, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="your-ai-decoder-ring-a-brief-introduction-to-key-terms/">
+    <div class="card-num">33</div>
+    <div class="card-content">
+      <h3>YOUR AI DECODER RING (A brief introduction to key terms)</h3>
+      <div class="card-date">Mar 24, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="my-data-sciencemachine-learning-job-interview-experience-lis/">
+    <div class="card-num">34</div>
+    <div class="card-content">
+      <h3>My Data Science/Machine Learning Job Interview Experience : List of DS/ML/DL Questions</h3>
+      <div class="card-date">May 26, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="text-classification-using-scikit-learn-sklearn/">
+    <div class="card-num">35</div>
+    <div class="card-content">
+      <h3>Text Classification using Scikit-Learn (sklearn)</h3>
+      <div class="card-date">Jun 17, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="modelling-with-more-variables-than-data-points/">
+    <div class="card-num">36</div>
+    <div class="card-content">
+      <h3>Modelling with more variables than data points</h3>
+      <div class="card-date">Jun 17, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="chi-squared-test-for-machine-learning/">
+    <div class="card-num">37</div>
+    <div class="card-content">
+      <h3>Chi-Squared Test for Machine Learning:</h3>
+      <div class="card-date">Jun 17, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="teach-kids-programming-and-computer-science/">
+    <div class="card-num">38</div>
+    <div class="card-content">
+      <h3>Teach Kids Programming and Computer Science</h3>
+      <div class="card-date">Jun 17, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="what-is-type-i-vs-type-ii-error/">
+    <div class="card-num">39</div>
+    <div class="card-content">
+      <h3>What is Type I vs Type II error</h3>
+      <div class="card-date">Jun 17, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="simple-random-sample-and-a-stratified-random-sample/">
+    <div class="card-num">40</div>
+    <div class="card-content">
+      <h3>Simple random sample and a stratified random sample</h3>
+      <div class="card-date">Jun 17, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="where-can-i-get-datasets-for-practice/">
+    <div class="card-num">41</div>
+    <div class="card-content">
+      <h3>Where can I get datasets for practice?</h3>
+      <div class="card-date">Jun 17, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="python-practice-for-beginner/">
+    <div class="card-num">42</div>
+    <div class="card-content">
+      <h3>Python practice for beginner:</h3>
+      <div class="card-date">Jun 18, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="taxonomy-of-principal-distances/">
+    <div class="card-num">43</div>
+    <div class="card-content">
+      <h3>Taxonomy of principal distances</h3>
+      <div class="card-date">Jun 25, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="take-the-learn-python-challenge-june-11-17/">
+    <div class="card-num">44</div>
+    <div class="card-content">
+      <h3>Take the Learn Python Challenge June 11-17:</h3>
+      <div class="card-date">Jun 25, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="creating-word-vectors-with-word2vec-and-reduce-dimensionalit/">
+    <div class="card-num">45</div>
+    <div class="card-content">
+      <h3>Creating Word Vectors with word2vec and reduce dimensionality using TSNE and Visualizing it using Bokeh</h3>
+      <div class="card-date">Jul 04, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="my-first-introduction-with-gan-generative-adversarial-networ/">
+    <div class="card-num">46</div>
+    <div class="card-content">
+      <h3>My first Introduction with GAN ( Generative Adversarial Networks)</h3>
+      <div class="card-date">Aug 21, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="my-first-introduction-with-gan-generative-adversarial-networ/">
+    <div class="card-num">47</div>
+    <div class="card-content">
+      <h3>My first Introduction with GAN  ( Generative Adversarial Networks )</h3>
+      <div class="card-date">Aug 23, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="30-things-you-can-do-with-pandas/">
+    <div class="card-num">48</div>
+    <div class="card-content">
+      <h3>30 things you can do with Pandas</h3>
+      <div class="card-date">Aug 24, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="using-tensorboard-callback-from-keras/">
+    <div class="card-num">49</div>
+    <div class="card-content">
+      <h3>Using Tensorboard callback from Keras</h3>
+      <div class="card-date">Aug 28, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="classification-report-sklearn/">
+    <div class="card-num">50</div>
+    <div class="card-content">
+      <h3>Classification report sklearn</h3>
+      <div class="card-date">Aug 30, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="double-slit-experiment-quantum-mechanics/">
+    <div class="card-num">51</div>
+    <div class="card-content">
+      <h3>Double Slit Experiment Quantum Mechanics</h3>
+      <div class="card-date">Sep 11, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="understanding-how-deep-learning-works/">
+    <div class="card-num">52</div>
+    <div class="card-content">
+      <h3>Understanding how deep learning works:</h3>
+      <div class="card-date">Sep 13, 2018</div>
+    </div>
+  </a>
+  <a class="blog-card" href="why-deep-learning-why-now/">
+    <div class="card-num">53</div>
+    <div class="card-content">
+      <h3>Why deep learning? Why now?</h3>
+      <div class="card-date">Sep 17, 2018</div>
+    </div>
+  </a>
+</div>
+
+
+<script>
+/* Dark / light mode toggle — reads/writes localStorage key 'tcw-theme' */
+(function(){
+  var btn  = document.getElementById('themeToggle');
+  var root = document.documentElement;
+
+  /* Send theme to Utterances iframe */
+  function syncUtterances(theme) {
+    var frame = document.querySelector('.utterances-frame');
+    if (!frame) return;
+    frame.contentWindow.postMessage(
+      { type: 'set-theme', theme: theme === 'light' ? 'github-light' : 'github-dark' },
+      'https://utteranc.es'
+    );
+  }
+
+  /* When Utterances finishes loading it sends a resize message — use that
+     to set the correct theme in case the page loaded in light mode */
+  window.addEventListener('message', function(e) {
+    if (e.origin === 'https://utteranc.es') {
+      var isLight = root.getAttribute('data-theme') === 'light';
+      syncUtterances(isLight ? 'light' : 'dark');
+    }
+  });
+
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      root.removeAttribute('data-theme');
+      localStorage.setItem('tcw-theme','dark');
+      syncUtterances('dark');
+    } else {
+      root.setAttribute('data-theme','light');
+      localStorage.setItem('tcw-theme','light');
+      syncUtterances('light');
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Code a Neural Network in plain NumPy: Part 1 (with no Hidden Layer) — The Archives · llamasearch</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+  --bg-nav: rgba(10,10,15,0.92); --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0;
+  --accent: #6c8cff; --accent2: #a78bfa; --accent3: #34d399;
+  --accent5: #fbbf24; --radius: 12px;
+  --mono: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+/* ── Light mode overrides ─── */
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans);
+       line-height: 1.8; font-size: 16px; overflow-x: hidden; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; color: var(--accent2); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.25; color: var(--text); }
+h1 { font-size: clamp(1.8rem,4vw,2.8rem); }
+h2 { font-size: 1.5rem; margin: 2em 0 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin: 1.8em 0 0.4em; }
+h4 { font-size: 1rem; margin: 1.4em 0 0.3em; color: var(--text); }
+p  { margin-bottom: 1em; color: var(--text-dim); }
+p strong, p em, li strong { color: var(--text); }
+ul,ol { margin: 0 0 1em 1.4em; color: var(--text-dim); }
+li { margin-bottom: 0.35em; }
+hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+pre { background: var(--bg-card-alt); border: 1px solid var(--border);
+      border-radius: 8px; padding: 18px 20px; overflow-x: auto;
+      font-family: var(--mono); font-size: 0.85rem; line-height: 1.6;
+      color: var(--text); margin: 1.2em 0; }
+code { font-family: var(--mono); background: var(--bg-card-alt);
+       padding: 2px 6px; border-radius: 4px; font-size: 0.88em;
+       color: var(--accent); }
+pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+blockquote { border-left: 3px solid var(--accent); padding: 12px 20px;
+             background: rgba(108,140,255,0.06); border-radius: 0 8px 8px 0;
+             margin: 1.2em 0; color: var(--text-dim); font-style: italic; }
+figure img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); }
+figcaption { font-size: 0.82rem; color: var(--text-dim); text-align: center; margin-top: 8px; }
+table { width: 100%; border-collapse: collapse; margin: 1.2em 0; font-size: 0.9rem; }
+th { background: var(--bg-card-alt); color: var(--text);
+     padding: 10px 14px; text-align: left; border: 1px solid var(--border); }
+td { padding: 9px 14px; border: 1px solid var(--border); color: var(--text-dim); }
+.container { max-width: 820px; margin: 0 auto; padding: 0 24px; }
+/* breadcrumb */
+.breadcrumb-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: var(--bg-nav); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); padding: 12px 24px;
+  font-size: 0.85rem; border-bottom: 1px solid var(--border);
+  font-family: var(--sans);
+}
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px; }
+/* hero */
+.hero { padding: 80px 24px 40px; }
+.hero .meta { font-family: var(--mono); font-size: 0.78rem;
+              color: var(--text-dim); margin-bottom: 14px; letter-spacing: 0.5px; }
+.hero h1 { margin-bottom: 0; }
+/* post body */
+.post-body { padding: 40px 24px 60px; }
+/* prev/next nav */
+.post-nav { display: flex; justify-content: space-between; gap: 16px;
+            padding: 24px 24px 48px; max-width: 820px; margin: 0 auto;
+            border-top: 1px solid var(--border); }
+.post-nav a { font-size: 0.88rem; color: var(--text-dim); }
+.post-nav a:hover { color: var(--accent); }
+@media (max-width: 600px) {
+  .hero { padding: 70px 16px 28px; }
+  .post-body { padding: 24px 16px 48px; }
+}
+
+/* ── Theme toggle ── */
+.theme-toggle {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 8px; cursor: pointer;
+  color: var(--text-dim); display: flex; align-items: center;
+  transition: border-color .2s, color .2s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun  { display: block; }
+/* Make breadcrumb nav a flex row so toggle sits on the right */
+.breadcrumb-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+</style>
+<script>
+/* Apply saved theme before paint to avoid flash */
+(function(){
+  var t = localStorage.getItem('tcw-theme');
+  if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+})();
+</script>
+</head>
+<body>
+
+<nav class="breadcrumb-nav">
+  <a href="../../../">The Context Window</a>
+  <span class="bc-sep">/</span>
+  <a href="../../">The Archives</a>
+  <span class="bc-sep">/</span>
+  <a href="../">2020</a>
+  <span class="bc-sep">/</span>
+  <span class="bc-current">Code a Neural Network in plain NumPy: Part 1 </span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+    <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg class="icon-sun"  viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+  </button>
+</nav>
+
+<header class="hero container">
+  <div class="meta">Feb 08, 2020</div>
+  <h1>Code a Neural Network in plain NumPy: Part 1 (with no Hidden Layer)</h1>
+</header>
+
+<article class="post-body container">
+<p></p>
+
+<figure class="wp-block-image size-large is-resized"><img src="https://myl2ma.wordpress.com/wp-content/uploads/2025/02/218bb-ht.jpg?w=700" alt="" class="wp-image-900" width="739" height="554" /></figure>
+
+<h3 id="You-will-learn-to:">You will learn to:</h3>
+
+<div class="wp-block-group"><div class="wp-block-group__inner-container">
+<pre class="wp-block-code"><code>Build the general architecture of a learning algorithm, including:
+Initializing parameters
+Calculating the cost function and its gradient
+Using an optimization algorithm (gradient descent)
+
+Gather all three functions above into a main model function, in the right order.</code></pre>
+</div></div>
+
+<h3>Overview of the Problem set</h3>
+
+<p>Problem Statement: You are given a dataset containing:</p>
+
+<pre class="wp-block-code"><code>- a training set of m_train images labeled as cat (y=1) or non-cat (y=0)
+- a test set of m_test images labeled as cat or non-cat
+- each image is of shape (num_px, num_px, 3) where 3 is for the 3 channels (RGB). Thus, each image is square (height = num_px) and (width = num_px).
+</code></pre>
+
+<p>You will build a simple image-recognition algorithm that can correctly classify pictures as cat or non-cat.</p>
+
+<h3>Show me the code</h3>
+
+<pre class="wp-block-preformatted"><strong>import</strong> <strong>numpy</strong> <strong>as</strong> <strong>np</strong>
+<strong>import</strong> <strong>matplotlib.pyplot</strong> <strong>as</strong> <strong>plt</strong>
+<strong>import</strong> <strong>h5py</strong>
+<strong>import</strong> <strong>scipy</strong>
+<strong>from</strong> <strong>PIL</strong> <strong>import</strong> Image
+<strong>from</strong> <strong>scipy</strong> <strong>import</strong> ndimage
+<strong>from</strong> <strong>lr_utils</strong> <strong>import</strong> load_dataset # for this lib git link is provided
+%<strong>matplotlib</strong> inline</pre>
+
+<p>Let's get more familiar with the dataset.In&nbsp;[183]:</p>
+
+<pre class="wp-block-preformatted"><em># Loading the data (cat/non-cat)</em>
+train_set_x_orig, train_set_y, test_set_x_orig, test_set_y, classes = load_dataset()</pre>
+
+<p>In&nbsp;[28]:</p>
+
+<pre class="wp-block-preformatted">train_set_x_orig.shape</pre>
+
+<p>Out[28]:</p>
+
+<pre class="wp-block-preformatted">(209, 64, 64, 3)</pre>
+
+<p>In&nbsp;[29]:</p>
+
+<pre class="wp-block-preformatted">train_set_y.shape</pre>
+
+<p>Out[29]:</p>
+
+<pre class="wp-block-preformatted">(1, 209)</pre>
+
+<p>In&nbsp;[21]:</p>
+
+<pre class="wp-block-preformatted">classes</pre>
+
+<p>Out[21]:</p>
+
+<pre class="wp-block-preformatted">array([b'non-cat', b'cat'], dtype='|S7')</pre>
+
+<p>In&nbsp;[184]:</p>
+
+<pre class="wp-block-preformatted"><em># Example of a picture</em>
+index = 200
+plt.imshow(train_set_x_orig[index])</pre>
+
+<p>Out[184]:</p>
+
+<pre class="wp-block-preformatted">&lt;matplotlib.image.AxesImage at 0x22c6a3ba240&gt;</pre>
+
+<figure class="wp-block-image size-large"><img src="https://myl2ma.wordpress.com/wp-content/uploads/2025/02/8cc36-image-1.png?w=251" alt="" class="wp-image-894" /></figure>
+
+<h3 id="Exercise:-1">Exercise: 1</h3>
+
+<p>Find the values for:</p>
+
+<ul><li>m_train (number of training examples)</li><li>m_test (number of test examples)</li><li>num_px (= height = width of a training image) Remember that train_set_x_orig is a numpy-array of shape (m_train, num_px, num_px, 3). For instance, you can access m_train by writing train_set_x_orig.shape[0].</li></ul>
+
+<p>In&nbsp;[186]:</p>
+
+<pre class="wp-block-preformatted">m_train = train_set_x_orig.shape[0]
+m_test = test_set_x_orig.shape[0]
+num_px = train_set_x_orig.shape[1]
+
+print ("Number of training examples: m_train = " + str(m_train))
+print ("Number of testing examples: m_test = " + str(m_test))
+print ("Height/Width of each image: num_px = " + str(num_px))
+print ("Each image is of size: (" + str(num_px) + ", " + str(num_px) + ", 3)")
+print ("train_set_x shape: " + str(train_set_x_orig.shape))
+print ("train_set_y shape: " + str(train_set_y.shape))
+print ("test_set_x shape: " + str(test_set_x_orig.shape))
+print ("test_set_y shape: " + str(test_set_y.shape))</pre>
+
+<pre class="wp-block-preformatted">Number of training examples: m_train = 209
+Number of testing examples: m_test = 50
+Height/Width of each image: num_px = 64
+Each image is of size: (64, 64, 3)
+train_set_x shape: (209, 64, 64, 3)
+train_set_y shape: (1, 209)
+test_set_x shape: (50, 64, 64, 3)
+test_set_y shape: (1, 50)</pre>
+
+<h3 id="Exercise:2">Exercise:2</h3>
+
+<p>Standardize and Reshape the training and test data sets so that images of size (num_px, num_px, 3) are flattened into single vectors of shape (num_px ∗ num_px ∗ 3, 1).In&nbsp;[66]:</p>
+
+<pre class="wp-block-preformatted">train_set_x_flatten =train_set_x_orig.reshape(train_set_x_orig.shape[1]*train_set_x_orig.shape[1]*3,train_set_x_orig.shape[0])</pre>
+
+<p>In&nbsp;[67]:</p>
+
+<pre class="wp-block-preformatted">train_set_x_flatten .shape</pre>
+
+<p>Out[67]:</p>
+
+<pre class="wp-block-preformatted">(12288, 209)</pre>
+
+<p>In&nbsp;[54]:</p>
+
+<pre class="wp-block-preformatted">test_set_x_flatten =test_set_x_orig.reshape(test_set_x_orig.shape[1]*test_set_x_orig.shape[1]*3,test_set_x_orig.shape[0])</pre>
+
+<p>In&nbsp;[56]:</p>
+
+<pre class="wp-block-preformatted">test_set_x_flatten.shape</pre>
+
+<p>Out[56]:</p>
+
+<pre class="wp-block-preformatted">(12288, 50)</pre>
+
+<p>To represent color images, the red, green and blue channels (RGB) must be specified for each pixel, and so the pixel value is actually a vector of three numbers ranging from 0 to 255. Let's standardize our dataset.In&nbsp;[69]:</p>
+
+<pre class="wp-block-preformatted">train_set_x = train_set_x_flatten/255.
+test_set_x = test_set_x_flatten/255.</pre>
+
+<h3 id="General-Architecture-of-the-learning-algorithm">General Architecture of the learning algorithm</h3>
+
+<ul><li>Initialize the parameters of the model</li><li>Learn the parameters for the model by minimizing the cost</li><li>Use the learned parameters to make predictions (on the test set)</li><li>Analyse the results and conclude</li></ul>
+
+<h3 id="Building-the-parts-of-our-algorithm">Building the parts of our algorithm</h3>
+
+<p>The main steps for building a Neural Network are: Define the model structure (such as number of input features) Initialize the model's parameters Loop: Calculate current loss (forward propagation) Calculate current gradient (backward propagation) Update parameters (gradient descent) You often build 1-3 separately and integrate them into one function we call model().</p>
+
+<h3 id="Exercise:3">Exercise:3</h3>
+
+<p>Implement sigmoid() function .In&nbsp;[188]:</p>
+
+<pre class="wp-block-preformatted"><strong>def</strong> sigmoid(z):
+    <strong>return</strong> 1/(1+np.exp(-z))</pre>
+
+<p>In&nbsp;[189]:</p>
+
+<pre class="wp-block-preformatted">print ("sigmoid([0, 2]) = " + str(sigmoid(np.array([0,2]))))</pre>
+
+<pre class="wp-block-preformatted">sigmoid([0, 2]) = [0.5        0.88079708]</pre>
+
+<h3 id="Initializing-parameters">Initializing parameters</h3>
+
+<h3 id="Exercise:4">Exercise:4</h3>
+
+<p>Implement parameter initialization. You have to initialize w as a vector of zeros. If you don't know what numpy function to use, look up np.zeros() in the Numpy library's documentation.In&nbsp;[192]:</p>
+
+<pre class="wp-block-preformatted"><strong>def</strong> initialize_with_zeros(dim):
+    w=np.zeros((dim,1))
+    b=0
+    <strong>return</strong> w,b</pre>
+
+<p>In&nbsp;[193]:</p>
+
+<pre class="wp-block-preformatted">dim = 5
+w, b = initialize_with_zeros(dim)
+print ("w = " + str(w))
+print ("b = " + str(b))</pre>
+
+<pre class="wp-block-preformatted">w = [[0.]
+ [0.]
+ [0.]
+ [0.]
+ [0.]]
+b = 0</pre>
+
+<h3 id="Forward-and-Backward-propagation">Forward and Backward propagation</h3>
+
+<h3 id="Exercise:5">Exercise:5</h3>
+
+<p>Implement a function propagate() that computes the cost function and its gradient.In&nbsp;[194]:</p>
+
+<pre class="wp-block-preformatted"><strong>def</strong> propagate(w, b, X, Y):
+    m=X.shape[1]
+    A=sigmoid((np.dot(w.T,X) + b))
+    yloga=np.multiply(Y,np.log(A))
+    ylogaa=np.multiply((1-Y),np.log(1-A))
+    cost=(-1/m)*(np.sum(yloga+ylogaa))
+    dw=(1/m)*(np.dot(X,(A-Y).T))
+    db=(1/m)*(np.sum(A-Y))
+    <strong>assert</strong>(dw.shape == w.shape)
+    <strong>assert</strong>(db.dtype == float)
+    cost = np.squeeze(cost)
+    <strong>assert</strong>(cost.shape == ())
+    grads = {"dw": dw,
+             "db": db}
+    <strong>return</strong> grads, cost</pre>
+
+<p>In&nbsp;[195]:</p>
+
+<pre class="wp-block-preformatted">w, b, X, Y = np.array([[1.],[2.]]), 2., np.array([[1.,2.,-1.],[3.,4.,-3.2]]), np.array([[1,0,1]])
+grads, cost = propagate(w, b, X, Y)
+print ("dw = " + str(grads["dw"]))
+print ("db = " + str(grads["db"]))
+print ("cost = " + str(cost))</pre>
+
+<pre class="wp-block-preformatted">dw = [[0.99845601]
+ [2.39507239]]
+db = 0.001455578136784208
+cost = 5.801545319394553</pre>
+
+<h3 id="Optimization">Optimization</h3>
+
+<p>You have initialized your parameters. You are also able to compute a cost function and its gradient. Now, you want to update the parameters using gradient descent.</p>
+
+<h3 id="Exercise:-6">Exercise: 6</h3>
+
+<p>Write down the optimization function. The goal is to learn w and b by minimizing the cost function J . For a parameter θ ,the update rule is θ=θ−α*dθ ,where α is the learning rate.In&nbsp;[196]:</p>
+
+<pre class="wp-block-preformatted"><strong>def</strong> optimize(w, b, X, Y, num_iterations, learning_rate, print_cost = <strong>False</strong>):
+    costs=[]
+    <strong>for</strong> i <strong>in</strong> range(num_iterations):
+        grads, cost=propagate(w, b, X, Y)
+        
+        dw=grads['dw']
+        db=grads['db']
+        
+        w=w-np.multiply(learning_rate,dw)
+        b=b-np.multiply(learning_rate,db)
+        
+        costs.append(cost)
+        
+        <em># Record the costs</em>
+        <strong>if</strong> i % 100 == 0:
+            costs.append(cost)
+            
+        <em># Print the cost every 100 training iterations</em>
+        <strong>if</strong> print_cost <strong>and</strong> i % 100 == 0:
+            print ("Cost after iteration <strong>%i</strong>: <strong>%f</strong>" %(i, cost))
+    
+    params = {"w": w,
+              "b": b}
+    grads = {"dw": dw,
+             "db": db} 
+    <strong>return</strong> params, grads, costs</pre>
+
+<p>In&nbsp;[197]:</p>
+
+<pre class="wp-block-preformatted">params, grads, costs = optimize(w, b, X, Y, num_iterations= 100, learning_rate = 0.009, print_cost = <strong>False</strong>)
+
+print ("w = " + str(params["w"]))
+print ("b = " + str(params["b"]))
+print ("dw = " + str(grads["dw"]))
+print ("db = " + str(grads["db"]))</pre>
+
+<pre class="wp-block-preformatted">w = [[0.19033591]
+ [0.12259159]]
+b = 1.9253598300845747
+dw = [[0.67752042]
+ [1.41625495]]
+db = 0.21919450454067652</pre>
+
+<h3 id="Exercise:-7">Exercise: 7</h3>
+
+<p>We are able to learned w and b for a dataset X. Now Implement the predict() function.In&nbsp;[147]:</p>
+
+<pre class="wp-block-preformatted"><strong>def</strong> predict(w, b, X):
+    m = X.shape[1]
+    Y_prediction = np.zeros((1,m))
+    A=sigmoid(np.dot(w.T,X)+b)
+    <strong>for</strong> i <strong>in</strong> range(A.shape[1]):
+            <strong>if</strong> A[0,i] &gt; 0.5:
+                Y_prediction[0][i] = 1
+            <strong>else</strong>:
+                Y_prediction[0][i] = 0
+    <strong>assert</strong>(Y_prediction.shape == (1, m))
+    <strong>return</strong> Y_prediction </pre>
+
+<p>In&nbsp;[148]:</p>
+
+<pre class="wp-block-preformatted">w = np.array([[0.1124579],[0.23106775]])
+b = -0.3
+X = np.array([[1.,-1.1,-3.2],[1.2,2.,0.1]])
+print ("predictions = " + str(predict(w, b, X)))</pre>
+
+<pre class="wp-block-preformatted">predictions = [[1. 1. 0.]]</pre>
+
+<h3 id="Merge-all-functions-into-a-model">Merge all functions into a model</h3>
+
+<p>You will now see how the overall model is structured by putting together all the building blocks (functions implemented in the previous parts) together, in the right order.</p>
+
+<p>Exercise: Implement the model function. Use the following notation:</p>
+
+<ul><li>Y_prediction_test for your predictions on the test set</li><li>Y_prediction_train for your predictions on the train set</li><li>w, costs, grads for the outputs of optimize()</li></ul>
+
+<p>In&nbsp;[198]:</p>
+
+<pre class="wp-block-preformatted"><strong>def</strong> model(X_train, Y_train, X_test, Y_test, num_iterations = 2000, learning_rate = 0.5, print_cost = <strong>False</strong>):
+    dim=X_train.shape[0]
+    w,b=initialize_with_zeros(dim)
+    params, grads, costs = optimize(w, b, X_train, Y_train, num_iterations= num_iterations, learning_rate= learning_rate, print_cost= <strong>True</strong>)
+    
+    Y_prediction_train=predict(params["w"], params["b"], X_train)
+    Y_prediction_test=predict(params["w"],params["b"], X_test)
+    
+    print("train accuracy: <strong>{}</strong> %".format(100 - np.mean(np.abs(Y_prediction_train - Y_train)) * 100))
+    print("test accuracy: <strong>{}</strong> %".format(100 - np.mean(np.abs(Y_prediction_test - Y_test)) * 100))
+    
+    d = {"costs": costs,
+         "Y_prediction_test": Y_prediction_test, 
+         "Y_prediction_train" : Y_prediction_train, 
+         "w" : params["w"], 
+         "b" : params["b"],
+         "learning_rate" : learning_rate,
+         "num_iterations": num_iterations}
+    
+    <strong>return</strong> d</pre>
+
+<p>In&nbsp;[203]:</p>
+
+<pre class="wp-block-preformatted">d=model(train_set_x, train_set_y, test_set_x, test_set_y, num_iterations = 2000, learning_rate = 0.005, print_cost = <strong>True</strong>)</pre>
+
+<pre class="wp-block-preformatted">Cost after iteration 0: 0.693147
+Cost after iteration 100: 0.709726
+Cost after iteration 200: 0.657712
+Cost after iteration 300: 0.614611
+Cost after iteration 400: 0.578001
+Cost after iteration 500: 0.546372
+Cost after iteration 6: 0.518331
+Cost after iteration 700: 0.492852
+Cost after iteration 800: 0.469259
+Cost after iteration 900: 0.447139
+Cost after iteration 1000: 0.426262
+Cost after iteration 1100: 0.406617
+Cost after iteration 1200: 0.388723
+Cost after iteration 1300: 0.374678
+Cost after iteration 1400: 0.365826
+Cost after iteration 1500: 0.358532
+Cost after iteration 1600: 0.351612
+Cost after iteration 1700: 0.345012
+Cost after iteration 1800: 0.338704
+Cost after iteration 1900: 0.332664
+train accuracy: 91.38755980861244 %
+test accuracy: 34.0 %</pre>
+
+<p>In&nbsp;[162]:</p>
+
+<pre class="wp-block-preformatted"><em># Plot learning curve (with costs)</em>
+costs = np.squeeze(d['costs'])
+plt.plot(costs)
+plt.ylabel('cost')
+plt.xlabel('iterations (per hundreds)')
+plt.title("Learning rate =" + str(d["learning_rate"]))
+plt.show()</pre>
+
+<figure class="wp-block-image size-large"><img src="https://myl2ma.wordpress.com/wp-content/uploads/2025/02/fa39e-image.png?w=386" alt="" class="wp-image-893" /></figure>
+
+<p>In&nbsp;[165]:</p>
+
+<pre class="wp-block-preformatted">classes</pre>
+
+<p>Out[165]:</p>
+
+<pre class="wp-block-preformatted">array([b'non-cat', b'cat'], dtype='|S7')</pre>
+
+<p>In&nbsp;[175]:</p>
+
+<pre class="wp-block-preformatted"><em># Example of a picture that was wrongly classified.</em>
+index = 2
+plt.imshow(test_set_x[:,index].reshape((num_px, num_px, 3)))
+<em># print ("y = " + str(test_set_y[0,index]) + ", you predicted that it is a \"" + classes[d["Y_prediction_test"][0,index]].decode("utf-8") +  "\" picture.")</em></pre>
+
+<p>Out[175]:</p>
+
+<pre class="wp-block-preformatted">&lt;matplotlib.image.AxesImage at 0x22c6a2d2f60&gt;</pre>
+
+<figure class="wp-block-image size-large"><img src="https://myl2ma.wordpress.com/wp-content/uploads/2025/02/8cc36-image-1.png?w=251" alt="" class="wp-image-895" /></figure>
+
+<p>In&nbsp;[&nbsp;]:</p>
+
+<pre class="wp-block-preformatted">learning_rates = [0.01, 0.001, 0.0001]
+models = {}
+<strong>for</strong> i <strong>in</strong> learning_rates:
+    print ("learning rate is: " + str(i))
+    models[str(i)] = model(train_set_x, train_set_y, test_set_x, test_set_y, num_iterations = 1500, learning_rate = i, print_cost = <strong>False</strong>)
+    print ('<strong>\n</strong>' + "-------------------------------------------------------" + '<strong>\n</strong>')
+
+<strong>for</strong> i <strong>in</strong> learning_rates:
+    plt.plot(np.squeeze(models[str(i)]["costs"]), label= str(models[str(i)]["learning_rate"]))
+
+plt.ylabel('cost')
+plt.xlabel('iterations (hundreds)')
+
+legend = plt.legend(loc='upper center', shadow=<strong>True</strong>)
+frame = legend.get_frame()
+frame.set_facecolor('0.90')
+plt.show()
+</pre>
+
+<pre class="wp-block-preformatted">learning rate is: 0.01
+Cost after iteration 0: 0.693147
+Cost after iteration 100: 2.321788
+Cost after iteration 200: 3.011239
+Cost after iteration 300: 0.483519
+Cost after iteration 400: 1.297533
+Cost after iteration 500: 1.215430
+Cost after iteration 600: 1.135770
+Cost after iteration 700: 0.901737
+Cost after iteration 800: 0.821976
+Cost after iteration 900: 0.791033
+Cost after iteration 1000: 0.762400
+Cost after iteration 1100: 0.736228
+Cost after iteration 1200: 0.711983
+Cost after iteration 1300: 0.689076
+Cost after iteration 1400: 0.667013
+train accuracy: 71.29186602870814 %
+test accuracy: 64.0 %
+
+-------------------------------------------------------
+
+learning rate is: 0.001
+Cost after iteration 0: 0.693147
+Cost after iteration 100: 0.605784
+Cost after iteration 200: 0.589938
+Cost after iteration 300: 0.577890
+Cost after iteration 400: 0.567791
+Cost after iteration 500: 0.559013
+Cost after iteration 600: 0.551207
+Cost after iteration 700: 0.544146
+Cost after iteration 800: 0.537671
+Cost after iteration 900: 0.531668
+Cost after iteration 1000: 0.526054
+Cost after iteration 1100: 0.520764
+Cost after iteration 1200: 0.515752
+Cost after iteration 1300: 0.510979
+Cost after iteration 1400: 0.506416
+train accuracy: 74.16267942583733 %
+test accuracy: 34.0 %
+
+-------------------------------------------------------
+
+learning rate is: 0.0001
+Cost after iteration 0: 0.693147
+Cost after iteration 100: 0.636292
+Cost after iteration 200: 0.630322
+Cost after iteration 300: 0.625487
+Cost after iteration 400: 0.621470
+Cost after iteration 500: 0.618051
+Cost after iteration 600: 0.615075
+Cost after iteration 700: 0.612432
+Cost after iteration 800: 0.610042
+Cost after iteration 900: 0.607850
+Cost after iteration 1000: 0.605814
+Cost after iteration 1100: 0.603904
+Cost after iteration 1200: 0.602098
+Cost after iteration 1300: 0.600377
+Cost after iteration 1400: 0.598731</pre>
+
+<pre class="wp-block-preformatted"><strong>lr_utils.py</strong> code</pre>
+
+<pre class="wp-block-code"><code>import numpy as np
+import h5py
+
+def load_dataset():
+ train_dataset = h5py.File('datasets/train_catvnoncat.h5', "r")
+ train_set_x_orig = np.array(train_dataset&#091;"train_set_x"]&#091;:]) # your train set features
+ train_set_y_orig = np.array(train_dataset&#091;"train_set_y"]&#091;:]) # your train set labels
+ test_dataset = h5py.File('datasets/test_catvnoncat.h5', "r")
+ test_set_x_orig = np.array(test_dataset&#091;"test_set_x"]&#091;:]) # your test set features
+ test_set_y_orig = np.array(test_dataset&#091;"test_set_y"]&#091;:]) # your test set labels
+
+ classes = np.array(test_dataset&#091;"list_classes"]&#091;:]) # the list of classes
+
+ train_set_y_orig = train_set_y_orig.reshape((1, train_set_y_orig.shape&#091;0]))
+ test_set_y_orig = test_set_y_orig.reshape((1, test_set_y_orig.shape&#091;0]))
+
+ return train_set_x_orig, train_set_y_orig, test_set_x_orig, test_set_y_orig, classes</code></pre>
+
+<h3>REFERENCES:</h3>
+
+<p>coursera.org<br>deep learning specialization</p>
+</article>
+
+<div class="post-nav">
+  <span></span>
+  <a href="../code-a-neural-network-in-plain-numpy-part-2-planar-data-clas/">CODE A NEURAL NETWORK IN PLAIN NUMPY Part 2: Planar dat →</a>
+</div>
+
+
+
+<!-- ── Share ──────────────────────────────────────────────────────────────── -->
+<section class="share-section">
+  <p class="share-label">Share this post</p>
+  <div class="share-buttons">
+
+    <a class="share-btn share-x" id="share-x" href="#" target="_blank" rel="noopener">
+      <!-- Twitter icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      Twitter
+    </a>
+
+    <a class="share-btn share-reddit" id="share-reddit" href="#" target="_blank" rel="noopener">
+      <!-- Reddit icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+      </svg>
+      Reddit
+    </a>
+
+    <a class="share-btn share-linkedin" id="share-linkedin" href="#" target="_blank" rel="noopener">
+      <!-- LinkedIn icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.37V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.59 0 4.26 2.36 4.26 5.44v6.3zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.46C23.2 24 24 23.23 24 22.27V1.73C24 .77 23.2 0 22.23 0z"/>
+      </svg>
+      LinkedIn
+    </a>
+
+    <a class="share-btn share-facebook" id="share-facebook" href="#" target="_blank" rel="noopener">
+      <!-- Facebook icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+      </svg>
+      Facebook
+    </a>
+
+  </div>
+</section>
+
+<style>
+/* ── Share section ───────────────────────────────────────────────────────── */
+.share-section {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 24px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+.share-label {
+  font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8888a0;
+  margin-bottom: 14px;
+}
+.share-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  text-decoration: none;
+  border: 1px solid var(--border, #2a2a3a);
+  background: var(--bg-card, #12121a);
+  color: var(--text-dim, #8888a0);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+.share-btn svg {
+  width: 15px; height: 15px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+.share-btn:hover { text-decoration: none; }
+.share-x:hover       { border-color: var(--text, #e0e0e8); color: var(--text, #e0e0e8); }
+.share-reddit:hover  { border-color: #ff4500; color: #ff4500; }
+.share-linkedin:hover{ border-color: #0a66c2; color: #0a66c2; }
+.share-facebook:hover{ border-color: #1877f2; color: #1877f2; }
+</style>
+
+<script>
+/* Set share URLs using the current page URL and title */
+(function() {
+  var url   = encodeURIComponent(window.location.href);
+  var title = encodeURIComponent(document.title);
+  document.getElementById('share-x').href        = 'https://twitter.com/intent/tweet?url=' + url + '&text=' + title;
+  document.getElementById('share-reddit').href   = 'https://reddit.com/submit?url=' + url + '&title=' + title;
+  document.getElementById('share-linkedin').href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + url;
+  document.getElementById('share-facebook').href = 'https://www.facebook.com/sharer/sharer.php?u=' + url;
+})();
+</script>
+
+<!-- ── Comments ──────────────────────────────────────────────────────────── -->
+<section class="comments-section">
+  <h2>Comments</h2>
+  <script src="https://utteranc.es/client.js"
+          repo="abhibisht89/llamasearch-blogs"
+          issue-term="pathname"
+          label="💬 comment"
+          theme="github-dark"
+          crossorigin="anonymous"
+          async>
+  </script>
+</section>
+
+<style>
+/* ── Comments section styling ────────────────────────────────────────────── */
+.comments-section {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+.comments-section h2 {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8888a0;
+  margin-bottom: 24px;
+}
+/* Make the utterances iframe blend with the dark background */
+.utterances {
+  max-width: 100% !important;
+}
+</style>
+
+<script>
+/* Dark / light mode toggle — reads/writes localStorage key 'tcw-theme' */
+(function(){
+  var btn  = document.getElementById('themeToggle');
+  var root = document.documentElement;
+
+  /* Send theme to Utterances iframe */
+  function syncUtterances(theme) {
+    var frame = document.querySelector('.utterances-frame');
+    if (!frame) return;
+    frame.contentWindow.postMessage(
+      { type: 'set-theme', theme: theme === 'light' ? 'github-light' : 'github-dark' },
+      'https://utteranc.es'
+    );
+  }
+
+  /* When Utterances finishes loading it sends a resize message — use that
+     to set the correct theme in case the page loaded in light mode */
+  window.addEventListener('message', function(e) {
+    if (e.origin === 'https://utteranc.es') {
+      var isLight = root.getAttribute('data-theme') === 'light';
+      syncUtterances(isLight ? 'light' : 'dark');
+    }
+  });
+
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      root.removeAttribute('data-theme');
+      localStorage.setItem('tcw-theme','dark');
+      syncUtterances('dark');
+    } else {
+      root.setAttribute('data-theme','light');
+      localStorage.setItem('tcw-theme','light');
+      syncUtterances('light');
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>LLaMA — The Evolving Transformer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+  --bg-nav: rgba(10,10,15,0.92); --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Light mode overrides ── */
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 12px; }
+h2 { font-size: 1.35rem; font-weight: 700; margin: 0 0 16px; color: var(--text); }
+.lead { color: var(--text-dim); font-size: 1.05rem; max-width: 560px; margin: 0 auto; }
+p { color: var(--text-dim); font-size: 0.95rem; margin: 0 0 12px; }
+p:last-child { margin-bottom: 0; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 70vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 72px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.14) 0%, transparent 70%); pointer-events: none; }
+.stats { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+.stat-val { font-size: 2.4rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.82rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.evo-strip { display: flex; align-items: center; justify-content: center; gap: 0; margin: 24px auto; max-width: 700px; flex-wrap: wrap; }
+.evo-node { display: flex; align-items: center; gap: 0; color: inherit; }
+.evo-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg); flex-shrink: 0; }
+.evo-node.active .evo-dot { background: var(--accent); box-shadow: 0 0 12px rgba(108,140,255,0.4); }
+.evo-node.future .evo-dot { border-color: var(--border); border-style: dashed; }
+.evo-label { font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim); margin-left: 6px; white-space: nowrap; }
+.evo-node.active .evo-label { color: var(--accent); }
+.evo-node.future .evo-label { color: var(--border); }
+.evo-arrow { width: 48px; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); margin: 0 6px; flex-shrink: 0; }
+.evo-arrow.future { background: var(--border); border-top: 1px dashed var(--border); height: 0; }
+.code-section { margin: 28px 0; }
+.code-explanation { margin-bottom: 18px; }
+.code-explanation p { color: var(--text-dim); }
+.code-explanation p strong { color: var(--text); }
+.code-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.78rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); margin-left: auto; margin-right: 4px; }
+.code-copy-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-family: var(--sans);
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.code-copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+.code-copy-btn.copied { border-color: var(--accent3); color: var(--accent3); background: rgba(52, 211, 153, 0.08); }
+.code-block { padding: 14px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.52; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; color: inherit; }
+.ln { display: inline-block; width: 34px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 12px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.09); border-left: 2px solid var(--accent); margin-left: -14px; padding-left: 12px; }
+.kw { color: var(--accent4); }
+.fn { color: var(--accent); }
+.arg { color: var(--accent3); }
+.str { color: var(--accent5); }
+.num { color: var(--accent3); }
+.cmt { color: var(--text-dim); font-style: italic; }
+.op { color: var(--accent2); }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; margin: 14px 0; font-family: var(--mono); font-size: 0.92rem; text-align: center; color: var(--text); overflow-x: auto; }
+.config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin: 18px 0; font-size: 0.88rem; }
+.config-item { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.config-item code { font-family: var(--mono); color: var(--accent); font-size: 0.85em; }
+.config-item span { color: var(--text-dim); display: block; margin-top: 4px; font-size: 0.82rem; }
+.chapter-intro { max-width: 900px; margin: 0 auto; padding: 48px 24px 8px; }
+.chapter-intro p { font-size: 1.02rem; line-height: 1.7; margin-bottom: 14px; }
+.chapter-intro p:last-child { margin-bottom: 0; }
+.fade-in { opacity: 0; transform: translateY(18px); transition: all 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: var(--bg-nav); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 600; color: var(--text); }
+.nav-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.nav-links a { color: var(--text-dim); text-decoration: none; font-family: var(--mono); font-size: 0.75rem; padding: 2px 4px; border-radius: 4px; }
+.nav-links a:hover { color: var(--accent); background: rgba(108,140,255,0.1); }
+.footer { text-align: center; padding: 48px 24px 64px; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); }
+.footer a { color: var(--accent); }
+/* no media query needed — layout is already single-column */
+.delta-card { background: rgba(167, 139, 250, 0.06); border: 1px solid rgba(167, 139, 250, 0.2); border-left: 3px solid var(--accent2); border-radius: 0 var(--radius) var(--radius) 0; padding: 18px 22px; margin: 18px 0; }
+.delta-card h4 { color: var(--accent2); font-size: 0.85rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+.delta-card ul { list-style: none; padding: 0; margin: 0; }
+.delta-card li { font-size: 0.88rem; color: var(--text-dim); padding: 4px 0; padding-left: 18px; position: relative; }
+.delta-card li::before { content: 'Δ'; position: absolute; left: 0; color: var(--accent2); font-family: var(--mono); font-size: 0.8rem; }
+.prev-block { margin: 14px 0; }
+.prev-toggle { cursor: pointer; font-size: 0.78rem; font-family: var(--mono); color: var(--text-dim); background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; display: inline-block; transition: color 0.2s; }
+.prev-toggle:hover { color: var(--accent); }
+.prev-content { display: none; margin-top: 10px; }
+.prev-content.show { display: block; }
+.compare-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 20px 0; }
+.compare-table th, .compare-table td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+.compare-table th { background: var(--bg-card-alt); color: var(--text); font-family: var(--mono); font-size: 0.8rem; }
+.compare-table tr:nth-child(even) td { background: rgba(0,0,0,0.12); }
+.compare-table td { color: var(--text-dim); }
+.compare-table td:first-child { color: var(--text); font-weight: 500; }
+.refs-list { list-style: none; padding: 0; margin: 16px 0 0; }
+.refs-list li { font-size: 0.92rem; color: var(--text-dim); padding: 10px 0; border-bottom: 1px solid var(--border); line-height: 1.5; }
+.refs-list li:last-child { border-bottom: none; padding-bottom: 0; }
+.refs-list a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.refs-list a:hover { text-decoration: underline; }
+.refs-list .ref-note { display: block; font-size: 0.82rem; margin-top: 4px; color: var(--text-dim); font-weight: 400; }
+/* Lightbox */
+.lightbox { display: none; position: fixed; inset: 0; z-index: 10001; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); justify-content: center; align-items: center; cursor: zoom-out; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 90vw; max-height: 90vh; border-radius: var(--radius); box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+.arch-thumb { cursor: zoom-in; transition: transform 0.2s; }
+.arch-thumb:hover { transform: scale(1.03); }
+</style>
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--bg-nav); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; flex-wrap: wrap; gap: 2px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: var(--border); }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px !important; }
+/* Theme toggle button */
+.theme-toggle {
+  margin-left: auto;
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px;
+  color: var(--text-dim); cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun  { display: block; }
+
+.code-source-bar {
+  position: fixed;
+  top: 96px;
+  right: 24px;
+  z-index: 90;
+  text-align: right;
+}
+.code-source-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.code-github-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  background: var(--bg);
+  transition: border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.code-github-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+@media (max-width: 720px) {
+  .code-source-bar {
+    position: static;
+    text-align: center;
+    padding: 12px 24px 0;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .code-source-pills { justify-content: center; }
+}
+</style>
+<script>
+/* Apply saved theme before paint to avoid flash */
+(function(){
+  var t = localStorage.getItem('tcw-theme');
+  if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+})();
+</script>
+</head>
+<body>
+<nav class="breadcrumb-nav"><a href="../../../">The Context Window</a><span class="bc-sep">›</span><a href="../">The Evolving Transformer</a><span class="bc-sep">›</span><span class="bc-current">LLaMA</span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"><svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun"  viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+</nav>
+<div class="code-source-bar">
+  <div class="code-source-pills">
+    <a href="https://github.com/abhibisht89/llamasearch-blogs/blob/main/the-evolving-transformer/03-llama/llama.py" target="_blank" rel="noopener" class="code-github-pill">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      llama.py
+    </a>
+  </div>
+</div>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">The Evolving Transformer</a>
+  <div class="nav-links">
+    <a href="#s00">00</a><a href="#s01">01</a><a href="#s02">02</a><a href="#s03">03</a><a href="#s04">04</a><a href="#s05">05</a>
+    <a href="#s06">06</a><a href="#s07">07</a><a href="#s08">08</a>
+    <a href="#s09">09</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <p class="section-num" style="margin-bottom:8px;letter-spacing:3px;">THE EVOLVING TRANSFORMER · 04</p>
+  <h1>LLaMA</h1>
+  <p class="lead">From GPT-2 to modern open LLMs: LLaMA swaps learned positional embeddings for RoPE, LayerNorm for RMSNorm, GELU MLP for SwiGLU, and full multi-head attention for grouped-query attention — all without linear biases. Defaults match <strong>LLaMA 3 8B</strong>, the same size as the architecture diagram on this page.</p>
+  <div class="evo-strip">
+  <a class="evo-node" href="../14-clip/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">CLIP</span></a>
+  <div class="evo-arrow"></div>
+  <span class="evo-node active"><span class="evo-dot"></span><span class="evo-label">LLaMA (you are here)</span></span>
+  <div class="evo-arrow"></div>
+  <a class="evo-node" href="../04-mistral-7b/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">Mistral</span></a>
+  </div>
+  <div class="stats" style="margin-top:8px;">
+    <div><span class="stat-val">4096</span><span class="stat-label">d_model</span></div>
+    <div><span class="stat-val">32</span><span class="stat-label">layers N</span></div>
+    <div><span class="stat-val">GQA</span><span class="stat-label">8 KV · 32 Q</span></div>
+    <div><span class="stat-val">8B</span><span class="stat-label">LLaMA 3</span></div>
+  </div>
+</header>
+
+<main>
+<div class="container" style="padding-bottom:0;">
+  <div style="text-align:center;margin:0 auto 24px;max-width:320px;">
+  <img class="arch-thumb" onclick="openLightbox(this.src)" src="../images/llama-3-8b.webp" alt="LLaMA 3 8B architecture" style="width:100%;border-radius:var(--radius);border:1px solid var(--border);">
+  <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;font-family:var(--mono);">LLaMA 3 8B · decoder stack (32× blocks, GQA 32/8, RoPE, Pre-RMSNorm, SwiGLU)</p>
+  </div>
+</div>
+
+<div class="chapter-intro fade-in">
+  <p>This chapter evolves chapter 02 GPT-2 into LLaMA — the modern decoder-only stack that drops learned positional embeddings for RoPE, swaps LayerNorm for RMSNorm, replaces the GELU MLP with SwiGLU, and uses grouped-query attention instead of full multi-head attention. Hyperparameters follow <strong>LLaMA 3 8B</strong> from Meta, matching the diagram above. Same teaching pattern: one config object up front, then each layer in order until the full model runs.</p>
+  <p>We do not walk through a separate <strong>LLaMA 2</strong> chapter: the block diagram is the same decoder-only Transformer (RoPE, RMSNorm, SwiGLU, pre-norm residuals). <strong>LLaMA 3 is essentially a scaled and refined LLaMA 2</strong> — same backbone, better tokenizer, longer context, and training scale. The code below matches <strong>LLaMA 3</strong> because that is what the 8B defaults and this series use going forward.</p>
+  <p>Each section below is one building block. You get a short explanation, the code for that module, a delta from chapter 02 where it helps, and how it connects to what came before. By the end you have a runnable <code style="font-family:var(--mono);font-size:0.9em;">LLAMA</code> class, not just a diagram.</p>
+</div>
+
+<div class="container" style="padding-top:8px;padding-bottom:0;">
+  <div class="delta-card">
+    <h4>Delta from GPT-2 (02)</h4>
+    <ul>
+      <li>Learned <code>wpe</code> removed → RoPE applied in attention</li>
+      <li>LayerNorm → RMSNorm</li>
+      <li>GELU MLP → SwiGLU</li>
+      <li>MHA → GQA (grouped-query attention)</li>
+      <li>Linear biases removed (<code>bias=False</code> everywhere)</li>
+      <li>No embedding dropout</li>
+    </ul>
+    <p style="margin-top:14px;margin-bottom:0;font-size:0.9rem;color:var(--text-dim);">Full comparisons: <a href="#s08" style="color:var(--accent);">§08</a> (vs GPT-2 and LLaMA 2 lineage).</p>
+  </div>
+</div>
+
+<!-- s00 -->
+<section class="section fade-in" id="s00">
+  <div class="container">
+    <span class="section-num">00 · CONFIG</span>
+    <h2>One config object for the whole model</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Before any module, we define a single <strong><code style="font-family:var(--mono);font-size:0.9em;">LlamaConfig</code></strong> dataclass for <strong>LLaMA 3 8B</strong>. Every class below takes <code style="font-family:var(--mono);font-size:0.9em;">config</code> instead of a long list of constructor arguments — same pattern as chapter 02, with fields adjusted for LLaMA's architecture.</p>
+        <p>LLaMA 3 8B uses d_model=4096, N=32 blocks, H=32 query heads, n_kv_heads=8 (4:1 GQA ratio), vocab=128,256, context length 8,192, and d_ff=14,336 — matching Meta’s Llama-3-8B release (~8.0B parameters with untied embeddings). Unlike GPT-2, there is no dropout field — LLaMA trains without embedding or attention dropout in the reference stack.</p>
+        <div class="callout">
+          <p><strong><code style="font-family:var(--mono);">dk</code> property:</strong> <code style="font-family:var(--mono);">dmodel // H</code> → 4096 // 32 = <strong>128</strong>. Multi-head attention splits d_model across H query heads; d_model must be divisible by H.</p>
+          <p style="margin-top:8px;margin-bottom:0;"><strong><code style="font-family:var(--mono);">dff</code> / <code style="font-family:var(--mono);">n_kv_heads</code>:</strong> <code style="font-family:var(--mono);">dff = 14336</code> — <em>not</em> 4 × dmodel (SwiGLU uses a smaller inner dim than GPT-2's GELU FFN). <code style="font-family:var(--mono);">n_kv_heads = 8</code> gives a <strong>4:1</strong> Q-to-KV ratio (32 query heads share 8 key/value head groups).</p>
+        </div>
+        <p style="margin-top:12px;font-size:0.9rem;color:var(--text-dim);">All values below are <strong style="color:var(--text);">LLaMA 3 8B</strong> — verified against Meta’s published <code style="font-family:var(--mono);font-size:0.85em;">config.json</code> (<code style="font-family:var(--mono);font-size:0.85em;">hidden_size</code>, <code style="font-family:var(--mono);font-size:0.85em;">num_hidden_layers</code>, <code style="font-family:var(--mono);font-size:0.85em;">intermediate_size</code>, etc.). Change <code style="font-family:var(--mono);font-size:0.85em;">LlamaConfig</code> fields to explore other sizes from the LLaMA family.</p>
+        <div class="config-grid">
+          <div class="config-item"><code>dmodel</code><span>4096 — <code style="font-family:var(--mono);font-size:0.9em;">hidden_size</code> (LLaMA 3 8B)</span></div>
+          <div class="config-item"><code>N</code><span>32 — <code style="font-family:var(--mono);font-size:0.9em;">num_hidden_layers</code></span></div>
+          <div class="config-item"><code>H</code><span>32 — <code style="font-family:var(--mono);font-size:0.9em;">num_attention_heads</code></span></div>
+          <div class="config-item"><code>n_kv_heads</code><span>8 — <code style="font-family:var(--mono);font-size:0.9em;">num_key_value_heads</code> (4:1 GQA)</span></div>
+          <div class="config-item"><code>vocabsize</code><span>128,256 — <code style="font-family:var(--mono);font-size:0.9em;">vocab_size</code> (tiktoken tokenizer)</span></div>
+          <div class="config-item"><code>max_seq_len</code><span>8,192 — <code style="font-family:var(--mono);font-size:0.9em;">max_position_embeddings</code> (base 8B)</span></div>
+          <div class="config-item"><code>dff</code><span>14,336 — <code style="font-family:var(--mono);font-size:0.9em;">intermediate_size</code> (not 4 × dmodel)</span></div>
+          <div class="config-item"><code>norm_eps</code><span>1e-5 — <code style="font-family:var(--mono);font-size:0.9em;">rms_norm_eps</code></span></div>
+          <div class="config-item"><code>B</code><span>2 — batch size for demos only (not in official config)</span></div>
+          <div class="config-item"><code>dk</code><span>128 — dmodel // H (head dim)</span></div>
+        </div>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">imports + LlamaConfig</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 1</span><span class="kw">from</span> <span class="arg">dataclasses</span> <span class="kw">import</span> <span class="arg">dataclass</span></span>
+<span class="line"><span class="ln"> 2</span><span class="kw">import</span> <span class="arg">torch</span></span>
+<span class="line"><span class="ln"> 3</span><span class="kw">import</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">nn</span> <span class="kw">as</span> <span class="arg">nn</span></span>
+<span class="line"><span class="ln"> 4</span><span class="kw">import</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">nn</span><span class="op">.</span><span class="arg">functional</span> <span class="kw">as</span> <span class="arg">F</span></span>
+<span class="line"><span class="ln"> 5</span><span class="kw">import</span> <span class="arg">math</span></span>
+<span class="line"><span class="ln"> 6</span></span>
+<span class="line"><span class="ln"> 7</span></span>
+<span class="line"><span class="ln"> 8</span><span class="cmt"># ============================================================</span></span>
+<span class="line"><span class="ln"> 9</span><span class="cmt"># Config — LLaMA 3 8B from Touvron et al., 2023 / Meta, 2024</span></span>
+<span class="line"><span class="ln">10</span><span class="cmt"># d_model=4096, N=32, H=32, n_kv_heads=8, vocab=128256, context=8192, d_ff=14336</span></span>
+<span class="line"><span class="ln">11</span><span class="cmt"># ============================================================</span></span>
+<span class="line"><span class="ln">12</span><span class="op">@</span><span class="fn">dataclass</span></span>
+<span class="line"><span class="ln">13</span><span class="kw">class</span> <span class="fn">LlamaConfig</span><span class="op">:</span></span>
+<span class="line"><span class="ln">14</span>    <span class="arg">dmodel</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">4096</span>           <span class="cmt"># LLaMA 3 8B</span></span>
+<span class="line"><span class="ln">15</span>    <span class="arg">N</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">32</span>                  <span class="cmt"># transformer blocks</span></span>
+<span class="line"><span class="ln">16</span>    <span class="arg">H</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">32</span>                  <span class="cmt"># query heads</span></span>
+<span class="line"><span class="ln">17</span>    <span class="arg">n_kv_heads</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">8</span>          <span class="cmt"># GQA — 4:1 ratio (32 Q / 8 KV)</span></span>
+<span class="line"><span class="ln">18</span>    <span class="arg">vocabsize</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">128256</span>      <span class="cmt"># BPE vocabulary size (LLaMA 3)</span></span>
+<span class="line"><span class="ln">19</span>    <span class="arg">max_seq_len</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">8192</span>      <span class="cmt"># context length</span></span>
+<span class="line"><span class="ln">20</span>    <span class="arg">dff</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">14336</span>             <span class="cmt"># SwiGLU inner dim (not 4 × dmodel)</span></span>
+<span class="line"><span class="ln">21</span>    <span class="arg">norm_eps</span><span class="op">:</span> <span class="arg">float</span> <span class="op">=</span> <span class="num">1e-5</span>       <span class="cmt"># RMSNorm epsilon</span></span>
+<span class="line"><span class="ln">22</span>    <span class="arg">B</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">2</span>                   <span class="cmt"># batch size (for demo runs)</span></span>
+<span class="line"><span class="ln">23</span></span>
+<span class="line"><span class="ln">24</span>    <span class="op">@</span><span class="kw">property</span></span>
+<span class="line"><span class="ln">25</span>    <span class="kw">def</span> <span class="fn">dk</span><span class="op">(</span><span class="arg">self</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">26</span>        <span class="cmt"># per-head dimension — dmodel must be divisible by H</span></span>
+<span class="line"><span class="ln">27</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dmodel</span> <span class="op">//</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span></span>
+<span class="line"><span class="ln">28</span></span>
+<span class="line"><span class="ln">29</span></span>
+<span class="line"><span class="ln">30</span><span class="arg">config</span> <span class="op">=</span> <span class="fn">LlamaConfig</span><span class="op">(</span><span class="op">)</span>  <span class="cmt"># LLaMA 3 8B — shared by every module below</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s01 -->
+<section class="section fade-in" id="s01">
+  <div class="container">
+    <span class="section-num">01 · EMBEDDINGS</span>
+    <h2>Token embedding only — no learned position table</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>LLaMA keeps <strong>wte</strong> — a token embedding table mapping IDs to d_model vectors — but drops GPT-2's <strong>wpe</strong> entirely. Position is not added at the input; instead, <strong>RoPE</strong> (section 02) rotates Q and K inside attention. There is also <strong>no dropout</strong> on the embedding output — LLaMA's reference stack omits the embedding regularisation GPT-2 applies.</p>
+        <p>Chapter 02 summed <code>wte(x) + wpe(pos)</code> then dropped the result. Here the forward pass is simply <code>wte(x)</code> — one lookup, straight into the block stack.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">wte only</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 1</span><span class="cmt"># inside LLAMA.__init__ — token embedding only (no wpe):</span></span>
+<span class="line"><span class="ln"> 2</span><span class="arg">self</span><span class="op">.</span><span class="arg">wte</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Embedding</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">vocabsize</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># wte(x): (B, S, dmodel)</span></span>
+<span class="line"><span class="ln"> 3</span></span>
+<span class="line"><span class="ln"> 4</span><span class="cmt"># inside LLAMA.forward — no positional sum, no dropout:</span></span>
+<span class="line"><span class="ln"> 5</span><span class="arg">_</span><span class="op">,</span> <span class="arg">S</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S)</span></span>
+<span class="line"><span class="ln"> 6</span><span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wte</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) — no wpe; RoPE handles position in attention</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p01')">▼ Show original version</div>
+      <div class="prev-content" id="p01">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">GPT-2 in chapter 02: <strong>wte</strong> + <strong>wpe</strong> summed, then dropped (excerpt from <code>gpt2.py</code>).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">gpt2.py</span><span class="code-lines">wte + wpe</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 1</span><span class="cmt"># inside GPT.__init__ — two learned embedding tables:</span></span>
+<span class="line"><span class="ln"> 2</span><span class="arg">self</span><span class="op">.</span><span class="arg">wte</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Embedding</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">vocabsize</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>    <span class="cmt"># wte(x): (B, S, dmodel)</span></span>
+<span class="line"><span class="ln"> 3</span><span class="arg">self</span><span class="op">.</span><span class="arg">wpe</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Embedding</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># wpe(pos): (S, dmodel)</span></span>
+<span class="line"><span class="ln"> 4</span></span>
+<span class="line"><span class="ln"> 5</span><span class="cmt"># inside GPT.forward — sum and drop:</span></span>
+<span class="line"><span class="ln"> 6</span><span class="arg">_</span><span class="op">,</span> <span class="arg">S</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>                                              <span class="cmt"># x: (B, S)</span></span>
+<span class="line"><span class="ln"> 7</span><span class="arg">pos</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">arange</span><span class="op">(</span><span class="num">0</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">device</span><span class="op">=</span><span class="arg">x</span><span class="op">.</span><span class="arg">device</span><span class="op">)</span>                   <span class="cmt"># (S,)</span></span>
+<span class="line"><span class="ln"> 8</span><span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">drop</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">wte</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wpe</span><span class="op">(</span><span class="arg">pos</span><span class="op">)</span><span class="op">)</span>                  <span class="cmt"># (B, S, dmodel) + (S, dmodel) → (B, S, dmodel)</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s02 -->
+<section class="section fade-in" id="s02">
+  <div class="container">
+    <span class="section-num">02 · RoPE</span>
+    <h2>Rotary positional embeddings in attention</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><strong>RoPE</strong> (Rotary Positional Embedding) encodes position by rotating Q and K vectors in each head's 2D subspaces. Frequencies follow a geometric schedule from base θ=10,000 — same idea as sinusoidal PE, but applied as a rotation matrix rather than an additive table.</p>
+        <p>Cos/sin tables are precomputed for all positions up to <code>max_seq_len</code> and registered as buffers. In <code>forward</code>, even/odd dimensions are paired, rotated, and stacked back — no learned parameters, and the rotation composes naturally for relative position.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">RotaryPositionalEmbedding</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">57</span><span class="kw">class</span> <span class="fn">RotaryPositionalEmbedding</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">58</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">,</span> <span class="arg">base</span><span class="op">:</span> <span class="arg">float</span> <span class="op">=</span> <span class="num">10000.0</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">59</span>        <span class="kw">super</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">__init__</span><span class="op">(</span><span class="op">)</span></span>
+<span class="line"><span class="ln">60</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dk</span></span>
+<span class="line"><span class="ln">61</span>        <span class="arg">freqs</span> <span class="op">=</span> <span class="num">1.0</span> <span class="op">/</span> <span class="op">(</span></span>
+<span class="line"><span class="ln">62</span>            <span class="arg">base</span> <span class="op">**</span> <span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="arg">arange</span><span class="op">(</span><span class="num">0</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="arg">float</span><span class="op">(</span><span class="op">)</span> <span class="op">/</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span></span>
+<span class="line"><span class="ln">63</span>        <span class="op">)</span>  <span class="cmt"># (dk//2,)</span></span>
+<span class="line"><span class="ln">64</span>        <span class="arg">pos</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">arange</span><span class="op">(</span><span class="num">0</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">)</span><span class="op">.</span><span class="arg">float</span><span class="op">(</span><span class="op">)</span>  <span class="cmt"># (max_seq_len,)</span></span>
+<span class="line"><span class="ln">65</span>        <span class="arg">angles</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">outer</span><span class="op">(</span><span class="arg">pos</span><span class="op">,</span> <span class="arg">freqs</span><span class="op">)</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln">66</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">register_buffer</span><span class="op">(</span><span class="str">&quot;cos_cached&quot;</span><span class="op">,</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">cos</span><span class="op">(</span><span class="arg">angles</span><span class="op">)</span><span class="op">)</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln">67</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">register_buffer</span><span class="op">(</span><span class="str">&quot;sin_cached&quot;</span><span class="op">,</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">sin</span><span class="op">(</span><span class="arg">angles</span><span class="op">)</span><span class="op">)</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln">68</span></span>
+<span class="line"><span class="ln">69</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">70</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">H</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">71</span>        <span class="arg">x_even</span> <span class="op">=</span> <span class="arg">x</span><span class="op">[</span><span class="op">.</span><span class="op">.</span><span class="op">.</span><span class="op">,</span> <span class="num">0</span><span class="op">:</span><span class="op">:</span><span class="num">2</span><span class="op">]</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln">72</span>        <span class="arg">x_odd</span> <span class="op">=</span> <span class="arg">x</span><span class="op">[</span><span class="op">.</span><span class="op">.</span><span class="op">.</span><span class="op">,</span> <span class="num">1</span><span class="op">:</span><span class="op">:</span><span class="num">2</span><span class="op">]</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln">73</span>        <span class="arg">cos</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">cos_cached</span><span class="op">[</span><span class="op">:</span><span class="arg">S</span><span class="op">]</span><span class="op">.</span><span class="arg">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><span class="op">.</span><span class="arg">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>  <span class="cmt"># (1, 1, S, dk//2)</span></span>
+<span class="line"><span class="ln">74</span>        <span class="arg">sin</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">sin_cached</span><span class="op">[</span><span class="op">:</span><span class="arg">S</span><span class="op">]</span><span class="op">.</span><span class="arg">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><span class="op">.</span><span class="arg">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>  <span class="cmt"># (1, 1, S, dk//2)</span></span>
+<span class="line"><span class="ln">75</span>        <span class="arg">rotated_even</span> <span class="op">=</span> <span class="arg">x_even</span> <span class="op">*</span> <span class="arg">cos</span> <span class="op">-</span> <span class="arg">x_odd</span> <span class="op">*</span> <span class="arg">sin</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln">76</span>        <span class="arg">rotated_odd</span> <span class="op">=</span> <span class="arg">x_even</span> <span class="op">*</span> <span class="arg">sin</span> <span class="op">+</span> <span class="arg">x_odd</span> <span class="op">*</span> <span class="arg">cos</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln">77</span>        <span class="arg">rotated</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">stack</span><span class="op">(</span><span class="op">[</span><span class="arg">rotated_even</span><span class="op">,</span> <span class="arg">rotated_odd</span><span class="op">]</span><span class="op">,</span> <span class="arg">dim</span><span class="op">=</span><span class="num">-1</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk//2, 2)</span></span>
+<span class="line"><span class="ln">78</span>        <span class="kw">return</span> <span class="arg">rotated</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">H</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s03 -->
+<section class="section fade-in" id="s03">
+  <div class="container">
+    <span class="section-num">03 · RMSNORM</span>
+    <h2>Root-mean-square normalization</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Chapter 01 built <code>LayerNormalization</code> from scratch; chapter 02 switched to PyTorch's <code>nn.LayerNorm</code>. LLaMA goes further with <strong>RMSNorm</strong> — same scale-and-shift idea, but without centering (no mean subtraction). It divides by the root-mean-square of the features plus <code>norm_eps</code>, then multiplies by a learnable <code>gamma</code> vector.</p>
+        <p>RMSNorm is cheaper than LayerNorm (one fewer reduction) and works well with pre-norm stacks at large scale. We implement it explicitly here so you see the math, not just an import.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">RMSNorm</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">33</span><span class="kw">class</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">34</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">35</span>        <span class="kw">super</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">__init__</span><span class="op">(</span><span class="op">)</span></span>
+<span class="line"><span class="ln">36</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">norm_eps</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">norm_eps</span></span>
+<span class="line"><span class="ln">37</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">gamma</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Parameter</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="arg">ones</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span><span class="op">)</span>  <span class="cmt"># (dmodel,)</span></span>
+<span class="line"><span class="ln">38</span></span>
+<span class="line"><span class="ln">39</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">40</span>        <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">41</span>        <span class="arg">rms</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">rsqrt</span><span class="op">(</span><span class="arg">x</span><span class="op">.</span><span class="arg">pow</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="arg">mean</span><span class="op">(</span><span class="arg">dim</span><span class="op">=</span><span class="num">-1</span><span class="op">,</span> <span class="arg">keepdim</span><span class="op">=</span><span class="kw">True</span><span class="op">)</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="arg">norm_eps</span><span class="op">)</span>  <span class="cmt"># (B, S, 1)</span></span>
+<span class="line"><span class="ln">42</span>        <span class="kw">return</span> <span class="arg">x</span> <span class="op">*</span> <span class="arg">rms</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">gamma</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p03')">▼ Show original version</div>
+      <div class="prev-content" id="p03">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">GPT-2 in chapter 02 used PyTorch's built-in <strong>LayerNorm</strong> (mean + variance normalization with learnable weight and bias).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">gpt2.py</span><span class="code-lines">LayerNorm (PyTorch built-in)</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 1</span><span class="cmt"># Drop-in replacement for the educational LayerNormalization class: same math,</span></span>
+<span class="line"><span class="ln"> 2</span><span class="cmt"># fused kernels, and per-feature learnable weight/bias in modern PyTorch.</span></span>
+<span class="line"><span class="ln"> 3</span><span class="arg">ln</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">LayerNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) → (B, S, dmodel)</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s04 -->
+<section class="section fade-in" id="s04">
+  <div class="container">
+    <span class="section-num">04 · SWIGLU</span>
+    <h2>SwiGLU feed-forward — gate, up, down</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>LLaMA replaces GPT-2's two-linear GELU MLP with <strong>SwiGLU</strong>: three matrices (<strong>w1</strong> gate, <strong>w2</strong> up, <strong>w3</strong> down) and the activation <code>silu(w1(x)) * w2(x)</code>. The inner dimension <code>dff</code> is set explicitly in config (14,336 for 8B) — not derived as 4 × d_model.</p>
+        <p>All three linears use <code>bias=False</code>, consistent with LLaMA's bias-free design. No dropout inside the FFN either.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">SwiGLUFeedForward</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">45</span><span class="kw">class</span> <span class="fn">SwiGLUFeedForward</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">46</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">47</span>        <span class="kw">super</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">__init__</span><span class="op">(</span><span class="op">)</span></span>
+<span class="line"><span class="ln">48</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w1</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># (B,S,dmodel) → (B,S,dff) gate</span></span>
+<span class="line"><span class="ln">49</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w2</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># (B,S,dmodel) → (B,S,dff) up</span></span>
+<span class="line"><span class="ln">50</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w3</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># (B,S,dff) → (B,S,dmodel) down</span></span>
+<span class="line"><span class="ln">51</span></span>
+<span class="line"><span class="ln">52</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">53</span>        <span class="cmt"># x: (B, S, dmodel) → silu(w1) * w2 → w3 → (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">54</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="arg">w3</span><span class="op">(</span><span class="arg">F</span><span class="op">.</span><span class="arg">silu</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">w1</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">)</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">w2</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">)</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p04')">▼ Show original version</div>
+      <div class="prev-content" id="p04">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">GPT-2's <strong>MLP</strong> in chapter 02: two linears with GELU and dropout between them.</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">gpt2.py</span><span class="code-lines">MLP</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">35</span><span class="kw">class</span> <span class="fn">MLP</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">36</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">37</span>        <span class="kw">super</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">__init__</span><span class="op">(</span><span class="op">)</span></span>
+<span class="line"><span class="ln">38</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w1</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) → (B, S, dff)</span></span>
+<span class="line"><span class="ln">39</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w2</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># (B, S, dff) → (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">40</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dropout</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Dropout</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dropout</span><span class="op">)</span></span>
+<span class="line"><span class="ln">41</span></span>
+<span class="line"><span class="ln">42</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">43</span>        <span class="cmt"># x: (B, S, dmodel) → w1 → gelu → dropout → w2 → (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">44</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="arg">w2</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">dropout</span><span class="op">(</span><span class="arg">F</span><span class="op">.</span><span class="arg">gelu</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">w1</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s05 -->
+<section class="section fade-in" id="s05">
+  <div class="container">
+    <span class="section-num">05 · GQA</span>
+    <h2>Grouped-query attention with RoPE</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><strong>GQA</strong> (Grouped-Query Attention) uses H query heads but only <code>n_kv_heads</code> key/value head groups. After projecting K and V, <code>repeat_kv</code> broadcasts each KV head to serve multiple Q heads — here a 4:1 ratio (32 Q / 8 KV).</p>
+        <p>This is the main architectural fork from <strong>LLaMA 2 7B / 13B</strong>, which still use full MHA (<code>n_kv_heads = H</code>). Only LLaMA 2 70B used GQA; <strong>LLaMA 3 enables GQA on every size</strong>, which cuts KV-cache memory and speeds inference.</p>
+        <p>RoPE is applied to Q and K <em>after</em> projection. The causal mask and scaled dot-product attention follow the same pattern as GPT-2, but projections are bias-free and there is no attention dropout.</p>
+        <div class="formula">Attention(Q, K, V) = softmax(QK<sup>T</sup> / √d<sub>k</sub>) V</div>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">GQABlock</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">81</span><span class="kw">class</span> <span class="fn">GQABlock</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">82</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">83</span>        <span class="kw">super</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">__init__</span><span class="op">(</span><span class="op">)</span></span>
+<span class="line"><span class="ln">84</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dk</span></span>
+<span class="line"><span class="ln">85</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">H</span></span>
+<span class="line"><span class="ln">86</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span></span>
+<span class="line"><span class="ln">87</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">//</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span></span>
+<span class="line"><span class="ln">88</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wq</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">H</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># dmodel → H*dk</span></span>
+<span class="line"><span class="ln">89</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wk</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln">90</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wv</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln">91</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wo</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># dmodel → dmodel</span></span>
+<span class="line"><span class="ln">92</span></span>
+<span class="line"><span class="ln">93</span>    <span class="op">@</span><span class="kw">staticmethod</span></span>
+<span class="line"><span class="ln">94</span>    <span class="kw">def</span> <span class="fn">repeat_kv</span><span class="op">(</span><span class="arg">x</span><span class="op">,</span> <span class="arg">n_rep</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">95</span>        <span class="kw">if</span> <span class="arg">n_rep</span> <span class="op">==</span> <span class="num">1</span><span class="op">:</span></span>
+<span class="line"><span class="ln">96</span>            <span class="kw">return</span> <span class="arg">x</span></span>
+<span class="line"><span class="ln">97</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span></span>
+<span class="line"><span class="ln">98</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">unsqueeze</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="arg">expand</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">n_rep</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span></span>
+<span class="line"><span class="ln">99</span>        <span class="kw">return</span> <span class="arg">x</span><span class="op">.</span><span class="arg">contiguous</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">n_rep</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">100</span></span>
+<span class="line"><span class="ln">101</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">,</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">102</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">_</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">103</span>        <span class="arg">query</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wq</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">104</span>        <span class="arg">key</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wk</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">105</span>        <span class="arg">value</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wv</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">106</span>        <span class="arg">query</span> <span class="op">=</span> <span class="fn">rope</span><span class="op">(</span><span class="arg">query</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">107</span>        <span class="arg">key</span> <span class="op">=</span> <span class="fn">rope</span><span class="op">(</span><span class="arg">key</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">108</span>        <span class="arg">key</span> <span class="op">=</span> <span class="arg">GQABlock</span><span class="op">.</span><span class="arg">repeat_kv</span><span class="op">(</span><span class="arg">key</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">109</span>        <span class="arg">value</span> <span class="op">=</span> <span class="arg">GQABlock</span><span class="op">.</span><span class="arg">repeat_kv</span><span class="op">(</span><span class="arg">value</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">110</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">query</span> <span class="op">@</span> <span class="arg">key</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">-1</span><span class="op">,</span> <span class="num">-2</span><span class="op">)</span> <span class="op">/</span> <span class="arg">math</span><span class="op">.</span><span class="arg">sqrt</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">111</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">attn_score</span><span class="op">.</span><span class="arg">masked_fill</span><span class="op">(</span><span class="arg">mask</span><span class="op">[</span><span class="op">:</span><span class="arg">S</span><span class="op">,</span> <span class="op">:</span><span class="arg">S</span><span class="op">]</span> <span class="op">==</span> <span class="num">0</span><span class="op">,</span> <span class="fn">float</span><span class="op">(</span><span class="str">&quot;-inf&quot;</span><span class="op">)</span><span class="op">)</span></span>
+<span class="line"><span class="ln">112</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">F</span><span class="op">.</span><span class="arg">softmax</span><span class="op">(</span><span class="arg">attn_score</span><span class="op">,</span> <span class="arg">dim</span><span class="op">=</span><span class="num">-1</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">113</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">attn_score</span> <span class="op">@</span> <span class="arg">value</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">114</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="arg">contiguous</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">115</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wo</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p05')">▼ Show original version</div>
+      <div class="prev-content" id="p05">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">GPT-2's <strong>CausalSelfAttention</strong> in chapter 02: full MHA — every head gets its own K and V (excerpt from <code>gpt2.py</code>).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">gpt2.py</span><span class="code-lines">CausalSelfAttention (excerpt)</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">47</span><span class="kw">class</span> <span class="fn">CausalSelfAttention</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">48</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">49</span>        <span class="kw">super</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">__init__</span><span class="op">(</span><span class="op">)</span></span>
+<span class="line"><span class="ln">50</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dmodel</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span></span>
+<span class="line"><span class="ln">51</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">H</span></span>
+<span class="line"><span class="ln">52</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dk</span></span>
+<span class="line"><span class="ln">53</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wq</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># dmodel → dmodel</span></span>
+<span class="line"><span class="ln">54</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wk</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># dmodel → dmodel</span></span>
+<span class="line"><span class="ln">55</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wv</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># dmodel → dmodel</span></span>
+<span class="line"><span class="ln">56</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wo</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># dmodel → dmodel</span></span>
+<span class="line"><span class="ln">57</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">attn_dropout</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Dropout</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dropout</span><span class="op">)</span></span>
+<span class="line"><span class="ln">58</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">resid_dropout</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Dropout</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dropout</span><span class="op">)</span></span>
+<span class="line"><span class="ln">59</span></span>
+<span class="line"><span class="ln">60</span>    <span class="kw">def</span> <span class="fn">attention</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">q</span><span class="op">,</span> <span class="arg">k</span><span class="op">,</span> <span class="arg">v</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">mask</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">61</span>        <span class="cmt"># q, k, v: (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">62</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">q</span> <span class="op">@</span> <span class="arg">k</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">-1</span><span class="op">,</span> <span class="num">-2</span><span class="op">)</span> <span class="op">/</span> <span class="arg">math</span><span class="op">.</span><span class="arg">sqrt</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">63</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">attn_score</span><span class="op">.</span><span class="arg">masked_fill</span><span class="op">(</span><span class="arg">mask</span><span class="op">[</span><span class="op">:</span><span class="arg">S</span><span class="op">,</span> <span class="op">:</span><span class="arg">S</span><span class="op">]</span> <span class="op">==</span> <span class="num">0</span><span class="op">,</span> <span class="num">-1e9</span><span class="op">)</span>  <span class="cmt"># mask: (S, S)</span></span>
+<span class="line"><span class="ln">64</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">attn_score</span><span class="op">.</span><span class="arg">softmax</span><span class="op">(</span><span class="arg">dim</span><span class="op">=</span><span class="num">-1</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">65</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">attn_dropout</span><span class="op">(</span><span class="arg">attn_score</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">66</span>        <span class="kw">return</span> <span class="arg">attn_score</span> <span class="op">@</span> <span class="arg">v</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">67</span></span>
+<span class="line"><span class="ln">68</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">,</span> <span class="arg">mask</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">69</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">_</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">70</span>        <span class="cmt"># project and split into H heads — same Wq, Wk, Wv pattern as chapter 01</span></span>
+<span class="line"><span class="ln">71</span>        <span class="arg">query</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wq</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">72</span>        <span class="arg">key</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wk</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">73</span>        <span class="arg">value</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wv</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">74</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">attention</span><span class="op">(</span><span class="arg">query</span><span class="op">,</span> <span class="arg">key</span><span class="op">,</span> <span class="arg">value</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">mask</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">75</span>        <span class="cmt"># (B, H, S, dk) -&gt; (B, S, H, dk) -&gt; (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">76</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="arg">contiguous</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">77</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="arg">resid_dropout</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">wo</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s06 -->
+<section class="section fade-in" id="s06">
+  <div class="container">
+    <span class="section-num">06 · BLOCK</span>
+    <h2>RMSNorm + GQA + RMSNorm + SwiGLU</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>A LLaMA block is <code>Block(config)</code>: two RMSNorms (<code>rms_1</code>, <code>rms_2</code>), one <code>GQABlock</code>, one <code>SwiGLUFeedForward</code>. Pre-norm is done inline in <code>forward</code> — same pattern as GPT-2, but norms are RMSNorm and attention receives the shared <code>rope</code> module.</p>
+        <p>Each sublayer gets a residual add. The block signature is <code>(x, rope, mask)</code> because RoPE lives outside the block and is passed through from the model.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">Block</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">118</span><span class="kw">class</span> <span class="fn">Block</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">119</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">120</span>        <span class="kw">super</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">__init__</span><span class="op">(</span><span class="op">)</span></span>
+<span class="line"><span class="ln">121</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">gqa</span> <span class="op">=</span> <span class="fn">GQABlock</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span>
+<span class="line"><span class="ln">122</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">ff</span> <span class="op">=</span> <span class="fn">SwiGLUFeedForward</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span>
+<span class="line"><span class="ln">123</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">rms_1</span> <span class="op">=</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span>  <span class="cmt"># pre-norm before attention</span></span>
+<span class="line"><span class="ln">124</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">rms_2</span> <span class="op">=</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span>  <span class="cmt"># pre-norm before FFN</span></span>
+<span class="line"><span class="ln">125</span></span>
+<span class="line"><span class="ln">126</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">,</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">127</span>        <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">128</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="arg">gqa</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">rms_1</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">,</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">129</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="arg">ff</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">rms_2</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">130</span>        <span class="kw">return</span> <span class="arg">x</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s07 -->
+<section class="section fade-in" id="s07">
+  <div class="container">
+    <span class="section-num">07 · ASSEMBLE LLAMA</span>
+    <h2>Token embed, RoPE, N blocks, final norm, lm_head</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><code>LLAMA</code> owns everything. <strong>wte</strong> maps token IDs to vectors — no wpe, no dropout. A single <strong>RotaryPositionalEmbedding</strong> is shared across all blocks. <strong>N Blocks</strong> via <code>nn.ModuleList</code>, each taking <code>(x, rope, mask)</code>. Final <strong>RMSNorm</strong> then <strong>lm_head</strong> projects to vocab.</p>
+        <p>Two design choices carry over from GPT-2: (1) <strong>weight tying</strong> — <code>lm_head.weight = wte.weight</code>; (2) a pre-registered causal mask sliced per sequence at runtime. With the §00 defaults, that is the full <strong>LLaMA 3 8B</strong> stack at <strong>4096 / 32 / 32 / 14336</strong>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">LLAMA</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">133</span><span class="kw">class</span> <span class="fn">LLAMA</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">134</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">135</span>        <span class="kw">super</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="arg">__init__</span><span class="op">(</span><span class="op">)</span></span>
+<span class="line"><span class="ln">136</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wte</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Embedding</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">vocabsize</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># wte(x): (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">137</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">rope</span> <span class="op">=</span> <span class="fn">RotaryPositionalEmbedding</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span>
+<span class="line"><span class="ln">138</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">blocks</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">ModuleList</span><span class="op">(</span><span class="op">[</span><span class="fn">Block</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span> <span class="kw">for</span> <span class="arg">_</span> <span class="kw">in</span> <span class="fn">range</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">N</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
+<span class="line"><span class="ln">139</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">norm</span> <span class="op">=</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) → (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">140</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">lm_head</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">vocabsize</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) → (B, S, vocabsize)</span></span>
+<span class="line"><span class="ln">141</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">lm_head</span><span class="op">.</span><span class="arg">weight</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wte</span><span class="op">.</span><span class="arg">weight</span>  <span class="cmt"># weight tying</span></span>
+<span class="line"><span class="ln">142</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">register_buffer</span><span class="op">(</span></span>
+<span class="line"><span class="ln">143</span>            <span class="str">&quot;mask&quot;</span><span class="op">,</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">tril</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="arg">ones</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">)</span><span class="op">)</span></span>
+<span class="line"><span class="ln">144</span>        <span class="op">)</span>  <span class="cmt"># (max_seq_len, max_seq_len)</span></span>
+<span class="line"><span class="ln">145</span></span>
+<span class="line"><span class="ln">146</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">)</span><span class="op">:</span></span>
+<span class="line"><span class="ln">147</span>        <span class="arg">_</span><span class="op">,</span> <span class="arg">S</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S)</span></span>
+<span class="line"><span class="ln">148</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wte</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) — no wpe; RoPE handles position in attention</span></span>
+<span class="line"><span class="ln">149</span>        <span class="kw">for</span> <span class="arg">block</span> <span class="kw">in</span> <span class="arg">self</span><span class="op">.</span><span class="arg">blocks</span><span class="op">:</span></span>
+<span class="line"><span class="ln">150</span>            <span class="arg">x</span> <span class="op">=</span> <span class="fn">block</span><span class="op">(</span><span class="arg">x</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">rope</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">mask</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">151</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">norm</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">152</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="arg">lm_head</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, vocabsize)</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s08 -->
+<section class="section fade-in" id="s08">
+  <div class="container">
+    <span class="section-num">08 · COMPARISON</span>
+    <h2>GPT-2 Small (02) vs LLaMA 3 8B (03)</h2>
+    <p>Canonical comparison vs the previous chapter in this series (code-level detail after you have read the stack).</p>
+    <div class="code-panel" style="position:static;">
+      <table class="compare-table" role="table">
+        <thead>
+          <tr><th>Axis</th><th>GPT-2 Small (02)</th><th>LLaMA 3 8B (03)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Backbone</td><td>Decoder-only · learned <code>wpe</code> · LayerNorm · GELU MLP</td><td>Decoder-only · RoPE · RMSNorm · SwiGLU · GQA</td></tr>
+          <tr><td>Position encoding</td><td>Learned <code>wpe</code>, summed at input</td><td>RoPE on Q/K inside attention (no <code>wpe</code>)</td></tr>
+          <tr><td>Attention</td><td>Full MHA (12 heads on Small)</td><td>GQA — <code>n_kv_heads</code>=8, H=32 (4:1)</td></tr>
+          <tr><td>FFN activation</td><td>GELU two-linear MLP (<code>dff = 4 × dmodel</code>)</td><td>SwiGLU three-linear (<code>silu(w1) * w2</code>, explicit <code>dff</code>)</td></tr>
+          <tr><td>Normalization</td><td>Pre-norm LayerNorm</td><td>Pre-norm RMSNorm</td></tr>
+          <tr><td>Linear biases</td><td>Biases on attention and MLP</td><td><code>bias=False</code> everywhere</td></tr>
+          <tr><td>Dropout</td><td>0.1 on embeddings, attention, MLP</td><td>None in reference stack</td></tr>
+          <tr><td>Context / vocab</td><td>1,024 · 50,257 BPE</td><td>8,192 · 128,256 (tiktoken)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3 style="margin-top:28px;font-size:1.05rem;color:var(--text);">LLaMA 2 vs LLaMA 3 8B (same backbone, config deltas)</h3>
+    <p style="font-size:0.9rem;color:var(--text-dim);margin-bottom:12px;">We do not have a separate LLaMA 2 chapter — the block diagram is the same. What changes in the numbers you would put in <code style="font-family:var(--mono);font-size:0.9em;">LlamaConfig</code>:</p>
+    <div class="code-panel" style="position:static;">
+      <table class="compare-table" role="table">
+        <thead>
+          <tr><th>Axis</th><th>LLaMA 2</th><th>LLaMA 3 8B (this chapter)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Backbone</td><td>RoPE · RMSNorm · SwiGLU</td><td>Same</td></tr>
+          <tr><td>Attention (7B / 8B class)</td><td>7B / 13B: full MHA</td><td>8B: GQA on every size</td></tr>
+          <tr><td>Attention (70B)</td><td>GQA</td><td>GQA</td></tr>
+          <tr><td>Vocabulary</td><td>~32K (SentencePiece)</td><td>128K — stronger multilingual / code</td></tr>
+          <tr><td>Context (base)</td><td>4,096 tokens</td><td>8,192 (3.1+ extends with RoPE scaling)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px;font-size:0.9rem;color:var(--text-dim);">Training scale (~2T vs ~15T+ tokens) and data quality explain much of LLaMA 3’s capability jump — not a new layer type. For LLaMA 2 7B you would set <code style="font-family:var(--mono);font-size:0.9em;">n_kv_heads = H</code> (32) for MHA and use the smaller vocab / 4K context in config.</p>
+  </div>
+</section>
+
+
+<!-- s09: references -->
+<section class="section fade-in" id="s09">
+  <div class="container">
+    <span class="section-num">09 · REFERENCES</span>
+    <h2>Papers &amp; technical sources</h2>
+    <p>Primary reports and references for this chapter. Read these for full equations, training details, and official hyperparameters.</p>
+    <ul class="refs-list">
+      <li><a href="https://arxiv.org/abs/2407.21783" target="_blank" rel="noopener">The Llama 3 Herd of Models (Dubey et al., 2024)</a><span class="ref-note">LLaMA 3 — GQA, RoPE scaling, 128K tokenizer, SwiGLU + RMSNorm.</span></li>
+      <li><a href="https://arxiv.org/abs/2307.09288" target="_blank" rel="noopener">Llama 2: Open Foundation and Fine-Tuned Chat Models</a><span class="ref-note">Lineage comparison — MHA on smaller sizes, 4K context, ~32K vocab.</span></li>
+      <li><a href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noopener">RoFormer: Enhanced Transformer with Rotary Position Embedding</a><span class="ref-note">RoPE reference used throughout LLaMA-style stacks.</span></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="Full-size architecture diagram">
+</div>
+
+<script>
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+function togglePrev(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('show');
+  const btn = el.previousElementSibling;
+  btn.textContent = el.classList.contains('show') ? '▲ Hide original version' : '▼ Show original version';
+}
+
+/** Strip syntax-highlight markup; return runnable Python from a .code-block */
+function extractCodeText(panel) {
+  const codeEl = panel.querySelector('.code-block code');
+  if (!codeEl) return '';
+  const lines = codeEl.querySelectorAll('.line');
+  if (!lines.length) return codeEl.textContent.trim();
+  return Array.from(lines).map(line => {
+    const clone = line.cloneNode(true);
+    clone.querySelectorAll('.ln').forEach(el => el.remove());
+    return clone.textContent.replace(/\s+$/, '');
+  }).join('\n');
+}
+
+function copyPanelCode(btn, panel) {
+  const text = extractCodeText(panel);
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+
+function initCodeCopyButtons() {
+  document.querySelectorAll('.code-panel').forEach(panel => {
+    const header = panel.querySelector('.code-header');
+    if (!header || header.querySelector('.code-copy-btn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'code-copy-btn';
+    btn.setAttribute('aria-label', 'Copy code to clipboard');
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => copyPanelCode(btn, panel));
+    header.appendChild(btn);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initCodeCopyButtons();
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('visible', window.scrollY > 320);
+  });
+});
+</script>
+
+
+<!-- ── Share ──────────────────────────────────────────────────────────────── -->
+<section class="share-section">
+  <p class="share-label">Share this post</p>
+  <div class="share-buttons">
+
+    <a class="share-btn share-x" id="share-x" href="#" target="_blank" rel="noopener">
+      <!-- Twitter icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      Twitter
+    </a>
+
+    <a class="share-btn share-reddit" id="share-reddit" href="#" target="_blank" rel="noopener">
+      <!-- Reddit icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+      </svg>
+      Reddit
+    </a>
+
+    <a class="share-btn share-linkedin" id="share-linkedin" href="#" target="_blank" rel="noopener">
+      <!-- LinkedIn icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.37V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.59 0 4.26 2.36 4.26 5.44v6.3zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.46C23.2 24 24 23.23 24 22.27V1.73C24 .77 23.2 0 22.23 0z"/>
+      </svg>
+      LinkedIn
+    </a>
+
+    <a class="share-btn share-facebook" id="share-facebook" href="#" target="_blank" rel="noopener">
+      <!-- Facebook icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+      </svg>
+      Facebook
+    </a>
+
+  </div>
+</section>
+
+<style>
+/* ── Share section ───────────────────────────────────────────────────────── */
+.share-section {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 24px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+.share-label {
+  font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8888a0;
+  margin-bottom: 14px;
+}
+.share-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  text-decoration: none;
+  border: 1px solid var(--border, #2a2a3a);
+  background: var(--bg-card, #12121a);
+  color: var(--text-dim, #8888a0);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+.share-btn svg {
+  width: 15px; height: 15px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+.share-btn:hover { text-decoration: none; }
+.share-x:hover       { border-color: var(--text, #e0e0e8); color: var(--text, #e0e0e8); }
+.share-reddit:hover  { border-color: #ff4500; color: #ff4500; }
+.share-linkedin:hover{ border-color: #0a66c2; color: #0a66c2; }
+.share-facebook:hover{ border-color: #1877f2; color: #1877f2; }
+</style>
+
+<script>
+/* Set share URLs using the current page URL and title */
+(function() {
+  var url   = encodeURIComponent(window.location.href);
+  var title = encodeURIComponent(document.title);
+  document.getElementById('share-x').href        = 'https://twitter.com/intent/tweet?url=' + url + '&text=' + title;
+  document.getElementById('share-reddit').href   = 'https://reddit.com/submit?url=' + url + '&title=' + title;
+  document.getElementById('share-linkedin').href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + url;
+  document.getElementById('share-facebook').href = 'https://www.facebook.com/sharer/sharer.php?u=' + url;
+})();
+</script>
+
+<!-- ── Comments ──────────────────────────────────────────────────────────── -->
+<section class="comments-section">
+  <h2>Comments</h2>
+  <script src="https://utteranc.es/client.js"
+          repo="abhibisht89/llamasearch-blogs"
+          issue-term="pathname"
+          label="💬 comment"
+          theme="github-dark"
+          crossorigin="anonymous"
+          async>
+  </script>
+</section>
+
+<style>
+/* ── Comments section styling ────────────────────────────────────────────── */
+.comments-section {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+.comments-section h2 {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+/* Make the utterances iframe blend with the dark background */
+.utterances {
+  max-width: 100% !important;
+}
+</style>
+
+<script>
+/* Dark / light mode toggle — reads/writes localStorage key 'tcw-theme' */
+(function(){
+  var btn  = document.getElementById('themeToggle');
+  var root = document.documentElement;
+  function syncUtterances(theme) {
+    var frame = document.querySelector('.utterances-frame');
+    if (!frame) return;
+    frame.contentWindow.postMessage(
+      { type: 'set-theme', theme: theme === 'light' ? 'github-light' : 'github-dark' },
+      'https://utteranc.es'
+    );
+  }
+  window.addEventListener('message', function(e) {
+    if (e.origin === 'https://utteranc.es') {
+      var isLight = root.getAttribute('data-theme') === 'light';
+      syncUtterances(isLight ? 'light' : 'dark');
+    }
+  });
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      root.removeAttribute('data-theme');
+      localStorage.setItem('tcw-theme','dark');
+      syncUtterances('dark');
+    } else {
+      root.setAttribute('data-theme','light');
+      localStorage.setItem('tcw-theme','light');
+      syncUtterances('light');
+    }
+  });
+})();
+</script>
+</body>
+</html>

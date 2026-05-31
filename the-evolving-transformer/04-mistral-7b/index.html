@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Mistral 7B — The Evolving Transformer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+  --bg-nav: rgba(10,10,15,0.92); --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Light mode overrides ── */
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 12px; }
+h2 { font-size: 1.35rem; font-weight: 700; margin: 0 0 16px; color: var(--text); }
+.lead { color: var(--text-dim); font-size: 1.05rem; max-width: 560px; margin: 0 auto; }
+p { color: var(--text-dim); font-size: 0.95rem; margin: 0 0 12px; }
+p:last-child { margin-bottom: 0; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 70vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 72px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.14) 0%, transparent 70%); pointer-events: none; }
+.stats { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+.stat-val { font-size: 2.4rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.82rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.evo-strip { display: flex; align-items: center; justify-content: center; gap: 0; margin: 24px auto; max-width: 700px; flex-wrap: wrap; }
+.evo-node { display: flex; align-items: center; gap: 0; color: inherit; }
+.evo-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg); flex-shrink: 0; }
+.evo-node.active .evo-dot { background: var(--accent); box-shadow: 0 0 12px rgba(108,140,255,0.4); }
+.evo-node.future .evo-dot { border-color: var(--border); border-style: dashed; }
+.evo-label { font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim); margin-left: 6px; white-space: nowrap; }
+.evo-node.active .evo-label { color: var(--accent); }
+.evo-node.future .evo-label { color: var(--border); }
+.evo-arrow { width: 48px; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); margin: 0 6px; flex-shrink: 0; }
+.evo-arrow.future { background: var(--border); border-top: 1px dashed var(--border); height: 0; }
+.code-section { margin: 28px 0; }
+.code-explanation { margin-bottom: 18px; }
+.code-explanation p { color: var(--text-dim); }
+.code-explanation p strong { color: var(--text); }
+.code-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.78rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); margin-left: auto; margin-right: 4px; }
+.code-copy-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-family: var(--sans);
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.code-copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+.code-copy-btn.copied { border-color: var(--accent3); color: var(--accent3); background: rgba(52, 211, 153, 0.08); }
+.code-block { padding: 14px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.52; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; color: inherit; }
+.ln { display: inline-block; width: 34px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 12px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.09); border-left: 2px solid var(--accent); margin-left: -14px; padding-left: 12px; }
+.kw { color: var(--accent4); }
+.fn { color: var(--accent); }
+.arg { color: var(--accent3); }
+.str { color: var(--accent5); }
+.num { color: var(--accent3); }
+.cmt { color: var(--text-dim); font-style: italic; }
+.op { color: var(--accent2); }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; margin: 14px 0; font-family: var(--mono); font-size: 0.92rem; text-align: center; color: var(--text); overflow-x: auto; }
+.config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin: 18px 0; font-size: 0.88rem; }
+.config-item { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.config-item code { font-family: var(--mono); color: var(--accent); font-size: 0.85em; }
+.config-item span { color: var(--text-dim); display: block; margin-top: 4px; font-size: 0.82rem; }
+.chapter-intro { max-width: 900px; margin: 0 auto; padding: 48px 24px 8px; }
+.chapter-intro p { font-size: 1.02rem; line-height: 1.7; margin-bottom: 14px; }
+.chapter-intro p:last-child { margin-bottom: 0; }
+.fade-in { opacity: 0; transform: translateY(18px); transition: all 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: var(--bg-nav); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 600; color: var(--text); }
+.nav-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.nav-links a { color: var(--text-dim); text-decoration: none; font-family: var(--mono); font-size: 0.75rem; padding: 2px 4px; border-radius: 4px; }
+.nav-links a:hover { color: var(--accent); background: rgba(108,140,255,0.1); }
+.footer { text-align: center; padding: 48px 24px 64px; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); }
+.footer a { color: var(--accent); }
+/* no media query needed — layout is already single-column */
+.delta-card { background: rgba(167, 139, 250, 0.06); border: 1px solid rgba(167, 139, 250, 0.2); border-left: 3px solid var(--accent2); border-radius: 0 var(--radius) var(--radius) 0; padding: 18px 22px; margin: 18px 0; }
+.delta-card h4 { color: var(--accent2); font-size: 0.85rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+.delta-card ul { list-style: none; padding: 0; margin: 0; }
+.delta-card li { font-size: 0.88rem; color: var(--text-dim); padding: 4px 0; padding-left: 18px; position: relative; }
+.delta-card li::before { content: 'Δ'; position: absolute; left: 0; color: var(--accent2); font-family: var(--mono); font-size: 0.8rem; }
+.prev-block { margin: 14px 0; }
+.prev-toggle { cursor: pointer; font-size: 0.78rem; font-family: var(--mono); color: var(--text-dim); background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; display: inline-block; transition: color 0.2s; }
+.prev-toggle:hover { color: var(--accent); }
+.prev-content { display: none; margin-top: 10px; }
+.prev-content.show { display: block; }
+.compare-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 20px 0; }
+.compare-table th, .compare-table td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+.compare-table th { background: var(--bg-card-alt); color: var(--text); font-family: var(--mono); font-size: 0.8rem; }
+.compare-table tr:nth-child(even) td { background: rgba(0,0,0,0.12); }
+.compare-table td { color: var(--text-dim); }
+.compare-table td:first-child { color: var(--text); font-weight: 500; }
+.refs-list { list-style: none; padding: 0; margin: 16px 0 0; }
+.refs-list li { font-size: 0.92rem; color: var(--text-dim); padding: 10px 0; border-bottom: 1px solid var(--border); line-height: 1.5; }
+.refs-list li:last-child { border-bottom: none; padding-bottom: 0; }
+.refs-list a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.refs-list a:hover { text-decoration: underline; }
+.refs-list .ref-note { display: block; font-size: 0.82rem; margin-top: 4px; color: var(--text-dim); font-weight: 400; }
+/* Lightbox */
+.lightbox { display: none; position: fixed; inset: 0; z-index: 10001; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); justify-content: center; align-items: center; cursor: zoom-out; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 90vw; max-height: 90vh; border-radius: var(--radius); box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+.arch-thumb { cursor: zoom-in; transition: transform 0.2s; }
+.arch-thumb:hover { transform: scale(1.03); }
+</style>
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--bg-nav); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; flex-wrap: wrap; gap: 2px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: var(--border); }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px !important; }
+/* Theme toggle button */
+.theme-toggle {
+  margin-left: auto;
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px;
+  color: var(--text-dim); cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun  { display: block; }
+
+.code-source-bar {
+  position: fixed;
+  top: 96px;
+  right: 24px;
+  z-index: 90;
+  text-align: right;
+}
+.code-source-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.code-github-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  background: var(--bg);
+  transition: border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.code-github-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+@media (max-width: 720px) {
+  .code-source-bar {
+    position: static;
+    text-align: center;
+    padding: 12px 24px 0;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .code-source-pills { justify-content: center; }
+}
+</style>
+<script>
+/* Apply saved theme before paint to avoid flash */
+(function(){
+  var t = localStorage.getItem('tcw-theme');
+  if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+})();
+</script>
+</head>
+<body>
+<nav class="breadcrumb-nav"><a href="../../../">The Context Window</a><span class="bc-sep">›</span><a href="../">The Evolving Transformer</a><span class="bc-sep">›</span><span class="bc-current">Mistral 7B</span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"><svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun"  viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+</nav>
+<div class="code-source-bar">
+  <div class="code-source-pills">
+    <a href="https://github.com/abhibisht89/llamasearch-blogs/blob/main/the-evolving-transformer/04-mistral-7b/mistral.py" target="_blank" rel="noopener" class="code-github-pill">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      mistral.py
+    </a>
+  </div>
+</div>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">The Evolving Transformer</a>
+  <div class="nav-links">
+    <a href="#s00">00</a><a href="#s01">01</a><a href="#s02">02</a><a href="#s03">03</a><a href="#s04">04</a><a href="#s05">05</a>
+    <a href="#s06">06</a><a href="#s07">07</a><a href="#s08">08</a>
+    <a href="#s09">09</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <p class="section-num" style="margin-bottom:8px;letter-spacing:3px;">THE EVOLVING TRANSFORMER · 05</p>
+  <h1>Mistral 7B</h1>
+  <p class="lead">From LLaMA to efficient long-context decoding: Mistral 7B keeps the same decoder-only stack but replaces full causal attention with a <strong>sliding window</strong> (W=4096). Each token attends only to the last W positions — memory stays bounded at inference. Defaults match <strong>Mistral 7B</strong>, the same size as the architecture diagram on this page.</p>
+  <div class="evo-strip">
+  <a class="evo-node" href="../03-llama/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">LLaMA</span></a>
+  <div class="evo-arrow"></div>
+  <span class="evo-node active"><span class="evo-dot"></span><span class="evo-label">Mistral (you are here)</span></span>
+  <div class="evo-arrow"></div>
+  <a class="evo-node" href="../05-mixtral/" style="text-decoration:none;"><span class="evo-dot"></span><span class="evo-label">Mixtral</span></a>
+  </div>
+  <div class="stats" style="margin-top:8px;">
+    <div><span class="stat-val">4096</span><span class="stat-label">d_model</span></div>
+    <div><span class="stat-val">32</span><span class="stat-label">layers N</span></div>
+    <div><span class="stat-val">W=4096</span><span class="stat-label">sliding window</span></div>
+    <div><span class="stat-val">7B</span><span class="stat-label">Mistral</span></div>
+  </div>
+</header>
+
+
+<main>
+<div class="container" style="padding-bottom:0;">
+  <div style="text-align:center;margin:0 auto 24px;max-width:320px;">
+  <img class="arch-thumb" onclick="openLightbox(this.src)" src="../images/mistral-7b.webp" alt="Mistral 7B architecture" style="width:100%;border-radius:var(--radius);border:1px solid var(--border);">
+  <p style="font-size:0.75rem;color:var(--text-dim);margin-top:8px;font-family:var(--mono);">Mistral 7B · decoder stack (32× blocks, SWA W=4096, GQA 32/8)</p>
+  </div>
+</div>
+
+<div class="chapter-intro fade-in">
+  <p>This chapter evolves chapter 03 LLaMA into Mistral 7B — same decoder-only stack (wte-only embeddings, RoPE, RMSNorm, SwiGLU, GQA, no biases, weight tying), with one key innovation: <strong>sliding window attention</strong>. Each token attends only to the last W=4096 positions instead of the full causal history. Hyperparameters follow <strong>Mistral 7B</strong> from Mistral AI. Same teaching pattern: one config object up front, then each layer in order until the full model runs.</p>
+  <p><strong>LLaMA 3 vs Mistral 7B at a glance:</strong> the block diagrams look almost the same — both are dense decoder-only Transformers, not MoE. LLaMA 3 optimizes for scale (128K vocab, full global attention, larger model family). Mistral 7B optimizes for <strong>efficiency</strong>: same GQA idea, but adds sliding-window attention so cost scales like O(N×W) instead of O(N²) over the local window. This chapter is the code path for that efficiency trade-off.</p>
+  <p>Each section below is one building block. You get a short explanation, the code for that module, a delta from chapter 03 where it helps, and how it connects to what came before. By the end you have a runnable <code style="font-family:var(--mono);font-size:0.9em;">Mistral</code> class, not just a diagram.</p>
+</div>
+
+<div class="container" style="padding-top:8px;padding-bottom:0;">
+  <div class="delta-card">
+    <h4>Delta from LLaMA 3 (03)</h4>
+    <ul>
+      <li>Full causal attention → sliding window attention (W=4096)</li>
+      <li><code>GQABlock</code> → <code>SlidingWindowGQA</code> (same projections, different mask)</li>
+      <li>At inference: rolling buffer KV cache bounds memory to W (not shown in this training-style code)</li>
+      <li>Everything else unchanged: wte-only embeddings, RoPE, RMSNorm, SwiGLU, GQA ratio, no bias, weight tying</li>
+    </ul>
+    <p style="margin-top:14px;margin-bottom:0;font-size:0.9rem;color:var(--text-dim);">Full side-by-side with chapter 03: <a href="#s08" style="color:var(--accent);">§08 Comparison</a>.</p>
+  </div>
+</div>
+
+<!-- s00 -->
+<section class="section fade-in" id="s00">
+  <div class="container">
+    <span class="section-num">00 · CONFIG</span>
+    <h2>One config object for the whole model</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Before any module, we define a single <strong><code style="font-family:var(--mono);font-size:0.9em;">MistralConfig</code></strong> dataclass for <strong>Mistral 7B</strong>. Every class below takes <code style="font-family:var(--mono);font-size:0.9em;">config</code> instead of a long list of constructor arguments — same pattern as chapter 03, plus one new field: <code style="font-family:var(--mono);font-size:0.9em;">sliding_window</code>.</p>
+        <p>Mistral 7B uses d_model=4096, N=32 blocks, H=32 query heads, n_kv_heads=8 (4:1 GQA ratio), vocab=32,000, context length 8,192, d_ff=14,336, and sliding window W=4096 — verified against Mistral’s <code style="font-family:var(--mono);font-size:0.85em;">Mistral-7B-v0.1</code> <code style="font-family:var(--mono);font-size:0.85em;">config.json</code> (~7.3B parameters). The window is the main architectural delta from LLaMA 3; everything else in the stack matches chapter 03.</p>
+        <div class="callout">
+          <p><strong><code style="font-family:var(--mono);">dk</code> property:</strong> <code style="font-family:var(--mono);">dmodel // H</code> → 4096 // 32 = <strong>128</strong>. Multi-head attention splits d_model across H query heads; d_model must be divisible by H.</p>
+          <p style="margin-top:8px;"><strong><code style="font-family:var(--mono);">sliding_window</code>:</strong> W=4096 — each token attends to at most W past tokens (causal ∩ band). Built by <code style="font-family:var(--mono);">make_sliding_window_mask</code> (section 05):</p>
+          <pre class="code-block" style="margin-top:10px;padding:10px 12px;background:var(--bg-card-alt);border-radius:6px;font-size:0.78rem;"><code><span class="line"><span class="ln"> 34</span><span class="kw">def</span> <span class="fn">make_sliding_window_mask</span><span class="op">(</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">sliding_window</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 35</span>    <span class="str">""</span><span class="str">"Causal mask ∩ sliding window band: token i attends to [max(0, i-W+1) .. i]."</span><span class="str">""</span></span>
+<span class="line"><span class="ln"> 36</span>    <span class="arg">causal</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">tril</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">ones</span><span class="op">(</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">max_seq_len</span><span class="op">))</span></span>
+<span class="line"><span class="ln"> 37</span>    <span class="arg">window</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">triu</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">ones</span><span class="op">(</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">max_seq_len</span><span class="op">),</span> <span class="arg">diagonal</span><span class="op">=-(</span><span class="arg">sliding_window</span> <span class="op">-</span> <span class="num">1</span><span class="op">))</span></span>
+<span class="line"><span class="ln"> 38</span>    <span class="kw">return</span> <span class="arg">causal</span> <span class="op">*</span> <span class="arg">window</span>  <span class="cmt"># (max_seq_len, max_seq_len)</span></span></code></pre>
+          <p style="margin-top:8px;margin-bottom:0;"><strong><code style="font-family:var(--mono);">vocabsize</code>:</strong> 32,000 for Mistral 7B (vs 128,256 in LLaMA 3 8B) — the only other config default that differs from chapter 03 besides the window.</p>
+        </div>
+        <p style="margin-top:12px;font-size:0.9rem;color:var(--text-dim);">All values below are <strong style="color:var(--text);">Mistral 7B</strong> — verified against official <code style="font-family:var(--mono);font-size:0.85em;">config.json</code>. Change <code style="font-family:var(--mono);font-size:0.85em;">MistralConfig</code> fields to explore other Mistral sizes.</p>
+        <div class="config-grid">
+          <div class="config-item"><code>dmodel</code><span>4096 — <code style="font-family:var(--mono);font-size:0.9em;">hidden_size</code></span></div>
+          <div class="config-item"><code>N</code><span>32 — <code style="font-family:var(--mono);font-size:0.9em;">num_hidden_layers</code></span></div>
+          <div class="config-item"><code>H</code><span>32 — <code style="font-family:var(--mono);font-size:0.9em;">num_attention_heads</code></span></div>
+          <div class="config-item"><code>n_kv_heads</code><span>8 — <code style="font-family:var(--mono);font-size:0.9em;">num_key_value_heads</code> (4:1 GQA)</span></div>
+          <div class="config-item"><code>vocabsize</code><span>32,000 — <code style="font-family:var(--mono);font-size:0.9em;">vocab_size</code></span></div>
+          <div class="config-item"><code>max_seq_len</code><span>8,192 in <code style="font-family:var(--mono);font-size:0.9em;">mistral.py</code> (8K paper context; RoPE + mask buffer). HF <code style="font-family:var(--mono);font-size:0.9em;">max_position_embeddings</code>: 32,768</span></div>
+          <div class="config-item"><code>dff</code><span>14,336 — <code style="font-family:var(--mono);font-size:0.9em;">intermediate_size</code></span></div>
+          <div class="config-item"><code>sliding_window</code><span>4,096 — <code style="font-family:var(--mono);font-size:0.9em;">sliding_window</code> (local attention band)</span></div>
+          <div class="config-item"><code>norm_eps</code><span>1e-5 — <code style="font-family:var(--mono);font-size:0.9em;">rms_norm_eps</code></span></div>
+          <div class="config-item"><code>B</code><span>2 — batch size for demos only</span></div>
+          <div class="config-item"><code>dk</code><span>128 — dmodel // H (head dim)</span></div>
+        </div>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">mistral.py</span><span class="code-lines">imports + MistralConfig</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">  1</span><span class="kw">from</span> <span class="arg">dataclasses</span> <span class="kw">import</span> <span class="arg">dataclass</span></span>
+<span class="line"><span class="ln">  2</span><span class="kw">import</span> <span class="arg">torch</span></span>
+<span class="line"><span class="ln">  3</span><span class="kw">import</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">nn</span> <span class="kw">as</span> <span class="arg">nn</span></span>
+<span class="line"><span class="ln">  4</span><span class="kw">import</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">nn</span><span class="op">.</span><span class="arg">functional</span> <span class="kw">as</span> <span class="arg">F</span></span>
+<span class="line"><span class="ln">  5</span><span class="kw">import</span> <span class="arg">math</span></span>
+<span class="line"><span class="ln">  6</span></span>
+<span class="line"><span class="ln">  7</span></span>
+<span class="line"><span class="ln">  8</span><span class="cmt"># ============================================================</span></span>
+<span class="line"><span class="ln">  9</span><span class="cmt"># Config — Mistral 7B from Jiang et al., 2023 (Mistral AI)</span></span>
+<span class="line"><span class="ln"> 10</span><span class="cmt"># d_model=4096, N=32, H=32, n_kv_heads=8, vocab=32000, W=4096 sliding window</span></span>
+<span class="line"><span class="ln"> 11</span><span class="cmt"># ============================================================</span></span>
+<span class="line"><span class="ln"> 12</span><span class="op">@</span><span class="fn">dataclass</span></span>
+<span class="line"><span class="ln"> 13</span><span class="kw">class</span> <span class="arg">MistralConfig</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 14</span>    <span class="arg">dmodel</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">4096</span>           <span class="cmt"># Mistral 7B</span></span>
+<span class="line"><span class="ln"> 15</span>    <span class="arg">N</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">32</span>                  <span class="cmt"># transformer blocks</span></span>
+<span class="line"><span class="ln"> 16</span>    <span class="arg">H</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">32</span>                  <span class="cmt"># query heads</span></span>
+<span class="line"><span class="ln"> 17</span>    <span class="arg">n_kv_heads</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">8</span>          <span class="cmt"># GQA — 4:1 ratio (32 Q / 8 KV)</span></span>
+<span class="line"><span class="ln"> 18</span>    <span class="arg">vocabsize</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">32000</span>       <span class="cmt"># BPE vocabulary size (Mistral 7B)</span></span>
+<span class="line"><span class="ln"> 19</span>    <span class="arg">max_seq_len</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">8192</span>      <span class="cmt"># max context length</span></span>
+<span class="line"><span class="ln"> 20</span>    <span class="arg">dff</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">14336</span>             <span class="cmt"># SwiGLU inner dim</span></span>
+<span class="line"><span class="ln"> 21</span>    <span class="arg">norm_eps</span><span class="op">:</span> <span class="kw">float</span> <span class="op">=</span> <span class="num">1e-5</span>       <span class="cmt"># RMSNorm epsilon</span></span>
+<span class="line"><span class="ln"> 22</span>    <span class="arg">sliding_window</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">4096</span>   <span class="cmt"># attention window W — each token sees W past tokens</span></span>
+<span class="line"><span class="ln"> 23</span>    <span class="arg">B</span><span class="op">:</span> <span class="arg">int</span> <span class="op">=</span> <span class="num">2</span>                   <span class="cmt"># batch size (for demo runs)</span></span>
+<span class="line"><span class="ln"> 24</span></span>
+<span class="line"><span class="ln"> 25</span>    <span class="op">@</span><span class="kw">property</span></span>
+<span class="line"><span class="ln"> 26</span>    <span class="kw">def</span> <span class="fn">dk</span><span class="op">(</span><span class="arg">self</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 27</span>        <span class="cmt"># per-head dimension — dmodel must be divisible by H</span></span>
+<span class="line"><span class="ln"> 28</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dmodel</span> <span class="op">//</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span></span>
+<span class="line"><span class="ln"> 29</span></span>
+<span class="line"><span class="ln"> 30</span></span>
+<span class="line"><span class="ln"> 31</span><span class="arg">config</span> <span class="op">=</span> <span class="fn">MistralConfig</span><span class="op">()</span>  <span class="cmt"># Mistral 7B — shared by every module below</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s01 -->
+<section class="section fade-in" id="s01">
+  <div class="container">
+    <span class="section-num">01 · EMBEDDINGS</span>
+    <h2>Token embedding only — unchanged from LLaMA</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Mistral keeps the same <strong>wte</strong>-only input as chapter 03: a token embedding table mapping IDs to d_model vectors, no learned position table, no dropout. Position is handled by RoPE inside attention (section 02).</p>
+        <p>The forward pass is simply <code>wte(x)</code> — one lookup, straight into the block stack. No delta from LLaMA here.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">mistral.py</span><span class="code-lines">wte only</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">  1</span><span class="cmt"># inside Mistral.__init__ — token embedding only (no wpe):</span></span>
+<span class="line"><span class="ln">  2</span><span class="arg">self</span><span class="op">.</span><span class="arg">wte</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Embedding</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">vocabsize</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># wte(x): (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">  3</span></span>
+<span class="line"><span class="ln">  4</span><span class="cmt"># inside Mistral.forward — no positional sum, no dropout:</span></span>
+<span class="line"><span class="ln">  5</span><span class="arg">_</span><span class="op">,</span> <span class="arg">S</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S)</span></span>
+<span class="line"><span class="ln">  6</span><span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wte</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) — no wpe; RoPE handles position in attention</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p01')">▼ Show original version</div>
+      <div class="prev-content" id="p01">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">LLaMA in chapter 03 — identical <strong>wte</strong> pattern (excerpt from <code>llama.py</code>).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">wte only</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">  1</span><span class="cmt"># inside LLAMA.__init__ — token embedding only (no wpe):</span></span>
+<span class="line"><span class="ln">  2</span><span class="arg">self</span><span class="op">.</span><span class="arg">wte</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Embedding</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">vocabsize</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># wte(x): (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">  3</span></span>
+<span class="line"><span class="ln">  4</span><span class="cmt"># inside LLAMA.forward — no positional sum, no dropout:</span></span>
+<span class="line"><span class="ln">  5</span><span class="arg">_</span><span class="op">,</span> <span class="arg">S</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S)</span></span>
+<span class="line"><span class="ln">  6</span><span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wte</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) — no wpe; RoPE handles position in attention</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s02 -->
+<section class="section fade-in" id="s02">
+  <div class="container">
+    <span class="section-num">02 · RoPE</span>
+    <h2>Rotary positional embeddings — unchanged from LLaMA</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><strong>RoPE</strong> encodes position by rotating Q and K vectors in each head's 2D subspaces. Cos/sin tables are precomputed for all positions up to <code>max_seq_len</code> and registered as buffers — same implementation as chapter 03.</p>
+        <p>No delta from LLaMA. Sliding window attention (section 05) limits which keys each query sees; RoPE still rotates Q and K the same way.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">mistral.py</span><span class="code-lines">RotaryPositionalEmbedding</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 65</span><span class="kw">class</span> <span class="fn">RotaryPositionalEmbedding</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 66</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">,</span> <span class="arg">base</span><span class="op">:</span> <span class="kw">float</span> <span class="op">=</span> <span class="num">10000.0</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 67</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln"> 68</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dk</span></span>
+<span class="line"><span class="ln"> 69</span>        <span class="arg">freqs</span> <span class="op">=</span> <span class="num">1.0</span> <span class="op">/</span> <span class="op">(</span></span>
+<span class="line"><span class="ln"> 70</span>            <span class="arg">base</span> <span class="op">**</span> <span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">arange</span><span class="op">(</span><span class="num">0</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="kw">float</span><span class="op">()</span> <span class="op">/</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span></span>
+<span class="line"><span class="ln"> 71</span>        <span class="op">)</span>  <span class="cmt"># (dk//2,)</span></span>
+<span class="line"><span class="ln"> 72</span>        <span class="arg">pos</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">arange</span><span class="op">(</span><span class="num">0</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">)</span><span class="op">.</span><span class="kw">float</span><span class="op">()</span>  <span class="cmt"># (max_seq_len,)</span></span>
+<span class="line"><span class="ln"> 73</span>        <span class="arg">angles</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">outer</span><span class="op">(</span><span class="arg">pos</span><span class="op">,</span> <span class="arg">freqs</span><span class="op">)</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln"> 74</span>        <span class="arg">self</span><span class="op">.</span><span class="fn">register_buffer</span><span class="op">(</span><span class="str">"cos_cached"</span><span class="op">,</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">cos</span><span class="op">(</span><span class="arg">angles</span><span class="op">))</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln"> 75</span>        <span class="arg">self</span><span class="op">.</span><span class="fn">register_buffer</span><span class="op">(</span><span class="str">"sin_cached"</span><span class="op">,</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">sin</span><span class="op">(</span><span class="arg">angles</span><span class="op">))</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln"> 76</span></span>
+<span class="line"><span class="ln"> 77</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 78</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">H</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, H, S, dk)</span></span>
+<span class="line"><span class="ln"> 79</span>        <span class="arg">x_even</span> <span class="op">=</span> <span class="arg">x</span><span class="op">[</span><span class="op">.</span><span class="op">.</span><span class="op">.,</span> <span class="num">0</span><span class="op">::</span><span class="num">2</span><span class="op">]</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 80</span>        <span class="arg">x_odd</span> <span class="op">=</span> <span class="arg">x</span><span class="op">[</span><span class="op">.</span><span class="op">.</span><span class="op">.,</span> <span class="num">1</span><span class="op">::</span><span class="num">2</span><span class="op">]</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 81</span>        <span class="arg">cos</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">cos_cached</span><span class="op">[:</span><span class="arg">S</span><span class="op">]</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>  <span class="cmt"># (1, 1, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 82</span>        <span class="arg">sin</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">sin_cached</span><span class="op">[:</span><span class="arg">S</span><span class="op">]</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>  <span class="cmt"># (1, 1, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 83</span>        <span class="arg">rotated_even</span> <span class="op">=</span> <span class="arg">x_even</span> <span class="op">*</span> <span class="arg">cos</span> <span class="op">-</span> <span class="arg">x_odd</span> <span class="op">*</span> <span class="arg">sin</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 84</span>        <span class="arg">rotated_odd</span> <span class="op">=</span> <span class="arg">x_even</span> <span class="op">*</span> <span class="arg">sin</span> <span class="op">+</span> <span class="arg">x_odd</span> <span class="op">*</span> <span class="arg">cos</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 85</span>        <span class="arg">rotated</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">stack</span><span class="op">([</span><span class="arg">rotated_even</span><span class="op">,</span> <span class="arg">rotated_odd</span><span class="op">],</span> <span class="arg">dim</span><span class="op">=-</span><span class="num">1</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk//2, 2)</span></span>
+<span class="line"><span class="ln"> 86</span>        <span class="kw">return</span> <span class="arg">rotated</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">H</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p02')">▼ Show original version</div>
+      <div class="prev-content" id="p02">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">LLaMA in chapter 03 — same <strong>RotaryPositionalEmbedding</strong> (excerpt from <code>llama.py</code>).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">RotaryPositionalEmbedding</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 57</span><span class="kw">class</span> <span class="fn">RotaryPositionalEmbedding</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 58</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">,</span> <span class="arg">base</span><span class="op">:</span> <span class="kw">float</span> <span class="op">=</span> <span class="num">10000.0</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 59</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln"> 60</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dk</span></span>
+<span class="line"><span class="ln"> 61</span>        <span class="arg">freqs</span> <span class="op">=</span> <span class="num">1.0</span> <span class="op">/</span> <span class="op">(</span></span>
+<span class="line"><span class="ln"> 62</span>            <span class="arg">base</span> <span class="op">**</span> <span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">arange</span><span class="op">(</span><span class="num">0</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="kw">float</span><span class="op">()</span> <span class="op">/</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span></span>
+<span class="line"><span class="ln"> 63</span>        <span class="op">)</span>  <span class="cmt"># (dk//2,)</span></span>
+<span class="line"><span class="ln"> 64</span>        <span class="arg">pos</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">arange</span><span class="op">(</span><span class="num">0</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">)</span><span class="op">.</span><span class="kw">float</span><span class="op">()</span>  <span class="cmt"># (max_seq_len,)</span></span>
+<span class="line"><span class="ln"> 65</span>        <span class="arg">angles</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">outer</span><span class="op">(</span><span class="arg">pos</span><span class="op">,</span> <span class="arg">freqs</span><span class="op">)</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln"> 66</span>        <span class="arg">self</span><span class="op">.</span><span class="fn">register_buffer</span><span class="op">(</span><span class="str">"cos_cached"</span><span class="op">,</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">cos</span><span class="op">(</span><span class="arg">angles</span><span class="op">))</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln"> 67</span>        <span class="arg">self</span><span class="op">.</span><span class="fn">register_buffer</span><span class="op">(</span><span class="str">"sin_cached"</span><span class="op">,</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">sin</span><span class="op">(</span><span class="arg">angles</span><span class="op">))</span>  <span class="cmt"># (max_seq_len, dk//2)</span></span>
+<span class="line"><span class="ln"> 68</span></span>
+<span class="line"><span class="ln"> 69</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 70</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">H</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, H, S, dk)</span></span>
+<span class="line"><span class="ln"> 71</span>        <span class="arg">x_even</span> <span class="op">=</span> <span class="arg">x</span><span class="op">[</span><span class="op">.</span><span class="op">.</span><span class="op">.,</span> <span class="num">0</span><span class="op">::</span><span class="num">2</span><span class="op">]</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 72</span>        <span class="arg">x_odd</span> <span class="op">=</span> <span class="arg">x</span><span class="op">[</span><span class="op">.</span><span class="op">.</span><span class="op">.,</span> <span class="num">1</span><span class="op">::</span><span class="num">2</span><span class="op">]</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 73</span>        <span class="arg">cos</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">cos_cached</span><span class="op">[:</span><span class="arg">S</span><span class="op">]</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>  <span class="cmt"># (1, 1, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 74</span>        <span class="arg">sin</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">sin_cached</span><span class="op">[:</span><span class="arg">S</span><span class="op">]</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>  <span class="cmt"># (1, 1, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 75</span>        <span class="arg">rotated_even</span> <span class="op">=</span> <span class="arg">x_even</span> <span class="op">*</span> <span class="arg">cos</span> <span class="op">-</span> <span class="arg">x_odd</span> <span class="op">*</span> <span class="arg">sin</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 76</span>        <span class="arg">rotated_odd</span> <span class="op">=</span> <span class="arg">x_even</span> <span class="op">*</span> <span class="arg">sin</span> <span class="op">+</span> <span class="arg">x_odd</span> <span class="op">*</span> <span class="arg">cos</span>  <span class="cmt"># (B, H, S, dk//2)</span></span>
+<span class="line"><span class="ln"> 77</span>        <span class="arg">rotated</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">stack</span><span class="op">([</span><span class="arg">rotated_even</span><span class="op">,</span> <span class="arg">rotated_odd</span><span class="op">],</span> <span class="arg">dim</span><span class="op">=-</span><span class="num">1</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk//2, 2)</span></span>
+<span class="line"><span class="ln"> 78</span>        <span class="kw">return</span> <span class="arg">rotated</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">H</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s03 -->
+<section class="section fade-in" id="s03">
+  <div class="container">
+    <span class="section-num">03 · RMSNORM</span>
+    <h2>Root-mean-square normalization — unchanged from LLaMA</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><strong>RMSNorm</strong> divides by the root-mean-square of the features plus <code>norm_eps</code>, then multiplies by a learnable <code>gamma</code> vector — no mean centering. Pre-norm placement in each block is identical to chapter 03.</p>
+        <p>No delta from LLaMA.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">mistral.py</span><span class="code-lines">RMSNorm</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 41</span><span class="kw">class</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 42</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 43</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln"> 44</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">norm_eps</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">norm_eps</span></span>
+<span class="line"><span class="ln"> 45</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">gamma</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Parameter</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">ones</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">))</span>  <span class="cmt"># (dmodel,)</span></span>
+<span class="line"><span class="ln"> 46</span></span>
+<span class="line"><span class="ln"> 47</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 48</span>        <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln"> 49</span>        <span class="arg">rms</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">rsqrt</span><span class="op">(</span><span class="arg">x</span><span class="op">.</span><span class="fn">pow</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="fn">mean</span><span class="op">(</span><span class="arg">dim</span><span class="op">=-</span><span class="num">1</span><span class="op">,</span> <span class="arg">keepdim</span><span class="op">=</span><span class="kw">True</span><span class="op">)</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="arg">norm_eps</span><span class="op">)</span>  <span class="cmt"># (B, S, 1)</span></span>
+<span class="line"><span class="ln"> 50</span>        <span class="kw">return</span> <span class="arg">x</span> <span class="op">*</span> <span class="arg">rms</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">gamma</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p03')">▼ Show original version</div>
+      <div class="prev-content" id="p03">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">LLaMA in chapter 03 — same <strong>RMSNorm</strong> (excerpt from <code>llama.py</code>).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">RMSNorm</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 33</span><span class="kw">class</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 34</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 35</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln"> 36</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">norm_eps</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">norm_eps</span></span>
+<span class="line"><span class="ln"> 37</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">gamma</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Parameter</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">ones</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">))</span>  <span class="cmt"># (dmodel,)</span></span>
+<span class="line"><span class="ln"> 38</span></span>
+<span class="line"><span class="ln"> 39</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 40</span>        <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln"> 41</span>        <span class="arg">rms</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">rsqrt</span><span class="op">(</span><span class="arg">x</span><span class="op">.</span><span class="fn">pow</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="fn">mean</span><span class="op">(</span><span class="arg">dim</span><span class="op">=-</span><span class="num">1</span><span class="op">,</span> <span class="arg">keepdim</span><span class="op">=</span><span class="kw">True</span><span class="op">)</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="arg">norm_eps</span><span class="op">)</span>  <span class="cmt"># (B, S, 1)</span></span>
+<span class="line"><span class="ln"> 42</span>        <span class="kw">return</span> <span class="arg">x</span> <span class="op">*</span> <span class="arg">rms</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">gamma</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s04 -->
+<section class="section fade-in" id="s04">
+  <div class="container">
+    <span class="section-num">04 · SWIGLU</span>
+    <h2>SwiGLU feed-forward — unchanged from LLaMA</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Mistral uses the same <strong>SwiGLU</strong> FFN as LLaMA: three bias-free matrices (<strong>w1</strong> gate, <strong>w2</strong> up, <strong>w3</strong> down) with activation <code>silu(w1(x)) * w2(x)</code>. Inner dimension <code>dff=14336</code> comes from config.</p>
+        <p>No delta from LLaMA.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">mistral.py</span><span class="code-lines">SwiGLUFeedForward</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 53</span><span class="kw">class</span> <span class="fn">SwiGLUFeedForward</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 54</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 55</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln"> 56</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w1</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># gate</span></span>
+<span class="line"><span class="ln"> 57</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w2</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># up</span></span>
+<span class="line"><span class="ln"> 58</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w3</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># down</span></span>
+<span class="line"><span class="ln"> 59</span></span>
+<span class="line"><span class="ln"> 60</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 61</span>        <span class="cmt"># x: (B, S, dmodel) → silu(w1) * w2 → w3 → (B, S, dmodel)</span></span>
+<span class="line"><span class="ln"> 62</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="fn">w3</span><span class="op">(</span><span class="arg">F</span><span class="op">.</span><span class="fn">silu</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="fn">w1</span><span class="op">(</span><span class="arg">x</span><span class="op">))</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="fn">w2</span><span class="op">(</span><span class="arg">x</span><span class="op">))</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p04')">▼ Show original version</div>
+      <div class="prev-content" id="p04">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">LLaMA in chapter 03 — same <strong>SwiGLUFeedForward</strong> (excerpt from <code>llama.py</code>).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">SwiGLUFeedForward</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 45</span><span class="kw">class</span> <span class="fn">SwiGLUFeedForward</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 46</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 47</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln"> 48</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w1</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># (B,S,dmodel) → (B,S,dff) gate</span></span>
+<span class="line"><span class="ln"> 49</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w2</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># (B,S,dmodel) → (B,S,dff) up</span></span>
+<span class="line"><span class="ln"> 50</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">w3</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dff</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># (B,S,dff) → (B,S,dmodel) down</span></span>
+<span class="line"><span class="ln"> 51</span></span>
+<span class="line"><span class="ln"> 52</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 53</span>        <span class="cmt"># x: (B, S, dmodel) → silu(w1) * w2 → w3 → (B, S, dmodel)</span></span>
+<span class="line"><span class="ln"> 54</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="fn">w3</span><span class="op">(</span><span class="arg">F</span><span class="op">.</span><span class="fn">silu</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="fn">w1</span><span class="op">(</span><span class="arg">x</span><span class="op">))</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="fn">w2</span><span class="op">(</span><span class="arg">x</span><span class="op">))</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s05 -->
+<section class="section fade-in" id="s05">
+  <div class="container">
+    <span class="section-num">05 · SLIDING WINDOW GQA</span>
+    <h2>Grouped-query attention with a sliding window mask</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>This is the main delta from chapter 03. <strong>SlidingWindowGQA</strong> keeps the same GQA projections and RoPE application as <code>GQABlock</code>, but the attention mask is no longer full causal — it is <strong>causal ∩ sliding window band</strong>.</p>
+        <p><strong>vs LLaMA 3 8B:</strong> LLaMA uses GQA with <em>full</em> causal attention — every token sees all past tokens (O(N²) attention cost). Mistral adds a local window of W=4096, so each token only attends to the last W positions (O(N×W) over the band). GQA is the same in both; the mask is what changes.</p>
+        <p><code>make_sliding_window_mask</code> builds the mask: lower-triangular (causal) multiplied by a band matrix where token <em>i</em> can attend to positions in <code>[max(0, i−W+1) .. i]</code>. At inference, production systems use a rolling KV cache so memory stays bounded by W rather than growing with sequence length — that optimization is not in this training-style forward pass, but it is why sliding window matters in practice.</p>
+        <div class="formula">mask = tril(1) ⊙ triu(1, diag=−(W−1)) &nbsp;·&nbsp; Attention(Q, K, V) = softmax(QK<sup>T</sup> / √d<sub>k</sub> + mask) V</div>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">mistral.py</span><span class="code-lines">make_sliding_window_mask + SlidingWindowGQA</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 34</span><span class="kw">def</span> <span class="fn">make_sliding_window_mask</span><span class="op">(</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">sliding_window</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 35</span>    <span class="str">""</span><span class="str">"Causal mask ∩ sliding window band: token i attends to [max(0, i-W+1) .. i]."</span><span class="str">""</span></span>
+<span class="line"><span class="ln"> 36</span>    <span class="arg">causal</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">tril</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">ones</span><span class="op">(</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">max_seq_len</span><span class="op">))</span></span>
+<span class="line"><span class="ln"> 37</span>    <span class="arg">window</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">triu</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">ones</span><span class="op">(</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">max_seq_len</span><span class="op">),</span> <span class="arg">diagonal</span><span class="op">=-(</span><span class="arg">sliding_window</span> <span class="op">-</span> <span class="num">1</span><span class="op">))</span></span>
+<span class="line"><span class="ln"> 38</span>    <span class="kw">return</span> <span class="arg">causal</span> <span class="op">*</span> <span class="arg">window</span>  <span class="cmt"># (max_seq_len, max_seq_len)</span></span>
+<span class="line"><span class="ln"></span></span>
+<span class="line"><span class="ln"> 89</span><span class="kw">class</span> <span class="fn">SlidingWindowGQA</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 90</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 91</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln"> 92</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dk</span></span>
+<span class="line"><span class="ln"> 93</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">H</span></span>
+<span class="line"><span class="ln"> 94</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span></span>
+<span class="line"><span class="ln"> 95</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">//</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span></span>
+<span class="line"><span class="ln"> 96</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wq</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">H</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln"> 97</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wk</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln"> 98</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wv</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln"> 99</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wo</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln">100</span></span>
+<span class="line"><span class="ln">101</span>    <span class="op">@</span><span class="kw">staticmethod</span></span>
+<span class="line"><span class="ln">102</span>    <span class="kw">def</span> <span class="fn">repeat_kv</span><span class="op">(</span><span class="arg">x</span><span class="op">,</span> <span class="arg">n_rep</span><span class="op">):</span></span>
+<span class="line"><span class="ln">103</span>        <span class="kw">if</span> <span class="arg">n_rep</span> <span class="op">==</span> <span class="num">1</span><span class="op">:</span></span>
+<span class="line"><span class="ln">104</span>            <span class="kw">return</span> <span class="arg">x</span></span>
+<span class="line"><span class="ln">105</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span></span>
+<span class="line"><span class="ln">106</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="fn">expand</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">n_rep</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span></span>
+<span class="line"><span class="ln">107</span>        <span class="kw">return</span> <span class="arg">x</span><span class="op">.</span><span class="fn">contiguous</span><span class="op">()</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">n_rep</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">108</span></span>
+<span class="line"><span class="ln">109</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">,</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">):</span></span>
+<span class="line"><span class="ln">110</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">_</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">111</span>        <span class="arg">query</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wq</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">112</span>        <span class="arg">key</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wk</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">113</span>        <span class="arg">value</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wv</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">114</span>        <span class="arg">query</span> <span class="op">=</span> <span class="fn">rope</span><span class="op">(</span><span class="arg">query</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">115</span>        <span class="arg">key</span> <span class="op">=</span> <span class="fn">rope</span><span class="op">(</span><span class="arg">key</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">116</span>        <span class="arg">key</span> <span class="op">=</span> <span class="arg">SlidingWindowGQA</span><span class="op">.</span><span class="fn">repeat_kv</span><span class="op">(</span><span class="arg">key</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">117</span>        <span class="arg">value</span> <span class="op">=</span> <span class="arg">SlidingWindowGQA</span><span class="op">.</span><span class="fn">repeat_kv</span><span class="op">(</span><span class="arg">value</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">118</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">query</span> <span class="op">@</span> <span class="arg">key</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(-</span><span class="num">1</span><span class="op">,</span> <span class="op">-</span><span class="num">2</span><span class="op">)</span> <span class="op">/</span> <span class="arg">math</span><span class="op">.</span><span class="fn">sqrt</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">119</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">attn_score</span><span class="op">.</span><span class="fn">masked_fill</span><span class="op">(</span><span class="arg">mask</span><span class="op">[:</span><span class="arg">S</span><span class="op">,</span> <span class="op">:</span><span class="arg">S</span><span class="op">]</span> <span class="op">==</span> <span class="num">0</span><span class="op">,</span> <span class="kw">float</span><span class="op">(</span><span class="str">"-inf"</span><span class="op">))</span></span>
+<span class="line"><span class="ln">120</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">F</span><span class="op">.</span><span class="fn">softmax</span><span class="op">(</span><span class="arg">attn_score</span><span class="op">,</span> <span class="arg">dim</span><span class="op">=-</span><span class="num">1</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">121</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">attn_score</span> <span class="op">@</span> <span class="arg">value</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">122</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="fn">contiguous</span><span class="op">()</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">123</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wo</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p05')">▼ Show original version</div>
+      <div class="prev-content" id="p05">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">LLaMA in chapter 03: <strong>GQABlock</strong> with a full causal mask <code>torch.tril(...)</code> — every past token is visible (excerpt from <code>llama.py</code>).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">GQABlock + full causal mask</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln"> 81</span><span class="kw">class</span> <span class="fn">GQABlock</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 82</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 83</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln"> 84</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dk</span></span>
+<span class="line"><span class="ln"> 85</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">H</span></span>
+<span class="line"><span class="ln"> 86</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">=</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span></span>
+<span class="line"><span class="ln"> 87</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">//</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span></span>
+<span class="line"><span class="ln"> 88</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wq</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">H</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># dmodel → H*dk</span></span>
+<span class="line"><span class="ln"> 89</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wk</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln"> 90</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wv</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln"> 91</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wo</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span>  <span class="cmt"># dmodel → dmodel</span></span>
+<span class="line"><span class="ln"> 92</span></span>
+<span class="line"><span class="ln"> 93</span>    <span class="op">@</span><span class="kw">staticmethod</span></span>
+<span class="line"><span class="ln"> 94</span>    <span class="kw">def</span> <span class="fn">repeat_kv</span><span class="op">(</span><span class="arg">x</span><span class="op">,</span> <span class="arg">n_rep</span><span class="op">):</span></span>
+<span class="line"><span class="ln"> 95</span>        <span class="kw">if</span> <span class="arg">n_rep</span> <span class="op">==</span> <span class="num">1</span><span class="op">:</span></span>
+<span class="line"><span class="ln"> 96</span>            <span class="kw">return</span> <span class="arg">x</span></span>
+<span class="line"><span class="ln"> 97</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span></span>
+<span class="line"><span class="ln"> 98</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="fn">unsqueeze</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="fn">expand</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">n_rep</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span></span>
+<span class="line"><span class="ln"> 99</span>        <span class="kw">return</span> <span class="arg">x</span><span class="op">.</span><span class="fn">contiguous</span><span class="op">()</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">n_kv_heads</span> <span class="op">*</span> <span class="arg">n_rep</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">100</span></span>
+<span class="line"><span class="ln">101</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">,</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">):</span></span>
+<span class="line"><span class="ln">102</span>        <span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">_</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">103</span>        <span class="arg">query</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wq</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">104</span>        <span class="arg">key</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wk</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">105</span>        <span class="arg">value</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wv</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_kv_heads</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">106</span>        <span class="arg">query</span> <span class="op">=</span> <span class="fn">rope</span><span class="op">(</span><span class="arg">query</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">107</span>        <span class="arg">key</span> <span class="op">=</span> <span class="fn">rope</span><span class="op">(</span><span class="arg">key</span><span class="op">)</span>  <span class="cmt"># (B, n_kv, S, dk)</span></span>
+<span class="line"><span class="ln">108</span>        <span class="arg">key</span> <span class="op">=</span> <span class="arg">GQABlock</span><span class="op">.</span><span class="fn">repeat_kv</span><span class="op">(</span><span class="arg">key</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">109</span>        <span class="arg">value</span> <span class="op">=</span> <span class="arg">GQABlock</span><span class="op">.</span><span class="fn">repeat_kv</span><span class="op">(</span><span class="arg">value</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">n_rep</span><span class="op">)</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">110</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">query</span> <span class="op">@</span> <span class="arg">key</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(-</span><span class="num">1</span><span class="op">,</span> <span class="op">-</span><span class="num">2</span><span class="op">)</span> <span class="op">/</span> <span class="arg">math</span><span class="op">.</span><span class="fn">sqrt</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">111</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">attn_score</span><span class="op">.</span><span class="fn">masked_fill</span><span class="op">(</span><span class="arg">mask</span><span class="op">[:</span><span class="arg">S</span><span class="op">,</span> <span class="op">:</span><span class="arg">S</span><span class="op">]</span> <span class="op">==</span> <span class="num">0</span><span class="op">,</span> <span class="kw">float</span><span class="op">(</span><span class="str">"-inf"</span><span class="op">))</span></span>
+<span class="line"><span class="ln">112</span>        <span class="arg">attn_score</span> <span class="op">=</span> <span class="arg">F</span><span class="op">.</span><span class="fn">softmax</span><span class="op">(</span><span class="arg">attn_score</span><span class="op">,</span> <span class="arg">dim</span><span class="op">=-</span><span class="num">1</span><span class="op">)</span>  <span class="cmt"># (B, H, S, S)</span></span>
+<span class="line"><span class="ln">113</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">attn_score</span> <span class="op">@</span> <span class="arg">value</span>  <span class="cmt"># (B, H, S, dk)</span></span>
+<span class="line"><span class="ln">114</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="fn">transpose</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="num">2</span><span class="op">)</span><span class="op">.</span><span class="fn">contiguous</span><span class="op">()</span><span class="op">.</span><span class="fn">view</span><span class="op">(</span><span class="arg">B</span><span class="op">,</span> <span class="arg">S</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">H</span> <span class="op">*</span> <span class="arg">self</span><span class="op">.</span><span class="arg">dk</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">115</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wo</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln"></span></span>
+<span class="line"><span class="ln">142</span>        <span class="arg">self</span><span class="op">.</span><span class="fn">register_buffer</span><span class="op">(</span></span>
+<span class="line"><span class="ln">143</span>            <span class="str">"mask"</span><span class="op">,</span> <span class="arg">torch</span><span class="op">.</span><span class="fn">tril</span><span class="op">(</span><span class="arg">torch</span><span class="op">.</span><span class="fn">ones</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">))</span></span>
+<span class="line"><span class="ln">144</span>        <span class="op">)</span>  <span class="cmt"># (max_seq_len, max_seq_len)</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s06 -->
+<section class="section fade-in" id="s06">
+  <div class="container">
+    <span class="section-num">06 · BLOCK</span>
+    <h2>RMSNorm + SlidingWindowGQA + RMSNorm + SwiGLU</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Block structure is unchanged from LLaMA: two RMSNorms, one attention module, one SwiGLU FFN, pre-norm residuals. The only swap is <code>GQABlock</code> → <code>SlidingWindowGQA</code>; the block still passes <code>(x, rope, mask)</code> through.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">mistral.py</span><span class="code-lines">Block</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">126</span><span class="kw">class</span> <span class="fn">Block</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln">127</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">128</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln">129</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">gqa</span> <span class="op">=</span> <span class="fn">SlidingWindowGQA</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span>
+<span class="line"><span class="ln">130</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">ff</span> <span class="op">=</span> <span class="fn">SwiGLUFeedForward</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span>
+<span class="line"><span class="ln">131</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">rms_1</span> <span class="op">=</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span>  <span class="cmt"># pre-norm before attention</span></span>
+<span class="line"><span class="ln">132</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">rms_2</span> <span class="op">=</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span>  <span class="cmt"># pre-norm before FFN</span></span>
+<span class="line"><span class="ln">133</span></span>
+<span class="line"><span class="ln">134</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">,</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">):</span></span>
+<span class="line"><span class="ln">135</span>        <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">136</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="fn">gqa</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="fn">rms_1</span><span class="op">(</span><span class="arg">x</span><span class="op">),</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">137</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="fn">ff</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="fn">rms_2</span><span class="op">(</span><span class="arg">x</span><span class="op">))</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">138</span>        <span class="kw">return</span> <span class="arg">x</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+    </div>
+    <div class="prev-block">
+      <div class="prev-toggle" onclick="togglePrev('p06')">▼ Show original version</div>
+      <div class="prev-content" id="p06">
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">LLaMA in chapter 03: same block layout with <strong>GQABlock</strong> (excerpt from <code>llama.py</code>).</p>
+        <div class="code-panel" style="margin-top:0;">
+        <div class="code-header"><span class="code-filename">llama.py</span><span class="code-lines">Block</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">118</span><span class="kw">class</span> <span class="fn">Block</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln">119</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">120</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln">121</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">gqa</span> <span class="op">=</span> <span class="fn">GQABlock</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span>
+<span class="line"><span class="ln">122</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">ff</span> <span class="op">=</span> <span class="fn">SwiGLUFeedForward</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span>
+<span class="line"><span class="ln">123</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">rms_1</span> <span class="op">=</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span>  <span class="cmt"># pre-norm before attention</span></span>
+<span class="line"><span class="ln">124</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">rms_2</span> <span class="op">=</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span>  <span class="cmt"># pre-norm before FFN</span></span>
+<span class="line"><span class="ln">125</span></span>
+<span class="line"><span class="ln">126</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">,</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">):</span></span>
+<span class="line"><span class="ln">127</span>        <span class="cmt"># x: (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">128</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="fn">gqa</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="fn">rms_1</span><span class="op">(</span><span class="arg">x</span><span class="op">),</span> <span class="arg">rope</span><span class="op">,</span> <span class="arg">mask</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">129</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">x</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="fn">ff</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="fn">rms_2</span><span class="op">(</span><span class="arg">x</span><span class="op">))</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">130</span>        <span class="kw">return</span> <span class="arg">x</span>  <span class="cmt"># (B, S, dmodel)</span></span></code></pre>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s07 -->
+<section class="section fade-in" id="s07">
+  <div class="container">
+    <span class="section-num">07 · ASSEMBLE MISTRAL</span>
+    <h2>Token embed, RoPE, N blocks, final norm, lm_head</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><code>Mistral</code> owns everything. <strong>wte</strong> maps token IDs to vectors. A single <strong>RotaryPositionalEmbedding</strong> is shared across all blocks. <strong>N Blocks</strong> via <code>nn.ModuleList</code>, each taking <code>(x, rope, mask)</code>. Final <strong>RMSNorm</strong> then <strong>lm_head</strong> projects to vocab with <strong>weight tying</strong>.</p>
+        <p>The delta from LLaMA is the registered mask: <code>make_sliding_window_mask(max_seq_len, sliding_window)</code> instead of a plain causal <code>torch.tril</code>. With the §00 defaults, that is the full <strong>Mistral 7B</strong> stack.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">mistral.py</span><span class="code-lines">Mistral</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">141</span><span class="kw">class</span> <span class="fn">Mistral</span><span class="op">(</span><span class="arg">nn</span><span class="op">.</span><span class="arg">Module</span><span class="op">):</span></span>
+<span class="line"><span class="ln">142</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">config</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="kw">None</span><span class="op">:</span></span>
+<span class="line"><span class="ln">143</span>        <span class="kw">super</span><span class="op">()</span><span class="op">.</span><span class="fn">__init__</span><span class="op">()</span></span>
+<span class="line"><span class="ln">144</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">wte</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Embedding</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">vocabsize</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">)</span>  <span class="cmt"># wte(x): (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">145</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">rope</span> <span class="op">=</span> <span class="fn">RotaryPositionalEmbedding</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span>
+<span class="line"><span class="ln">146</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">blocks</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">ModuleList</span><span class="op">([</span><span class="fn">Block</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span> <span class="kw">for</span> <span class="arg">_</span> <span class="kw">in</span> <span class="fn">range</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">N</span><span class="op">)])</span></span>
+<span class="line"><span class="ln">147</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">norm</span> <span class="op">=</span> <span class="fn">RMSNorm</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel) → (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">148</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">lm_head</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="fn">Linear</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">dmodel</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">vocabsize</span><span class="op">,</span> <span class="arg">bias</span><span class="op">=</span><span class="kw">False</span><span class="op">)</span></span>
+<span class="line"><span class="ln">149</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">lm_head</span><span class="op">.</span><span class="arg">weight</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">wte</span><span class="op">.</span><span class="arg">weight</span>  <span class="cmt"># weight tying</span></span>
+<span class="line"><span class="ln">150</span>        <span class="cmt"># sliding window mask — causal ∩ band of width W</span></span>
+<span class="line"><span class="ln">151</span>        <span class="arg">self</span><span class="op">.</span><span class="fn">register_buffer</span><span class="op">(</span></span>
+<span class="line"><span class="ln">152</span>            <span class="str">"mask"</span><span class="op">,</span></span>
+<span class="line"><span class="ln">153</span>            <span class="fn">make_sliding_window_mask</span><span class="op">(</span><span class="arg">config</span><span class="op">.</span><span class="arg">max_seq_len</span><span class="op">,</span> <span class="arg">config</span><span class="op">.</span><span class="arg">sliding_window</span><span class="op">),</span></span>
+<span class="line"><span class="ln">154</span>        <span class="op">)</span>  <span class="cmt"># (max_seq_len, max_seq_len)</span></span>
+<span class="line"><span class="ln">155</span></span>
+<span class="line"><span class="ln">156</span>    <span class="kw">def</span> <span class="fn">forward</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">x</span><span class="op">):</span></span>
+<span class="line"><span class="ln">157</span>        <span class="arg">_</span><span class="op">,</span> <span class="arg">S</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">shape</span>  <span class="cmt"># x: (B, S)</span></span>
+<span class="line"><span class="ln">158</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">wte</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">159</span>        <span class="kw">for</span> <span class="arg">block</span> <span class="kw">in</span> <span class="arg">self</span><span class="op">.</span><span class="arg">blocks</span><span class="op">:</span></span>
+<span class="line"><span class="ln">160</span>            <span class="arg">x</span> <span class="op">=</span> <span class="fn">block</span><span class="op">(</span><span class="arg">x</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">rope</span><span class="op">,</span> <span class="arg">self</span><span class="op">.</span><span class="arg">mask</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">161</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="fn">norm</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, dmodel)</span></span>
+<span class="line"><span class="ln">162</span>        <span class="kw">return</span> <span class="arg">self</span><span class="op">.</span><span class="fn">lm_head</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>  <span class="cmt"># (B, S, vocabsize)</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s08 -->
+<section class="section fade-in" id="s08">
+  <div class="container">
+    <span class="section-num">08 · COMPARISON</span>
+    <h2>LLaMA 3 (03) vs Mistral 7B (04)</h2>
+    <p>Canonical comparison for this chapter — same pair as the delta card above, with code-level detail after you have read the stack.</p>
+    <div class="code-panel" style="position:static;">
+      <table class="compare-table" role="table">
+        <thead>
+          <tr><th>Axis</th><th>LLaMA 3 8B (03)</th><th>Mistral 7B (04)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Design goal</td><td>Scale + capability (family to 405B)</td><td>Efficiency at ~7B (dense, fast inference)</td></tr>
+          <tr><td>Attention mask</td><td>Full causal — every past token visible</td><td>Sliding window — causal ∩ band W=4096</td></tr>
+          <tr><td>Attention module</td><td><code>GQABlock</code></td><td><code>SlidingWindowGQA</code> (same Q/K/V projections)</td></tr>
+          <tr><td>GQA</td><td>32 Q · 8 KV (4:1)</td><td>32 Q · 8 KV (same)</td></tr>
+          <tr><td>KV cache (inference)</td><td>Grows with sequence length</td><td>Rolling buffer bounded by W</td></tr>
+          <tr><td>RoPE</td><td>Higher <code>rope_theta</code> for long context</td><td>Standard θ=10,000 (v0.1)</td></tr>
+          <tr><td>Embeddings / FFN</td><td><code>wte</code> · RMSNorm · SwiGLU · <code>bias=False</code></td><td>Same stack</td></tr>
+          <tr><td>Context / vocab</td><td>8,192 base; 3.1+ extends with RoPE scaling · 128,256 vocab</td><td>32k <code>max_position_embeddings</code> (HF v0.1); local SWA band 4,096 · 32,000 vocab</td></tr>
+          <tr><td>Scale</td><td>8B · 70B · 405B family</td><td>~7.3B dense (efficiency-focused)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px;font-size:0.9rem;color:var(--text-dim);">Mistral 7B is a LLaMA-style transformer tuned for <strong>fast inference</strong> via sliding-window attention; LLaMA 3 keeps full global attention and scales tokenizer, context, and model family size for stronger general capability.</p>
+  </div>
+</section>
+
+
+<!-- s09: references -->
+<section class="section fade-in" id="s09">
+  <div class="container">
+    <span class="section-num">09 · REFERENCES</span>
+    <h2>Papers &amp; technical sources</h2>
+    <p>Primary reports and references for this chapter. Read these for full equations, training details, and official hyperparameters.</p>
+    <ul class="refs-list">
+      <li><a href="https://arxiv.org/abs/2310.06825" target="_blank" rel="noopener">Mistral 7B (Jiang et al., 2023)</a><span class="ref-note">Sliding-window attention, GQA, SwiGLU — efficiency-focused 7B dense model.</span></li>
+      <li><a href="https://mistral.ai/news/announcing-mistral-7b" target="_blank" rel="noopener">Announcing Mistral 7B (Mistral AI)</a><span class="ref-note">Product blog with sliding-window and rolling-buffer KV cache context.</span></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="Full-size architecture diagram">
+</div>
+
+<script>
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+function togglePrev(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('show');
+  const btn = el.previousElementSibling;
+  btn.textContent = el.classList.contains('show') ? '▲ Hide original version' : '▼ Show original version';
+}
+
+/** Strip syntax-highlight markup; return runnable Python from a .code-block */
+function extractCodeText(panel) {
+  const codeEl = panel.querySelector('.code-block code');
+  if (!codeEl) return '';
+  const lines = codeEl.querySelectorAll('.line');
+  if (!lines.length) return codeEl.textContent.trim();
+  return Array.from(lines).map(line => {
+    const clone = line.cloneNode(true);
+    clone.querySelectorAll('.ln').forEach(el => el.remove());
+    return clone.textContent.replace(/\s+$/, '');
+  }).join('\n');
+}
+
+function copyPanelCode(btn, panel) {
+  const text = extractCodeText(panel);
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+
+function initCodeCopyButtons() {
+  document.querySelectorAll('.code-panel').forEach(panel => {
+    const header = panel.querySelector('.code-header');
+    if (!header || header.querySelector('.code-copy-btn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'code-copy-btn';
+    btn.setAttribute('aria-label', 'Copy code to clipboard');
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => copyPanelCode(btn, panel));
+    header.appendChild(btn);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initCodeCopyButtons();
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('visible', window.scrollY > 320);
+  });
+});
+</script>
+
+
+<!-- ── Share ──────────────────────────────────────────────────────────────── -->
+<section class="share-section">
+  <p class="share-label">Share this post</p>
+  <div class="share-buttons">
+
+    <a class="share-btn share-x" id="share-x" href="#" target="_blank" rel="noopener">
+      <!-- Twitter icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+      Twitter
+    </a>
+
+    <a class="share-btn share-reddit" id="share-reddit" href="#" target="_blank" rel="noopener">
+      <!-- Reddit icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+      </svg>
+      Reddit
+    </a>
+
+    <a class="share-btn share-linkedin" id="share-linkedin" href="#" target="_blank" rel="noopener">
+      <!-- LinkedIn icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.37V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.59 0 4.26 2.36 4.26 5.44v6.3zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.46C23.2 24 24 23.23 24 22.27V1.73C24 .77 23.2 0 22.23 0z"/>
+      </svg>
+      LinkedIn
+    </a>
+
+    <a class="share-btn share-facebook" id="share-facebook" href="#" target="_blank" rel="noopener">
+      <!-- Facebook icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+      </svg>
+      Facebook
+    </a>
+
+  </div>
+</section>
+
+<style>
+/* ── Share section ───────────────────────────────────────────────────────── */
+.share-section {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 24px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+.share-label {
+  font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8888a0;
+  margin-bottom: 14px;
+}
+.share-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  text-decoration: none;
+  border: 1px solid var(--border, #2a2a3a);
+  background: var(--bg-card, #12121a);
+  color: var(--text-dim, #8888a0);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  cursor: pointer;
+}
+.share-btn svg {
+  width: 15px; height: 15px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+.share-btn:hover { text-decoration: none; }
+.share-x:hover       { border-color: var(--text, #e0e0e8); color: var(--text, #e0e0e8); }
+.share-reddit:hover  { border-color: #ff4500; color: #ff4500; }
+.share-linkedin:hover{ border-color: #0a66c2; color: #0a66c2; }
+.share-facebook:hover{ border-color: #1877f2; color: #1877f2; }
+</style>
+
+<script>
+/* Set share URLs using the current page URL and title */
+(function() {
+  var url   = encodeURIComponent(window.location.href);
+  var title = encodeURIComponent(document.title);
+  document.getElementById('share-x').href        = 'https://twitter.com/intent/tweet?url=' + url + '&text=' + title;
+  document.getElementById('share-reddit').href   = 'https://reddit.com/submit?url=' + url + '&title=' + title;
+  document.getElementById('share-linkedin').href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + url;
+  document.getElementById('share-facebook').href = 'https://www.facebook.com/sharer/sharer.php?u=' + url;
+})();
+</script>
+
+<!-- ── Comments ──────────────────────────────────────────────────────────── -->
+<section class="comments-section">
+  <h2>Comments</h2>
+  <script src="https://utteranc.es/client.js"
+          repo="abhibisht89/llamasearch-blogs"
+          issue-term="pathname"
+          label="💬 comment"
+          theme="github-dark"
+          crossorigin="anonymous"
+          async>
+  </script>
+</section>
+
+<style>
+/* ── Comments section styling ────────────────────────────────────────────── */
+.comments-section {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+.comments-section h2 {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+/* Make the utterances iframe blend with the dark background */
+.utterances {
+  max-width: 100% !important;
+}
+</style>
+
+<script>
+/* Dark / light mode toggle — reads/writes localStorage key 'tcw-theme' */
+(function(){
+  var btn  = document.getElementById('themeToggle');
+  var root = document.documentElement;
+  function syncUtterances(theme) {
+    var frame = document.querySelector('.utterances-frame');
+    if (!frame) return;
+    frame.contentWindow.postMessage(
+      { type: 'set-theme', theme: theme === 'light' ? 'github-light' : 'github-dark' },
+      'https://utteranc.es'
+    );
+  }
+  window.addEventListener('message', function(e) {
+    if (e.origin === 'https://utteranc.es') {
+      var isLight = root.getAttribute('data-theme') === 'light';
+      syncUtterances(isLight ? 'light' : 'dark');
+    }
+  });
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      root.removeAttribute('data-theme');
+      localStorage.setItem('tcw-theme','dark');
+      syncUtterances('dark');
+    } else {
+      root.setAttribute('data-theme','light');
+      localStorage.setItem('tcw-theme','light');
+      syncUtterances('light');
+    }
+  });
+})();
+</script>
+</body>
+</html>
