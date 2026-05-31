@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>The Training Loop — The Evolving Transformer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+  --bg-nav: rgba(10,10,15,0.92); --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 12px; }
+h2 { font-size: 1.35rem; font-weight: 700; margin: 0 0 16px; color: var(--text); }
+h3 { font-size: 1.05rem; font-weight: 600; margin: 20px 0 10px; color: var(--text); }
+.lead { color: var(--text-dim); font-size: 1.05rem; max-width: 640px; margin: 0 auto; }
+p { color: var(--text-dim); font-size: 0.95rem; margin: 0 0 12px; }
+p:last-child { margin-bottom: 0; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent3); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 65vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 72px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(52,211,153,0.12) 0%, transparent 70%); pointer-events: none; }
+.stats { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+.stat-val { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent3), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.chapter-intro { max-width: 900px; margin: 0 auto; padding: 48px 24px 8px; }
+.chapter-intro p { font-size: 1.02rem; line-height: 1.7; margin-bottom: 14px; }
+.code-section { margin: 28px 0; }
+.code-explanation { margin-bottom: 18px; }
+.code-explanation p { color: var(--text-dim); }
+.code-explanation p strong { color: var(--text); }
+.code-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.78rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); margin-left: auto; margin-right: 4px; }
+.code-copy-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-family: var(--sans);
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.code-copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+.code-copy-btn.copied { border-color: var(--accent3); color: var(--accent3); background: rgba(52, 211, 153, 0.08); }
+.code-block { padding: 14px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.52; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; color: inherit; }
+.ln { display: inline-block; width: 34px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 12px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.09); border-left: 2px solid var(--accent); margin-left: -14px; padding-left: 12px; }
+.kw { color: var(--accent4); }
+.fn { color: var(--accent); }
+.arg { color: var(--accent3); }
+.str { color: var(--accent5); }
+.num { color: var(--accent3); }
+.cmt { color: var(--text-dim); font-style: italic; }
+.op { color: var(--accent2); }
+.callout { background: rgba(52,211,153,0.08); border-left: 3px solid var(--accent3); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 0.9rem; }
+.callout p { color: var(--text); margin: 0; }
+.callout-accent { background: rgba(108,140,255,0.08); border-left-color: var(--accent); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; margin: 14px 0; font-family: var(--mono); font-size: 0.9rem; text-align: center; color: var(--text); overflow-x: auto; }
+.config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 18px 0; font-size: 0.88rem; }
+.config-item { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.config-item code { font-family: var(--mono); color: var(--accent); font-size: 0.85em; }
+.config-item span { color: var(--text-dim); display: block; margin-top: 4px; font-size: 0.82rem; }
+.fade-in { opacity: 0; transform: translateY(18px); transition: all 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.flow-diagram { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; margin: 24px 0; font-family: var(--mono); font-size: 0.78rem; }
+.flow-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); }
+.flow-arrow { color: var(--accent3); }
+.shape-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 16px 0; }
+.shape-table th, .shape-table td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+.shape-table th { background: var(--bg-card-alt); color: var(--text); font-family: var(--mono); font-weight: 600; }
+.shape-table td { color: var(--text-dim); font-family: var(--mono); font-size: 0.82rem; }
+.shape-table code { color: var(--accent3); }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: var(--bg-nav); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 600; color: var(--text); font-size: 0.9rem; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; max-width: 70%; }
+.nav-links a { color: var(--text-dim); text-decoration: none; font-family: var(--mono); font-size: 0.72rem; padding: 2px 5px; border-radius: 4px; }
+.nav-links a:hover { color: var(--accent3); background: rgba(52,211,153,0.1); }
+ul.bullet { margin: 0 0 14px 20px; color: var(--text-dim); font-size: 0.93rem; }
+ul.bullet li { margin-bottom: 6px; }
+</style>
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--bg-nav); backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: var(--border); }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px !important; }
+.theme-toggle { margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; color: var(--text-dim); cursor: pointer; }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun { display: block; }
+.code-source-bar { position: fixed; top: 96px; right: 24px; z-index: 90; }
+.code-github-pill { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 0.82rem; text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; background: var(--bg); }
+.code-github-pill:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+<script>
+const SERIES_LIVE = true;
+if (!SERIES_LIVE) { window.location.replace('../'); }
+(function(){ var t = localStorage.getItem('tcw-theme'); if (t === 'light') document.documentElement.setAttribute('data-theme','light'); })();
+</script>
+</head>
+<body>
+<nav class="breadcrumb-nav">
+  <a href="../../../">The Context Window</a><span class="bc-sep">›</span>
+  <a href="../">The Evolving Transformer</a><span class="bc-sep">›</span>
+  <span class="bc-current">The Training Loop</span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+    <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>
+  </button>
+</nav>
+<div class="code-source-bar">
+  <a href="https://github.com/abhibisht89/llamasearch-blogs/tree/main/the-evolving-transformer/99-the-training-loop" target="_blank" rel="noopener" class="code-github-pill">GitHub · chapter folder</a>
+</div>
+
+<nav class="nav" id="sectionNav">
+  <span class="nav-title">Training Loop</span>
+  <div class="nav-links">
+    <a href="#s00">00</a><a href="#s01">01</a><a href="#s02">02</a><a href="#s03">03</a>
+    <a href="#s04">04</a><a href="#s05">05</a><a href="#s06">06</a>
+    <a href="#s07">07</a><a href="#s08">08</a><a href="#s09">09</a>
+    <a href="#s10">10</a><a href="#s11">11</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <p class="section-num" style="color:var(--accent3);">THE EVOLVING TRANSFORMER · 99</p>
+  <h1>The Training Loop</h1>
+  <p class="lead">Other chapters teach <em>what</em> each architecture is. This chapter teaches <em>how any of them learns</em> — dataset, batches, loss, backward pass, validation, and generation in one reusable script.</p>
+  <div class="stats">
+    <div><span class="stat-val">3</span><span class="stat-label">Python modules</span></div>
+    <div><span class="stat-val">~65</span><span class="stat-label">Char vocab</span></div>
+    <div><span class="stat-val">500</span><span class="stat-label">Training steps</span></div>
+  </div>
+</header>
+
+<div class="chapter-intro fade-in">
+  <p>Every architecture chapter in this series ends with <code>forward(x) → logits</code> of shape <strong>(B, S, vocab)</strong>. That is the <em>inference</em> path: given token IDs, predict a distribution over the vocabulary at every position. Training adds one more ingredient: a <strong>target sequence</strong> <code>y</code> and a loss that measures how wrong those predictions are.</p>
+  <p>The objective is <strong>causal language modeling</strong>: at position <code>i</code>, the model may only attend to tokens <code>0…i</code> (already enforced by the causal mask in each decoder), and we ask it to predict token <code>y[i]</code> — the token that actually comes next in the text. We train on every position in parallel inside one forward pass, then average the cross-entropy across all <code>B × S</code> positions.</p>
+  <p>This chapter is deliberately <strong>model-agnostic</strong>. <code>train.py</code> owns the loop; <code>dataset.py</code> owns the data; the only hook that names a specific architecture is <code>build_model(vocab_size)</code>. The default example imports <a href="../02-gpt-2/">GPT-2 from Stop 02</a> so you reuse the same <code>gpt2.py</code> you already studied.</p>
+  <p>We train on <strong>TinyShakespeare</strong> at <strong>character level</strong> (~65 unique symbols) so a machine finishes 500 steps in minutes. Production stacks use BPE or SentencePiece with vocab sizes in the tens of thousands; the loop does not change — only the tokenizer and <code>vocab_size</code> passed into <code>build_model</code>.</p>
+</div>
+
+<!-- s00 -->
+<section class="section fade-in" id="s00">
+  <div class="container">
+    <span class="section-num">00 · OVERVIEW</span>
+    <h2>From architecture to learning</h2>
+    <p>Think of training as a pipeline with two halves. The <strong>data half</strong> turns raw text into batches <code>(x, y)</code> on your device. The <strong>optimization half</strong> runs the model, computes loss, backpropagates, and updates weights. Evaluation and generation sit at the end to answer: “did anything actually learn?”</p>
+    <div class="flow-diagram">
+      <span class="flow-box">download text</span><span class="flow-arrow">→</span>
+      <span class="flow-box">encode chars</span><span class="flow-arrow">→</span>
+      <span class="flow-box">sliding windows</span><span class="flow-arrow">→</span>
+      <span class="flow-box">DataLoader</span><span class="flow-arrow">→</span>
+      <span class="flow-box">forward</span><span class="flow-arrow">→</span>
+      <span class="flow-box">CE loss</span><span class="flow-arrow">→</span>
+      <span class="flow-box">backward</span><span class="flow-arrow">→</span>
+      <span class="flow-box">AdamW</span><span class="flow-arrow">→</span>
+      <span class="flow-box">val loss</span><span class="flow-arrow">→</span>
+      <span class="flow-box">sample text</span>
+    </div>
+    <div class="callout callout-accent">
+      <p><strong>Files in this folder:</strong> <code>dataset.py</code>, <code>train.py</code>, <code>test.py</code>. Weights for the default run live in <a href="../02-gpt-2/gpt2.py">02-gpt-2/gpt2.py</a> and are imported at runtime via <code>sys.path</code>.</p>
+    </div>
+    <p>The same five-line inner step trains GPT-2, LLaMA, Mistral, or any other decoder in this series. Swapping models means changing <code>build_model()</code> and the config object — not rewriting the loop.</p>
+  </div>
+</section>
+
+<!-- s01 -->
+<section class="section fade-in" id="s01">
+  <div class="container">
+    <span class="section-num">01 · HYPERPARAMETERS</span>
+    <h2>Knobs at the top of train.py</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>All training hyperparameters live as module-level constants in <code>train.py</code>. That keeps the script easy to read and tweak without argparse for every knob. Only the post-training <code>--prompt</code> flag is exposed on the command line.</p>
+        <p><code>MAX_SEQ_LEN = 256</code> is smaller than GPT-2’s paper context (1024) on purpose: shorter windows mean more samples per epoch and faster iterations on CPU/MPS. The model’s <code>GPTConfig.max_seq_len</code> must match so positional embeddings and causal masks agree with the batch shape.</p>
+      </div>
+      <div class="config-grid">
+        <div class="config-item"><code>N_STEPS</code><span>500 optimizer steps (not epochs)</span></div>
+        <div class="config-item"><code>EVAL_INTERVAL</code><span>Log train + val loss every 50 steps</span></div>
+        <div class="config-item"><code>EVAL_STEPS</code><span>20 val batches per evaluation</span></div>
+        <div class="config-item"><code>BATCH_SIZE</code><span>16 sequences per step</span></div>
+        <div class="config-item"><code>LR</code><span>3e-4 — AdamW learning rate</span></div>
+        <div class="config-item"><code>MAX_SEQ_LEN</code><span>256 tokens per window</span></div>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">constants + device</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="arg">N_STEPS</span> <span class="op">=</span> <span class="num">500</span></span>
+<span class="line"><span class="ln">2</span><span class="arg">EVAL_INTERVAL</span> <span class="op">=</span> <span class="num">50</span></span>
+<span class="line"><span class="ln">3</span><span class="arg">EVAL_STEPS</span> <span class="op">=</span> <span class="num">20</span></span>
+<span class="line"><span class="ln">4</span><span class="arg">BATCH_SIZE</span> <span class="op">=</span> <span class="num">16</span></span>
+<span class="line"><span class="ln">5</span><span class="arg">LR</span> <span class="op">=</span> <span class="num">3e-4</span></span>
+<span class="line"><span class="ln">6</span><span class="arg">MAX_SEQ_LEN</span> <span class="op">=</span> <span class="num">256</span></span>
+<span class="line"><span class="ln">7</span></span>
+<span class="line"><span class="ln">8</span><span class="kw">if</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">cuda</span><span class="op">.</span><span class="arg">is_available</span><span class="op">():</span></span>
+<span class="line"><span class="ln">9</span>    <span class="arg">DEVICE</span> <span class="op">=</span> <span class="str">"cuda"</span></span>
+<span class="line"><span class="ln">10</span><span class="kw">elif</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">backends</span><span class="op">.</span><span class="arg">mps</span><span class="op">.</span><span class="arg">is_available</span><span class="op">():</span></span>
+<span class="line"><span class="ln">11</span>    <span class="arg">DEVICE</span> <span class="op">=</span> <span class="str">"mps"</span></span>
+<span class="line"><span class="ln">12</span><span class="kw">else</span><span class="op">:</span></span>
+<span class="line"><span class="ln">13</span>    <span class="arg">DEVICE</span> <span class="op">=</span> <span class="str">"cpu"</span></span></code></pre>
+      </div>
+      <p>Device selection is automatic: NVIDIA GPU if present, else Apple Silicon <code>mps</code>, else CPU. Every batch is moved with <code>x.to(DEVICE)</code> and <code>y.to(DEVICE)</code> right before the forward pass.</p>
+    </div>
+  </div>
+</section>
+
+<!-- s02 -->
+<section class="section fade-in" id="s02">
+  <div class="container">
+    <span class="section-num">02 · DOWNLOAD</span>
+    <h2>dataset.py — fetching TinyShakespeare</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Karpathy’s TinyShakespeare is a ~1MB slice of Shakespeare plays — small enough to download in seconds, rich enough to see loss drop. <code>download_dataset()</code> checks for <code>tinyshakespeare.txt</code> beside the script; if missing, it pulls from GitHub:</p>
+        <p style="font-family:var(--mono);font-size:0.82rem;word-break:break-all;"><a href="https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt" target="_blank" rel="noopener">https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt</a></p>
+        <p>Keeping the URL in <code>DATA_URL</code> documents the source in code and lets <code>train.py</code> print it when you start a run.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">dataset.py</span><span class="code-lines">download_dataset</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="arg">DATA_URL</span> <span class="op">=</span> <span class="str">"https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"</span></span>
+<span class="line"><span class="ln">2</span><span class="arg">DATA_PATH</span> <span class="op">=</span> <span class="str">"tinyshakespeare.txt"</span></span>
+<span class="line"><span class="ln">3</span></span>
+<span class="line"><span class="ln">4</span><span class="kw">def</span> <span class="fn">download_dataset</span><span class="op">():</span></span>
+<span class="line"><span class="ln">5</span>    <span class="kw">if</span> <span class="kw">not</span> <span class="arg">os</span><span class="op">.</span><span class="arg">path</span><span class="op">.</span><span class="arg">exists</span><span class="op">(</span><span class="arg">DATA_PATH</span><span class="op">):</span></span>
+<span class="line"><span class="ln">6</span>        <span class="fn">print</span><span class="op">(</span><span class="arg">f</span><span class="str">"Downloading TinyShakespeare to {DATA_PATH}..."</span><span class="op">)</span></span>
+<span class="line"><span class="ln">7</span>        <span class="arg">urllib</span><span class="op">.</span><span class="arg">request</span><span class="op">.</span><span class="arg">urlretrieve</span><span class="op">(</span><span class="arg">DATA_URL</span><span class="op">,</span> <span class="arg">DATA_PATH</span><span class="op">)</span></span>
+<span class="line"><span class="ln">8</span>        <span class="fn">print</span><span class="op">(</span><span class="str">"Done."</span><span class="op">)</span></span>
+<span class="line"><span class="ln">9</span>    <span class="kw">else</span><span class="op">:</span></span>
+<span class="line"><span class="ln">10</span>        <span class="fn">print</span><span class="op">(</span><span class="arg">f</span><span class="str">"Dataset already exists at {DATA_PATH}"</span><span class="op">)</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s03 -->
+<section class="section fade-in" id="s03">
+  <div class="container">
+    <span class="section-num">03 · TOKENIZER</span>
+    <h2>CharTokenizer — vocabulary from the corpus</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><code>CharTokenizer</code> is the simplest possible tokenizer: one integer ID per unique character in the training text. Shakespeare’s charset includes letters, punctuation, and newlines — typically <strong>~65 symbols</strong>, far smaller than GPT-2’s 50,257 BPE merges.</p>
+        <p><code>encode</code> maps a string to a list of ints; <code>decode</code> maps back. There is no <code>&lt;unk&gt;</code> token because every character in the file appeared when we built the vocab. At inference time, any character outside that set would crash — another reason production systems use subword tokenizers with explicit unknown handling.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">dataset.py</span><span class="code-lines">CharTokenizer</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">class</span> <span class="arg">CharTokenizer</span><span class="op">:</span></span>
+<span class="line"><span class="ln">2</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">text</span><span class="op">:</span> <span class="arg">str</span><span class="op">):</span></span>
+<span class="line"><span class="ln">3</span>        <span class="arg">chars</span> <span class="op">=</span> <span class="fn">sorted</span><span class="op">(</span><span class="fn">set</span><span class="op">(</span><span class="arg">text</span><span class="op">))</span></span>
+<span class="line"><span class="ln">4</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">vocab_size</span> <span class="op">=</span> <span class="fn">len</span><span class="op">(</span><span class="arg">chars</span><span class="op">)</span></span>
+<span class="line"><span class="ln">5</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">char_to_id</span> <span class="op">=</span> <span class="op">{</span><span class="arg">c</span><span class="op">:</span> <span class="arg">i</span> <span class="kw">for</span> <span class="arg">i</span><span class="op">,</span> <span class="arg">c</span> <span class="kw">in</span> <span class="fn">enumerate</span><span class="op">(</span><span class="arg">chars</span><span class="op">)}</span></span>
+<span class="line"><span class="ln">6</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">id_to_char</span> <span class="op">=</span> <span class="op">{</span><span class="arg">i</span><span class="op">:</span> <span class="arg">c</span> <span class="kw">for</span> <span class="arg">i</span><span class="op">,</span> <span class="arg">c</span> <span class="kw">in</span> <span class="fn">enumerate</span><span class="op">(</span><span class="arg">chars</span><span class="op">)}</span></span>
+<span class="line"><span class="ln">7</span></span>
+<span class="line"><span class="ln">8</span>    <span class="kw">def</span> <span class="fn">encode</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">text</span><span class="op">:</span> <span class="arg">str</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="arg">list</span><span class="op">[</span><span class="arg">int</span><span class="op">]:</span></span>
+<span class="line"><span class="ln">9</span>        <span class="kw">return</span> <span class="op">[</span><span class="arg">self</span><span class="op">.</span><span class="arg">char_to_id</span><span class="op">[</span><span class="arg">c</span><span class="op">]</span> <span class="kw">for</span> <span class="arg">c</span> <span class="kw">in</span> <span class="arg">text</span><span class="op">]</span></span>
+<span class="line"><span class="ln">10</span></span>
+<span class="line"><span class="ln">11</span>    <span class="kw">def</span> <span class="fn">decode</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">ids</span><span class="op">:</span> <span class="arg">list</span><span class="op">[</span><span class="arg">int</span><span class="op">])</span> <span class="op">-&gt;</span> <span class="arg">str</span><span class="op">:</span></span>
+<span class="line"><span class="ln">12</span>        <span class="kw">return</span> <span class="str">""</span><span class="op">.</span><span class="arg">join</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">id_to_char</span><span class="op">[</span><span class="arg">i</span><span class="op">]</span> <span class="kw">for</span> <span class="arg">i</span> <span class="kw">in</span> <span class="arg">ids</span><span class="op">)</span></span></code></pre>
+      </div>
+      <p>After tokenization, the full play is one long tensor of IDs. Training never shuffles characters inside a window — only <em>which starting index</em> each batch sample uses.</p>
+    </div>
+  </div>
+</section>
+
+<!-- s04 -->
+<section class="section fade-in" id="s04">
+  <div class="container">
+    <span class="section-num">04 · WINDOWS</span>
+    <h2>CharDataset — sliding (x, y) pairs</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Language modeling needs pairs: <strong>input</strong> <code>x</code> and <strong>target</strong> <code>y</code> shifted by one token. For window length <code>S = max_seq_len</code>, index <code>idx</code> takes a contiguous slice of length <code>S + 1</code> from the token stream:</p>
+        <ul class="bullet">
+          <li><code>x = chunk[:-1]</code> — tokens the model is allowed to see (length <code>S</code>)</li>
+          <li><code>y = chunk[1:]</code> — the next character at each position (length <code>S</code>)</li>
+        </ul>
+        <p>Concrete example with <code>S = 4</code> and text <code>"ROMEO"</code> encoded as <code>[17, 24, 22, 8, 20]</code>:</p>
+      </div>
+      <div class="formula">x = [17, 24, 22, 8]  →  predict  →  y = [24, 22, 8, 20]</div>
+      <p>At position 0 the model sees <code>17</code> ('R') and should predict <code>24</code> ('O'). At position 3 it sees <code>8</code> ('E') and should predict <code>20</code> ('O'). Causal attention in the transformer ensures position <code>i</code> never peeks at future tokens in <code>x</code>.</p>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">dataset.py</span><span class="code-lines">CharDataset</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">class</span> <span class="fn">CharDataset</span><span class="op">(</span><span class="arg">Dataset</span><span class="op">):</span></span>
+<span class="line"><span class="ln">2</span>    <span class="kw">def</span> <span class="fn">__init__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">token_ids</span><span class="op">:</span> <span class="arg">list</span><span class="op">[</span><span class="arg">int</span><span class="op">],</span> <span class="arg">max_seq_len</span><span class="op">:</span> <span class="arg">int</span><span class="op">):</span></span>
+<span class="line"><span class="ln">3</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">data</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">tensor</span><span class="op">(</span><span class="arg">token_ids</span><span class="op">,</span> <span class="arg">dtype</span><span class="op">=</span><span class="arg">torch</span><span class="op">.</span><span class="arg">long</span><span class="op">)</span></span>
+<span class="line"><span class="ln">4</span>        <span class="arg">self</span><span class="op">.</span><span class="arg">max_seq_len</span> <span class="op">=</span> <span class="arg">max_seq_len</span></span>
+<span class="line"><span class="ln">5</span></span>
+<span class="line"><span class="ln">6</span>    <span class="kw">def</span> <span class="fn">__len__</span><span class="op">(</span><span class="arg">self</span><span class="op">):</span></span>
+<span class="line"><span class="ln">7</span>        <span class="kw">return</span> <span class="fn">len</span><span class="op">(</span><span class="arg">self</span><span class="op">.</span><span class="arg">data</span><span class="op">)</span> <span class="op">-</span> <span class="arg">self</span><span class="op">.</span><span class="arg">max_seq_len</span></span>
+<span class="line"><span class="ln">8</span></span>
+<span class="line"><span class="ln">9</span>    <span class="kw">def</span> <span class="fn">__getitem__</span><span class="op">(</span><span class="arg">self</span><span class="op">,</span> <span class="arg">idx</span><span class="op">):</span></span>
+<span class="line"><span class="ln">10</span>        <span class="arg">chunk</span> <span class="op">=</span> <span class="arg">self</span><span class="op">.</span><span class="arg">data</span><span class="op">[</span><span class="arg">idx</span> <span class="op">:</span> <span class="arg">idx</span> <span class="op">+</span> <span class="arg">self</span><span class="op">.</span><span class="arg">max_seq_len</span> <span class="op">+</span> <span class="num">1</span><span class="op">]</span></span>
+<span class="line"><span class="ln">11</span>        <span class="kw">return</span> <span class="arg">chunk</span><span class="op">[:-</span><span class="num">1</span><span class="op">],</span> <span class="arg">chunk</span><span class="op">[</span><span class="num">1</span><span class="op">:]</span></span></code></pre>
+      </div>
+      <p><code>__len__</code> is <code>len(tokens) - S</code> because the last valid start index must still fit <code>S + 1</code> characters. With ~1M characters and <code>S = 256</code>, you get on the order of <strong>a million training windows</strong> — far more than 500 optimizer steps, which is why the training loop restarts the DataLoader iterator when an epoch ends.</p>
+    </div>
+  </div>
+</section>
+
+<!-- s05 -->
+<section class="section fade-in" id="s05">
+  <div class="container">
+    <span class="section-num">05 · DATALOADERS</span>
+    <h2>Train / validation split</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><code>get_dataloaders()</code> ties everything together: download, read file, build tokenizer, encode full text, split, wrap in <code>DataLoader</code>.</p>
+        <p>The split is <strong>chronological</strong>: the first 90% of tokens train, the last 10% validate. We do <em>not</em> shuffle tokens before splitting — that would leak future plot into training windows. Shuffling happens only across <strong>window start indices</strong> in the train loader (<code>shuffle=True</code>).</p>
+        <p>Both loaders use <code>drop_last=True</code> so every batch has exactly <code>BATCH_SIZE</code> sequences — no partial batch edge cases in the demo loop.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">dataset.py</span><span class="code-lines">get_dataloaders</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">get_dataloaders</span><span class="op">(</span><span class="arg">max_seq_len</span><span class="op">:</span> <span class="arg">int</span><span class="op">,</span> <span class="arg">batch_size</span><span class="op">:</span> <span class="arg">int</span><span class="op">,</span> <span class="arg">val_fraction</span><span class="op">:</span> <span class="arg">float</span> <span class="op">=</span> <span class="num">0.1</span><span class="op">):</span></span>
+<span class="line"><span class="ln">2</span>    <span class="fn">download_dataset</span><span class="op">()</span></span>
+<span class="line"><span class="ln">3</span>    <span class="kw">with</span> <span class="fn">open</span><span class="op">(</span><span class="arg">DATA_PATH</span><span class="op">,</span> <span class="str">"r"</span><span class="op">,</span> <span class="arg">encoding</span><span class="op">=</span><span class="str">"utf-8"</span><span class="op">)</span> <span class="kw">as</span> <span class="arg">f</span><span class="op">:</span></span>
+<span class="line"><span class="ln">4</span>        <span class="arg">text</span> <span class="op">=</span> <span class="arg">f</span><span class="op">.</span><span class="arg">read</span><span class="op">()</span></span>
+<span class="line"><span class="ln">5</span></span>
+<span class="line"><span class="ln">6</span>    <span class="arg">tokenizer</span> <span class="op">=</span> <span class="fn">CharTokenizer</span><span class="op">(</span><span class="arg">text</span><span class="op">)</span></span>
+<span class="line"><span class="ln">7</span>    <span class="arg">token_ids</span> <span class="op">=</span> <span class="arg">tokenizer</span><span class="op">.</span><span class="arg">encode</span><span class="op">(</span><span class="arg">text</span><span class="op">)</span></span>
+<span class="line"><span class="ln">8</span></span>
+<span class="line"><span class="ln">9</span>    <span class="arg">split</span> <span class="op">=</span> <span class="fn">int</span><span class="op">(</span><span class="fn">len</span><span class="op">(</span><span class="arg">token_ids</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="num">1</span> <span class="op">-</span> <span class="arg">val_fraction</span><span class="op">))</span></span>
+<span class="line"><span class="ln">10</span>    <span class="arg">train_dataset</span> <span class="op">=</span> <span class="fn">CharDataset</span><span class="op">(</span><span class="arg">token_ids</span><span class="op">[:</span><span class="arg">split</span><span class="op">],</span> <span class="arg">max_seq_len</span><span class="op">)</span></span>
+<span class="line"><span class="ln">11</span>    <span class="arg">val_dataset</span> <span class="op">=</span> <span class="fn">CharDataset</span><span class="op">(</span><span class="arg">token_ids</span><span class="op">[</span><span class="arg">split</span><span class="op">:],</span> <span class="arg">max_seq_len</span><span class="op">)</span></span>
+<span class="line"><span class="ln">12</span></span>
+<span class="line"><span class="ln">13</span>    <span class="arg">train_loader</span> <span class="op">=</span> <span class="fn">DataLoader</span><span class="op">(</span></span>
+<span class="line"><span class="ln">14</span>        <span class="arg">train_dataset</span><span class="op">,</span> <span class="arg">batch_size</span><span class="op">=</span><span class="arg">batch_size</span><span class="op">,</span> <span class="arg">shuffle</span><span class="op">=</span><span class="kw">True</span><span class="op">,</span> <span class="arg">drop_last</span><span class="op">=</span><span class="kw">True</span></span>
+<span class="line"><span class="ln">15</span>    <span class="op">)</span></span>
+<span class="line"><span class="ln">16</span>    <span class="arg">val_loader</span> <span class="op">=</span> <span class="fn">DataLoader</span><span class="op">(</span></span>
+<span class="line"><span class="ln">17</span>        <span class="arg">val_dataset</span><span class="op">,</span> <span class="arg">batch_size</span><span class="op">=</span><span class="arg">batch_size</span><span class="op">,</span> <span class="arg">shuffle</span><span class="op">=</span><span class="kw">False</span><span class="op">,</span> <span class="arg">drop_last</span><span class="op">=</span><span class="kw">True</span></span>
+<span class="line"><span class="ln">18</span>    <span class="op">)</span></span>
+<span class="line"><span class="ln">19</span>    <span class="kw">return</span> <span class="arg">train_loader</span><span class="op">,</span> <span class="arg">val_loader</span><span class="op">,</span> <span class="arg">tokenizer</span></span></code></pre>
+      </div>
+      <table class="shape-table">
+        <thead><tr><th>Tensor</th><th>Shape</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>x</code></td><td><code>(B, S)</code></td><td>Input token IDs — here B=16, S=256</td></tr>
+          <tr><td><code>y</code></td><td><code>(B, S)</code></td><td>Target token IDs, shifted by 1</td></tr>
+          <tr><td><code>logits</code></td><td><code>(B, S, vocab)</code></td><td>Unnormalized scores per position</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- s06 -->
+<section class="section fade-in" id="s06">
+  <div class="container">
+    <span class="section-num">06 · build_model</span>
+    <h2>Wiring in GPT-2 from Stop 02</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>The training script adds the sibling folder <code>02-gpt-2</code> to <code>sys.path</code> and imports <code>GPT</code> and <code>GPTConfig</code>. That way there is a single source of truth for the architecture — fixes in the GPT-2 chapter automatically apply here.</p>
+        <p><code>build_model(vocab_size)</code> is the only function you replace to train another decoder. Pass the tokenizer’s vocab size (here ~65, not 50,257) so the embedding table matches the data.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">import + build_model</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="arg">_GPT2_DIR</span> <span class="op">=</span> <span class="fn">Path</span><span class="op">(</span><span class="arg">__file__</span><span class="op">).</span><span class="arg">resolve</span><span class="op">().</span><span class="arg">parent</span><span class="op">.</span><span class="arg">parent</span> <span class="op">/</span> <span class="str">"02-gpt-2"</span></span>
+<span class="line"><span class="ln">2</span><span class="kw">if</span> <span class="fn">str</span><span class="op">(</span><span class="arg">_GPT2_DIR</span><span class="op">)</span> <span class="kw">not</span> <span class="kw">in</span> <span class="arg">sys</span><span class="op">.</span><span class="arg">path</span><span class="op">:</span></span>
+<span class="line"><span class="ln">3</span>    <span class="arg">sys</span><span class="op">.</span><span class="arg">path</span><span class="op">.</span><span class="arg">insert</span><span class="op">(</span><span class="num">0</span><span class="op">,</span> <span class="fn">str</span><span class="op">(</span><span class="arg">_GPT2_DIR</span><span class="op">))</span></span>
+<span class="line"><span class="ln">4</span><span class="kw">from</span> <span class="arg">gpt2</span> <span class="kw">import</span> <span class="arg">GPT</span><span class="op">,</span> <span class="arg">GPTConfig</span></span>
+<span class="line"><span class="ln">5</span></span>
+<span class="line"><span class="ln">6</span><span class="kw">def</span> <span class="fn">build_model</span><span class="op">(</span><span class="arg">vocab_size</span><span class="op">:</span> <span class="arg">int</span><span class="op">):</span></span>
+<span class="line"><span class="ln">7</span>    <span class="arg">config</span> <span class="op">=</span> <span class="fn">GPTConfig</span><span class="op">(</span><span class="arg">vocabsize</span><span class="op">=</span><span class="arg">vocab_size</span><span class="op">,</span> <span class="arg">max_seq_len</span><span class="op">=</span><span class="arg">MAX_SEQ_LEN</span><span class="op">)</span></span>
+<span class="line"><span class="ln">8</span>    <span class="kw">return</span> <span class="fn">GPT</span><span class="op">(</span><span class="arg">config</span><span class="op">)</span></span></code></pre>
+      </div>
+      <div class="callout">
+        <p>To train <a href="../04-llama/">LLaMA</a> or <a href="../05-mistral/">Mistral</a> instead: import that chapter’s module, construct its config with the same <code>vocab_size</code> and <code>max_seq_len</code>, return the model from <code>build_model</code>. The loss, optimizer, and generation code stay unchanged.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s07 -->
+<section class="section fade-in" id="s07">
+  <div class="container">
+    <span class="section-num">07 · LOSS</span>
+    <h2>Cross-entropy over every position</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><code>nn.CrossEntropyLoss</code> expects class scores of shape <code>(N, C)</code> and targets of shape <code>(N,)</code>. Here <code>N</code> is the number of positions we score at once, and <code>C</code> is the number of classes — for us, <code>C = vocab_size</code> (one logit per possible next token, ~65 on TinyShakespeare). Our model returns <code>(B, S, vocab)</code>, so we <strong>flatten</strong> batch and time: <code>N = B × S</code>, and the last dimension is already <code>C</code>.</p>
+        <p>GPT returns <strong>raw logits</strong>, not log-softmax. <code>CrossEntropyLoss</code> applies <code>log_softmax</code> internally for numerical stability. Do not pass probabilities or log-probabilities unless you switch to <code>NLLLoss</code>.</p>
+        <p>Per-step loss is the average negative log-likelihood across all positions in the batch. Lower loss means the model assigns higher probability to the true next characters.</p>
+      </div>
+      <div class="formula">loss = − (1 / (B·S)) Σ<sub>b,s</sub> log P(y[b,s] | x[b,≤s])</div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">criterion + forward</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="arg">optimizer</span> <span class="op">=</span> <span class="fn">AdamW</span><span class="op">(</span><span class="arg">model</span><span class="op">.</span><span class="arg">parameters</span><span class="op">(),</span> <span class="arg">lr</span><span class="op">=</span><span class="arg">LR</span><span class="op">)</span></span>
+<span class="line"><span class="ln">2</span><span class="arg">criterion</span> <span class="op">=</span> <span class="arg">nn</span><span class="op">.</span><span class="arg">CrossEntropyLoss</span><span class="op">()</span></span>
+<span class="line"><span class="ln">3</span></span>
+<span class="line"><span class="ln">4</span><span class="cmt"># inside the training loop:</span></span>
+<span class="line"><span class="ln">5</span><span class="arg">logits</span> <span class="op">=</span> <span class="fn">model</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span>   <span class="cmt"># (B, S, vocab)</span></span>
+<span class="line"><span class="ln">6</span><span class="arg">loss</span> <span class="op">=</span> <span class="fn">criterion</span><span class="op">(</span></span>
+<span class="line"><span class="ln">7</span>    <span class="arg">logits</span><span class="op">.</span><span class="arg">view</span><span class="op">(-</span><span class="num">1</span><span class="op">,</span> <span class="arg">logits</span><span class="op">.</span><span class="arg">size</span><span class="op">(-</span><span class="num">1</span><span class="op">)),</span></span>
+<span class="line"><span class="ln">8</span>    <span class="arg">y</span><span class="op">.</span><span class="arg">view</span><span class="op">(-</span><span class="num">1</span><span class="op">),</span></span>
+<span class="line"><span class="ln">9</span><span class="op">)</span></span></code></pre>
+      </div>
+      <p><strong>AdamW</strong> is Adam with decoupled weight decay — the default choice for transformer LMs since GPT-2. For this tiny demo we use a single learning rate for all parameters; larger systems use warmup, cosine decay, and sometimes separate LR for embeddings.</p>
+    </div>
+  </div>
+</section>
+
+<!-- s08 -->
+<section class="section fade-in" id="s08">
+  <div class="container">
+    <span class="section-num">08 · ONE STEP</span>
+    <h2>The inner loop that never changes</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>One optimizer step is always the same five operations, regardless of whether the model has RoPE, GQA, or MoE:</p>
+        <ol class="bullet" style="list-style:decimal;">
+          <li><strong>zero_grad</strong> — clear stale gradients from the previous step</li>
+          <li><strong>forward</strong> — compute logits</li>
+          <li><strong>loss.backward()</strong> — backprop through the entire graph</li>
+          <li><strong>clip_grad_norm_</strong> — cap global gradient norm at 1.0</li>
+          <li><strong>optimizer.step()</strong> — apply the update</li>
+        </ol>
+        <p>Gradient clipping prevents occasional huge updates when loss spikes early in training. Norm 1.0 is a common default for small LMs; large-scale training often uses different thresholds or adaptive clipping.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">one training step</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="arg">optimizer</span><span class="op">.</span><span class="arg">zero_grad</span><span class="op">()</span></span>
+<span class="line"><span class="ln">2</span><span class="arg">logits</span> <span class="op">=</span> <span class="fn">model</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span></span>
+<span class="line"><span class="ln">3</span><span class="arg">loss</span> <span class="op">=</span> <span class="fn">criterion</span><span class="op">(</span><span class="arg">logits</span><span class="op">.</span><span class="arg">view</span><span class="op">(-</span><span class="num">1</span><span class="op">,</span> <span class="arg">logits</span><span class="op">.</span><span class="arg">size</span><span class="op">(-</span><span class="num">1</span><span class="op">)),</span> <span class="arg">y</span><span class="op">.</span><span class="arg">view</span><span class="op">(-</span><span class="num">1</span><span class="op">))</span></span>
+<span class="line"><span class="ln">4</span><span class="arg">loss</span><span class="op">.</span><span class="arg">backward</span><span class="op">()</span></span>
+<span class="line"><span class="ln">5</span><span class="arg">nn</span><span class="op">.</span><span class="arg">utils</span><span class="op">.</span><span class="arg">clip_grad_norm_</span><span class="op">(</span><span class="arg">model</span><span class="op">.</span><span class="arg">parameters</span><span class="op">(),</span> <span class="arg">max_norm</span><span class="op">=</span><span class="num">1.0</span><span class="op">)</span></span>
+<span class="line"><span class="ln">6</span><span class="arg">optimizer</span><span class="op">.</span><span class="arg">step</span><span class="op">()</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- s09 -->
+<section class="section fade-in" id="s09">
+  <div class="container">
+    <span class="section-num">09 · OUTER LOOP</span>
+    <h2>500 steps and restarting the iterator</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>The outer loop counts <strong>optimizer steps</strong>, not full epochs. With ~1M windows and batch 16, one epoch is tens of thousands of steps — overkill for a teaching demo. <code>N_STEPS = 500</code> is enough to watch loss fall and generate recognizable Shakespeare-ish gibberish.</p>
+        <p>We hold a manual iterator <code>train_iter = iter(train_loader)</code> and call <code>next(train_iter)</code> each step. When the epoch exhausts, Python raises <code>StopIteration</code>; we catch it, rebuild the iterator, and fetch the next batch. That pattern streams data indefinitely without nesting epoch loops.</p>
+        <p>Every <code>EVAL_INTERVAL</code> steps we average the last 50 training losses (running sum) and call <code>get_val_loss()</code> for a sanity check on held-out text.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">main loop</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="arg">train_iter</span> <span class="op">=</span> <span class="fn">iter</span><span class="op">(</span><span class="arg">train_loader</span><span class="op">)</span></span>
+<span class="line"><span class="ln">2</span><span class="arg">running_loss</span> <span class="op">=</span> <span class="num">0.0</span></span>
+<span class="line"><span class="ln">3</span></span>
+<span class="line"><span class="ln">4</span><span class="kw">for</span> <span class="arg">step</span> <span class="kw">in</span> <span class="fn">range</span><span class="op">(</span><span class="num">1</span><span class="op">,</span> <span class="arg">N_STEPS</span> <span class="op">+</span> <span class="num">1</span><span class="op">):</span></span>
+<span class="line"><span class="ln">5</span>    <span class="kw">try</span><span class="op">:</span></span>
+<span class="line"><span class="ln">6</span>        <span class="arg">x</span><span class="op">,</span> <span class="arg">y</span> <span class="op">=</span> <span class="fn">next</span><span class="op">(</span><span class="arg">train_iter</span><span class="op">)</span></span>
+<span class="line"><span class="ln">7</span>    <span class="kw">except</span> <span class="arg">StopIteration</span><span class="op">:</span></span>
+<span class="line"><span class="ln">8</span>        <span class="arg">train_iter</span> <span class="op">=</span> <span class="fn">iter</span><span class="op">(</span><span class="arg">train_loader</span><span class="op">)</span></span>
+<span class="line"><span class="ln">9</span>        <span class="arg">x</span><span class="op">,</span> <span class="arg">y</span> <span class="op">=</span> <span class="fn">next</span><span class="op">(</span><span class="arg">train_iter</span><span class="op">)</span></span>
+<span class="line"><span class="ln">10</span></span>
+<span class="line"><span class="ln">11</span>    <span class="arg">x</span><span class="op">,</span> <span class="arg">y</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">to</span><span class="op">(</span><span class="arg">DEVICE</span><span class="op">),</span> <span class="arg">y</span><span class="op">.</span><span class="arg">to</span><span class="op">(</span><span class="arg">DEVICE</span><span class="op">)</span></span>
+<span class="line"><span class="ln">12</span>    <span class="cmt"># ... zero_grad, forward, backward, step ...</span></span>
+<span class="line"><span class="ln">13</span>    <span class="arg">running_loss</span> <span class="op">+=</span> <span class="arg">loss</span><span class="op">.</span><span class="arg">item</span><span class="op">()</span></span>
+<span class="line"><span class="ln">14</span></span>
+<span class="line"><span class="ln">15</span>    <span class="kw">if</span> <span class="arg">step</span> <span class="op">%</span> <span class="arg">EVAL_INTERVAL</span> <span class="op">==</span> <span class="num">0</span><span class="op">:</span></span>
+<span class="line"><span class="ln">16</span>        <span class="arg">avg_train_loss</span> <span class="op">=</span> <span class="arg">running_loss</span> <span class="op">/</span> <span class="arg">EVAL_INTERVAL</span></span>
+<span class="line"><span class="ln">17</span>        <span class="arg">val_loss</span> <span class="op">=</span> <span class="fn">get_val_loss</span><span class="op">(</span><span class="arg">model</span><span class="op">,</span> <span class="arg">val_loader</span><span class="op">,</span> <span class="arg">criterion</span><span class="op">)</span></span>
+<span class="line"><span class="ln">18</span>        <span class="fn">print</span><span class="op">(</span><span class="arg">f</span><span class="str">"step {step:4d}/{N_STEPS} | train: {avg_train_loss:.4f} | val: {val_loss:.4f}"</span><span class="op">)</span></span>
+<span class="line"><span class="ln">19</span>        <span class="arg">running_loss</span> <span class="op">=</span> <span class="num">0.0</span></span></code></pre>
+      </div>
+      <p>Typical console output shows train and val loss in the same ballpark early on; if val diverges far above train, you are overfitting — less of an issue on this tiny corpus with a fresh model, but critical on real data.</p>
+    </div>
+  </div>
+</section>
+
+<!-- s10 -->
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10 · VALIDATION</span>
+    <h2>get_val_loss — eval mode without gradients</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p><code>get_val_loss</code> sets <code>model.eval()</code> so dropout is disabled, wraps inference in <code>torch.no_grad()</code>, and averages loss over at most <code>EVAL_STEPS</code> validation batches. It restores <code>model.train()</code> before returning so the next training step still gets dropout.</p>
+        <p>We cap validation batches because the val loader can be large; 20 batches × 16 × 256 positions is already plenty for a stable estimate during a short demo run.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">get_val_loss</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">get_val_loss</span><span class="op">(</span><span class="arg">model</span><span class="op">,</span> <span class="arg">val_loader</span><span class="op">,</span> <span class="arg">criterion</span><span class="op">,</span> <span class="arg">n_steps</span><span class="op">=</span><span class="arg">EVAL_STEPS</span><span class="op">):</span></span>
+<span class="line"><span class="ln">2</span>    <span class="arg">model</span><span class="op">.</span><span class="arg">eval</span><span class="op">()</span></span>
+<span class="line"><span class="ln">3</span>    <span class="arg">total_loss</span> <span class="op">=</span> <span class="num">0.0</span></span>
+<span class="line"><span class="ln">4</span>    <span class="arg">steps</span> <span class="op">=</span> <span class="num">0</span></span>
+<span class="line"><span class="ln">5</span>    <span class="kw">with</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">no_grad</span><span class="op">():</span></span>
+<span class="line"><span class="ln">6</span>        <span class="kw">for</span> <span class="arg">x</span><span class="op">,</span> <span class="arg">y</span> <span class="kw">in</span> <span class="arg">val_loader</span><span class="op">:</span></span>
+<span class="line"><span class="ln">7</span>            <span class="arg">x</span><span class="op">,</span> <span class="arg">y</span> <span class="op">=</span> <span class="arg">x</span><span class="op">.</span><span class="arg">to</span><span class="op">(</span><span class="arg">DEVICE</span><span class="op">),</span> <span class="arg">y</span><span class="op">.</span><span class="arg">to</span><span class="op">(</span><span class="arg">DEVICE</span><span class="op">)</span></span>
+<span class="line"><span class="ln">8</span>            <span class="arg">logits</span> <span class="op">=</span> <span class="fn">model</span><span class="op">(</span><span class="arg">x</span><span class="op">)</span></span>
+<span class="line"><span class="ln">9</span>            <span class="arg">loss</span> <span class="op">=</span> <span class="fn">criterion</span><span class="op">(</span><span class="arg">logits</span><span class="op">.</span><span class="arg">view</span><span class="op">(-</span><span class="num">1</span><span class="op">,</span> <span class="arg">logits</span><span class="op">.</span><span class="arg">size</span><span class="op">(-</span><span class="num">1</span><span class="op">)),</span> <span class="arg">y</span><span class="op">.</span><span class="arg">view</span><span class="op">(-</span><span class="num">1</span><span class="op">))</span></span>
+<span class="line"><span class="ln">10</span>            <span class="arg">total_loss</span> <span class="op">+=</span> <span class="arg">loss</span><span class="op">.</span><span class="arg">item</span><span class="op">()</span></span>
+<span class="line"><span class="ln">11</span>            <span class="arg">steps</span> <span class="op">+=</span> <span class="num">1</span></span>
+<span class="line"><span class="ln">12</span>            <span class="kw">if</span> <span class="arg">steps</span> <span class="op">&gt;=</span> <span class="arg">n_steps</span><span class="op">:</span></span>
+<span class="line"><span class="ln">13</span>                <span class="kw">break</span></span>
+<span class="line"><span class="ln">14</span>    <span class="arg">model</span><span class="op">.</span><span class="arg">train</span><span class="op">()</span></span>
+<span class="line"><span class="ln">15</span>    <span class="kw">return</span> <span class="arg">total_loss</span> <span class="op">/</span> <span class="arg">steps</span></span></code></pre>
+      </div>
+      <h3>Logging</h3>
+      <p><code>SummaryWriter</code> writes scalars to <code>runs/training-loop/</code> for TensorBoard. After training, <code>training_losses.json</code> stores the step / train / val series locally — useful if you plot curves yourself. Neither file is required to understand the chapter; they are artifacts of a real run.</p>
+    </div>
+  </div>
+</section>
+
+<!-- s11 -->
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11 · GENERATE</span>
+    <h2>Sampling after training</h2>
+    <div class="code-section">
+      <div class="code-explanation">
+        <p>Training optimizes teacher-forced next-token prediction: at every position the model sees the <em>true</em> prefix from <code>x</code>. <strong>Generation</strong> is different: we feed the model its own predictions autoregressively.</p>
+        <p><code>generate()</code> encodes a prompt (default <code>"ROMEO:"</code>), then repeats:</p>
+        <ul class="bullet">
+          <li>Crop context to the last <code>MAX_SEQ_LEN</code> tokens (same as training window)</li>
+          <li>Forward → take logits at the <strong>last</strong> position only</li>
+          <li>Divide by <code>temperature</code> (higher = more random), softmax, sample one ID</li>
+          <li>Append to the sequence and continue</li>
+        </ul>
+        <p>After ~500 steps you should see Elizabethan-flavored character soup — not coherent acts, but loss should have dropped from ~4 (random) toward ~2 or below if training ran correctly. That gap is the proof the weights moved.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">generate</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="op">@torch</span><span class="op">.</span><span class="arg">no_grad</span><span class="op">()</span></span>
+<span class="line"><span class="ln">2</span><span class="kw">def</span> <span class="fn">generate</span><span class="op">(</span><span class="arg">model</span><span class="op">,</span> <span class="arg">tokenizer</span><span class="op">,</span> <span class="arg">prompt</span><span class="op">=</span><span class="str">"ROMEO:"</span><span class="op">,</span> <span class="arg">max_new_tokens</span><span class="op">=</span><span class="num">200</span><span class="op">,</span> <span class="arg">temperature</span><span class="op">=</span><span class="num">0.8</span><span class="op">):</span></span>
+<span class="line"><span class="ln">3</span>    <span class="arg">model</span><span class="op">.</span><span class="arg">eval</span><span class="op">()</span></span>
+<span class="line"><span class="ln">4</span>    <span class="arg">token_ids</span> <span class="op">=</span> <span class="arg">tokenizer</span><span class="op">.</span><span class="arg">encode</span><span class="op">(</span><span class="arg">prompt</span><span class="op">)</span></span>
+<span class="line"><span class="ln">5</span>    <span class="arg">x</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">tensor</span><span class="op">([</span><span class="arg">token_ids</span><span class="op">],</span> <span class="arg">dtype</span><span class="op">=</span><span class="arg">torch</span><span class="op">.</span><span class="arg">long</span><span class="op">,</span> <span class="arg">device</span><span class="op">=</span><span class="arg">DEVICE</span><span class="op">)</span></span>
+<span class="line"><span class="ln">6</span></span>
+<span class="line"><span class="ln">7</span>    <span class="kw">for</span> <span class="arg">_</span> <span class="kw">in</span> <span class="fn">range</span><span class="op">(</span><span class="arg">max_new_tokens</span><span class="op">):</span></span>
+<span class="line"><span class="ln">8</span>        <span class="arg">x_cond</span> <span class="op">=</span> <span class="arg">x</span><span class="op">[:,</span> <span class="op">-</span><span class="arg">MAX_SEQ_LEN</span><span class="op">:]</span></span>
+<span class="line"><span class="ln">9</span>        <span class="arg">logits</span> <span class="op">=</span> <span class="fn">model</span><span class="op">(</span><span class="arg">x_cond</span><span class="op">)</span></span>
+<span class="line"><span class="ln">10</span>        <span class="arg">logits</span> <span class="op">=</span> <span class="arg">logits</span><span class="op">[:,</span> <span class="op">-</span><span class="num">1</span><span class="op">,</span> <span class="op">:]</span> <span class="op">/</span> <span class="arg">temperature</span></span>
+<span class="line"><span class="ln">11</span>        <span class="arg">probs</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">softmax</span><span class="op">(</span><span class="arg">logits</span><span class="op">,</span> <span class="arg">dim</span><span class="op">=-</span><span class="num">1</span><span class="op">)</span></span>
+<span class="line"><span class="ln">12</span>        <span class="arg">next_token</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">multinomial</span><span class="op">(</span><span class="arg">probs</span><span class="op">,</span> <span class="arg">num_samples</span><span class="op">=</span><span class="num">1</span><span class="op">)</span></span>
+<span class="line"><span class="ln">13</span>        <span class="arg">x</span> <span class="op">=</span> <span class="arg">torch</span><span class="op">.</span><span class="arg">cat</span><span class="op">([</span><span class="arg">x</span><span class="op">,</span> <span class="arg">next_token</span><span class="op">],</span> <span class="arg">dim</span><span class="op">=</span><span class="num">1</span><span class="op">)</span></span>
+<span class="line"><span class="ln">14</span></span>
+<span class="line"><span class="ln">15</span>    <span class="kw">return</span> <span class="arg">tokenizer</span><span class="op">.</span><span class="arg">decode</span><span class="op">(</span><span class="arg">x</span><span class="op">[</span><span class="num">0</span><span class="op">].</span><span class="arg">tolist</span><span class="op">())</span></span></code></pre>
+      </div>
+      <div class="callout">
+        <p>This sampling loop is the same one you would use for LLaMA, Mistral, or any decoder in the series after swapping <code>build_model</code>. Training changes weights; generation code does not.</p>
+      </div>
+      <h3>What you run</h3>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">shell</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="cmt">cd the-evolving-transformer/99-the-training-loop</span></span>
+<span class="line"><span class="ln">2</span><span class="arg">python3</span> <span class="fn">train</span><span class="op">.</span><span class="arg">py</span></span>
+<span class="line"><span class="ln">3</span><span class="arg">python3</span> <span class="fn">train</span><span class="op">.</span><span class="arg">py</span> <span class="op">--</span><span class="arg">prompt</span> <span class="str">"First Citizen:"</span></span></code></pre>
+      </div>
+      <p><code>test.py</code> smoke-tests download, batch shapes, one forward/backward step, and that <code>build_model</code> returns logits of the right shape — run it before a long train if you change imports or configs.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+function extractCodeText(panel) {
+  const codeEl = panel.querySelector('.code-block code');
+  if (!codeEl) return '';
+  const lines = codeEl.querySelectorAll('.line');
+  if (!lines.length) return codeEl.textContent.trim();
+  return Array.from(lines).map(line => {
+    const clone = line.cloneNode(true);
+    clone.querySelectorAll('.ln').forEach(el => el.remove());
+    return clone.textContent.replace(/\s+$/, '');
+  }).join('\n');
+}
+
+function copyPanelCode(btn, panel) {
+  const text = extractCodeText(panel);
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+
+function initCodeCopyButtons() {
+  document.querySelectorAll('.code-panel').forEach(panel => {
+    const header = panel.querySelector('.code-header');
+    if (!header || header.querySelector('.code-copy-btn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'code-copy-btn';
+    btn.setAttribute('aria-label', 'Copy code to clipboard');
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', () => copyPanelCode(btn, panel));
+    header.appendChild(btn);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initCodeCopyButtons();
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+
+  const nav = document.getElementById('sectionNav');
+  if (nav) {
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('visible', window.scrollY > 320);
+    }, { passive: true });
+  }
+});
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var root = document.documentElement;
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) { root.removeAttribute('data-theme'); localStorage.setItem('tcw-theme','dark'); }
+    else { root.setAttribute('data-theme','light'); localStorage.setItem('tcw-theme','light'); }
+  });
+})();
+</script>
+</body>
+</html>
