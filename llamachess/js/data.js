@@ -5,7 +5,7 @@ const _sectionCache = new Map();
 
 export async function loadData() {
   if (_cache) return _cache;
-  const res = await fetch("data/puzzles.json");
+  const res = await fetch("data/puzzles.json", { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load puzzles.json");
   _cache = await res.json();
   return _cache;
@@ -19,7 +19,7 @@ export async function getSection(sectionId) {
 
   // Larger sections live in data/sections/{id}.json (mate_in_2, mate_in_3, …).
   if (!section) {
-    const res = await fetch(`data/sections/${sectionId}.json`);
+    const res = await fetch(`data/sections/${sectionId}.json`, { cache: "no-store" });
     if (!res.ok) throw new Error(`Unknown section: ${sectionId}`);
     section = await res.json();
   }

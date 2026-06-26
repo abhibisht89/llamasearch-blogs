@@ -66,3 +66,18 @@ export function getChapter(slug) {
 export function chapterDataUrl(chapter) {
   return `data/sections/${chapter.dataFile}`;
 }
+
+/** True when the puzzle has a stored multi-move line for the full-line solver. */
+export function hasFullCombinationLine(puzzle) {
+  return Array.isArray(puzzle.solutionMoves) && puzzle.solutionMoves.length >= 2;
+}
+
+export function filterPlayableMiniatures(section, verifiedIds) {
+  const ids = verifiedIds instanceof Set ? verifiedIds : new Set(verifiedIds || []);
+  const puzzles = section.puzzles.filter((p) => ids.has(p.id) && hasFullCombinationLine(p));
+  return {
+    ...section,
+    available: puzzles.length,
+    puzzles,
+  };
+}

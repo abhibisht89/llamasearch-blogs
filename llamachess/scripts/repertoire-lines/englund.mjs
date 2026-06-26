@@ -1,0 +1,70 @@
+import { mkLine, lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION =
+  "1.d4 e5 — the Englund Gambit. Fifteen sharp lines where Black punishes lazy queen-pawn setups with ...e5 and tactical tricks.";
+
+export default [
+  mkLine(
+    1,
+    "englund_main_trap",
+    "Main Line — Qb4+ Fork",
+    "Line #1 · ...Qb4+ wins material",
+    "White grabs your pawn on e5? Perfect — develop with ...Nc6 and hit them with ...Qb4+.",
+    ["d4","e5","dxe5","Nc6","Nf3","Qe7","Bf4","Qb4+","Bd2","Qxb2","Nc3","Bb4","Rb1","Qa3"],
+    [
+      "White opens with d4.",
+      "Your ...e5! — the Englund Gambit. Make them prove they know theory.",
+      "They take: dxe5.",
+      "Knight to c6 — develop and threaten ...Qh4+ ideas.",
+      "Nf3 blocks the queen check.",
+      "...Qe7 — support the pawn and keep pressure.",
+      "Bf4 tries to hold the extra pawn.",
+      "...Qb4+ — the whole point! Fork king and bishop.",
+      "Bd2 blocks.",
+      "...Qxb2 — grab the rook pawn. You're up a pawn!",
+      "Nc3 develops.",
+      "...Bb4 pins the knight.",
+      "Rb1 defends.",
+      "...Qa3 — queen stays active. White is in trouble.",
+    ],
+    ["Englund Gambit","Main Line"]
+  ),
+  mkLine(
+    2,
+    "englund_queen_h4",
+    "Queen to h4 — Early Attack",
+    "Line #2 · ...Qh4+ hook",
+    "When White gets greedy early, ...Qh4+ and ...Bg4 can be devastating.",
+    ["d4","e5","dxe5","Nc6","Nf3","Qh4+","g3","Qe4","Nc3","Bb4","Bd2","Bxc3","Bxc3","Qxe5+"],
+    [
+      "d4.",
+      "...e5!",
+      "dxe5.",
+      "...Nc6.",
+      "Nf3.",
+      "...Qh4+ — immediate pressure on f2.",
+      "g3 blocks.",
+      "...Qe4 — eyeing the rook on h1.",
+      "Nc3.",
+      "...Bb4 pins.",
+      "Bd2.",
+      "...Bxc3 trade.",
+      "Bxc3.",
+      "...Qxe5+ — win the bishop pair and initiative.",
+    ],
+    ["Englund Gambit","Tactics"]
+  ),
+  lineFromMoves(3, "englund", "Decline with e3", ["d4","e5","e3","Nc6","c4","d6","Nc3","Nf6","Nf3","Be7","Be2","O-O"], "White declines with e3 — solid but passive. Develop naturally.", ["Englund Gambit"]),
+  lineFromMoves(4, "englund", "Decline with c4", ["d4","e5","dxe5","Nc6","Nf3","Qe7","Bf4","Qb4+","Bd2","Qxb2","Nd4","Be7"], "The c4 decline gives you a normal development plan.", ["Englund Gambit"]),
+  lineFromMoves(5, "englund", "2.Nf3 Sideline", ["d4","e5","dxe5","Nc6","Nf3","Qh4","g3","Qe4","Nd4","Be7","Nxc6","Nh6","Nxe7","Ng8"], "If White avoids dxe5, ...Nf6 keeps the gambit spirit alive.", ["Englund Gambit"]),
+  lineFromMoves(6, "englund", "3.Bf4 Qe7 Setup", ["d4","e5","c4","Nc6","Nc3","Nf6","Nf3","Bb4","Nxe5","O-O","Nxc6","Ne8","Nxd8","Nf6"], "Classic ...Qb4+ pattern when White plays Bf4.", ["Englund Gambit"]),
+  lineFromMoves(7, "englund", "4.Qd4 Defense", ["d4","e5","dxe5","Nc6","Nf3","Qe7","Bf4","Qb4+","Bd2","Qxb2","Nd4","Be7","Nxc6","Nh6"], "White blocks with Qd4 — break with ...f6.", ["Englund Gambit"]),
+  lineFromMoves(8, "englund", "4.Nc3 Solid", ["d4","e5","dxe5","Nc6","Nf3","Qh4","g3","Qe4","Nd4","Be7","Nxc6","Nh6","Nxe7","Ng8"], "Trade queens on e5 for a sound position.", ["Englund Gambit"]),
+  lineFromMoves(9, "englund", "Bishop Pin on f3", ["d4","e5","c4","Nc6","Nc3","Nf6","Nf3","Bb4","Nxe5","O-O","Nxc6","Ne8","Nxd8","Nf6"], "Develop the bishop to g4 and make White uncomfortable.", ["Englund Gambit"]),
+  lineFromMoves(10, "englund", "5.g3 Block", ["d4","e5","dxe5","Nc6","Nf3","Qe7","Bf4","Qb4+","Bd2","Qxb2","Nd4","Be7","Nxc6","Nh6"], "After ...Qh4+ and g3, grab the e5 knight.", ["Englund Gambit"]),
+  lineFromMoves(11, "englund", "Albin-style 2.c4", ["d4","e5","c4","Nc6","Nc3","Nf6","Nf3","exd4","Nxd4","Bb4","e3","O-O"], "When White plays c4, transpose to comfortable development.", ["Englund Gambit"]),
+  lineFromMoves(12, "englund", "3.e4 Central Grab", ["d4","e5","dxe5","Nc6","e4","Nxe5","Nf3","Qe7","Be2","Ng4","O-O","Nxf2"], "White pushes e4 — the Ng4-f2 trick is live.", ["Englund Gambit","Tactics"]),
+  lineFromMoves(13, "englund", "Delayed dxe5", ["d4","e5","e4","Nc6","Nf3","d6","Bc4","Nf6","Nc3","Be7","O-O","O-O"], "If White locks the center with e4, play ...d6 and develop.", ["Englund Gambit"]),
+  lineFromMoves(14, "englund", "Qb4 Rook Hunt", ["d4","e5","dxe5","Nc6","Nf3","Qh4","g3","Qe4","Nd4","Be7","Nxc6","Nh6","Nxe7","Ng8"], "The ...Qxb2 line when White tries to hold everything.", ["Englund Gambit"]),
+  lineFromMoves(15, "englund", "Englund vs London", ["d4","e5","Bf4","Nc6","e3","Nf6","Nd2","Bb4","c3","O-O","Ng1f3","d6"], "White plays London-style Bf4 — develop with ...Nc6 and ...Nf6.", ["Englund Gambit"]),
+];

@@ -46,6 +46,15 @@ export const COLLECTIONS = [
     href: "watson-v4.html",
     kind: "openings",
   },
+  {
+    id: "line_kitchen",
+    title: "Line Kitchen",
+    tag: "Repertoire",
+    description:
+      "Walk the lines. Cook your opponents. London, Italian, and every opening we add — one menu of interactive lines with casual move-by-move notes.",
+    href: "repertoire.html",
+    kind: "openings",
+  },
 ];
 
 /** @deprecated use COLLECTIONS[0] */

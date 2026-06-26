@@ -1,12 +1,30 @@
 /** Load Sisters Tournament Combinations section data (isolated from puzzles.json). */
 
+const VERIFIED_IDS_URL = "data/sections/sisters_verified_ids.json";
+
 let _cache = null;
+
+async function filterVerified(section) {
+  const verifiedRes = await fetch(VERIFIED_IDS_URL, { cache: "no-store" });
+  if (!verifiedRes.ok) return section;
+
+  const verified = await verifiedRes.json();
+  const verifiedIds = new Set(verified.ids || []);
+  const puzzles = section.puzzles.filter((p) => verifiedIds.has(p.id));
+
+  return {
+    ...section,
+    available: puzzles.length,
+    puzzles,
+  };
+}
 
 export async function loadSectionData() {
   if (_cache) return _cache;
-  const res = await fetch("data/sections/sisters.json");
+  const res = await fetch("data/sections/sisters.json", { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load data/sections/sisters.json");
-  _cache = await res.json();
+  const section = await res.json();
+  _cache = await filterVerified(section);
   return _cache;
 }
 

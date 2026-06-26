@@ -1,23 +1,24 @@
 import { Chessground } from "@lichess-org/chessground";
 import { loadOpenings, getLesson, nextPrevLesson } from "./opening-data.js";
+import { loadRepertoireCatalog, isDrillEnabled, drillLessonHref } from "./repertoire-config.js";
 import { progress } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
 
 const params = new URLSearchParams(location.search);
-const COLLECTION_META = {
+const WATSON_META = {
   v1: { backHref: "watson.html", label: "Watson Vol. 1" },
   v2: { backHref: "watson-v2.html", label: "Watson Vol. 2" },
   v3: { backHref: "watson-v3.html", label: "Watson Vol. 3" },
   v4: { backHref: "watson-v4.html", label: "Watson Vol. 4" },
 };
-const requestedCollection = params.get("collection");
-const collectionKey = Object.hasOwn(COLLECTION_META, requestedCollection) ? requestedCollection : "v1";
+const requestedCollection = params.get("collection") || "v1";
 const lessonId = Number(params.get("lesson") || "1");
 const stepParam = params.get("step");
 let stepIdx = stepParam != null ? Number(stepParam) : 0;
 
-const collectionBackHref = COLLECTION_META[collectionKey].backHref;
-const collectionLabel = COLLECTION_META[collectionKey].label;
+let collectionKey = requestedCollection;
+let collectionBackHref = "watson.html";
+let collectionLabel = "Watson Openings";
 
 const boardEl = document.getElementById("board");
 const lessonTitleEl = document.getElementById("lesson-title");
@@ -160,7 +161,30 @@ function wireNav() {
   });
 }
 
+async function resolveCollectionNav(key) {
+  if (Object.hasOwn(WATSON_META, key)) return WATSON_META[key];
+  try {
+    const catalog = await loadRepertoireCatalog();
+    const course = catalog.courses.find((c) => c.collectionKey === key);
+    if (course) return { backHref: course.href, label: course.title };
+  } catch {
+    /* fall through */
+  }
+  const data = await loadOpenings(key);
+  return { backHref: `course.html?key=${key}`, label: data.title };
+}
+
 async function main() {
+  if (!Object.hasOwn(WATSON_META, requestedCollection)) {
+    collectionKey = requestedCollection;
+  } else {
+    collectionKey = requestedCollection;
+  }
+
+  const nav = await resolveCollectionNav(collectionKey);
+  collectionBackHref = nav.backHref;
+  collectionLabel = nav.label;
+
   data = await loadOpenings(collectionKey);
   lesson = getLesson(data, lessonId);
 
@@ -185,6 +209,15 @@ async function main() {
   if (backLink) {
     backLink.href = collectionBackHref;
     backLink.textContent = collectionLabel;
+  }
+
+  const drillLink = document.getElementById("drill-link");
+  const modeSwitch = document.getElementById("mode-switch");
+  const modeBadge = document.getElementById("mode-badge");
+  if (isDrillEnabled(collectionKey)) {
+    if (modeBadge) modeBadge.hidden = false;
+    if (modeSwitch) modeSwitch.hidden = false;
+    if (drillLink) drillLink.href = drillLessonHref(collectionKey, lesson.id);
   }
 
   ground = Chessground(boardEl, {

@@ -2,6 +2,7 @@ import { getSection, sortedPuzzleIds, firstUnsolvedId } from "./data.js";
 import { progress, migrateProgressToSequential } from "./progress.js";
 
 const SECTION_ID = "mate_in_1";
+const VERIFIED_IDS_URL = "data/sections/mate_in_1_verified_ids.json";
 const PAGE_SIZE = 100;
 
 let currentFilter = "all";
@@ -171,8 +172,25 @@ window.addEventListener("popstate", () => {
   renderPagination();
 });
 
+async function loadVerifiedSection() {
+  const sectionRes = await getSection(SECTION_ID);
+  const verifiedRes = await fetch(VERIFIED_IDS_URL, { cache: "no-store" });
+
+  if (!verifiedRes.ok) return sectionRes;
+
+  const verified = await verifiedRes.json();
+  const verifiedIds = new Set(verified.ids || []);
+  const puzzles = sectionRes.puzzles.filter((p) => verifiedIds.has(p.id));
+
+  return {
+    ...sectionRes,
+    available: puzzles.length,
+    puzzles,
+  };
+}
+
 async function main() {
-  section = await getSection(SECTION_ID);
+  section = await loadVerifiedSection();
   migrateProgressToSequential(SECTION_ID, section.puzzles);
   currentPage = readPageFromUrl();
   renderHeader();

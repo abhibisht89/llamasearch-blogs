@@ -1,10 +1,20 @@
-import { MINIATURE_CHAPTERS, chapterDataUrl } from "./miniatures-config.js";
+import { MINIATURE_CHAPTERS, chapterDataUrl, filterPlayableMiniatures } from "./miniatures-config.js";
 import { progress } from "./progress.js";
 
 async function loadChapterData(chapter) {
-  const res = await fetch(chapterDataUrl(chapter));
-  if (!res.ok) throw new Error(`Could not load ${chapter.dataFile}`);
-  return res.json();
+  const [sectionRes, verifiedRes] = await Promise.all([
+    fetch(chapterDataUrl(chapter)),
+    fetch(`data/sections/${chapter.id}_verified_ids.json`, { cache: "no-store" }),
+  ]);
+  if (!sectionRes.ok) throw new Error(`Could not load ${chapter.dataFile}`);
+
+  const section = await sectionRes.json();
+  if (!verifiedRes.ok) return section;
+
+  const verified = await verifiedRes.json();
+  const verifiedIds = new Set(verified.ids || []);
+
+  return filterPlayableMiniatures(section, verifiedIds);
 }
 
 function renderChapterCard(chapter, section, solved, total) {

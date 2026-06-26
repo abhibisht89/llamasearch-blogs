@@ -6,6 +6,7 @@ import { progress, migrateProgressToSequential } from "./progress.js";
 
 const SECTION_ID = "mate_in_3";
 const DATA_URL = "data/sections/mate_in_3.json";
+const VERIFIED_IDS_URL = "data/sections/mate_in_3_verified_ids.json";
 const PAGE_SIZE = 100;
 
 let currentFilter = "all";
@@ -14,9 +15,22 @@ let section = null;
 let puzzleIds = [];
 
 async function loadSection() {
-  const res = await fetch(DATA_URL);
-  if (!res.ok) throw new Error(`Could not load ${DATA_URL}`);
-  return res.json();
+  const [sectionRes, verifiedRes] = await Promise.all([
+    fetch(DATA_URL, { cache: "no-store" }),
+    fetch(VERIFIED_IDS_URL, { cache: "no-store" }),
+  ]);
+
+  if (!sectionRes.ok) throw new Error(`Could not load ${DATA_URL}`);
+  if (!verifiedRes.ok) throw new Error(`Could not load ${VERIFIED_IDS_URL}`);
+
+  const sec = await sectionRes.json();
+  const verified = await verifiedRes.json();
+  const verifiedIds = new Set(verified.ids || []);
+
+  sec.puzzles = sec.puzzles.filter((p) => verifiedIds.has(p.id));
+  sec.available = sec.puzzles.length;
+
+  return sec;
 }
 
 function sortedPuzzleIds(sec) {

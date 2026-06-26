@@ -1,6 +1,5 @@
 /**
- * Mate in 3 solve page — validates the book's first move (not full line).
- * Loads data/sections/mate_in_3.json directly; does not use shared data.js.
+ * Mate in 3 solve page — first move, auto reply, second move, auto reply, checkmate.
  */
 import { Chess } from "chess.js";
 import { Chessground } from "@lichess-org/chessground";
@@ -15,6 +14,7 @@ import { initBoardThemeSwitcher } from "./board-theme.js";
 
 const SECTION_ID = "mate_in_3";
 const DATA_URL = "data/sections/mate_in_3.json";
+const VERIFIED_IDS_URL = "data/sections/mate_in_3_verified_ids.json";
 const puzzleId = Number(new URLSearchParams(location.search).get("id") || "1");
 
 const statusEl = document.getElementById("status-msg");
@@ -30,30 +30,28 @@ let ground;
 let puzzle;
 let section;
 let solved = false;
+let autoPlaying = false;
+let expectedMove2 = null;
+let expectedFinalMate = null;
+let activeContinuation = null;
 
 async function loadSection() {
-  const res = await fetch(DATA_URL);
-  if (!res.ok) throw new Error(`Could not load ${DATA_URL}`);
-  return res.json();
-}
+  const [sectionRes, verifiedRes] = await Promise.all([
+    fetch(DATA_URL, { cache: "no-store" }),
+    fetch(VERIFIED_IDS_URL, { cache: "no-store" }),
+  ]);
 
-function getPuzzle(sec, id) {
-  const p = sec.puzzles.find((x) => x.id === id);
-  if (!p) throw new Error(`Puzzle #${id} not found`);
-  return p;
-}
+  if (!sectionRes.ok) throw new Error(`Could not load ${DATA_URL}`);
+  if (!verifiedRes.ok) throw new Error(`Could not load ${VERIFIED_IDS_URL}`);
 
-function sortedPuzzleIds(sec) {
-  return sec.puzzles.map((p) => p.id).sort((a, b) => a - b);
-}
+  const sec = await sectionRes.json();
+  const verified = await verifiedRes.json();
+  const verifiedIds = new Set(verified.ids || []);
 
-function nextPrevIds(sec, currentId) {
-  const ids = sortedPuzzleIds(sec);
-  const idx = ids.indexOf(currentId);
-  return {
-    prev: idx > 0 ? ids[idx - 1] : null,
-    next: idx < ids.length - 1 ? ids[idx + 1] : null,
-  };
+  sec.puzzles = sec.puzzles.filter((p) => verifiedIds.has(p.id));
+  sec.available = sec.puzzles.length;
+
+  return sec;
 }
 
 function setStatus(text, kind = "idle") {
@@ -87,18 +85,175 @@ function showSideToMove(side) {
   }
 }
 
-function normalizeSan(san) {
-  return san.replace(/[+#]$/, "");
+function normalizeMove(san) {
+  return String(san || "").replace(/[+#]$/, "");
 }
 
-function isCorrectFirstMove(san) {
-  const n = normalizeSan(san);
-  return puzzle.solutionMoves.some((s) => normalizeSan(s) === n);
+function normalizeSolutionToken(token) {
+  return String(token || "")
+    .replace(/X/g, "x")
+    .replace(/m$/i, "#")
+    .replace(/[?!]+$/g, "");
+}
+
+function removeBracketedText(text) {
+  return String(text || "").replace(/\[[^\]]*\]/g, " ");
+}
+
+function removeParenthesizedText(text) {
+  let result = "";
+  let depth = 0;
+  for (const char of String(text || "")) {
+    if (char === "(") {
+      depth += 1;
+      continue;
+    }
+    if (char === ")") {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (depth === 0) result += char;
+  }
+  return result;
+}
+
+function parseRawMainLine(raw) {
+  return removeParenthesizedText(removeBracketedText(raw))
+    .replace(/\d+\.\.\./g, " ")
+    .replace(/\d+\./g, " ")
+    .split(/\s+/)
+    .map((token) => normalizeSolutionToken(token.trim()))
+    .filter(Boolean);
+}
+
+function mateInThreeLine() {
+  if (puzzle.solutionMoves?.length >= 5) return puzzle.solutionMoves.slice(0, 5);
+  const rawLine = parseRawMainLine(puzzle.solutionRaw);
+  return rawLine.length >= 5 ? rawLine.slice(0, 5) : null;
+}
+
+function mateInThreeFirstMoves() {
+  const line = mateInThreeLine();
+  const raw = parseRawMainLine(puzzle.solutionRaw);
+  const candidates = [line?.[0], puzzle.solutionMoves?.[0], raw[0]].filter(Boolean);
+  return [...new Set(candidates.map(normalizeMove))];
+}
+
+function findCheckmateMove(game) {
+  for (const candidate of game.moves({ verbose: true })) {
+    game.move(candidate.san);
+    const isMate = game.isCheckmate();
+    game.undo();
+    if (isMate) return candidate.san;
+  }
+  return null;
+}
+
+function continuationFromPosition(reply1San, move2San, reply2San, finalSan) {
+  if (!reply1San) return null;
+
+  try {
+    const probe = new Chess(chess.fen());
+    const reply1 = probe.move(reply1San);
+    if (!reply1) return null;
+
+    if (move2San) {
+      const move2 = probe.move(move2San);
+      if (!move2) return null;
+
+      if (reply2San) {
+        const reply2 = probe.move(reply2San);
+        if (!reply2) return null;
+
+        if (finalSan) {
+          const finalMove = probe.move(finalSan);
+          if (finalMove && probe.isCheckmate()) {
+            return {
+              reply1San: reply1.san,
+              move2San: move2.san,
+              reply2San: reply2.san,
+              finalSan: finalMove.san,
+            };
+          }
+        }
+
+        const computedMate = findCheckmateMove(probe);
+        if (computedMate) {
+          return {
+            reply1San: reply1.san,
+            move2San: move2.san,
+            reply2San: reply2.san,
+            finalSan: computedMate,
+          };
+        }
+      } else {
+        for (const reply2 of probe.moves({ verbose: true })) {
+          const branch = new Chess(probe.fen());
+          branch.move(reply2.san);
+          const mate = findCheckmateMove(branch);
+          if (mate) {
+            return {
+              reply1San: reply1.san,
+              move2San: move2.san,
+              reply2San: reply2.san,
+              finalSan: mate,
+            };
+          }
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function derivedMateInThreeContinuation(preferredLine) {
+  const preferred = continuationFromPosition(
+    preferredLine?.[1],
+    preferredLine?.[2],
+    preferredLine?.[3],
+    preferredLine?.[4]
+  );
+  if (preferred) return preferred;
+
+  for (const reply1 of chess.moves({ verbose: true })) {
+    const branch = new Chess(chess.fen());
+    branch.move(reply1.san);
+    for (const move2 of branch.moves({ verbose: true })) {
+      const trial = new Chess(branch.fen());
+      trial.move(move2.san);
+      for (const reply2 of trial.moves({ verbose: true })) {
+        const end = new Chess(trial.fen());
+        end.move(reply2.san);
+        const mate = findCheckmateMove(end);
+        if (mate) {
+          return {
+            reply1San: reply1.san,
+            move2San: move2.san,
+            reply2San: reply2.san,
+            finalSan: mate,
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function getMateInThreeContinuation(firstMove) {
+  if (!mateInThreeFirstMoves().includes(normalizeMove(firstMove.san))) return null;
+
+  const line = mateInThreeLine();
+  const rawLine = parseRawMainLine(puzzle.solutionRaw);
+  return derivedMateInThreeContinuation(line || rawLine);
 }
 
 function updateGround(lastMove) {
   const turn = chess.turn();
-  const canMove = !solved && turn === puzzle.sideToMove;
+  const canMove = !solved && !autoPlaying && turn === puzzle.sideToMove;
 
   ground.set({
     fen: chess.fen(),
@@ -110,10 +265,51 @@ function updateGround(lastMove) {
     lastMove: lastMove ? [lastMove.from, lastMove.to] : undefined,
     check: chess.isCheck() ? orientColor(chess.turn()) : false,
   });
+  showSideToMove(turn);
+}
+
+function markSolved(message) {
+  solved = true;
+  expectedMove2 = null;
+  expectedFinalMate = null;
+  activeContinuation = null;
+  progress.markSolved(SECTION_ID, puzzle.id);
+  setStatus(message, "success");
+}
+
+function fallbackNoLine(lastMove) {
+  chess.undo();
+  expectedMove2 = null;
+  expectedFinalMate = null;
+  activeContinuation = null;
+  setStatus("Correct first move, but this local row has no playable mate line.", "error");
+  updateGround();
+}
+
+function playAutoReply(replySan, nextExpectedMove2, nextExpectedFinalMate, statusText, lastMove) {
+  autoPlaying = true;
+  setStatus(statusText, "idle");
+  updateGround(lastMove);
+
+  window.setTimeout(() => {
+    try {
+      const reply = chess.move(replySan);
+      expectedMove2 = nextExpectedMove2;
+      expectedFinalMate = nextExpectedFinalMate;
+      autoPlaying = false;
+      setStatus(nextExpectedFinalMate ? "Now find checkmate." : "Continue the attack.", "idle");
+      updateGround({ from: reply.from, to: reply.to });
+    } catch {
+      autoPlaying = false;
+      expectedMove2 = null;
+      expectedFinalMate = null;
+      fallbackNoLine(lastMove);
+    }
+  }, 180);
 }
 
 function onMove(orig, dest) {
-  if (solved) return;
+  if (solved || autoPlaying) return;
 
   progress.markAttempted(SECTION_ID, puzzle.id);
 
@@ -125,11 +321,51 @@ function onMove(orig, dest) {
 
   const lastMove = { from: orig, to: dest };
 
-  if (isCorrectFirstMove(move.san)) {
-    solved = true;
-    progress.markSolved(SECTION_ID, puzzle.id);
-    setStatus("Correct first move!", "success");
-    updateGround(lastMove);
+  if (expectedFinalMate) {
+    if (chess.isCheckmate() && normalizeMove(move.san) === normalizeMove(expectedFinalMate)) {
+      markSolved("Solved! Checkmate.");
+      updateGround(lastMove);
+      return;
+    }
+    chess.undo();
+    setStatus("Not quite — find the checkmate.", "error");
+    updateGround();
+    return;
+  }
+
+  if (expectedMove2) {
+    if (normalizeMove(move.san) === normalizeMove(expectedMove2)) {
+      if (!activeContinuation?.reply2San) {
+        chess.undo();
+        setStatus("This local row has no playable mate line.", "error");
+        updateGround();
+        return;
+      }
+      playAutoReply(
+        activeContinuation.reply2San,
+        null,
+        activeContinuation.finalSan,
+        "Correct — opponent replying…",
+        lastMove
+      );
+      return;
+    }
+    chess.undo();
+    setStatus("Not quite — find the next move in the sequence.", "error");
+    updateGround();
+    return;
+  }
+
+  const continuation = getMateInThreeContinuation(move);
+  if (continuation) {
+    activeContinuation = continuation;
+    playAutoReply(
+      continuation.reply1San,
+      continuation.move2San,
+      null,
+      "Correct first move — opponent replying…",
+      lastMove
+    );
     return;
   }
 
@@ -139,11 +375,18 @@ function onMove(orig, dest) {
 }
 
 function resetPuzzle() {
-  solved = progress.isSolved(SECTION_ID, puzzle.id);
+  const alreadySolved = progress.isSolved(SECTION_ID, puzzle.id);
+  solved = false;
+  autoPlaying = false;
+  expectedMove2 = null;
+  expectedFinalMate = null;
+  activeContinuation = null;
   chess = new Chess(puzzle.fen);
   setStatus(
-    solved ? "Already solved — play again for practice." : "Find the correct first move.",
-    solved ? "success" : "idle"
+    alreadySolved
+      ? "Already solved — play again for practice."
+      : "Find the first move, then finish the checkmate in three.",
+    alreadySolved ? "success" : "idle"
   );
   updateGround();
 }
@@ -174,7 +417,6 @@ async function main() {
   document.title = `Puzzle #${puzzle.id} — Mate in 3 — LlamaChess`;
   showSideToMove(puzzle.sideToMove || puzzle.fen.split(" ")[1]);
 
-  solved = progress.isSolved(SECTION_ID, puzzle.id);
   chess = new Chess(puzzle.fen);
 
   ground = Chessground(boardEl, {

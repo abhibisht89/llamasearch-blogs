@@ -1,4 +1,4 @@
-import { getChapter, chapterDataUrl } from "./miniatures-config.js";
+import { getChapter, chapterDataUrl, filterPlayableMiniatures } from "./miniatures-config.js";
 import { progress, migrateProgressToSequential } from "./progress.js";
 
 const PAGE_SIZE = 100;
@@ -10,10 +10,24 @@ let currentFilter = "all";
 let currentPage = 1;
 let section = null;
 
+function verifiedIdsUrl() {
+  return `data/sections/${SECTION_ID}_verified_ids.json`;
+}
+
 async function loadSection() {
-  const res = await fetch(chapterDataUrl(chapterMeta));
-  if (!res.ok) throw new Error(`Could not load ${chapterMeta.dataFile}`);
-  return res.json();
+  const [sectionRes, verifiedRes] = await Promise.all([
+    fetch(chapterDataUrl(chapterMeta)),
+    fetch(verifiedIdsUrl(), { cache: "no-store" }),
+  ]);
+  if (!sectionRes.ok) throw new Error(`Could not load ${chapterMeta.dataFile}`);
+
+  const sec = await sectionRes.json();
+  if (!verifiedRes.ok) return sec;
+
+  const verified = await verifiedRes.json();
+  const verifiedIds = new Set(verified.ids || []);
+
+  return filterPlayableMiniatures(sec, verifiedIds);
 }
 
 function sortedPuzzleIds(sec) {

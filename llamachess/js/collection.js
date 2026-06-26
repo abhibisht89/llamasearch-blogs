@@ -52,7 +52,7 @@ function renderMiniaturesCard(meta) {
     <a class="course-card" href="miniatures.html">
       <span class="course-tag">Live</span>
       <h2>Miniature Games</h2>
-      <p>600 combinations — find the winning move to the target square (6 chapters)</p>
+      <p>600 combinations — find the winning move to the target square, then play the full line (6 chapters)</p>
       <div class="progress-label">${solved} / ${total} solved (${pct}%)</div>
       <div class="progress-bar-wrap">
         <div class="progress-bar" style="width:${pct}%"></div>

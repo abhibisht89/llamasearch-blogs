@@ -1,19 +1,57 @@
 /** Load and navigate Watson opening lesson data across Watson volumes. */
 
-const COLLECTION_FILES = {
+const WATSON_FILES = {
   v1: "data/openings-watson-v1.json",
   v2: "data/openings-watson-v2.json",
   v3: "data/openings-watson-v3.json",
   v4: "data/openings-watson-v4.json",
 };
 
-const _cache = {};
+const COLLECTION_FILES = { ...WATSON_FILES };
 
-/** @param {'v1'|'v2'|'v3'|'v4'} collection */
+const _cache = {};
+let _manifestLoaded = false;
+
+async function ensureRepertoireManifest() {
+  if (_manifestLoaded) return;
+  try {
+    const res = await fetch("data/repertoire-manifest.json");
+    if (res.ok) {
+      const manifest = await res.json();
+      for (const opening of manifest.openings || []) {
+        COLLECTION_FILES[opening.key] = `data/openings-${opening.key}.json`;
+      }
+    }
+  } catch {
+    /* manifest optional at runtime */
+  }
+  _manifestLoaded = true;
+}
+
+function collectionFile(collection) {
+  return COLLECTION_FILES[collection] || `data/openings-${collection}.json`;
+}
+
+export async function loadTocLondon() {
+  const res = await fetch("data/london-toc.json");
+  if (!res.ok) throw new Error("Could not load london-toc.json");
+  return res.json();
+}
+
+export async function loadTocItalian() {
+  const res = await fetch("data/italian-toc.json");
+  if (!res.ok) throw new Error("Could not load italian-toc.json");
+  return res.json();
+}
+
+/** @param {string} collection watson v1–v4 or repertoire key */
 export async function loadOpenings(collection = "v1") {
   if (_cache[collection]) return _cache[collection];
-  const file = COLLECTION_FILES[collection];
-  if (!file) throw new Error(`Unknown collection: ${collection}`);
+  await ensureRepertoireManifest();
+  const file = collectionFile(collection);
+  if (!COLLECTION_FILES[collection] && !file.startsWith("data/openings-")) {
+    throw new Error(`Unknown collection: ${collection}`);
+  }
   const res = await fetch(`${file}?v=3`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Could not load ${file}`);
   _cache[collection] = await res.json();

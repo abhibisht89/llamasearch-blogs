@@ -2,6 +2,7 @@ import { loadData } from "./data.js";
 import { loadOpenings, allLessons } from "./opening-data.js";
 import { progress } from "./progress.js";
 import { COLLECTIONS } from "./config.js";
+import { loadRepertoireCatalog } from "./repertoire-config.js";
 
 async function loadSectionJson(path) {
   const res = await fetch(path);
@@ -89,6 +90,24 @@ async function watsonV4Meta() {
   return `${lessons.length} topics · ${live.length} live · ${studied} studied by you`;
 }
 
+async function lineKitchenMeta() {
+  const catalog = await loadRepertoireCatalog();
+  let totalLines = 0;
+  let totalStudied = 0;
+
+  for (const course of catalog.courses) {
+    const data = await loadOpenings(course.collectionKey);
+    const lessons = allLessons(data).filter((l) => l.status === "live");
+    totalLines += lessons.length;
+    totalStudied += progress.countSolved(
+      data.collectionId,
+      lessons.map((l) => l.id)
+    );
+  }
+
+  return `${catalog.courses.length} openings · ${totalLines} lines · ${totalStudied} studied by you`;
+}
+
 async function main() {
   const metaFns = {
     polgar: polgarMeta,
@@ -96,6 +115,7 @@ async function main() {
     watson_v2: watsonV2Meta,
     watson_v3: watsonV3Meta,
     watson_v4: watsonV4Meta,
+    line_kitchen: lineKitchenMeta,
   };
 
   const cards = await Promise.all(

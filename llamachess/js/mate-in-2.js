@@ -3,6 +3,7 @@ import { progress, migrateProgressToSequential } from "./progress.js";
 const SECTION_ID = "mate_in_2";
 const PAGE_SIZE = 100;
 const DATA_URL = "data/sections/mate_in_2.json";
+const VERIFIED_IDS_URL = "data/sections/mate_in_2_verified_ids.json";
 
 let currentFilter = "all";
 let currentPage = 1;
@@ -20,9 +21,24 @@ function firstUnsolvedId(sec, prog) {
 }
 
 async function loadSection() {
-  const res = await fetch(DATA_URL);
-  if (!res.ok) throw new Error(`Could not load ${DATA_URL}`);
-  return res.json();
+  const [sectionRes, verifiedRes] = await Promise.all([
+    fetch(DATA_URL, { cache: "no-store" }),
+    fetch(VERIFIED_IDS_URL, { cache: "no-store" }),
+  ]);
+
+  if (!sectionRes.ok) throw new Error(`Could not load ${DATA_URL}`);
+  if (!verifiedRes.ok) throw new Error(`Could not load ${VERIFIED_IDS_URL}`);
+
+  const sec = await sectionRes.json();
+  const verified = await verifiedRes.json();
+  const verifiedIds = new Set(verified.ids || []);
+
+  // Only show rows whose local FEN and full mate-in-2 line were validated.
+  // The source export still contains many partial or corrupt rows.
+  sec.puzzles = sec.puzzles.filter((p) => verifiedIds.has(p.id));
+  sec.available = sec.puzzles.length;
+
+  return sec;
 }
 
 function readPageFromUrl() {
