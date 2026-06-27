@@ -30,11 +30,11 @@ export function initBoardSettings({ getFen, onStatus } = {}) {
   const aside = document.createElement("aside");
   aside.className = `${sidebarClass} board-sidebar-left`;
   aside.innerHTML = `
-    <div class="info-card board-settings-card">
+    <div class="info-card board-settings-card is-open">
       <button
         type="button"
         class="board-settings-header"
-        aria-expanded="false"
+        aria-expanded="true"
         aria-controls="board-settings-menu"
       >
         <span class="board-settings-title">
@@ -43,7 +43,7 @@ export function initBoardSettings({ getFen, onStatus } = {}) {
         </span>
         <span class="board-settings-chevron" aria-hidden="true"></span>
       </button>
-      <div id="board-settings-menu" class="board-settings-body" hidden>
+      <div id="board-settings-menu" class="board-settings-body">
         <p class="board-settings-label">Export &amp; Share</p>
         <button type="button" class="btn btn-ghost btn-block board-settings-action" data-action="lichess">
           Open in Lichess
