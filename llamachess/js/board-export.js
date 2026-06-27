@@ -13,19 +13,22 @@ export function buildPgnFromFen(fen, { event = "LlamaChess" } = {}) {
 }
 
 /** Lichess analysis board from a raw FEN path segment (most reliable for setup positions). */
-export function lichessAnalysisUrlFromFen(fen) {
+export function lichessAnalysisUrlFromFen(fen, orientation) {
   const clean = String(fen || "").trim();
   const path = clean.replace(/ /g, "_");
-  const color = fenActiveColor(clean);
+  // Lichess ?color= is board orientation (bottom side), not side to move.
+  const color = orientation === "black" || orientation === "white"
+    ? orientation
+    : fenActiveColor(clean);
   return `https://lichess.org/analysis/${path}?color=${color}`;
 }
 
 /**
  * Open the current position in Lichess analysis.
- * Uses the FEN path URL — PGN import with only "*" often loads the start position.
+ * Pass orientation ("white" | "black") to match the LlamaChess board view.
  */
-export function lichessAnalysisUrl(fen) {
-  return lichessAnalysisUrlFromFen(fen);
+export function lichessAnalysisUrl(fen, orientation) {
+  return lichessAnalysisUrlFromFen(fen, orientation);
 }
 
 /**

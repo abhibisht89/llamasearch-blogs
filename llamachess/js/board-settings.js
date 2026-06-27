@@ -14,15 +14,18 @@ const BOARD_LAYOUT_SELECTOR = ".solve-layout, .study-layout";
 
 /**
  * Mount the settings card once per page.
- * @param {{ getFen: () => string, onStatus?: (text: string, kind?: string) => void }} options
+ * @param {{ getFen: () => string, getOrientation?: () => "white" | "black", onStatus?: (text: string, kind?: string) => void }} options
  */
-export function initBoardSettings({ getFen, onStatus } = {}) {
+export function initBoardSettings({ getFen, getOrientation, onStatus } = {}) {
   const layout = document.querySelector(BOARD_LAYOUT_SELECTOR);
   if (!layout || layout.querySelector(".board-sidebar-left")) return null;
 
   unwrapBoardStage(layout);
 
   const getFenFn = typeof getFen === "function" ? getFen : () => "";
+  const getOrientationFn = typeof getOrientation === "function"
+    ? getOrientation
+    : readBoardOrientation;
   const sidebarClass = layout.classList.contains("study-layout")
     ? "study-sidebar"
     : "solve-sidebar";
@@ -101,7 +104,7 @@ export function initBoardSettings({ getFen, onStatus } = {}) {
 
     try {
       if (action === "lichess") {
-        window.open(lichessAnalysisUrl(fen), "_blank", "noopener,noreferrer");
+        window.open(lichessAnalysisUrl(fen, getOrientationFn()), "_blank", "noopener,noreferrer");
         onStatus?.("Opened in Lichess.", "idle");
       } else if (action === "copy-pgn") {
         await copyText(buildPgnFromFen(fen));
@@ -116,6 +119,13 @@ export function initBoardSettings({ getFen, onStatus } = {}) {
   });
 
   return { closeMenu, wrap: aside };
+}
+
+/** Read chessground orientation from the live board (matches what you see in LlamaChess). */
+function readBoardOrientation() {
+  const wrap = document.querySelector(".board-wrap .cg-wrap");
+  if (wrap?.classList.contains("orientation-black")) return "black";
+  return "white";
 }
 
 /** Move Board theme controls from the right sidebar into the Setting card. */
