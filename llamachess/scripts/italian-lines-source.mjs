@@ -1,6 +1,7 @@
 /**
  * Italian Game — 22 repertoire lines (casual commentary).
  */
+import { buildItalianWrongMoveHints } from "./italian-trunk-hints.mjs";
 
 function line(num, topicId, title, subtitle, intro, moves, comments, tags = []) {
   return {
@@ -11,6 +12,7 @@ function line(num, topicId, title, subtitle, intro, moves, comments, tags = []) 
     intro,
     moves,
     comments,
+    wrongMoveHints: buildItalianWrongMoveHints(moves),
     tags: ["Italian Game", ...tags],
     orientation: "white",
   };

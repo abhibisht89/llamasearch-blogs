@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { lineToLesson } from "./opening-line-lib.mjs";
+import { enrichLineComments } from "./rich-comments.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -37,12 +38,15 @@ export async function buildCourse(key, { lines, meta, description }) {
 
   const lessons = lineList.map((line, index) =>
     lineToLesson(
-      {
-        ...line,
-        partId: `${key}_lines`,
-        orientation: meta.color === "black" ? "black" : "white",
-        tags: line.tags || [meta.name],
-      },
+      enrichLineComments(
+        {
+          ...line,
+          partId: `${key}_lines`,
+          orientation: meta.color === "black" ? "black" : "white",
+          tags: line.tags || [meta.name],
+        },
+        meta
+      ),
       index + 1
     )
   );

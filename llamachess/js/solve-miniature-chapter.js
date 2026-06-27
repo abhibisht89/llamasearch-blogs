@@ -9,6 +9,7 @@ import { progress, migrateProgressToSequential } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
 import { createHintUi } from "./hint-ui.js";
 import { initBoardSettings } from "./board-settings.js";
+import { initPuzzleKeyboardNav } from "./board-keyboard.js";
 
 const params = new URLSearchParams(location.search);
 const chapterSlug = params.get("chapter") || "f3_f6";
@@ -344,6 +345,7 @@ async function main() {
   });
 
   setupNav();
+  initPuzzleKeyboardNav(prevBtn, nextBtn);
   initHint();
   initBoardSettings({ getFen: () => chess.fen(), onStatus: setStatus });
   resetPuzzle();

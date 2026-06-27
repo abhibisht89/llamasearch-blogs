@@ -1,0 +1,55 @@
+import { mkLine, lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION =
+  "EVERY variation from the one and only Modern Defense — 1...g6 and ...Bg7, then strike back at White's center with ...c5 or ...d5.";
+
+export default [
+  mkLine(
+    1,
+    "modern_classic",
+    "Classical — ...c6 and ...d5",
+    "Line #1 · Solid Modern tabiya",
+    "Fianchetto, castle, then hit the center with ...c6 and ...d5.",
+    ["e4","g6","d4","Bg7","Nc3","d6","f4","c6","Nf3","Bg4","Be3","Nd7","h3","Bxf3","Qxf3","e5","dxe5","dxe5"],
+    [
+      "e4.",
+      "...g6 — Modern!",
+      "d4.",
+      "...Bg7 — bishop eyes the center.",
+      "Nc3.",
+      "...d6 — flexible.",
+      "f4.",
+      "...c6 — prep ...d5.",
+      "Nf3.",
+      "...Bg4 — pin the knight.",
+      "Be3.",
+      "...Nd7 — reroute.",
+      "h3.",
+      "...Bxf3 — trade the pin.",
+      "Qxf3.",
+      "...e5! — break open.",
+      "dxe5.",
+      "...dxe5 — central tension.",
+    ],
+    ["Modern Defense","Classical"]
+  ),
+  lineFromMoves(2, "modern", "Averbakh 4.Be3", ["e4","g6","d4","Bg7","Nc3","d6","Be3","a6","Qd2","b5","f3","Bb7","O-O-O","Nd7","g4","c5"], "Meet Be3 with ...a6 and queenside expansion.", ["Modern Defense"]),
+  lineFromMoves(3, "modern", "4.g3 Fianchetto", ["e4","g6","d4","Bg7","Nf3","d6","g3","Nf6","Bg2","O-O","O-O","Nbd7","c3","e5","Nbd2","Re8"], "White fianchettos — play ...e5 anyway.", ["Modern Defense"]),
+  lineFromMoves(4, "modern", "5.h4 Aggression", ["e4","g6","d4","Bg7","Nc3","d6","Be3","a6","Qd2","b5","f3","Bb7","O-O-O","Nd7","g4","c5"], "When White pushes h4, ...c5 is the answer.", ["Modern Defense"]),
+  lineFromMoves(5, "modern", "6.Bg5 Pin", ["e4","g6","d4","Bg7","Nc3","d6","Be3","Nf6","Qd2","O-O","Bh6","c5","Bxg7","Kxg7","f3","Nc6","Nge2","e5"], "Trade dark bishops when White plays Bg5.", ["Modern Defense"]),
+  lineFromMoves(6, "modern", "4.f4 Attack", ["e4","g6","d4","Bg7","Nc3","d6","f4","c6","Nf3","Bg4","Be3","Nd7","h3","Bxf3","Qxf3","e5"], "Same ...Bg4 pin against the f4 line.", ["Modern Defense"]),
+  lineFromMoves(7, "modern", "3.Nf3 d6", ["e4","g6","d4","Bg7","Nf3","d6","c3","Nf6","Be2","O-O","O-O","Nbd7","Re1","e5","Nbd2","Re8"], "Quiet Nf3 — develop and ...e5.", ["Modern Defense"]),
+  lineFromMoves(8, "modern", "5.c3 Setup", ["e4","g6","d4","Bg7","Nf3","d6","c3","Nf6","Be2","O-O","O-O","Nbd7","Re1","e5","Nbd2","Re8"], "c3 setup — same ...e5 plan.", ["Modern Defense"]),
+  lineFromMoves(9, "modern", "7...e5 Break", ["e4","g6","d4","Bg7","Nf3","d6","c3","Nf6","Be2","O-O","O-O","Nbd7","Re1","e5","Nbd2","Re8"], "The ...e5 break is your main weapon.", ["Modern Defense"]),
+  lineFromMoves(10, "modern", "4.c4 English", ["e4","g6","c4","Bg7","d4","d6","Nc3","Nf6","f3","O-O","Be3","e5","d5","c5","Qd2","a5"], "English transposition — ...c5 counter.", ["Modern Defense"]),
+  lineFromMoves(11, "modern", "6...O-O", ["e4","g6","d4","Bg7","Nc3","d6","Be3","Nf6","Qd2","O-O","O-O-O","c5","f3","Nc6","dxc5","dxc5"], "Castle and hit ...c5.", ["Modern Defense"]),
+  lineFromMoves(12, "modern", "5.Bd3 Nc6", ["e4","g6","d4","Bg7","Nc3","d6","Be3","Nf6","f3","O-O","Qd2","c5","dxc5","dxc5","O-O-O","Nc6"], "Develop ...Nc6 and pressure d4.", ["Modern Defense"]),
+  lineFromMoves(13, "modern", "8...Re8", ["e4","g6","d4","Bg7","Nf3","d6","c3","Nf6","Be2","O-O","O-O","Nbd7","Re1","e5","Nbd2","Re8"], "Rook to e8 supports ...e5.", ["Modern Defense"]),
+  lineFromMoves(14, "modern", "6...Nc6", ["e4","g6","d4","Bg7","Nc3","d6","Be3","Nf6","Qd2","O-O","O-O-O","c5","f3","Nc6","dxc5","dxc5"], "Knight to c6 hits d4 and e5.", ["Modern Defense"]),
+  lineFromMoves(15, "modern", "7...a6", ["e4","g6","d4","Bg7","Nc3","d6","Be3","a6","Qd2","b5","f3","Bb7","O-O-O","Nd7","g4","c5"], "Queenside ...b5 expansion.", ["Modern Defense"]),
+  lineFromMoves(16, "modern", "9...c5 Counter", ["e4","g6","d4","Bg7","Nc3","d6","Be3","a6","Qd2","b5","f3","Bb7","O-O-O","Nd7","g4","c5"], "The ...c5 break is always thematic.", ["Modern Defense"]),
+  lineFromMoves(17, "modern", "4.Nge2 Flexible", ["e4","g6","d4","Bg7","Nge2","d6","Ng3","Nf6","Be2","O-O","O-O","c5","c3","Nc6","f4","e5"], "Nge2 — meet with ...c5 and ...Nc6.", ["Modern Defense"]),
+  lineFromMoves(18, "modern", "5.Ng3 Nbd7", ["e4","g6","d4","Bg7","Nge2","d6","Ng3","Nf6","Be2","O-O","O-O","c5","c3","Nc6","f4","e5"], "Develop knights before the center fight.", ["Modern Defense"]),
+  lineFromMoves(19, "modern", "10...Nc6", ["e4","g6","d4","Bg7","Nc3","d6","Be3","Nf6","Qd2","O-O","O-O-O","c5","f3","Nc6","dxc5","dxc5"], "Nc6 pressure on d4.", ["Modern Defense"]),
+  lineFromMoves(20, "modern", "8...Bb7", ["e4","g6","d4","Bg7","Nc3","d6","Be3","a6","Qd2","b5","f3","Bb7","O-O-O","Nd7","g4","c5"], "Bishop to b7 supports ...c5.", ["Modern Defense"]),
+];

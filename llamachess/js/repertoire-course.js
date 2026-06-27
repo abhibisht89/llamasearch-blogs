@@ -10,10 +10,6 @@ import {
 const params = new URLSearchParams(location.search);
 const courseKey = params.get("key");
 
-function moveCount(lesson) {
-  return lesson.steps.filter((s) => s.type === "move").length;
-}
-
 function renderLineCard(lesson, collectionKey) {
   const studyHref = studyLessonHref(collectionKey, lesson.id);
   const drillHref = drillLessonHref(collectionKey, lesson.id);
@@ -23,25 +19,18 @@ function renderLineCard(lesson, collectionKey) {
     progress.isAttempted(collectionKey, lesson.id) && !studied;
   const cls = studied ? "studied" : attempted ? "attempted" : "";
   const check = studied ? " ✓" : "";
-  const tags = (lesson.tags || [])
-    .slice(0, 3)
-    .map((t) => `<span class="london-tag">${t}</span>`)
-    .join("");
 
   const actions = drillOn
     ? `<div class="line-card-actions">
         <a class="btn btn-primary" href="${studyHref}">Study</a>
         <a class="btn btn-ghost" href="${drillHref}">Drill</a>
       </div>`
-    : `<a class="btn btn-primary btn-block" href="${studyHref}">Study line</a>`;
+    : `<a class="btn btn-primary btn-block" href="${studyHref}">Study</a>`;
 
   return `
     <article class="london-line-card ${cls}">
       <div class="london-line-num">Line #${lesson.id}${check}</div>
       <h2 class="london-line-title">${lesson.title}</h2>
-      <p class="london-line-sub">${lesson.subtitle || ""}</p>
-      <div class="london-line-meta">${moveCount(lesson)} moves</div>
-      ${tags ? `<div class="london-tags">${tags}</div>` : ""}
       ${actions}
     </article>
   `;
@@ -60,7 +49,7 @@ async function main() {
   const collectionId = data.collectionId;
 
   const colorLabel = (courseMeta?.color || data.meta?.color) === "black" ? "Black" : "White";
-  document.getElementById("course-tag").textContent = `Repertoire · ${colorLabel}`;
+  document.getElementById("course-tag").textContent = colorLabel;
   document.getElementById("course-title").textContent = data.title;
   document.getElementById("course-description").textContent =
     courseMeta?.description || data.description || "";
@@ -70,24 +59,6 @@ async function main() {
   document.getElementById("line-grid").innerHTML = lessons
     .map((lesson) => renderLineCard(lesson, collectionId))
     .join("");
-
-  const live = lessons.filter((l) => l.status === "live").length;
-  document.getElementById("line-count").textContent = `${live} lines · play as ${colorLabel}`;
-
-  const studied = progress.countSolved(
-    collectionId,
-    lessons.filter((l) => l.status === "live").map((l) => l.id)
-  );
-  const attempted = lessons.filter(
-    (l) =>
-      l.status === "live" &&
-      progress.isAttempted(collectionId, l.id) &&
-      !progress.isSolved(collectionId, l.id)
-  ).length;
-  document.getElementById("study-stats").textContent =
-    attempted > 0
-      ? `${studied} / ${live} studied · ${attempted} opened`
-      : `${studied} / ${live} studied`;
 
   document.getElementById("reset-btn")?.addEventListener("click", () => {
     if (confirm(`Reset all ${data.title} progress?`)) {

@@ -1,0 +1,22 @@
+import { lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION = "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything.";
+
+/** Potluck course — generated from validated templates. */
+export default [
+  lineFromMoves(1, "caro-slav", "Whole Caro-Kann / Slav — Line 1", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Bf5","Ng3","Bg6","Nf3","Nd7","h4","h6","Bd3","Bxd3","Qxd3","Qc7"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 1.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(2, "caro-slav", "Whole Caro-Kann / Slav — Line 2", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nc6","c3","Qb6","Na3","cxd4","cxd4","Rc8"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 2.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(3, "caro-slav", "Whole Caro-Kann / Slav — Line 3", ["e4","c6","d4","d5","exd5","cxd5","Bd3","Nc6","c3","Nf6","Bf4","Bg4","Qb3","Qd7"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 3.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(4, "caro-slav", "Whole Caro-Kann / Slav — Line 4", ["e4","c6","d4","d5","exd5","cxd5","c4","Nf6","Nc3","e6","Nf3","Be7","cxd5","Nxd5"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 4.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(5, "caro-slav", "Whole Caro-Kann / Slav — Line 5", ["e4","c6","d4","d5","Nc3","g6","Nf3","Bg7","h3","e6","Bd3","Ne7","O-O","O-O","Re1","Nd7","Bf4","f6"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 5.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(6, "caro-slav", "Whole Caro-Kann / Slav — Line 6", ["e4","c6","Nc3","d5","Nf3","Bg4","h3","Bxf3","Qxf3","e6","d4","Nf6","Bd3","Be7"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 6.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(7, "caro-slav", "Whole Caro-Kann / Slav — Line 7", ["e4","c6","f3","d5","d4","e6","Nc3","dxe4","fxe4","f5","Nf3","fxe4","Nxe4","Nf6"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 7.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(8, "caro-slav", "Whole Caro-Kann / Slav — Line 8", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nc6","c3","Qb6","Na3","O-O-O","Nb5","Re8"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 8.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(9, "caro-slav", "Whole Caro-Kann / Slav — Line 9", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Nd7","Ng5","Ngf6","Bd3","e6","N1f3","Be7","O-O","O-O"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 9.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(10, "caro-slav", "Whole Caro-Kann / Slav — Line 10", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nc6","c3","Qb6","Na3","cxd4"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 10.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(11, "caro-slav", "Whole Caro-Kann / Slav — Line 11", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Bf5","Nd6+","Qxd6","Bd2","Nd7","Bc3","O-O-O"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 11.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(12, "caro-slav", "Whole Caro-Kann / Slav — Line 12", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Nd7","Nf3","Ngf6","Nxf6+","Nxf6","Bd3","e6","O-O","Bd6","Re1","O-O","c4","Re8"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 12.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(13, "caro-slav", "Whole Caro-Kann / Slav — Line 13", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nd7","Ng5","Be7","Nxe6","Nh6"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 13.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(14, "caro-slav", "Whole Caro-Kann / Slav — Line 14", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nc6","c3","Qb6","Na3","a6"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 14.", ["Whole Caro-Kann / Slav"]),
+  lineFromMoves(15, "caro-slav", "Whole Caro-Kann / Slav — Line 15", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Nf6","Nxf6+","gxf6","c3","Bg7","Bd3","e5","Qh5","Qe7","Nf3","f5"], "Unified Caro-Kann and Slav structures — ...c6 and ...d5 against everything. Line 15.", ["Whole Caro-Kann / Slav"]),
+];

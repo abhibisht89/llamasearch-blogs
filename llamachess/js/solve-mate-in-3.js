@@ -13,6 +13,7 @@ import {
 import { initBoardThemeSwitcher } from "./board-theme.js";
 import { createHintUi } from "./hint-ui.js";
 import { initBoardSettings } from "./board-settings.js";
+import { initPuzzleKeyboardNav } from "./board-keyboard.js";
 
 const SECTION_ID = "mate_in_3";
 const DATA_URL = "data/sections/mate_in_3.json";
@@ -464,6 +465,7 @@ async function main() {
   });
 
   setupNav();
+  initPuzzleKeyboardNav(prevBtn, nextBtn);
   initHint();
   initBoardSettings({ getFen: () => chess.fen(), onStatus: setStatus });
   resetPuzzle();

@@ -15,6 +15,13 @@ import { progress } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
 import { decorateHintButton } from "./hint-ui.js";
 import { initBoardSettings } from "./board-settings.js";
+import { initDrillKeyboardNav } from "./board-keyboard.js";
+import {
+  normalizeSan,
+  opponentTurnPrompt,
+  sanToPlain,
+  wrongMoveMessage,
+} from "./drill-feedback.js";
 
 const params = new URLSearchParams(location.search);
 const collectionKey = params.get("collection") || "london";
@@ -29,10 +36,11 @@ const resetBtn = document.getElementById("reset-btn");
 const hintBtn = document.getElementById("hint-btn");
 const sideToMoveEl = document.getElementById("side-to-move");
 const lessonTitleEl = document.getElementById("lesson-title");
-const lessonSubEl = document.getElementById("lesson-sub");
 const drillProgressEl = document.getElementById("drill-progress");
 const hintTitleEl = document.getElementById("hint-title");
 const hintBodyEl = document.getElementById("hint-body");
+const commentaryTitleEl = document.getElementById("commentary-title");
+const commentaryBodyEl = document.getElementById("commentary-body");
 const prevLessonBtn = document.getElementById("prev-lesson");
 const nextLessonBtn = document.getElementById("next-lesson");
 const studyLinkEl = document.getElementById("study-link");
@@ -54,8 +62,21 @@ let hintRevealed = false;
 let playGen = 0;
 
 function setStatus(text, kind = "idle") {
-  statusEl.textContent = text;
+  if (!statusEl) return;
+  const msg = String(text || "").trim();
+  if (!msg) {
+    statusEl.textContent = "";
+    statusEl.hidden = true;
+    statusEl.className = "status-msg idle";
+    return;
+  }
+  statusEl.hidden = false;
+  statusEl.textContent = msg;
   statusEl.className = `status-msg ${kind}`;
+}
+
+function clearStatus() {
+  setStatus("");
 }
 
 function orientColor(side) {
@@ -81,10 +102,6 @@ function toDests(game) {
     dests.get(move.from).push(move.to);
   }
   return dests;
-}
-
-function normalizeSan(san) {
-  return String(san || "").replace(/[+#?!]+/g, "");
 }
 
 /** Who plays this step: user (repertoire side) or opponent. */
@@ -134,9 +151,20 @@ function setHintPanel(title, body) {
   hintBodyEl.textContent = body || "";
 }
 
+function setCommentaryPanel(title, body) {
+  if (!commentaryTitleEl || !commentaryBodyEl) return;
+  commentaryTitleEl.textContent = title || "";
+  commentaryBodyEl.textContent = body || "";
+}
+
+function showTurnCommentary(side) {
+  setCommentaryPanel("", opponentTurnPrompt(side));
+}
+
 function showIntroPanel() {
   const intro = lesson.steps[0]?.type === "intro" ? lesson.steps[0] : null;
-  setHintPanel(intro?.title || lesson.title, intro?.theory || "Play your side of the line from memory.");
+  setHintPanel(intro?.title || lesson.title, "Press Start line when ready, then play from memory.");
+  setCommentaryPanel("", intro?.theory || "");
 }
 
 function showUserHint(step, revealed = false) {
@@ -145,10 +173,18 @@ function showUserHint(step, revealed = false) {
     return;
   }
   if (revealed) {
-    setHintPanel(`Book move: ${step.san}`, step.theory || "");
+    setHintPanel(`Book move: ${sanToPlain(step.san)}`, step.theory || "");
     return;
   }
-  setHintPanel(step.title || "Your move", "Find the correct move for your repertoire.");
+  setHintPanel(step.title || "Your move", step.theory || "Find the correct move for your repertoire.");
+}
+
+function showMoveCommentary(step) {
+  if (!step) {
+    setCommentaryPanel("", "");
+    return;
+  }
+  setCommentaryPanel(step.san || step.title || "Move", step.theory || "");
 }
 
 function updateGround(lastMove) {
@@ -174,8 +210,9 @@ function updateGround(lastMove) {
 function markComplete() {
   solved = true;
   progress.markSolved(data.collectionId, lesson.id);
-  setStatus("Line complete — nice work!", "success");
-  setHintPanel("Done", "You played the full line correctly.");
+  clearStatus();
+  setHintPanel("", "");
+  setCommentaryPanel("Done", "You played the full line correctly.");
   updateGround();
   hintBtn.disabled = true;
 }
@@ -205,29 +242,39 @@ function playOpponentMoves(lastMove) {
       autoPlaying = false;
       hintRevealed = false;
       hintBtn.disabled = false;
-      setStatus("Your move — play the repertoire line.", "idle");
-      showUserHint(step, false);
+      if (step && isUserStep(step)) {
+        showUserHint(step, false);
+      }
       updateGround(prevMove);
       return;
     }
 
-    try {
-      const reply = chess.move(step.san);
-      if (!reply) throw new Error(`Illegal ${step.san}`);
-      stepPtr += 1;
-      const lm = { from: reply.from, to: reply.to };
-      setStatus("Opponent played…", "idle");
-      updateGround(lm);
-      window.setTimeout(() => playNext(lm), 220);
-    } catch (err) {
-      console.error(err);
-      autoPlaying = false;
-      setStatus("Could not replay opponent move — reset and try again.", "error");
-      updateGround(prevMove);
-    }
+    showTurnCommentary(chess.turn());
+    clearStatus();
+    updateGround(prevMove);
+
+    window.setTimeout(() => {
+      if (gen !== playGen) return;
+
+      try {
+        const reply = chess.move(step.san);
+        if (!reply) throw new Error(`Illegal ${step.san}`);
+        stepPtr += 1;
+        const lm = { from: reply.from, to: reply.to };
+        showMoveCommentary(step);
+        updateGround(lm);
+
+        window.setTimeout(() => playNext(lm), 380);
+      } catch (err) {
+        console.error(err);
+        autoPlaying = false;
+        setStatus("Could not replay opponent move — reset and try again.", "error");
+        updateGround(prevMove);
+      }
+    }, 320);
   };
 
-  window.setTimeout(() => playNext(lastMove), 220);
+  window.setTimeout(() => playNext(lastMove), 180);
 }
 
 function onMove(orig, dest) {
@@ -249,23 +296,25 @@ function onMove(orig, dest) {
     chess.undo();
     hintRevealed = true;
     showUserHint(step, true);
-    setStatus(`Not quite — the book move is ${step.san}.`, "error");
+    setCommentaryPanel("", wrongMoveMessage(move.san, step.san, step));
+    clearStatus();
     updateGround();
     return;
   }
 
   userMovesDone += 1;
   updateDrillProgress();
+  const playedStep = step;
   stepPtr += 1;
   hintRevealed = false;
-  showUserHint(null);
+  showMoveCommentary(playedStep);
 
   if (finishIfDone()) {
     updateGround(lastMove);
     return;
   }
 
-  setStatus("Correct — opponent replying…", "idle");
+  clearStatus();
   updateGround(lastMove);
   playOpponentMoves(lastMove);
 }
@@ -276,22 +325,24 @@ function startDrill() {
   userMovesDone = 0;
   hintRevealed = false;
   stepPtr = firstMoveIndex();
-  startBtn.style.display = "none";
+  startBtn.hidden = true;
   hintBtn.disabled = false;
 
   chess = new Chess(fenBeforeStep(stepPtr));
   const step = lesson.steps[stepPtr];
 
   if (step && isOpponentStep(step)) {
-    setStatus("Line starting — opponent to play…", "idle");
+    showTurnCommentary(chess.turn());
+    clearStatus();
     updateGround();
     playOpponentMoves(undefined);
     return;
   }
 
   if (step && isUserStep(step)) {
-    setStatus("Your move — play the repertoire line.", "idle");
     showUserHint(step, false);
+    setCommentaryPanel("", "");
+    clearStatus();
     updateGround();
     return;
   }
@@ -312,25 +363,24 @@ function resetDrill() {
   if (hasIntro) {
     phase = "intro";
     chess = new Chess(lesson.steps[0].fen || START_FEN);
-    startBtn.style.display = "block";
+    startBtn.hidden = false;
     showIntroPanel();
-    setStatus("Read the intro, then start when you're ready.", "idle");
+    clearStatus();
   } else {
     phase = "active";
-    startBtn.style.display = "none";
+    startBtn.hidden = true;
     chess = new Chess(fenBeforeStep(stepPtr));
     const step = lesson.steps[stepPtr];
     if (step && isOpponentStep(step)) {
-      setStatus(solved ? "Already drilled — play again for practice." : "Line starting…", solved ? "success" : "idle");
+      showTurnCommentary(chess.turn());
+      clearStatus();
       updateGround();
       playOpponentMoves(undefined);
       return;
     }
-    setStatus(
-      solved ? "Already drilled — play again for practice." : "Your move — play the repertoire line.",
-      solved ? "success" : "idle"
-    );
+    clearStatus();
     showUserHint(step, false);
+    setCommentaryPanel("", "");
   }
 
   updateDrillProgress();
@@ -342,7 +392,7 @@ function revealHint() {
   if (!step || phase !== "active" || solved || autoPlaying) return;
   hintRevealed = true;
   showUserHint(step, true);
-  setStatus(`Hint: play ${step.san}`, "idle");
+  clearStatus();
 }
 
 function wireNav() {
@@ -352,6 +402,8 @@ function wireNav() {
   nextLessonBtn.href = next ? drillHref(next) : "#";
   prevLessonBtn.classList.toggle("disabled", !prev);
   nextLessonBtn.classList.toggle("disabled", !next);
+
+  initDrillKeyboardNav(prevLessonBtn, nextLessonBtn);
 }
 
 async function resolveCollectionNav() {
@@ -395,7 +447,6 @@ async function main() {
   collectionBackEl.textContent = nav.label;
 
   lessonTitleEl.textContent = lesson.title;
-  lessonSubEl.textContent = lesson.subtitle || "";
   document.title = `Drill: ${lesson.title} — ${nav.label}`;
   studyLinkEl.href = studyLessonHref(collectionKey, lesson.id);
 

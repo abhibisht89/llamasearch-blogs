@@ -12,6 +12,7 @@ import {
 import { initBoardThemeSwitcher } from "./board-theme.js";
 import { createHintUi } from "./hint-ui.js";
 import { initBoardSettings } from "./board-settings.js";
+import { initPuzzleKeyboardNav } from "./board-keyboard.js";
 
 export function createEndgameLineSolver(config) {
   const {
@@ -296,6 +297,7 @@ export function createEndgameLineSolver(config) {
     });
 
     setupNav();
+    initPuzzleKeyboardNav(prevBtn, nextBtn);
     initHint();
     initBoardSettings({ getFen: () => chess.fen(), onStatus: setStatus });
     resetPuzzle();

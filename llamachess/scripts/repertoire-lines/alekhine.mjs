@@ -1,0 +1,57 @@
+import { mkLine, lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION =
+  "Want to get your opponents out of prep on move 1? The Alekhine (1...Nf6) invites White's pawn center, then you counterattack with ...d6 and ...Bg4.";
+
+export default [
+  mkLine(
+    1,
+    "alekhine_four_pawns",
+    "Four Pawns — ...Bg4 Pin",
+    "Line #1 · Chase the overextended center",
+    "White builds a huge pawn center? Pin with ...Bg4 and make them prove it.",
+    ["e4","Nf6","e5","Nd5","d4","d6","c4","Nb6","f4","dxe5","fxe5","Nc6","Be3","Bf5","Nc3","e6","Nf3","Bb4"],
+    [
+      "e4.",
+      "...Nf6 — Alekhine!",
+      "e5.",
+      "...Nd5 — chase the knight.",
+      "d4.",
+      "...d6 — undermine the center.",
+      "c4.",
+      "...Nb6 — retreat with tempo.",
+      "f4.",
+      "...dxe5 — open the f-file.",
+      "fxe5.",
+      "...Nc6 — develop and hit e5.",
+      "Be3.",
+      "...Bf5 — active bishop.",
+      "Nc3.",
+      "...e6 — solid structure.",
+      "Nf3.",
+      "...Bb4 — pin the knight.",
+    ],
+    ["Alekhine Defense","Four Pawns"]
+  ),
+  lineFromMoves(2, "alekhine", "Exchange 4...dxe5", ["e4","Nf6","e5","Nd5","d4","d6","c4","Nb6","f4","dxe5","fxe5","Nc6","Be3","Bf5","Nc3","e6","Nf3","Be7"], "Trade on e5 and develop with ...Bf5.", ["Alekhine Defense"]),
+  lineFromMoves(3, "alekhine", "Modern 2.Nc3", ["e4","Nf6","Nc3","d5","e5","Ne4","Nxe4","dxe4","d3","exd3","Bxd3","e6","Nf3","c5","O-O","Nc6"], "2.Nc3 is tricky — meet ...d5 and grab the e4 pawn.", ["Alekhine Defense","Modern"]),
+  lineFromMoves(4, "alekhine", "Chase 5.c5 Nd5", ["e4","Nf6","e5","Nd5","c4","Nb6","c5","Nd5","d4","e6","Nf3","c6","Be2","Be7","O-O","O-O"], "The c5 chase keeps White's center fat and targetable.", ["Alekhine Defense"]),
+  lineFromMoves(5, "alekhine", "Classical 4.Nf3 g6", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","g6","Bc4","Nb6","Bb3","Bg7","a4","a5","O-O","O-O"], "Fianchetto ...g6 when White plays quietly.", ["Alekhine Defense"]),
+  lineFromMoves(6, "alekhine", "Balanced 6.Be2", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","g6","Be2","Bg7","O-O","O-O","c4","Nb6","Nc3","c5"], "Castle and strike with ...c5.", ["Alekhine Defense"]),
+  lineFromMoves(7, "alekhine", "4.Bc4 Nb6", ["e4","Nf6","e5","Nd5","d4","d6","Bc4","Nb6","Bb3","Bf5","Nf3","e6","O-O","Be7","Re1","O-O"], "Bishop to c4 — reroute knight and develop ...Bf5.", ["Alekhine Defense"]),
+  lineFromMoves(8, "alekhine", "Saemisch 5.f4", ["e4","Nf6","e5","Nd5","d4","d6","f4","g6","Nf3","Bg7","Be2","O-O","O-O","c5","c4","Nb6"], "Meet f4 with ...g6 and ...c5 breaks.", ["Alekhine Defense"]),
+  lineFromMoves(9, "alekhine", "3...Bg4 Pin", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","Bg4","Be2","e6","O-O","Be7","c4","Nb6","Nc3","O-O"], "The ...Bg4 pin is a classic Alekhine weapon.", ["Alekhine Defense"]),
+  lineFromMoves(10, "alekhine", "5.Nc3 Bb4", ["e4","Nf6","e5","Nd5","d4","d6","c4","Nb6","f4","dxe5","fxe5","Nc6","Be3","Bf5","Nc3","e6","Nf3","Bb4"], "Pin on b4 when White overextends.", ["Alekhine Defense"]),
+  lineFromMoves(11, "alekhine", "2.e5 Nd5 3.c4", ["e4","Nf6","e5","Nd5","c4","Nb6","c5","Nd5","d4","e6","Nf3","c6","Be2","Be7","O-O","O-O"], "c4 chase — knight hops to d5.", ["Alekhine Defense"]),
+  lineFromMoves(12, "alekhine", "Exchange 7...Be7", ["e4","Nf6","e5","Nd5","d4","d6","c4","Nb6","f4","dxe5","fxe5","Nc6","Be3","Bf5","Nc3","e6","Nf3","Be7"], "Solid ...Be7 in the exchange line.", ["Alekhine Defense"]),
+  lineFromMoves(13, "alekhine", "4...g6 Fianchetto", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","g6","c4","Nb6","Be2","Bg7","O-O","O-O","Nc3","c5"], "Fianchetto setup with ...c5 counter.", ["Alekhine Defense"]),
+  lineFromMoves(14, "alekhine", "5.Be2 O-O", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","g6","Be2","Bg7","O-O","O-O","c4","Nb6","Nc3","c5"], "Quiet development — then ...c5.", ["Alekhine Defense"]),
+  lineFromMoves(15, "alekhine", "6.a4 a5", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","g6","Bc4","Nb6","Bb3","Bg7","a4","a5","O-O","O-O"], "Grab queenside space with ...a5.", ["Alekhine Defense"]),
+  lineFromMoves(16, "alekhine", "3.Nc3 d5", ["e4","Nf6","Nc3","d5","e5","Ne4","Nxe4","dxe4","d3","exd3","Bxd3","e6","Nf3","c5","O-O","Nc6"], "Modern 2.Nc3 — take on e4.", ["Alekhine Defense"]),
+  lineFromMoves(17, "alekhine", "4.Nxe4 dxe4", ["e4","Nf6","Nc3","d5","e5","Ne4","Nxe4","dxe4","d3","exd3","Bxd3","e6","Nf3","c5","O-O","Nc6"], "Grab the pawn and develop fast.", ["Alekhine Defense"]),
+  lineFromMoves(18, "alekhine", "5.Bxd3 c5", ["e4","Nf6","Nc3","d5","e5","Ne4","Nxe4","dxe4","d3","exd3","Bxd3","e6","Nf3","c5","O-O","Nc6"], "Strike the center with ...c5.", ["Alekhine Defense"]),
+  lineFromMoves(19, "alekhine", "7...Nc6 Development", ["e4","Nf6","e5","Nd5","d4","d6","c4","Nb6","f4","dxe5","fxe5","Nc6","Be3","Bf5","Nc3","e6","Nf3","Be7"], "Develop knights before breaking.", ["Alekhine Defense"]),
+  lineFromMoves(20, "alekhine", "8...O-O Castle", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","g6","Be2","Bg7","O-O","O-O","c4","Nb6","Nc3","c5"], "Castle and prepare ...c5.", ["Alekhine Defense"]),
+  lineFromMoves(21, "alekhine", "6...c5 Break", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","g6","Be2","Bg7","O-O","O-O","c4","Nb6","Nc3","c5"], "The ...c5 break is your main counter.", ["Alekhine Defense"]),
+  lineFromMoves(22, "alekhine", "9...cxd4 Central", ["e4","Nf6","e5","Nd5","d4","d6","Nf3","g6","Be2","Bg7","O-O","O-O","c4","Nb6","Nc3","c5","dxc5","dxc5"], "Open the center when White allows it.", ["Alekhine Defense"]),
+];

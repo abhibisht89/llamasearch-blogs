@@ -92,20 +92,34 @@ async function watsonV4Meta() {
 
 async function lineKitchenMeta() {
   const catalog = await loadRepertoireCatalog();
-  let totalLines = 0;
-  let totalStudied = 0;
+  const totalLines = catalog.courses.reduce((sum, c) => sum + (c.lineCount || 0), 0);
 
-  for (const course of catalog.courses) {
-    const data = await loadOpenings(course.collectionKey);
-    const lessons = allLessons(data).filter((l) => l.status === "live");
-    totalLines += lessons.length;
-    totalStudied += progress.countSolved(
-      data.collectionId,
-      lessons.map((l) => l.id)
-    );
+  const studiedCounts = await Promise.all(
+    catalog.courses.map(async (course) => {
+      try {
+        const data = await loadOpenings(course.collectionKey);
+        const lessons = allLessons(data).filter((l) => l.status === "live");
+        return progress.countSolved(
+          data.collectionId,
+          lessons.map((l) => l.id)
+        );
+      } catch {
+        return 0;
+      }
+    })
+  );
+  const totalStudied = studiedCounts.reduce((sum, n) => sum + n, 0);
+
+  return `${catalog.courses.length} openings · ${totalLines.toLocaleString()} lines · ${totalStudied} studied by you`;
+}
+
+async function lineKitchenDescription(fallback) {
+  try {
+    const catalog = await loadRepertoireCatalog();
+    return `${catalog.tagline} ${catalog.description}`;
+  } catch {
+    return fallback;
   }
-
-  return `${catalog.courses.length} openings · ${totalLines} lines · ${totalStudied} studied by you`;
 }
 
 async function main() {
@@ -120,12 +134,14 @@ async function main() {
 
   const cards = await Promise.all(
     COLLECTIONS.map(async (c) => {
+      const description =
+        c.id === "line_kitchen" ? await lineKitchenDescription(c.description) : c.description;
       const meta = await (metaFns[c.id]?.() ?? Promise.resolve("Coming soon"));
       return `
         <a class="hub-card" href="${c.href}">
           <span class="hub-tag">${c.tag}</span>
           <h2>${c.title}</h2>
-          <p>${c.description}</p>
+          <p>${description}</p>
           <div class="hub-meta">${meta}</div>
         </a>
       `;

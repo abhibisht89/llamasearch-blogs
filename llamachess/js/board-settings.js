@@ -33,11 +33,11 @@ export function initBoardSettings({ getFen, getOrientation, onStatus } = {}) {
   const aside = document.createElement("aside");
   aside.className = `${sidebarClass} board-sidebar-left`;
   aside.innerHTML = `
-    <div class="info-card board-settings-card is-open">
+    <div class="info-card board-settings-card">
       <button
         type="button"
         class="board-settings-header"
-        aria-expanded="true"
+        aria-expanded="false"
         aria-controls="board-settings-menu"
       >
         <span class="board-settings-title">
@@ -46,7 +46,7 @@ export function initBoardSettings({ getFen, getOrientation, onStatus } = {}) {
         </span>
         <span class="board-settings-chevron" aria-hidden="true"></span>
       </button>
-      <div id="board-settings-menu" class="board-settings-body">
+      <div id="board-settings-menu" class="board-settings-body" hidden>
         <p class="board-settings-label">Export &amp; Share</p>
         <button type="button" class="btn btn-ghost btn-block board-settings-action" data-action="lichess">
           Open in Lichess
@@ -63,7 +63,12 @@ export function initBoardSettings({ getFen, getOrientation, onStatus } = {}) {
   `;
 
   layout.insertBefore(aside, layout.firstChild);
+  layout.classList.add("board-workspace");
   relocateBoardTheme(aside);
+  relocateModeSwitch(aside);
+  relocateLessonHeader(aside);
+  relocateLineNav(aside);
+  relocateMarkStudied(aside);
 
   const card = aside.querySelector(".board-settings-card");
   const toggle = aside.querySelector(".board-settings-header");
@@ -142,6 +147,74 @@ function relocateBoardTheme(leftSidebar) {
   if (heading) slot.appendChild(heading);
   if (themeSwitch) slot.appendChild(themeSwitch);
   themeCard.remove();
+}
+
+/** Move Study / Drill mode toggle from the right sidebar to the left, after Setting. */
+function relocateModeSwitch(leftSidebar) {
+  const rightSidebar = document.querySelector(
+    ".solve-sidebar:not(.board-sidebar-left), .study-sidebar:not(.board-sidebar-left)",
+  );
+  const modeSwitch = rightSidebar?.querySelector("#mode-switch, .mode-switch");
+  if (!modeSwitch || leftSidebar.querySelector(".board-mode-card")) return;
+
+  const card = document.createElement("div");
+  card.className = "info-card board-mode-card";
+  const heading = document.createElement("h2");
+  heading.textContent = "Mode";
+  card.appendChild(heading);
+  card.appendChild(modeSwitch);
+  leftSidebar.appendChild(card);
+}
+
+/** Move line title card (mode badge + lesson name) to the left, after Mode. */
+function relocateLessonHeader(leftSidebar) {
+  const rightSidebar = document.querySelector(
+    ".solve-sidebar:not(.board-sidebar-left), .study-sidebar:not(.board-sidebar-left)",
+  );
+  const titleEl = rightSidebar?.querySelector("#lesson-title");
+  const lessonCard = titleEl?.closest(".info-card");
+  if (!lessonCard || lessonCard.classList.contains("board-lesson-card")) return;
+
+  lessonCard.classList.add("board-lesson-card");
+  const modeCard = leftSidebar.querySelector(".board-mode-card");
+  if (modeCard) {
+    leftSidebar.insertBefore(lessonCard, modeCard.nextElementSibling);
+  } else {
+    leftSidebar.appendChild(lessonCard);
+  }
+}
+
+/** Move Prev / Next line nav from the right sidebar to the left, after Mode. */
+function relocateLineNav(leftSidebar) {
+  const rightSidebar = document.querySelector(
+    ".solve-sidebar:not(.board-sidebar-left), .study-sidebar:not(.board-sidebar-left)",
+  );
+  const navRow = rightSidebar?.querySelector("#prev-lesson")?.closest(".nav-row");
+  if (!navRow || navRow.classList.contains("drill-action-row")) return;
+  if (leftSidebar.querySelector(".board-line-nav-card")) return;
+
+  const card = document.createElement("div");
+  card.className = "info-card board-line-nav-card";
+  const heading = document.createElement("h2");
+  heading.textContent = "Lines";
+  card.appendChild(heading);
+  card.appendChild(navRow);
+  leftSidebar.appendChild(card);
+}
+
+/** Move Mark as studied from the right sidebar to the left (study mode only). */
+function relocateMarkStudied(leftSidebar) {
+  const rightSidebar = document.querySelector(
+    ".solve-sidebar:not(.board-sidebar-left), .study-sidebar:not(.board-sidebar-left)",
+  );
+  const markBtn = rightSidebar?.querySelector("#mark-studied");
+  const actionRow = markBtn?.closest(".study-action-row");
+  if (!markBtn || leftSidebar.querySelector(".board-mark-studied-card")) return;
+
+  const card = document.createElement("div");
+  card.className = "info-card board-mark-studied-card";
+  card.appendChild(actionRow || markBtn);
+  leftSidebar.appendChild(card);
 }
 
 /** Undo older board-stage layout if present. */

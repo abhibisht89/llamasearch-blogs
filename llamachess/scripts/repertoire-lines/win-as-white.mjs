@@ -1,0 +1,17 @@
+import { lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION = "Epic openings that will WIN you the game — Fried Liver, Danish, and more.";
+
+/** Potluck course — generated from validated templates. */
+export default [
+  lineFromMoves(1, "win-as-white", "Win Every Game As White! (Almost) — Line 1", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","d5","exd5","Nxd5","Nxf7","Kxf7","Qf3+","Ke6","Nc3","Ne7","Bxd5+","Kd6","Qe4+"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 1.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(2, "win-as-white", "Win Every Game As White! (Almost) — Line 2", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","d5","exd5","Nxd5","Nxf7","Kxf7","Qf3+","Kg8","Bxd5+","Qxd5","Qxd5+","Be6","Qxe5+"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 2.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(3, "win-as-white", "Win Every Game As White! (Almost) — Line 3", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","d5","exd5","Na5","Bb5+","c6","dxc6","bxc6","Be2","h6","Nf3","e4","Ne5"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 3.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(4, "win-as-white", "Win Every Game As White! (Almost) — Line 4", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","Bc5","O-O","Nxe4","Nxe4","d5","Bxd5","Qxd5","Re1"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 4.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(5, "win-as-white", "Win Every Game As White! (Almost) — Line 5", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","d5","exd5","b5","Bf1","Nd4","d3"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 5.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(6, "win-as-white", "Win Every Game As White! (Almost) — Line 6", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","d5","exd5","Nd4","c3","Nxd5","Nxf7","Kxf7","Qf3+","Ke6","Bxd5+","Kd6","Qe4+"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 6.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(7, "win-as-white", "Win Every Game As White! (Almost) — Line 7", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","d5","exd5","h6","Nxf7","Kxf7","Qf3+","Kg8","Qe4","Ne7","O-O","c6","dxc6"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 7.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(8, "win-as-white", "Win Every Game As White! (Almost) — Line 8", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","Nxe4","O-O","Nxf2","Kxf2","d5","Bxd5+","Be6","Bxe6","fxe6","d4"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 8.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(9, "win-as-white", "Win Every Game As White! (Almost) — Line 9", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","d5","exd5","Na5","Bb5+","c6","dxc6","bxc6","Be2","h6","Nf3","e4","Ne5","Qe7","Ng4"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 9.", ["Win Every Game As White! (Almost)"]),
+  lineFromMoves(10, "win-as-white", "Win Every Game As White! (Almost) — Line 10", ["e4","e5","Nf3","Nc6","Bc4","Nf6","Ng5","Bc5","O-O","Nxe4","Nxe4","d5","Bxd5","Qxd5","Re1","Be6","c3"], "Epic openings that will WIN you the game — Fried Liver, Danish, and more. Line 10.", ["Win Every Game As White! (Almost)"]),
+];

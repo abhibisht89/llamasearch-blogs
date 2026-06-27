@@ -1,0 +1,57 @@
+import { mkLine, lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION =
+  "The Pirc and KID are sister openings. This course unifies the approach — 1...Nf6 and ...g6, then transposition to KID or Pirc depending on White's setup.";
+
+export default [
+  mkLine(
+    1,
+    "pirc_kid_main",
+    "1.e4 d6 2.d4 Nf6 — KID Transpo",
+    "Line #1 · Unified ...Nf6",
+    "Answer 1.e4 with ...d6 and ...Nf6. If White plays d4 and c4, you have a King's Indian.",
+    ["e4","d6","d4","Nf6","Nc3","g6","Nf3","Bg7","Be2","O-O","O-O","Nbd7","Re1","e5","Bf1","Re8","g3","c5","Bg2","cxd4","Nxd4","Nc5"],
+    [
+      "e4.",
+      "...d6 — flexible.",
+      "d4.",
+      "...Nf6 — unified move!",
+      "Nc3.",
+      "...g6 — KID/Pirc hybrid.",
+      "Nf3.",
+      "...Bg7.",
+      "Be2.",
+      "...O-O.",
+      "O-O.",
+      "...Nbd7.",
+      "Re1.",
+      "...e5! — KID break.",
+      "Bf1.",
+      "...Re8.",
+      "g3.",
+      "...c5 — counter!",
+      "Bg2.",
+      "...cxd4.",
+      "Nxd4.",
+      "...Nc5.",
+    ],
+    ["Pirc","KID","Unified"]
+  ),
+  lineFromMoves(2, "pirc_kid", "2.Nc3 Nf6 Pirc", ["e4","d6","Nc3","Nf6","d4","g6","Be3","Bg7","Qd2","O-O","O-O-O","c5","f3","Nc6","Nge2","b5","Bh6","Bxh6","Qxh6","e5","dxe5","dxe5","Qe3","Bf5","g4","Bxg4","fxg4","Nxg4","Qf3","Nf6","h3","Nh5","Qd3","Qe7","Nd5","Qd7"], "2.Nc3 — classical Pirc with ...c5.", ["Pirc","Unified"]),
+  lineFromMoves(3, "pirc_kid", "3...g6 Fianchetto", ["e4","d6","d4","Nf6","Nc3","g6","Nf3","Bg7","Be2","O-O","O-O","Nbd7","Re1","e5","Bf1","Re8","g3","c5"], "Fianchetto is the unifying idea.", ["KID","Unified"]),
+  lineFromMoves(4, "pirc_kid", "4.Nf3 Bg7", ["e4","d6","d4","Nf6","Nc3","g6","Nf3","Bg7","Be2","O-O","O-O","Nbd7","Re1","e5","Bf1","Re8","g3","c5","Bg2","cxd4"], "Develop and play ...e5.", ["KID","Unified"]),
+  lineFromMoves(5, "pirc_kid", "5.Be2 O-O", ["e4","d6","d4","Nf6","Nc3","g6","Nf3","Bg7","Be2","O-O","O-O","Nbd7","Re1","e5","Bf1","Re8","g3","c5"], "Castle and strike ...e5.", ["KID","Unified"]),
+  lineFromMoves(6, "pirc_kid", "6...Nbd7", ["e4","d6","d4","Nf6","Nc3","g6","Nf3","Bg7","Be2","O-O","O-O","Nbd7","Re1","e5","Bf1","Re8","g3","c5","Bg2","cxd4"], "Nbd7 reroute before ...e5.", ["KID","Unified"]),
+  lineFromMoves(7, "pirc_kid", "7...e5 Break", ["e4","d6","d4","Nf6","Nc3","g6","Nf3","Bg7","Be2","O-O","O-O","Nbd7","Re1","e5","Bf1","Re8","g3","c5"], "The ...e5 break is KID DNA.", ["KID","Unified"]),
+  lineFromMoves(8, "pirc_kid", "8...Re8", ["e4","d6","d4","Nf6","Nc3","g6","Nf3","Bg7","Be2","O-O","O-O","Nbd7","Re1","e5","Bf1","Re8","g3","c5","Bg2","cxd4"], "Re8 supports the center.", ["KID","Unified"]),
+  lineFromMoves(9, "pirc_kid", "9...c5 Counter", ["e4","d6","d4","Nf6","Nc3","g6","Nf3","Bg7","Be2","O-O","O-O","Nbd7","Re1","e5","Bf1","Re8","g3","c5","Bg2","cxd4","Nxd4","Nc5"], "Queenside ...c5 is the Pirc answer.", ["Pirc","Unified"]),
+  lineFromMoves(10, "pirc_kid", "1.d4 Nf6 KID", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5"], "1.d4 Nf6 goes straight to KID.", ["KID","Unified"]),
+  lineFromMoves(11, "pirc_kid", "2.c4 g6", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5"], "Same KID structure from d4.", ["KID","Unified"]),
+  lineFromMoves(12, "pirc_kid", "3...Bg7", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5","g4","Nf6"], "Classical KID with ...f5.", ["KID","Unified"]),
+  lineFromMoves(13, "pirc_kid", "4...O-O", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5"], "Castle and prepare ...f5.", ["KID","Unified"]),
+  lineFromMoves(14, "pirc_kid", "5...e5", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5"], "The ...e5 break unifies both systems.", ["KID","Unified"]),
+  lineFromMoves(15, "pirc_kid", "6...Nc6", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5","g4","Nf6"], "Nc6 hits d4 and e5.", ["KID","Unified"]),
+  lineFromMoves(16, "pirc_kid", "7...Ne7", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5"], "Ne7 reroute — classic KID.", ["KID","Unified"]),
+  lineFromMoves(17, "pirc_kid", "8...Nd7", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5","g4","Nf6","h3","Nh5"], "Nd7 prepares ...f5.", ["KID","Unified"]),
+  lineFromMoves(18, "pirc_kid", "9...f5 Kingside", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5","g4","Nf6","h3","Nh5"], "The ...f5 break is your KID weapon.", ["KID","Unified"]),
+];

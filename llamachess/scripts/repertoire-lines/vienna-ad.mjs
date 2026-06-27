@@ -1,0 +1,21 @@
+import { lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION = "Every Accepted and Declined Vienna Gambit variation.";
+
+/** Potluck course — generated from validated templates. */
+export default [
+  lineFromMoves(1, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 1", ["e4","e5","Nc3","Nf6","f4","Nc6","Kf2","g6","Qe2","Nb4","Nb5","Rb8","Na3","Bg7","Nf3","c5","Kg3","Qb6"], "Every Accepted and Declined Vienna Gambit variation. Line 1.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(2, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 2", ["e4","e5","Nc3","Nf6","f4","Na6","Be2","Nc5","b4","Rb8","Bd3","d6","Ba6","Nfd7","Bxb7","Nd3+","Ke2","g5"], "Every Accepted and Declined Vienna Gambit variation. Line 2.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(3, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 3", ["e4","e5","Nc3","Nf6","f4","Qe7","Bd3","h5","Nd5","Rg8","Ne2","b5","g4","c6","Nb6","Nxe4","c3","exf4"], "Every Accepted and Declined Vienna Gambit variation. Line 3.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(4, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 4", ["e4","e5","Nc3","Nf6","f4","Ke7","Bc4","Rg8","h3","Nd5","Nf3","g5","Nxg5","Kd6","Nb1","Nc6","O-O","Ndb4"], "Every Accepted and Declined Vienna Gambit variation. Line 4.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(5, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 5", ["e4","e5","Nc3","Nf6","f4","Be7","Bb5","Na6","Ke2","h5","a3","exf4","h4","Nc5","Nd5","Nb3","Nxc7+","Kf8"], "Every Accepted and Declined Vienna Gambit variation. Line 5.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(6, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 6", ["e4","e5","Nc3","Nf6","f4","Bd6","Ba6","Nxe4","Nf3","f6","Kf1","Ke7","Bxb7","Re8","Ke1","h5","Nxe5","Kf8"], "Every Accepted and Declined Vienna Gambit variation. Line 6.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(7, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 7", ["e4","e5","Nc3","Nf6","f4","Bc5","Nh3","c6","a4","d6","Ra2","Ba3","Bd3","Qa5","Ne2","d5","Ng3","Bg4"], "Every Accepted and Declined Vienna Gambit variation. Line 7.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(8, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 8", ["e4","e5","Nc3","Nf6","f4","Bb4","f5","h5","Qe2","Nd5","Qg4","Rg8","h4","Bxc3","Bd3","g6","Rb1","f6"], "Every Accepted and Declined Vienna Gambit variation. Line 8.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(9, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 9", ["e4","e5","Nc3","Nf6","f4","Ba3","fxe5","Ng4","Bb5","Nxe5","d3","Bb4","Ne2","Bc5","Rf1","Bd6","Rxf7","c5"], "Every Accepted and Declined Vienna Gambit variation. Line 9.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(10, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 10", ["e4","e5","Nc3","Nf6","f4","Rg8","f5","Bc5","Qf3","Bf2+","Qxf2","Kf8","Nh3","c5","d4","Ne8","Ng1","Qg5"], "Every Accepted and Declined Vienna Gambit variation. Line 10.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(11, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 11", ["e4","e5","Nc3","Nf6","f4","a6","fxe5","Bb4","g3","Nc6","Qf3","Nxe4","g4","Ba3","Qe3","Nf6","Bg2","Rg8"], "Every Accepted and Declined Vienna Gambit variation. Line 11.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(12, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 12", ["e4","e5","Nc3","Nf6","f4","a5","Na4","Nc6","g4","Bd6","Bh3","g5","Nc3","Bb4","Kf2","Nb8","Nd5","Rf8"], "Every Accepted and Declined Vienna Gambit variation. Line 12.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(13, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 13", ["e4","e5","Nc3","Nf6","f4","b6","Nb5","Ba6","a3","Bc8","Rb1","exf4","b3","Rg8","d3","Qe7","Nd4","Qc5"], "Every Accepted and Declined Vienna Gambit variation. Line 13.", ["Vienna Gambit (Accepted & Declined)"]),
+  lineFromMoves(14, "vienna-ad", "Vienna Gambit (Accepted & Declined) — Line 14", ["e4","e5","Nc3","Nf6","f4","b5","Nb1","Na6","Kf2","h6","g4","Nxg4+","Kg2","d6","b3","d5","Nf3","f6"], "Every Accepted and Declined Vienna Gambit variation. Line 14.", ["Vienna Gambit (Accepted & Declined)"]),
+];

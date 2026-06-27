@@ -1,0 +1,19 @@
+import { lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION = "Short rep for 1...Nf6 vs White's random first moves — always land in a KID.";
+
+/** Potluck course — generated from validated templates. */
+export default [
+  lineFromMoves(1, "kid-random", "KID vs Random First Moves — Line 1", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 1.", ["KID vs Random First Moves"]),
+  lineFromMoves(2, "kid-random", "KID vs Random First Moves — Line 2", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","f3","O-O","Be3","c5","d5","e6","Qd2","exd5","cxd5","a6"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 2.", ["KID vs Random First Moves"]),
+  lineFromMoves(3, "kid-random", "KID vs Random First Moves — Line 3", ["d4","Nf6","c4","g6","Nf3","Bg7","g3","O-O","Bg2","d6","O-O","Nbd7","Nc3","e5"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 3.", ["KID vs Random First Moves"]),
+  lineFromMoves(4, "kid-random", "KID vs Random First Moves — Line 4", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","f4","O-O","Nf3","c5","d5","e6","Be2","exd5"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 4.", ["KID vs Random First Moves"]),
+  lineFromMoves(5, "kid-random", "KID vs Random First Moves — Line 5", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5","g4","Nf6"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 5.", ["KID vs Random First Moves"]),
+  lineFromMoves(6, "kid-random", "KID vs Random First Moves — Line 6", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 6.", ["KID vs Random First Moves"]),
+  lineFromMoves(7, "kid-random", "KID vs Random First Moves — Line 7", ["d4","Nf6","c4","g6","Nf3","Bg7","g3","O-O","Bg2","d6","O-O","Nbd7","Nc3","e5","e4","c6","Re1","Re8","h3","exd4","Nxd4","Nc5"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 7.", ["KID vs Random First Moves"]),
+  lineFromMoves(8, "kid-random", "KID vs Random First Moves — Line 8", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5","h3","Nf6"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 8.", ["KID vs Random First Moves"]),
+  lineFromMoves(9, "kid-random", "KID vs Random First Moves — Line 9", ["d4","Nf6","Nf3","g6","c4","Bg7","g3","O-O","Bg2","d6","O-O","Nbd7","Nc3","e5"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 9.", ["KID vs Random First Moves"]),
+  lineFromMoves(10, "kid-random", "KID vs Random First Moves — Line 10", ["d4","Nf6","c4","g6","Nf3","Bg7","g3","O-O","Bg2","d6","O-O","Nbd7","Nc3","e5","e4","c6"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 10.", ["KID vs Random First Moves"]),
+  lineFromMoves(11, "kid-random", "KID vs Random First Moves — Line 11", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5","Qd2","Nf6"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 11.", ["KID vs Random First Moves"]),
+  lineFromMoves(12, "kid-random", "KID vs Random First Moves — Line 12", ["d4","Nf6","c4","g6","Nc3","Bg7","e4","d6","Nf3","O-O","Be2","e5","O-O","Nc6","d5","Ne7","Ne1","Nd7","f3","f5","g4","fxg4"], "Short rep for 1...Nf6 vs White's random first moves — always land in a KID. Line 12.", ["KID vs Random First Moves"]),
+];

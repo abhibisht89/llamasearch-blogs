@@ -51,7 +51,7 @@ export const COLLECTIONS = [
     title: "Line Kitchen",
     tag: "Repertoire",
     description:
-      "Walk the lines. Cook your opponents. London, Italian, and every opening we add — one menu of interactive lines with casual move-by-move notes.",
+      "Walk the lines. Cook your opponents. Interactive opening repertoires with casual move-by-move notes.",
     href: "repertoire.html",
     kind: "openings",
   },

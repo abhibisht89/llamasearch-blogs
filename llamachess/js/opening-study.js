@@ -4,6 +4,7 @@ import { loadRepertoireCatalog, isDrillEnabled, drillLessonHref } from "./repert
 import { progress } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
 import { initBoardSettings } from "./board-settings.js";
+import { initStudyKeyboardNav } from "./board-keyboard.js";
 
 const params = new URLSearchParams(location.search);
 const WATSON_META = {
@@ -23,8 +24,6 @@ let collectionLabel = "Watson Openings";
 
 const boardEl = document.getElementById("board");
 const lessonTitleEl = document.getElementById("lesson-title");
-const lessonSubEl = document.getElementById("lesson-sub");
-const stepCounterEl = document.getElementById("step-counter");
 const moveLineEl = document.getElementById("move-line");
 const theoryTitleEl = document.getElementById("theory-title");
 const theoryBodyEl = document.getElementById("theory-body");
@@ -35,6 +34,7 @@ const nextStepBtn = document.getElementById("next-step");
 const prevLessonBtn = document.getElementById("prev-lesson");
 const nextLessonBtn = document.getElementById("next-lesson");
 const markStudiedBtn = document.getElementById("mark-studied");
+const resetLineBtn = document.getElementById("reset-line");
 
 let data;
 let lesson;
@@ -122,7 +122,6 @@ function renderStep() {
   const step = currentStep();
   if (!step) return;
 
-  stepCounterEl.textContent = `Step ${stepIdx + 1} of ${lesson.steps.length}`;
   renderMoveLine();
   renderTheory();
   renderBoard();
@@ -157,8 +156,30 @@ function wireNav() {
 
   markStudiedBtn.addEventListener("click", () => {
     progress.markSolved(data.collectionId, lesson.id);
-    markStudiedBtn.textContent = "Studied ✓";
+    markStudiedBtn.textContent = "Complete ✓";
     markStudiedBtn.disabled = true;
+  });
+
+  resetLineBtn?.addEventListener("click", () => {
+    stepIdx = 0;
+    renderStep();
+  });
+
+  initStudyKeyboardNav({
+    prevStep: () => {
+      if (stepIdx <= 0) return false;
+      stepIdx -= 1;
+      renderStep();
+      return true;
+    },
+    nextStep: () => {
+      if (stepIdx >= lesson.steps.length - 1) return false;
+      stepIdx += 1;
+      renderStep();
+      return true;
+    },
+    prevItem: prevLessonBtn,
+    nextItem: nextLessonBtn,
   });
 }
 
@@ -202,7 +223,6 @@ async function main() {
   stepIdx = Math.max(0, Math.min(stepIdx, lesson.steps.length - 1));
 
   lessonTitleEl.textContent = lesson.title;
-  lessonSubEl.textContent = lesson.subtitle || lesson.chapterTitle;
 
   document.title = `${lesson.title} — ${collectionLabel}`;
 
@@ -214,9 +234,7 @@ async function main() {
 
   const drillLink = document.getElementById("drill-link");
   const modeSwitch = document.getElementById("mode-switch");
-  const modeBadge = document.getElementById("mode-badge");
   if (isDrillEnabled(collectionKey)) {
-    if (modeBadge) modeBadge.hidden = false;
     if (modeSwitch) modeSwitch.hidden = false;
     if (drillLink) drillLink.href = drillLessonHref(collectionKey, lesson.id);
   }
@@ -244,7 +262,7 @@ async function main() {
   });
 
   if (progress.isSolved(data.collectionId, lesson.id)) {
-    markStudiedBtn.textContent = "Studied ✓";
+    markStudiedBtn.textContent = "Complete ✓";
     markStudiedBtn.disabled = true;
   }
 

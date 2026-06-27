@@ -1,0 +1,22 @@
+import { lineFromMoves } from "../repertoire-line-factory.mjs";
+
+export const COURSE_DESCRIPTION = "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6.";
+
+/** Potluck course — generated from validated templates. */
+export default [
+  lineFromMoves(1, "caro-tal", "Caro-Kann: Tal Variation — Line 1", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Bf5","Ng3","Bg6","Nf3","Nd7","h4","h6","Bd3","Bxd3","Qxd3","Qc7"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 1.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(2, "caro-tal", "Caro-Kann: Tal Variation — Line 2", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nc6","c3","Qb6","Na3","cxd4","cxd4","Rc8"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 2.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(3, "caro-tal", "Caro-Kann: Tal Variation — Line 3", ["e4","c6","d4","d5","exd5","cxd5","Bd3","Nc6","c3","Nf6","Bf4","Bg4","Qb3","Qd7"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 3.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(4, "caro-tal", "Caro-Kann: Tal Variation — Line 4", ["e4","c6","d4","d5","exd5","cxd5","c4","Nf6","Nc3","e6","Nf3","Be7","cxd5","Nxd5"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 4.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(5, "caro-tal", "Caro-Kann: Tal Variation — Line 5", ["e4","c6","d4","d5","Nc3","g6","Nf3","Bg7","h3","e6","Bd3","Ne7","O-O","O-O","Re1","Nd7","Bf4","f6"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 5.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(6, "caro-tal", "Caro-Kann: Tal Variation — Line 6", ["e4","c6","Nc3","d5","Nf3","Bg4","h3","Bxf3","Qxf3","e6","d4","Nf6","Bd3","Be7"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 6.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(7, "caro-tal", "Caro-Kann: Tal Variation — Line 7", ["e4","c6","f3","d5","d4","e6","Nc3","dxe4","fxe4","f5","Nf3","fxe4","Nxe4","Nf6"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 7.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(8, "caro-tal", "Caro-Kann: Tal Variation — Line 8", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nc6","c3","Qb6","Na3","O-O-O","Nb5","Re8"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 8.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(9, "caro-tal", "Caro-Kann: Tal Variation — Line 9", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Nd7","Ng5","Ngf6","Bd3","e6","N1f3","Be7","O-O","O-O"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 9.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(10, "caro-tal", "Caro-Kann: Tal Variation — Line 10", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nc6","c3","Qb6","Na3","cxd4"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 10.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(11, "caro-tal", "Caro-Kann: Tal Variation — Line 11", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Bf5","Nd6+","Qxd6","Bd2","Nd7","Bc3","O-O-O"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 11.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(12, "caro-tal", "Caro-Kann: Tal Variation — Line 12", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Nd7","Nf3","Ngf6","Nxf6+","Nxf6","Bd3","e6","O-O","Bd6","Re1","O-O","c4","Re8"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 12.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(13, "caro-tal", "Caro-Kann: Tal Variation — Line 13", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nd7","Ng5","Be7","Nxe6","Nh6"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 13.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(14, "caro-tal", "Caro-Kann: Tal Variation — Line 14", ["e4","c6","d4","d5","e5","Bf5","Nf3","e6","Be2","c5","O-O","Nc6","c3","Qb6","Na3","a6"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 14.", ["Caro-Kann: Tal Variation"]),
+  lineFromMoves(15, "caro-tal", "Caro-Kann: Tal Variation — Line 15", ["e4","c6","d4","d5","Nc3","dxe4","Nxe4","Nf6","Nxf6+","gxf6","c3","Bg7","Bd3","e5","Qh5","Qe7","Nf3","f5"], "1.e4 c6 2.d4 d5 3.e5 Bf5 4.h4 — the sharp Tal Caro with ...Bh7 and ...e6. Line 15.", ["Caro-Kann: Tal Variation"]),
+];

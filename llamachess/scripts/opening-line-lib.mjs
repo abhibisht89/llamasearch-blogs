@@ -44,6 +44,7 @@ export function buildStepsFromMoves(moves, comments = [], opts = {}) {
       title: move.color === "w" ? `${chess.moveNumber()}.${move.san}` : move.san,
       theory: comments[i] || "",
       alternatives: [],
+      wrongMoveHints: opts.wrongMoveHints?.[i] || undefined,
       implications: "",
       from: move.from,
       to: move.to,
@@ -62,6 +63,7 @@ export function lineToLesson(line, lessonId) {
     intro: line.intro,
     introTitle: line.introTitle || line.title,
     orientation,
+    wrongMoveHints: line.wrongMoveHints,
   });
 
   return {
