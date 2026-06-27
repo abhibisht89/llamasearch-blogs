@@ -32,6 +32,8 @@ let section;
 let solved = false;
 let autoPlaying = false;
 let expectedFinalMate = null;
+/** Cleared on reset so a mate-in-2 auto-reply cannot fire after the board is reset. */
+let autoPlayTimer = null;
 let hint;
 
 function setStatus(text, kind = "idle") {
@@ -325,10 +327,24 @@ function updateGround(lastMove) {
   showSideToMove(turn);
 }
 
+/** Cancel mate-in-2 opponent auto-reply timer (safe during reset). */
+function clearAutoPlayTimer() {
+  if (autoPlayTimer != null) {
+    window.clearTimeout(autoPlayTimer);
+    autoPlayTimer = null;
+  }
+}
+
 /** Snap chessground back to the puzzle start (no animation — practice reset). */
 function syncGroundToPuzzleStart() {
   const turn = puzzle.sideToMove || chess.turn();
 
+  clearAutoPlayTimer();
+  autoPlaying = false;
+  expectedFinalMate = null;
+
+  // Stop in-flight drag/animation from the solved line before swapping the FEN.
+  ground.stop?.();
   ground.cancelMove?.();
   // Instant reset: animated fen updates can leave pieces stuck after a solved line.
   ground.set({ animation: { enabled: false } });
@@ -363,12 +379,14 @@ function fallbackToFirstMoveSolved(lastMove) {
 }
 
 function playMateInTwoReply(continuation, lastMove) {
+  clearAutoPlayTimer();
   autoPlaying = true;
   hint?.updateControls();
   setStatus("Correct first move — opponent replying…", "idle");
   updateGround(lastMove);
 
-  window.setTimeout(() => {
+  autoPlayTimer = window.setTimeout(() => {
+    autoPlayTimer = null;
     try {
       const reply = chess.move(continuation.replySan);
       expectedFinalMate = continuation.finalSan;
@@ -453,8 +471,6 @@ function idlePrompt() {
 function resetPuzzle() {
   const alreadySolved = progress.isSolved(sectionId, puzzle.id);
   solved = false;
-  autoPlaying = false;
-  expectedFinalMate = null;
   chess = new Chess(puzzle.fen);
   syncGroundToPuzzleStart();
   setStatus(
