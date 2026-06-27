@@ -7,6 +7,7 @@ import {
 } from "./fen-utils.js";
 import { progress, migrateProgressToSequential } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
+import { createHintUi } from "./hint-ui.js";
 
 const params = new URLSearchParams(location.search);
 const sectionId = params.get("section") || "mate_in_1";
@@ -30,6 +31,7 @@ let section;
 let solved = false;
 let autoPlaying = false;
 let expectedFinalMate = null;
+let hint;
 
 function setStatus(text, kind = "idle") {
   statusEl.textContent = text;
@@ -62,6 +64,44 @@ function showSideToMove(side) {
     sideToMoveEl.className = `side-to-move ${cls}`;
     sideToMoveEl.innerHTML = `<span class="side-dot" aria-hidden="true"></span>${label}`;
   }
+}
+
+function initHint() {
+  const isMi1 = sectionId === "mate_in_1";
+  const isMi2 = sectionId === "mate_in_2";
+  if (!isMi1 && !isMi2) {
+    document.getElementById("hint-card")?.style.setProperty("display", "none");
+    document.getElementById("hint-btn")?.style.setProperty("display", "none");
+    return;
+  }
+
+  hint = createHintUi({
+    idleTitle: "Your move",
+    idleBody: isMi1
+      ? "Find the checkmate in one move."
+      : "Find the first move, then finish the checkmate.",
+    revealBody: isMi1
+      ? "Play this move to deliver checkmate."
+      : "Play this move, then continue the mating line.",
+    doneTitle: "Done",
+    doneBody: isMi1 ? "You found the checkmate." : "You finished the mating line.",
+  });
+
+  hint.setStatusHandler(setStatus);
+  hint.setBlockedCheck(() => solved || autoPlaying);
+  hint.setMoveProvider(() => {
+    if (expectedFinalMate) return expectedFinalMate;
+    if (isMi1) return mateInOneSolutionSan();
+    return mateInTwoFirstMove();
+  });
+  hint.showIdle();
+  hint.updateControls();
+}
+
+function mateInOneSolutionSan() {
+  if (!isMateInOne()) return null;
+  if (puzzle.solutionMoves?.[0]) return puzzle.solutionMoves[0];
+  return parseRawMainLine(puzzle.solutionRaw)[0] || null;
 }
 
 function isMateInOne() {
@@ -231,12 +271,46 @@ function isCorrectMove(san) {
   return candidateMoves.some((s) => normalizeMove(s) === played);
 }
 
+/** Pawn promotion piece for this from/to, parsed from the book solution when needed. */
+function promotionPieceForMove(orig, dest) {
+  const piece = chess.get(orig);
+  if (!piece || piece.type !== "p") return null;
+
+  const promoRank = piece.color === "w" ? "8" : "1";
+  if (dest[1] !== promoRank) return null;
+
+  const candidateSans = [...(puzzle.solutionMoves || [])];
+  const fullMateLine = mateInTwoLine();
+  if (fullMateLine) candidateSans.push(...fullMateLine);
+
+  for (const san of candidateSans) {
+    for (const promo of ["q", "r", "b", "n"]) {
+      const probe = new Chess(chess.fen());
+      try {
+        const m = probe.move({ from: orig, to: dest, promotion: promo });
+        if (m && normalizeMove(m.san) === normalizeMove(san)) return promo;
+      } catch {
+        // try next promotion piece
+      }
+    }
+  }
+
+  return "q";
+}
+
+function applyPlayerMove(orig, dest) {
+  const promotion = promotionPieceForMove(orig, dest);
+  if (promotion) return chess.move({ from: orig, to: dest, promotion });
+  return chess.move({ from: orig, to: dest });
+}
+
 function updateGround(lastMove) {
   const turn = chess.turn();
   const canMove = !solved && !autoPlaying && turn === puzzle.sideToMove;
+  const fen = chess.fen();
 
   ground.set({
-    fen: chess.fen(),
+    fen,
     turnColor: orientColor(turn),
     movable: {
       color: canMove ? orientColor(puzzle.sideToMove) : undefined,
@@ -245,6 +319,30 @@ function updateGround(lastMove) {
     lastMove: lastMove ? [lastMove.from, lastMove.to] : undefined,
     check: chess.isCheck() ? orientColor(chess.turn()) : false,
   });
+  // Lets automations (do-check) verify the live board matches chess.js.
+  if (boardEl) boardEl.dataset.fen = fen;
+  showSideToMove(turn);
+}
+
+/** Snap chessground back to the puzzle start (no animation — practice reset). */
+function syncGroundToPuzzleStart() {
+  const turn = puzzle.sideToMove || chess.turn();
+
+  ground.cancelMove?.();
+  // Instant reset: animated fen updates can leave pieces stuck after a solved line.
+  ground.set({ animation: { enabled: false } });
+  ground.set({
+    fen: puzzle.fen,
+    turnColor: orientColor(turn),
+    lastMove: undefined,
+    check: false,
+    movable: {
+      color: orientColor(puzzle.sideToMove),
+      dests: toDests(chess),
+    },
+  });
+  ground.set({ animation: { enabled: true, duration: 180 } });
+  if (boardEl) boardEl.dataset.fen = puzzle.fen;
   showSideToMove(turn);
 }
 
@@ -253,6 +351,7 @@ function markSolved(message) {
   expectedFinalMate = null;
   progress.markSolved(sectionId, puzzle.id);
   setStatus(message, "success");
+  hint?.markDone();
 }
 
 function fallbackToFirstMoveSolved(lastMove) {
@@ -264,6 +363,7 @@ function fallbackToFirstMoveSolved(lastMove) {
 
 function playMateInTwoReply(continuation, lastMove) {
   autoPlaying = true;
+  hint?.updateControls();
   setStatus("Correct first move — opponent replying…", "idle");
   updateGround(lastMove);
 
@@ -272,6 +372,7 @@ function playMateInTwoReply(continuation, lastMove) {
       const reply = chess.move(continuation.replySan);
       expectedFinalMate = continuation.finalSan;
       autoPlaying = false;
+      hint?.updateControls();
       setStatus("Now find checkmate.", "idle");
       updateGround({ from: reply.from, to: reply.to });
     } catch {
@@ -287,7 +388,7 @@ function onMove(orig, dest) {
 
   progress.markAttempted(sectionId, puzzle.id);
 
-  const move = chess.move({ from: orig, to: dest, promotion: "q" });
+  const move = applyPlayerMove(orig, dest);
   if (!move) {
     updateGround();
     return;
@@ -354,11 +455,12 @@ function resetPuzzle() {
   autoPlaying = false;
   expectedFinalMate = null;
   chess = new Chess(puzzle.fen);
+  syncGroundToPuzzleStart();
   setStatus(
     alreadySolved ? "Already solved — play again for practice." : idlePrompt(),
     alreadySolved ? "success" : "idle"
   );
-  updateGround();
+  hint?.reset();
 }
 
 function setupNav() {
@@ -456,6 +558,7 @@ async function main() {
   });
 
   setupNav();
+  initHint();
   resetPuzzle();
 }
 

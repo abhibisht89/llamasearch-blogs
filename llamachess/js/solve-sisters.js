@@ -9,6 +9,7 @@ import {
 } from "./fen-utils.js";
 import { progress, migrateProgressToSequential } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
+import { createHintUi } from "./hint-ui.js";
 
 const SECTION_ID = "sisters";
 const puzzleId = Number(new URLSearchParams(location.search).get("id") || "1");
@@ -26,6 +27,22 @@ let ground;
 let puzzle;
 let section;
 let solved = false;
+let hint;
+
+function initHint() {
+  hint = createHintUi({
+    idleTitle: "Your move",
+    idleBody: "Find the winning first move from the tournament game.",
+    revealBody: "Play this move to start the winning combination.",
+    doneTitle: "Done",
+    doneBody: "You found the winning first move.",
+  });
+  hint.setStatusHandler(setStatus);
+  hint.setBlockedCheck(() => solved);
+  hint.setMoveProvider(() => puzzle.solutionMoves?.[0] || null);
+  hint.showIdle();
+  hint.updateControls();
+}
 
 function setStatus(text, kind = "idle") {
   statusEl.textContent = text;
@@ -102,6 +119,7 @@ function onMove(orig, dest) {
     solved = true;
     progress.markSolved(SECTION_ID, puzzle.id);
     setStatus("Correct! That's the winning first move.", "success");
+    hint?.markDone();
     updateGround(lastMove);
     return;
   }
@@ -119,6 +137,7 @@ function resetPuzzle() {
     solved ? "success" : "idle"
   );
   updateGround();
+  hint?.reset();
 }
 
 function setupNav() {
@@ -168,6 +187,7 @@ async function main() {
   });
 
   setupNav();
+  initHint();
   resetPuzzle();
 }
 

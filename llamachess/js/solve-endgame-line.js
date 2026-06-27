@@ -10,6 +10,7 @@ import {
   resolveLoadablePuzzle,
 } from "./fen-utils.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
+import { createHintUi } from "./hint-ui.js";
 
 export function createEndgameLineSolver(config) {
   const {
@@ -39,6 +40,30 @@ export function createEndgameLineSolver(config) {
   let solved = false;
   let moveIndex = 0;
   let autoPlaying = false;
+  let hint;
+
+  function initHint() {
+    const isDraw = puzzle.outcome === "draw";
+    hint = createHintUi({
+      idleTitle: "Your move",
+      idleBody: isDraw
+        ? "Play the next move in the drawing line."
+        : "Play the next move in the winning line.",
+      revealBody: "Play this move from the book line.",
+      doneTitle: "Done",
+      doneBody: isDraw ? "You played the drawing line." : "You played the winning line.",
+    });
+    hint.setStatusHandler(setStatus);
+    hint.setBlockedCheck(() => solved || autoPlaying || !isPlayerTurn());
+    hint.setMoveProvider(() => (isPlayerTurn() ? expectedMove() : null));
+    hint.showIdle();
+    hint.updateControls();
+  }
+
+  function onPlayerTurn() {
+    hint?.showIdle();
+    hint?.updateControls();
+  }
 
   async function loadSection() {
     const res = await fetch(dataUrl);
@@ -107,6 +132,7 @@ export function createEndgameLineSolver(config) {
     solved = true;
     progress.markSolved(sectionId, puzzle.id);
     setStatus(successText(), "success");
+    hint?.markDone();
     updateGround();
   }
 
@@ -120,6 +146,7 @@ export function createEndgameLineSolver(config) {
 
   function playOpponentReplies(lastMove) {
     autoPlaying = true;
+    hint?.updateControls();
     const playNext = (prevMove) => {
       if (finishIfDone()) {
         autoPlaying = false;
@@ -128,6 +155,7 @@ export function createEndgameLineSolver(config) {
       if (isPlayerTurn()) {
         autoPlaying = false;
         setStatus(idleText(), "idle");
+        onPlayerTurn();
         updateGround(prevMove);
         return;
       }
@@ -219,6 +247,7 @@ export function createEndgameLineSolver(config) {
       solved ? "success" : "idle"
     );
     updateGround();
+    hint?.reset();
   }
 
   function setupNav() {
@@ -266,6 +295,7 @@ export function createEndgameLineSolver(config) {
     });
 
     setupNav();
+    initHint();
     resetPuzzle();
   }
 

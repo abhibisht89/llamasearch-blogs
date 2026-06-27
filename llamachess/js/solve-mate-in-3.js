@@ -11,6 +11,7 @@ import {
   sortedLoadableIds,
 } from "./fen-utils.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
+import { createHintUi } from "./hint-ui.js";
 
 const SECTION_ID = "mate_in_3";
 const DATA_URL = "data/sections/mate_in_3.json";
@@ -34,6 +35,29 @@ let autoPlaying = false;
 let expectedMove2 = null;
 let expectedFinalMate = null;
 let activeContinuation = null;
+let hint;
+
+function currentHintMove() {
+  if (expectedFinalMate) return expectedFinalMate;
+  if (expectedMove2) return expectedMove2;
+  const line = mateInThreeLine();
+  return line?.[0] || puzzle.solutionMoves?.[0] || parseRawMainLine(puzzle.solutionRaw)[0] || null;
+}
+
+function initHint() {
+  hint = createHintUi({
+    idleTitle: "Your move",
+    idleBody: "Find the first move, then finish the checkmate in three.",
+    revealBody: "Play this move, then continue the mating line.",
+    doneTitle: "Done",
+    doneBody: "You finished the mate-in-three line.",
+  });
+  hint.setStatusHandler(setStatus);
+  hint.setBlockedCheck(() => solved || autoPlaying);
+  hint.setMoveProvider(currentHintMove);
+  hint.showIdle();
+  hint.updateControls();
+}
 
 async function loadSection() {
   const [sectionRes, verifiedRes] = await Promise.all([
@@ -275,6 +299,7 @@ function markSolved(message) {
   activeContinuation = null;
   progress.markSolved(SECTION_ID, puzzle.id);
   setStatus(message, "success");
+  hint?.markDone();
 }
 
 function fallbackNoLine(lastMove) {
@@ -288,6 +313,7 @@ function fallbackNoLine(lastMove) {
 
 function playAutoReply(replySan, nextExpectedMove2, nextExpectedFinalMate, statusText, lastMove) {
   autoPlaying = true;
+  hint?.updateControls();
   setStatus(statusText, "idle");
   updateGround(lastMove);
 
@@ -297,6 +323,7 @@ function playAutoReply(replySan, nextExpectedMove2, nextExpectedFinalMate, statu
       expectedMove2 = nextExpectedMove2;
       expectedFinalMate = nextExpectedFinalMate;
       autoPlaying = false;
+      hint?.updateControls();
       setStatus(nextExpectedFinalMate ? "Now find checkmate." : "Continue the attack.", "idle");
       updateGround({ from: reply.from, to: reply.to });
     } catch {
@@ -389,6 +416,7 @@ function resetPuzzle() {
     alreadySolved ? "success" : "idle"
   );
   updateGround();
+  hint?.reset();
 }
 
 function setupNav() {
@@ -435,6 +463,7 @@ async function main() {
   });
 
   setupNav();
+  initHint();
   resetPuzzle();
 }
 

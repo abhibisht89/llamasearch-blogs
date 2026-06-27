@@ -7,6 +7,7 @@ import { Chessground } from "@lichess-org/chessground";
 import { getChapter, chapterDataUrl, filterPlayableMiniatures } from "./miniatures-config.js";
 import { progress, migrateProgressToSequential } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
+import { createHintUi } from "./hint-ui.js";
 
 const params = new URLSearchParams(location.search);
 const chapterSlug = params.get("chapter") || "f3_f6";
@@ -32,6 +33,27 @@ let solved = false;
 let moveIndex = 0;
 let autoPlaying = false;
 let playerSide = "w";
+let hint;
+
+function initHint() {
+  hint = createHintUi({
+    idleTitle: "Your move",
+    idleBody: "Play the next move in the winning combination.",
+    revealBody: "Play this move from the book line.",
+    doneTitle: "Done",
+    doneBody: "Combination complete.",
+  });
+  hint.setStatusHandler(setStatus);
+  hint.setBlockedCheck(() => solved || autoPlaying || !isPlayerTurn());
+  hint.setMoveProvider(() => (isPlayerTurn() ? expectedMove() : null));
+  hint.showIdle();
+  hint.updateControls();
+}
+
+function onPlayerTurn() {
+  hint?.showIdle();
+  hint?.updateControls();
+}
 
 async function loadSection() {
   const [sectionRes, verifiedRes] = await Promise.all([
@@ -141,6 +163,7 @@ function markComplete() {
   solved = true;
   progress.markSolved(SECTION_ID, puzzle.id);
   setStatus("Correct! Combination complete.", "success");
+  hint?.markDone();
   updateGround();
 }
 
@@ -154,6 +177,7 @@ function finishIfDone() {
 
 function playOpponentReplies(lastMove) {
   autoPlaying = true;
+  hint?.updateControls();
   const playNext = (prevMove) => {
     if (finishIfDone()) {
       autoPlaying = false;
@@ -162,6 +186,7 @@ function playOpponentReplies(lastMove) {
     if (isPlayerTurn()) {
       autoPlaying = false;
       setStatus(idleText(), "idle");
+      onPlayerTurn();
       updateGround(prevMove);
       return;
     }
@@ -263,6 +288,7 @@ function resetPuzzle() {
     solved ? "success" : "idle"
   );
   updateGround();
+  hint?.reset();
 }
 
 function setupNav() {
@@ -317,6 +343,7 @@ async function main() {
   });
 
   setupNav();
+  initHint();
   resetPuzzle();
 }
 

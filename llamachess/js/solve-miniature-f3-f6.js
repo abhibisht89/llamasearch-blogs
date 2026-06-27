@@ -6,6 +6,7 @@ import { Chess } from "chess.js";
 import { Chessground } from "@lichess-org/chessground";
 import { progress, migrateProgressToSequential } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
+import { createHintUi } from "./hint-ui.js";
 
 const SECTION_ID = "miniature_f3_f6";
 const DATA_URL = "data/sections/miniature_f3_f6.json";
@@ -25,6 +26,23 @@ let ground;
 let puzzle;
 let section;
 let solved = false;
+let hint;
+
+function initHint() {
+  const squares = puzzle.targetSquares?.join(" / ") || "f3 / f6";
+  hint = createHintUi({
+    idleTitle: "Your move",
+    idleBody: `Find the winning move to ${squares}.`,
+    revealBody: "Play this move to land on the target square.",
+    doneTitle: "Done",
+    doneBody: "You found the winning move.",
+  });
+  hint.setStatusHandler(setStatus);
+  hint.setBlockedCheck(() => solved);
+  hint.setMoveProvider(() => puzzle.solutionMoves?.[0] || null);
+  hint.showIdle();
+  hint.updateControls();
+}
 
 async function loadSection() {
   const res = await fetch(DATA_URL);
@@ -138,6 +156,7 @@ function onMove(orig, dest) {
     solved = true;
     progress.markSolved(SECTION_ID, puzzle.id);
     setStatus(`Correct! Winning move to ${moveDest(move.san)}.`, "success");
+    hint?.markDone();
     updateGround(lastMove);
     return;
   }
@@ -155,6 +174,7 @@ function resetPuzzle() {
     solved ? "success" : "idle"
   );
   updateGround();
+  hint?.reset();
 }
 
 function setupNav() {
@@ -199,6 +219,7 @@ async function main() {
   });
 
   setupNav();
+  initHint();
   resetPuzzle();
 }
 
