@@ -1,5 +1,18 @@
 /** Shared hint panel + Show hint button (matches Line Kitchen opening drill UI). */
 
+const HINT_BTN_ICON = `<svg class="hint-btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>`;
+
+/** Add lightbulb icon to the shared Show hint button. */
+export function decorateHintButton(btn = document.getElementById("hint-btn")) {
+  if (!btn || btn.dataset.hintDecorated === "true") return btn;
+
+  btn.dataset.hintDecorated = "true";
+  btn.classList.add("btn-hint");
+  const label = btn.textContent.trim() || "Hint";
+  btn.innerHTML = `${HINT_BTN_ICON}<span>${label}</span>`;
+  return btn;
+}
+
 export function createHintUi({
   idleTitle = "Your move",
   idleBody = "Find the correct move.",
@@ -7,6 +20,7 @@ export function createHintUi({
   doneTitle = "Done",
   doneBody = "Puzzle complete.",
 } = {}) {
+  decorateHintButton();
   const hintBtn = document.getElementById("hint-btn");
   const hintTitleEl = document.getElementById("hint-title");
   const hintBodyEl = document.getElementById("hint-body");

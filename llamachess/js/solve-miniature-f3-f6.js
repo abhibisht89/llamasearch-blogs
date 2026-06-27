@@ -7,6 +7,7 @@ import { Chessground } from "@lichess-org/chessground";
 import { progress, migrateProgressToSequential } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
 import { createHintUi } from "./hint-ui.js";
+import { initBoardSettings } from "./board-settings.js";
 
 const SECTION_ID = "miniature_f3_f6";
 const DATA_URL = "data/sections/miniature_f3_f6.json";
@@ -220,6 +221,7 @@ async function main() {
 
   setupNav();
   initHint();
+  initBoardSettings({ getFen: () => chess.fen(), onStatus: setStatus });
   resetPuzzle();
 }
 

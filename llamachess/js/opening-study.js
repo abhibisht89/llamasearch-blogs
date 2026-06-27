@@ -3,6 +3,7 @@ import { loadOpenings, getLesson, nextPrevLesson } from "./opening-data.js";
 import { loadRepertoireCatalog, isDrillEnabled, drillLessonHref } from "./repertoire-config.js";
 import { progress } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
+import { initBoardSettings } from "./board-settings.js";
 
 const params = new URLSearchParams(location.search);
 const WATSON_META = {
@@ -230,6 +231,17 @@ async function main() {
   });
 
   initBoardThemeSwitcher();
+
+  initBoardSettings({
+    getFen: () => currentStep()?.fen || lesson?.steps?.[0]?.fen || "",
+    onStatus: (text) => {
+      const prev = moveLineEl.textContent;
+      moveLineEl.textContent = text;
+      window.setTimeout(() => {
+        if (moveLineEl.textContent === text) moveLineEl.textContent = prev;
+      }, 2200);
+    },
+  });
 
   if (progress.isSolved(data.collectionId, lesson.id)) {
     markStudiedBtn.textContent = "Studied ✓";

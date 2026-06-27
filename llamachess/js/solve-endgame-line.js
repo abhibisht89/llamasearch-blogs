@@ -11,6 +11,7 @@ import {
 } from "./fen-utils.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
 import { createHintUi } from "./hint-ui.js";
+import { initBoardSettings } from "./board-settings.js";
 
 export function createEndgameLineSolver(config) {
   const {
@@ -296,6 +297,7 @@ export function createEndgameLineSolver(config) {
 
     setupNav();
     initHint();
+    initBoardSettings({ getFen: () => chess.fen(), onStatus: setStatus });
     resetPuzzle();
   }
 

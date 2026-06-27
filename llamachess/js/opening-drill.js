@@ -13,6 +13,8 @@ import {
 } from "./repertoire-config.js";
 import { progress } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
+import { decorateHintButton } from "./hint-ui.js";
+import { initBoardSettings } from "./board-settings.js";
 
 const params = new URLSearchParams(location.search);
 const collectionKey = params.get("collection") || "london";
@@ -364,6 +366,7 @@ async function resolveCollectionNav() {
 }
 
 async function main() {
+  decorateHintButton();
   if (!isDrillEnabled(collectionKey)) {
     document.body.innerHTML = `
       <p style="padding:24px;color:var(--muted)">
@@ -408,6 +411,7 @@ async function main() {
   });
 
   wireNav();
+  initBoardSettings({ getFen: () => chess?.fen?.() || START_FEN, onStatus: setStatus });
   resetDrill();
 }
 

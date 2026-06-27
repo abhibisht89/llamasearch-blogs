@@ -10,6 +10,7 @@ import {
 import { progress, migrateProgressToSequential } from "./progress.js";
 import { initBoardThemeSwitcher } from "./board-theme.js";
 import { createHintUi } from "./hint-ui.js";
+import { initBoardSettings } from "./board-settings.js";
 
 const SECTION_ID = "sisters";
 const puzzleId = Number(new URLSearchParams(location.search).get("id") || "1");
@@ -188,6 +189,7 @@ async function main() {
 
   setupNav();
   initHint();
+  initBoardSettings({ getFen: () => chess.fen(), onStatus: setStatus });
   resetPuzzle();
 }
 
