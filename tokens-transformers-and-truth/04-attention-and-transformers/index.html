@@ -488,6 +488,8 @@ input[type="range"]::-webkit-slider-thumb {
 .explanation strong { color: var(--text); }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -663,9 +665,7 @@ input[type="range"]::-webkit-slider-thumb {
       At each time step, we project the input (word embedding or previous layer's hidden state) into three vectors: <strong>Query (Q)</strong>, <strong>Key (K)</strong>, and <strong>Value (V)</strong>. Each uses a different linear layer:
     </p>
 
-    <div class="formula">
-      Q<sub>i</sub> = W<sub>Q</sub> · x<sub>i</sub> &nbsp;&nbsp; K<sub>i</sub> = W<sub>K</sub> · x<sub>i</sub> &nbsp;&nbsp; V<sub>i</sub> = W<sub>V</sub> · x<sub>i</sub>
-    </div>
+    <div class="formula tex" data-tex="Q_i = W_Q\cdot x_i\quad K_i = W_K\cdot x_i\quad V_i = W_V\cdot x_i"></div>
 
     <p>
       The same weight matrices W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub> are shared across all time steps. Only the input changes.
@@ -685,25 +685,19 @@ input[type="range"]::-webkit-slider-thumb {
       We compute <strong>attention scores</strong> as the dot product between the query at the current position and each key:
     </p>
 
-    <div class="formula">
-      score<sub>i,j</sub> = Q<sub>i</sub> · K<sub>j</sub><sup>T</sup>
-    </div>
+    <div class="formula tex" data-tex="\mathrm{score}_{i,j} = Q_i\cdot K_j^{\mathsf{T}}"></div>
 
     <p>
       A higher dot product means that position <em>j</em> is more relevant to the prediction at position <em>i</em>. These scores are unbounded and hard to interpret, so we apply <strong>softmax</strong> to turn them into a probability distribution — the <strong>attention weights</strong>. We then take a <strong>weighted sum of the value vectors</strong>. A common question: why have a separate value vector? We could just weight the inputs directly. The value projection adds parameters and flexibility — the model can transform what it retrieves before summing, and this was found to improve performance.
     </p>
 
-    <div class="formula">
-      H<sub>i</sub> = Σ<sub>j</sub> attention_weight<sub>i,j</sub> · V<sub>j</sub>
-    </div>
+    <div class="formula tex" data-tex="H_i = \sum_j \mathrm{attention\_weight}_{i,j}\cdot V_j"></div>
 
     <h3 style="margin-top:28px;">Concrete weights: a three-token prefix</h3>
     <p>
       Take the third position of a prefix and suppose softmax over keys {1, 2, 3} yields weights <strong>0.30</strong>, <strong>0.50</strong>, <strong>0.20</strong> on positions 1, 2, and 3 respectively. Then the self-attention output at that position is literally a <strong>vector weighted sum</strong> of the value vectors:
     </p>
-    <div class="formula">
-      H<sub>3</sub> = 0.30 · V<sub>1</sub> + 0.50 · V<sub>2</sub> + 0.20 · V<sub>3</sub>
-    </div>
+    <div class="formula tex" data-tex="H_3 = 0.30\cdot V_1 + 0.50\cdot V_2 + 0.20\cdot V_3"></div>
     <p>
       Each scalar multiplies an entire vector (broadcast over dimensions); the result has the <strong>same dimensionality</strong> as each V<sub>j</sub>. That H<sub>3</sub> is then passed through the usual output projection and, at the top of the network, into the vocabulary softmax — the same pattern as RNN language models, only the construction of H<sub>t</sub> changed.
     </p>
@@ -720,9 +714,7 @@ input[type="range"]::-webkit-slider-thumb {
       In practice, we divide the dot product by √d<sub>k</sub> (where d<sub>k</sub> is the key dimension) before softmax. Without scaling, when d<sub>k</sub> is large, dot products can grow large and push softmax into regions where gradients are tiny. Scaling keeps the scores in a reasonable range.
     </p>
 
-    <div class="formula">
-      Attention(Q, K, V) = softmax(QK<sup>T</sup> / √d<sub>k</sub>) · V
-    </div>
+    <div class="formula tex" data-tex="\mathrm{Attention}(Q,K,V) = \mathrm{softmax}\!\left(\frac{QK^{\mathsf{T}}}{\sqrt{d_k}}\right)V"></div>
 
     <div class="interactive-panel">
       <h3>Attention Score Visualization (Q · K<sup>T</sup>)</h3>
@@ -821,9 +813,7 @@ input[type="range"]::-webkit-slider-thumb {
       For each head <em>h</em>, we compute head<sub>h</sub> = Attention(Q<sub>h</sub>, K<sub>h</sub>, V<sub>h</sub>). We concatenate all heads and multiply by W<sub>O</sub> (the output projection):
     </p>
 
-    <div class="formula">
-      MultiHead(Q, K, V) = Concat(head<sub>1</sub>, ..., head<sub>H</sub>) · W<sub>O</sub>
-    </div>
+    <div class="formula tex" data-tex="\mathrm{MultiHead}(Q,K,V) = \mathrm{Concat}(\mathrm{head}_1,\ldots,\mathrm{head}_H)\,W_O"></div>
 
     <div class="interactive-panel">
       <h3>Multi-Head Attention Demo</h3>
@@ -864,9 +854,7 @@ input[type="range"]::-webkit-slider-thumb {
       Why <strong>−∞</strong> (or a large negative sentinel), not zero, before softmax? Writing the softmax as <span style="font-family:var(--mono);">p<sub>i</sub> = exp(z<sub>i</sub>) / Σ<sub>j</sub> exp(z<sub>j</sub>)</span>, a masked position needs its numerator exp(z<sub>masked</sub>) to go to <strong>0</strong>, which requires z<sub>masked</sub> → −∞, not a finite zero logit. If you merely zero out a forbidden cell but leave other logits finite, that cell still gets <strong>positive probability mass</strong>. Setting the logit to <strong>negative infinity</strong> drives its softmax output to <strong>exactly zero</strong>, removing any influence on the weighted sum of values. Libraries such as PyTorch expose row-wise softmax over a chosen dimension; causal masking is applied <strong>per query row</strong> so each position’s weights form a proper distribution over allowed keys.
     </p>
 
-    <div class="formula">
-      softmax(z)<sub>i</sub> = exp(z<sub>i</sub>) / Σ<sub>j</sub> exp(z<sub>j</sub>) &nbsp;&nbsp;(row-wise over keys j for each query row)
-    </div>
+    <div class="formula tex" data-tex="\mathrm{softmax}(z)_i = \frac{\exp(z_i)}{\sum_j\exp(z_j)}\quad\text{(row-wise over keys)}"></div>
 
     <h3 style="margin-top:28px;">Matrix form: three steps for the whole sequence</h3>
     <p>
@@ -942,9 +930,7 @@ input[type="range"]::-webkit-slider-thumb {
       The idea was popularized for very deep convolutional nets by <strong>He et al. (2015)</strong>, “Deep Residual Learning for Image Recognition.” In a transformer block, suppose the sublayer produces an update such as Z<sup>(ℓ)</sup> from attention on the ℓ-th block’s input. A residual tie adds the <strong>input of that sublayer</strong> back in (dimension must match — model width is fixed by design). Stacking L blocks means the loss at the top can reach early representations either by walking backward through every attention map and FFN, or by hopping through <strong>additive shortcuts</strong> that skip whole interior chains. During backprop, gradients <strong>split</strong> across branches; the skip path is not a separate “free prediction” — parameters inside F still learn, but optimization is far less brittle when a near-identity route exists.
     </p>
 
-    <div class="formula">
-      x<sup>(ℓ+1)</sup> = x<sup>(ℓ)</sup> + F<sub>ℓ</sub>(x<sup>(ℓ)</sup>) &nbsp;&nbsp;(schematic residual around sublayer F<sub>ℓ</sub>)
-    </div>
+    <div class="formula tex" data-tex="x^{(\ell+1)} = x^{(\ell)} + F_{\ell}(x^{(\ell)})\quad\text{(residual around sublayer)}"></div>
 
     <h3 style="margin-top:28px;">Positional Encoding</h3>
     <p>
@@ -1463,6 +1449,8 @@ onScroll();
 </script>
 
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

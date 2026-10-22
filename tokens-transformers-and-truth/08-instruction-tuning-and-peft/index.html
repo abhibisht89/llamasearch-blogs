@@ -481,6 +481,8 @@ input[type="range"]::-webkit-slider-thumb {
 }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -659,9 +661,7 @@ input[type="range"]::-webkit-slider-thumb {
       The <strong>LIMA</strong> paper showed that <strong>"less is more"</strong> — a small, high-quality dataset can outperform a large, noisy one. Quality of instruction-tuning data matters more than raw quantity. Curating clean, diverse, well-formatted examples often beats scaling up indiscriminately.
     </p>
 
-    <div class="formula">
-      Loss = −(1/T) · Σᵢ log P(wᵢ | prompt, w₁, ..., wᵢ₋₁)  &nbsp;&nbsp; (output tokens only)
-    </div>
+    <div class="formula tex" data-tex="\mathrm{Loss}=-\frac{1}{T}\sum_i\log P(w_i\mid\mathrm{prompt},w_1,\ldots,w_{i-1})\quad\text{(output tokens only)}"></div>
 
     <div class="callout">
       <p><strong>Catastrophic forgetting:</strong> Fine-tuning heavily on one task can erase abilities learned during pre-training. For single-task optimization this may be acceptable. For general-purpose models, use diverse instruction data and monitor performance across tasks.</p>
@@ -742,9 +742,7 @@ input[type="range"]::-webkit-slider-thumb {
       <strong>Prefix tuning</strong> (Li &amp; Liang, 2021) names a closely related family of methods that also prepends trainable activations, but it is not identical line-for-line to the <strong>prompt tuning</strong> setup emphasized here (learned input embeddings with a frozen transformer, as in Lester et al.). Vendor codebases may label hooks differently; the implementation details matter when reproducing numbers.
     </p>
 
-    <div class="formula">
-      E<sub>i</sub><sup>new</sup> = E<sub>i</sub><sup>old</sup> − η · ∂L/∂E<sub>i</sub> &nbsp;&nbsp; (only for soft-prompt parameters E; transformer blocks frozen)
-    </div>
+    <div class="formula tex" data-tex="E_i^{\mathrm{new}}=E_i^{\mathrm{old}}-\eta\cdot\frac{\partial L}{\partial E_i}\quad\text{(soft-prompt only; blocks frozen)}"></div>
 
     <p>
       The loss is summed over all supervised output tokens, and back-propagation flows through the entire depth of the frozen network. By the chain rule you still materialize intermediate gradients in the stack; what changes is the <strong>optimizer step</strong>: it applies updates <em>only</em> to the soft prompt vectors (and optionally a small head), not to attention or MLP weights. Savings are in <strong>checkpoint size and versioning</strong> — you email megabytes of embeddings, not gigabytes of altered layers — not in wall-clock FLOPs per step.
@@ -815,17 +813,13 @@ input[type="range"]::-webkit-slider-thumb {
       Consider a linear layer: <strong>h = f(W·x)</strong>, where W is m×n. Full fine-tuning updates W. For LoRA, we keep W frozen and add:
     </p>
 
-    <div class="formula">
-      h = f((W + B·A) · x)  &nbsp;&nbsp; where A ∈ ℝ^{n×r}, B ∈ ℝ^{m×r}, r ≪ m, n
-    </div>
+    <div class="formula tex" data-tex="h=f((W+BA)\cdot x)\quad A\in\mathbb{R}^{n\times r},\;B\in\mathbb{R}^{m\times r},\;r\ll m,n"></div>
 
     <p>
       Full fine-tuning stores and differentiates a dense update of the same shape as W. Writing η for the learning rate,
     </p>
 
-    <div class="formula">
-      W<sup>new</sup> = W<sup>old</sup> − η · ∂L/∂W &nbsp;&nbsp; with ∂L/∂W ∈ ℝ^{m×n} (optimizer states add further memory on top)
-    </div>
+    <div class="formula tex" data-tex="W_{\mathrm{new}}=W_{\mathrm{old}}-\eta\cdot\frac{\partial L}{\partial W}\quad\tfrac{\partial L}{\partial W}\in\mathbb{R}^{m\times n}"></div>
 
     <p>
       LoRA instead accumulates changes in low-rank factors. Only ∂L/∂A and ∂L/∂B are formed for the adaptation parameters; W<sup>pretrained</sup> stays constant in the update rule. The matrices A and B are far smaller than W when r ≪ min(m, n), so optimizer memory for the trainable subset drops accordingly.
@@ -904,9 +898,7 @@ input[type="range"]::-webkit-slider-thumb {
       <strong>Worked example (symmetric-ish affine 4-bit).</strong> Take a tiny “layer slice” vector x = (−1.0, 0.5, 2.0). Then min = −1, max = 2, and with 16 distinct unsigned codes 0…15 the bin width is
     </p>
 
-    <div class="formula">
-      s = (x<sub>max</sub> − x<sub>min</sub>) / 15 = 3 / 15 = 0.2
-    </div>
+    <div class="formula tex" data-tex="s=\frac{x_{\max}-x_{\min}}{15}=\frac{3}{15}=0.2"></div>
 
     <p>
       Choose an integer zero-point z = round(−x<sub>min</sub> / s) = round(5) = 5 so that values near zero map near the middle of the code range. Quantize each entry with q = round(x / s + z), clamped to [0, 15]:
@@ -924,9 +916,7 @@ input[type="range"]::-webkit-slider-thumb {
       Larger models tend to tolerate quantization better than smaller ones. Many downloadable models today are offered in 4-bit or 8-bit quantized form and work well in practice.
     </p>
 
-    <div class="formula">
-      Quantize: q = round(x / s) + z  &nbsp;&nbsp; | &nbsp;&nbsp; Dequantize: x ≈ (q - z) · s
-    </div>
+    <div class="formula tex" data-tex="\mathrm{quantize:}\;q=\mathrm{round}(x/s)+z\qquad\mathrm{dequantize:}\;x\approx(q-z)\cdot s"></div>
 
     <div class="callout ok">
       <p><strong>LoRA + quantization (QLoRA):</strong> Even after adapters train in low precision, the <strong>base weights</strong> must still reside in device memory during adaptation unless the implementation streams layers. Quantization attacks that bottleneck; LoRA attacks the count of <em>changing</em> parameters. Together they are what make single-GPU adaptation of multi-billion-parameter bases practical in many notebooks.</p>
@@ -1312,6 +1302,8 @@ onScroll();
 </script>
 
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

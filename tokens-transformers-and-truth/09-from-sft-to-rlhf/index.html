@@ -435,6 +435,8 @@ input[type="range"]::-webkit-slider-thumb {
 }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -664,9 +666,7 @@ input[type="range"]::-webkit-slider-thumb {
       We need a way to turn pairwise preferences into a trainable objective. The <strong>Bradley-Terry model</strong> does exactly that. Given a prompt <strong>x</strong> and two responses <strong>y_w</strong> (preferred) and <strong>y_l</strong> (dispreferred), we model the probability that humans prefer y_w over y_l as:
     </p>
 
-    <div class="formula">
-      P(y_w ≻ y_l | x) = exp(r(x, y_w)) / (exp(r(x, y_w)) + exp(r(x, y_l)))
-    </div>
+    <div class="formula tex" data-tex="P(y_w \succ y_l \mid x) = \frac{\exp(r(x,y_w))}{\exp(r(x,y_w))+\exp(r(x,y_l))}"></div>
 
     <p>
       Here <strong>r(x, y)</strong> is a scalar reward function — the output of our reward model. The preferred response should get a higher reward. This formula is analogous to a two-class softmax: we normalize over the two options.
@@ -676,9 +676,7 @@ input[type="range"]::-webkit-slider-thumb {
       The same modeling choice underlies the <strong>RLHF stack popularized by InstructGPT</strong>: collect comparisons from labelers, fit a parametric reward function so that its implied pairwise probabilities match the data, then use that reward to update the policy. The Bradley–Terry layer is the bridge between messy human judgments and a smooth objective you can backprop into (through the reward network, before policy gradients enter the picture).
     </p>
 
-    <div class="formula">
-      σ(z) = 1 / (1 + e<sup>−z</sup>) = P(y_w ≻ y_l | x) &nbsp; when &nbsp; z = r(x, y_w) − r(x, y_l)
-    </div>
+    <div class="formula tex" data-tex="\sigma(z)=\frac{1}{1+e^{-z}}=P(y_w\succ y_l\mid x)\quad\text{when }z=r(x,y_w)-r(x,y_l)"></div>
 
     <p>
       Viewed another way, the sigmoid is exactly the <strong>softmax over two logits</strong> written in closed form: exponentiate both rewards and normalize, and the probability of preferring y_w collapses to σ(r_w − r_l). That parallel helps if you already think in terms of multi-class softmax at the vocabulary level—here the "vocabulary" is just the two presented completions.
@@ -688,9 +686,7 @@ input[type="range"]::-webkit-slider-thumb {
       To train the reward model, we minimize the negative log likelihood of the human-preferred choice:
     </p>
 
-    <div class="formula">
-      L = −log P(y_w ≻ y_l | x) = −log σ(r(x, y_w) − r(x, y_l))
-    </div>
+    <div class="formula tex" data-tex="L=-\log P(y_w\succ y_l\mid x)=-\log\sigma(r(x,y_w)-r(x,y_l))"></div>
 
     <p>
       where <strong>σ</strong> is the sigmoid function: σ(z) = 1 / (1 + e<sup>−z</sup>). To minimize this loss, we want r(x, y_w) to be higher than r(x, y_l). The larger the gap, the more confident the model is in the preference.
@@ -736,9 +732,7 @@ input[type="range"]::-webkit-slider-thumb {
       What does the reward model actually look like? It is an <strong>instruction-tuned language model</strong> with a <strong>linear layer</strong> on top of the final hidden state. The input is the concatenation of the prompt <strong>x</strong> and the response <strong>y</strong>. The model processes this sequence and produces hidden states at each position. We take the <strong>last hidden state</strong> (at the final token) and project it through a linear layer to get a single scalar score.
     </p>
 
-    <div class="formula">
-      r(x, y) = W · h_last
-    </div>
+    <div class="formula tex" data-tex="r(x,y)=W\cdot h_{\mathrm{last}}"></div>
 
     <p>
       where <strong>h_last</strong> is the final-layer hidden state at the last token of the concatenated sequence and <strong>W</strong> is a 1×d parameter matrix (a single row when viewed as a vector). The output is one real number—there is <strong>no vocabulary softmax</strong> at the end. In code, a typical batch stacks forward passes for winning and losing completions, subtracts scores, and applies the logistic loss.
@@ -911,17 +905,13 @@ input[type="range"]::-webkit-slider-thumb {
       </div>
     </div>
 
-    <div class="formula">
-      J(θ) = E_{y ∼ p_θ(y|x)} [ r(x, y) ]
-    </div>
+    <div class="formula tex" data-tex="J(\theta)=\mathbb{E}_{y\sim p_{\theta}(y|x)}[r(x,y)]"></div>
 
     <p>
       For a fixed prompt x, if we could enumerate the countable (yet astronomically large) space of strings y, the expectation would be the explicit sum
     </p>
 
-    <div class="formula">
-      E<sub>y∼p<sub>θ</sub></sub>[r(x, y)] = Σ<sub>y</sub> p<sub>θ</sub>(y|x) · r(x, y)
-    </div>
+    <div class="formula tex" data-tex="E_{y\sim p_{\theta}}[r(x,y)] = \sum_{y} p_{\theta}(y|x)\, r(x,y)"></div>
 
     <p>
       Enumeration is impossible, so RLHF estimators draw <strong>Monte Carlo samples</strong>—often a single completion per prompt per batch—and average empirical rewards across many prompts. With enough independent draws, the sample mean is an unbiased estimate of the true expectation even though each individual y is random.
@@ -939,9 +929,7 @@ input[type="range"]::-webkit-slider-thumb {
       A critical consideration: if we simply maximize reward, the model might <strong>reward hack</strong> — exploit quirks of the reward model (e.g., preferring longer outputs) rather than actually improving. To prevent this, we add a <strong>KL divergence penalty</strong> that keeps the policy close to a reference policy (typically the SFT model):
     </p>
 
-    <div class="formula">
-      J(θ) = E[r(x, y)] − β · KL(p_θ || p_ref)
-    </div>
+    <div class="formula tex" data-tex="J(\theta)=\mathbb{E}[r(x,y)]-\beta\cdot\mathrm{KL}(p_{\theta}\,\|\,p_{\mathrm{ref}})"></div>
 
     <p>
       The β term controls the strength of the penalty. Too small, and we risk reward hacking. Too large, and we barely move from the reference. Algorithms like <strong>PPO (Proximal Policy Optimization)</strong> implement this idea with additional safeguards to keep updates stable.
@@ -1274,6 +1262,8 @@ onScroll();
 </script>
 
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">
