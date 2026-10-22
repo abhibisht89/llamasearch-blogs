@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chapter 15 · RLHF End-to-End · Advanced NLP V2</title>
+  <style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-elevated: #1a1a24;
+      --border: #2a2a38;
+      --text: #e8e8ef;
+      --text-muted: #9898a8;
+      --accent: #7c9cff;
+      --accent-2: #5ce1c5;
+      --warn: #ffb86c;
+      --danger: #ff6b8a;
+      --radius: 12px;
+      --font: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .nav-wrap {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    nav .brand { font-weight: 600; font-size: 0.95rem; }
+    .nav-toggle {
+      display: none;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.45rem 0.75rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+      align-items: center;
+    }
+    .nav-links a {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 0.2rem 0;
+    }
+    .nav-links a:hover { color: var(--accent); }
+    @media (max-width: 720px) {
+      .nav-toggle { display: block; }
+      .nav-links {
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        padding-bottom: 0.5rem;
+      }
+      .nav-links.open { display: flex; }
+    }
+    .hero {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 3rem 1.25rem 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero h1 {
+      font-size: clamp(1.65rem, 4vw, 2.35rem);
+      font-weight: 700;
+      margin: 0 0 0.75rem;
+      letter-spacing: -0.02em;
+      background: linear-gradient(120deg, var(--text) 0%, var(--accent) 55%, var(--accent-2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p.lead {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 38rem;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .section {
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section:last-of-type { border-bottom: none; }
+    .section.fade-in {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    .section.fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .section-num {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--accent-2);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+    }
+    h2 {
+      font-size: 1.45rem;
+      margin: 0 0 1rem;
+      font-weight: 600;
+    }
+    h3 { font-size: 1.1rem; margin: 1.5rem 0 0.6rem; color: var(--text); }
+    p { margin: 0 0 1rem; color: var(--text-muted); }
+    ul, ol { color: var(--text-muted); margin: 0 0 1rem; padding-left: 1.25rem; }
+    li { margin-bottom: 0.35rem; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.35rem;
+      margin: 1.25rem 0;
+    }
+    .math {
+      font-family: var(--mono);
+      font-size: 0.92rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      color: var(--accent);
+    }
+    code { font-family: var(--mono); font-size: 0.88em; color: var(--accent-2); }
+    .demo {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .demo h4 {
+      margin: 0 0 1rem;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+    label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+    input[type="range"] { width: 100%; margin-bottom: 0.75rem; }
+    input[type="number"] {
+      width: 100%;
+      max-width: 120px;
+      padding: 0.4rem 0.5rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+    .row > div { flex: 1; min-width: 140px; }
+    .out {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      color: var(--accent-2);
+    }
+    canvas { max-width: 100%; border-radius: 8px; background: var(--bg); display: block; margin-top: 0.75rem; }
+    .pipeline {
+      display: grid;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      font-family: var(--mono);
+    }
+    .pipeline span {
+      display: block;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg);
+      border-radius: 6px;
+      border-left: 3px solid var(--accent);
+    }
+    .note {
+      border-left: 3px solid var(--warn);
+      padding-left: 1rem;
+      margin: 1rem 0;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .formula {
+      font-family: var(--mono);
+      font-size: 0.92rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.15rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      color: var(--accent);
+      line-height: 1.55;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: rgba(124, 156, 255, 0.07);
+      padding: 1rem 1.15rem;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin: 1.25rem 0;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .callout.warn {
+      border-left-color: var(--warn);
+      background: rgba(255, 184, 108, 0.08);
+    }
+    .callout.ok {
+      border-left-color: var(--accent-2);
+      background: rgba(92, 225, 197, 0.08);
+    }
+    .qa-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.25rem;
+      margin: 1.25rem 0;
+    }
+    .qa-box .q {
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+    .qa-box p:last-child { margin-bottom: 0; }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1.25rem 0;
+    }
+    @media (max-width: 640px) {
+      .comparison { grid-template-columns: 1fr; }
+    }
+    .comparison .card { margin: 0; }
+    pre {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+    pre code { color: var(--text-muted); }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">RLHF: PPO &amp; Code</span></nav>
+
+  <div class="nav-wrap">
+    <nav>
+      <a class="brand" href="../">Advanced NLP V2</a>
+      <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+      <div class="nav-links" id="navLinks">
+        <a href="#s00">00</a>
+        <a href="#s01">01</a>
+        <a href="#s02">02</a>
+        <a href="#s03">03</a>
+        <a href="#s04">04</a>
+        <a href="#s05">05</a>
+        <a href="#s06">06</a>
+        <a href="#s07">07</a>
+        <a href="#s08">08</a>
+        <a href="#s09">09</a>
+        <a href="#s10">10</a>
+        <a href="#s11">11</a>
+        <a href="#s12">12</a>
+        <a href="#playground">Playground</a>
+      </div>
+    </nav>
+  </div>
+
+  <header class="hero">
+    <h1>RLHF End-to-End: Policy Gradients, PPO &amp; Code</h1>
+    <p class="lead">From alignment goals to preference-trained reward models, policy-gradient derivations, variance reduction, PPO clipping, KL control, and how libraries like Hugging Face TRL implement the loop.</p>
+  </header>
+
+  <main class="container">
+    <section id="s00" class="section fade-in">
+      <div class="section-num">Section 00</div>
+      <h2>Why alignment matters</h2>
+      <p>Large language models absorb broad pretraining data. That teaches fluency and knowledge, not necessarily the behavior you want at deployment: avoiding harmful content, staying on task, or matching a product’s tone. <strong>Alignment</strong> steers the model toward desired outputs while preserving usefulness.</p>
+      <p><strong>Reinforcement learning from human feedback (RLHF)</strong> is one major alignment recipe: learn a reward signal from human preferences, then optimize the generative policy with reinforcement learning so sampled completions score highly under that reward—subject to staying close to a reference model so the text remains coherent.</p>
+      <div class="note">RLHF is not the only post-training approach; direct preference optimization (DPO) and related methods skip an explicit RL loop. This chapter focuses on the RLHF + PPO path because it exposes policy gradients, advantage estimation, and clipping in full.</div>
+      <p>RLHF is also the family of techniques used to align assistants such as ChatGPT toward safer, more helpful behavior. The same story applies whenever you want fluency and knowledge from pretraining to be <em>steered</em> without throwing away the base model.</p>
+      <div class="callout warn">This chapter assumes comfort with expectations and basic probability, gradient-based optimization (loss, backward pass), and the MDP vocabulary: agent, state, environment, reward. It leans heavily on the transformer: causal masking, per-position hidden states, and one forward pass over a full sequence.</div>
+    </section>
+
+    <section id="s01" class="section fade-in">
+      <div class="section-num">Section 01</div>
+      <h2>Language models as stochastic policies</h2>
+      <p>A causal LM assigns <code>P(next token | prefix)</code>. Autoregressive generation repeatedly appends a sampled token, so the prefix grows: that is a <strong>Markov decision process</strong> in disguise.</p>
+      <ul>
+        <li><strong>State</strong>: current token sequence (prompt + generated prefix).</li>
+        <li><strong>Action</strong>: the next token (possibly sampled with temperature, top-<em>k</em>, nucleus sampling, etc.).</li>
+        <li><strong>Policy</strong> <code>π<sub>θ</sub></code>: the LM itself, parameterized by weights <code>θ</code>.</li>
+      </ul>
+      <p>What is missing for RL is a numeric <strong>reward</strong> for partial or full generations. That is supplied by a <strong>reward model</strong> trained on human judgments.</p>
+      <p>For clarity, the exposition often treats <strong>one word as one token</strong>. Real tokenizers split text more finely (subwords), but the MDP picture is unchanged: each decoding step is an action.</p>
+      <p><strong>Greedy decoding as an MDP roll-out.</strong> Prompt: “Where is Shanghai?” The model assigns probabilities over the vocabulary for the next token; greedily take the argmax, append it, and repeat.</p>
+      <ol>
+        <li>State = prompt only → action might be <code>Shanghai</code>.</li>
+        <li>State = prompt + <code>Shanghai</code> → action might be <code>is</code>.</li>
+        <li>State = … + <code>is</code> → action might be <code>in</code>.</li>
+        <li>Continue until a stop criterion (max length, EOS, or task-specific heuristics). A completed answer might read “Shanghai is in China.”</li>
+      </ol>
+      <p>Sampling strategies (temperature, top-<em>k</em>, nucleus / top-<em>p</em>) only change how actions are drawn from the same conditional distributions <code>π<sub>θ</sub>(a|s)</code>.</p>
+    </section>
+
+    <section id="s02" class="section fade-in">
+      <div class="section-num">Section 02</div>
+      <h2>RL basics: states, actions, rewards, trajectories</h2>
+      <p>An agent acts in an environment: at each step it observes a state, samples an action from a policy, transitions (often stochastically) to a new state, and receives a scalar reward. A <strong>trajectory</strong> <code>τ = (s<sub>0</sub>, a<sub>0</sub>, s<sub>1</sub>, a<sub>1</sub>, …)</code> is one roll-out.</p>
+      <p>The <strong>return</strong> is usually <strong>discounted</strong> so future rewards are weighted less than immediate ones:</p>
+      <div class="math">R(τ) = Σ<sub>t=0</sub><sup>T</sup> γ<sup>t</sup> r<sub>t</sub>, 0 &lt; γ &lt; 1</div>
+      <p>Discounting encourages shorter successful paths when dynamics are stochastic and keeps infinite-horizon sums bounded when needed.</p>
+      <p>The <strong>objective</strong> is to find policy parameters that maximize expected return:</p>
+      <div class="formula">J(θ) = E<sub>τ ∼ π<sub>θ</sub></sub>[ R(τ) ]</div>
+      <p>Equivalently, the objective is an expectation over trajectories weighted by their probability under the policy—often written as an integral or sum: <code>∫ P(τ|θ) R(τ) dτ</code> in the continuous view.</p>
+
+      <h3>Concrete grid-world intuition</h3>
+      <p>Picture a <strong>cat</strong> on a grid: state = coordinates <code>(x, y)</code>; actions = up/down/left/right. Rewards might be <strong>0</strong> on empty cells, <strong>−1</strong> on a broom, <strong>−10</strong> in the bathtub, and <strong>+100</strong> at meat. The policy <code>π(a|s)</code> assigns action probabilities per cell—analogous to a language model’s next-token distribution.</p>
+
+      <h3>Stochastic transitions</h3>
+      <p>Next states need not be deterministic. The cat may <em>intend</em> “down” yet slip—model that as <code>P(s′|s, a)</code>. The same formalism covers noisy robots (e.g., broken wheels: “move down” might leave you in place). That is why trajectory probability includes both policy factors and transition dynamics.</p>
+
+      <h3>Probability of a trajectory</h3>
+      <p>A trajectory <code>τ = (s₀, a₀, s₁, a₁, …)</code> factorizes because of the Markov structure: the choice of <code>a<sub>t</sub></code> depends on <code>s<sub>t</sub></code>, and <code>s<sub>t+1</sub></code> depends on <code>(s<sub>t</sub>, a<sub>t</sub>)</code>. Under standard assumptions these factors multiply:</p>
+      <div class="formula">P(τ) = P(s₀) · ∏<sub>t</sub> π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) · P(s<sub>t+1</sub>|s<sub>t</sub>, a<sub>t</sub>)</div>
+      <p>Many paths of bounded length exist (straight to the goal, detours, wasted steps until a horizon). RL seeks a policy that maximizes <em>expected</em> return across those paths.</p>
+
+      <h3>Why discount? Money, risk, and convergence</h3>
+      <p><strong>Time preference.</strong> Receiving \$10,000 today beats receiving it in a year because you can earn interest—so future money is discounted.</p>
+      <p><strong>Shorter paths under noise.</strong> If transitions are stochastic, long routes expose you to more hazard (more chances to hit the broom or bathtub). Preferring earlier success aligns with lower discount-weighted risk.</p>
+      <p><strong>Mathematics.</strong> With <code>0 &lt; γ &lt; 1</code>, infinite-horizon sums can converge when rewards are bounded.</p>
+
+      <h3>Worked discounting example</h3>
+      <p>Along one path the cat hits the broom once (reward <code>−1</code> at an early step), then many zeros, then <code>+100</code> at the meat on step index 8 from the start. With per-step discounting applied to the return:</p>
+      <div class="formula">R = γ · (−1) + γ<sup>8</sup> · 100</div>
+      <p>Every intermediate zero contributes nothing; the terminal +100 is downweighted by <code>γ<sup>8</sup></code> because it arrives eight steps later. Smaller <code>γ</code> penalizes delay more sharply. In language modeling the same structure applies: <strong>state</strong> = prompt plus prefix, <strong>action</strong> = next token, <strong>return</strong> from the reward model (and KL penalties)—implementations vary, but the RL object is still “maximize expected discounted return under <code>π<sub>θ</sub></code>.”</p>
+    </section>
+
+    <section id="s03" class="section fade-in">
+      <div class="section-num">Section 03</div>
+      <h2>Reward modeling from preferences</h2>
+      <p>Absolute scalar scores for free-form answers are noisy and subjective. Humans compare pairs reliably: “A is better than B” is easier than “A is 7.3/10.”</p>
+      <p><strong>Data collection</strong>: for each prompt, sample multiple completions (e.g., higher temperature), then record which completion labelers prefer.</p>
+      <p><strong>Architecture</strong>: start from a pretrained transformer; instead of a vocabulary projection head for next-token prediction, attach a <strong>single linear output</strong> so the model emits one score <code>r<sub>φ</sub>(x, y)</code> for prompt <code>x</code> and response <code>y</code>.</p>
+      <p><strong>Bradley–Terry / logistic loss</strong> for a chosen response <code>y<sup>+</sup></code> and rejected <code>y<sup>−</sup></code>:</p>
+      <div class="formula">L<sub>RM</sub> = −log σ( r<sub>φ</sub>(x, y<sup>+</sup>) − r<sub>φ</sub>(x, y<sup>−</sup>) )</div>
+      <p>When the model ranks the preferred answer higher, <code>r<sup>+</sup> − r<sup>−</sup></code> is positive, <code>σ(·)</code> is above 1/2, and the loss is small; swapping scores inflates the loss. Minimizing this pushes the reward model to respect pairwise preferences.</p>
+
+      <div class="comparison">
+        <div class="card"><h3>Absolute scores</h3><p>Asking “rate this answer 1–10” is noisy: one annotator may love a short reply (“Shanghai is in China”), another may want more detail. The same holds for “what is 2+2?” answered only with “four”—too terse for some, perfect for others.</p></div>
+        <div class="card"><h3>Pairwise preferences</h3><p>Humans compare reliably: “A is better than B” yields cleaner supervision. So the pipeline samples several completions (e.g., higher temperature), labelers pick the winner, and the network learns a scalar scorer consistent with those choices.</p></div>
+      </div>
+
+      <h3>Architecture detail</h3>
+      <p>Start from a pretrained transformer. Feed the concatenation <code>[question tokens ∥ answer tokens]</code>. The stack produces hidden states per position; instead of projecting the last hidden state to vocabulary size for next-token prediction, attach a <strong>single-output linear head</strong> so the model emits one real number <code>r<sub>φ</sub>(x, y)</code> for the pair.</p>
+
+      <h3>Step-by-step behavior of the loss</h3>
+      <p>Let <code>Δ = r<sub>φ</sub>(x, y<sup>+</sup>) − r<sub>φ</sub>(x, y<sup>−</sup>)</code>.</p>
+      <ul>
+        <li>If the model is <strong>correct</strong> (higher score on the chosen answer), <code>Δ &gt; 0</code>. Then <code>σ(Δ) ∈ (½, 1)</code>. The quantity <code>−log σ(Δ)</code> is a <strong>small positive</strong> loss (bounded roughly in a modest range above 0).</li>
+        <li>If the model is <strong>wrong</strong> (higher score on the rejected answer), <code>Δ &lt; 0</code>. Then <code>σ(Δ) ∈ (0, ½)</code>. Now <code>log σ(Δ)</code> is a large-magnitude negative number, so <code>−log σ(Δ)</code> becomes <strong>large</strong>—the optimizer is heavily penalized.</li>
+      </ul>
+      <p>Training therefore forces high reward on winning responses and low reward on losing ones, because that is how the loss is minimized.</p>
+
+      <div class="callout ok">In Hugging Face TRL, <code>RewardTrainer</code> pairs with <code>AutoModelForSequenceClassification</code> configured so the classification head has <strong>one logit</strong>—exactly this scalar reward architecture. The implementation computes rewards for the chosen and rejected sequences, then applies the same <code>−log σ(r<sub>chosen</sub> − r<sub>rejected</sub>)</code> structure.</div>
+
+      <div class="demo" id="demoReward">
+        <h4>Interactive: preference loss vs. reward gap</h4>
+        <div class="row">
+          <div>
+            <label for="rPlus">Reward (preferred) r⁺</label>
+            <input type="range" id="rPlus" min="-3" max="3" step="0.1" value="1.2" />
+          </div>
+          <div>
+            <label for="rMinus">Reward (rejected) r⁻</label>
+            <input type="range" id="rMinus" min="-3" max="3" step="0.1" value="0.3" />
+          </div>
+        </div>
+        <div class="out" id="rewardOut"></div>
+      </div>
+    </section>
+
+    <section id="s04" class="section fade-in">
+      <div class="section-num">Section 04</div>
+      <h2>Trajectory probability and the policy-gradient target</h2>
+      <p>For a trajectory, probability factors into start state, policy choices, and transition dynamics. Only terms that depend on <code>θ</code> survive in <code>∇<sub>θ</sub> log P(τ | θ)</code>: the sum of <code>∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub> | s<sub>t</sub>)</code> over time steps.</p>
+      <p>Monte Carlo estimation replaces the expectation over all trajectories with a finite sample—unbiased in expectation but <strong>high variance</strong> when the sample is small.</p>
+      <p>For LMs, <code>log π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>)</code> is the log-probability of the actually sampled token at position <code>t</code>, obtained from one forward pass with causal masking: compute logits at each position, <code>log_softmax</code>, then gather the index of the realized token.</p>
+      <p>Per-token rewards can come from a reward head at each generated position, or a single scalar (e.g., classifier score) placed on the final token with per-step KL penalties—implementations differ; the math structure (returns, advantages) stays the same.</p>
+
+      <h3>Gradient of the objective (sketch)</h3>
+      <p>Start from the expected return under the policy:</p>
+      <div class="formula">J(θ) = E<sub>τ∼π<sub>θ</sub></sub>[R(τ)] = ∫ P(τ|θ) R(τ) dτ</div>
+      <p>Exchange gradient and integral (sum of derivatives):</p>
+      <div class="formula">∇<sub>θ</sub>J(θ) = ∫ R(τ) ∇<sub>θ</sub>P(τ|θ) dτ</div>
+      <p><strong>Log-derivative trick.</strong> Use <code>∇<sub>θ</sub> log P(τ|θ) = ∇<sub>θ</sub>P(τ|θ) / P(τ|θ)</code>, hence <code>∇<sub>θ</sub>P(τ|θ) = P(τ|θ) ∇<sub>θ</sub> log P(τ|θ)</code>. Substitute:</p>
+      <div class="formula">∇<sub>θ</sub>J(θ) = ∫ P(τ|θ) R(τ) ∇<sub>θ</sub> log P(τ|θ) dτ = E<sub>τ∼π<sub>θ</sub></sub>[ R(τ) ∇<sub>θ</sub> log P(τ|θ) ]</div>
+      <p>Expand <code>log P(τ|θ)</code> as a sum: initial state (often independent of <code>θ</code>), transition terms <code>log P(s<sub>t+1</sub>|s<sub>t</sub>, a<sub>t</sub>)</code> (typically independent of <code>θ</code> when the environment is fixed), and <strong>policy terms</strong> <code>log π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>)</code>. Only the latter survive in <code>∇<sub>θ</sub></code>:</p>
+      <div class="formula">∇<sub>θ</sub> log P(τ|θ) = ∑<sub>t</sub> ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>)</div>
+      <p>So the policy-gradient direction weights each per-step log-probability gradient by return (or improved surrogates below).</p>
+
+      <h3>Why Monte Carlo is expensive for LMs</h3>
+      <p>Exact expectations require summing over enormous trajectory spaces—e.g., all length-100 token sequences. That is intractable. The standard fix is <strong>Monte Carlo</strong>: sample trajectories from the current policy and replace the expectation with an empirical mean. The estimator is unbiased in expectation but can have <strong>high variance</strong> when the batch of trajectories is small.</p>
+
+      <h3>Log-probabilities for a concrete LM trajectory</h3>
+      <p>Prompt: “Where is Shanghai?” Generated continuation: “Shanghai is in China.” Concatenate query + response and run one <strong>causal</strong> forward pass. For each position, the model produces logits for the <em>next</em> token; apply <code>log_softmax</code> along the vocabulary dimension. Because of the causal mask, the hidden state at “Shanghai” encodes the prefix ending at “Shanghai” and predicts the token that actually followed—here <code>is</code>. Gather only the log-prob entries for the <strong>realized</strong> actions (the tokens that were actually sampled during roll-out). That yields the sequence <code>log π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>)</code> needed for the policy gradient.</p>
+      <div class="callout">This is the same trick used in supervised LM training (teacher forcing), except actions are the tokens you chose at generation time, not tokens from a fixed dataset.</div>
+
+      <h3>Rewarding the trajectory with the reward model</h3>
+      <p>Feed the same concatenated sequence through the reward transformer. You may read a scalar after the final position, or attach the linear head to each response position and sum (or discounted-sum) per-step scores:</p>
+      <div class="formula">R ≈ r<sub>0</sub> + γ r<sub>1</sub> + γ<sup>2</sup> r<sub>2</sub> + γ<sup>3</sup> r<sub>3</sub> + …</div>
+      <p>Either way, once returns and log-probs exist, multiply—conceptually—by advantages (after variance reduction) and ascend.</p>
+    </section>
+
+    <section id="s05" class="section fade-in">
+      <div class="section-num">Section 05</div>
+      <h2>Policy gradient theorem (REINFORCE)</h2>
+      <p>Using the log-derivative trick,</p>
+      <div class="formula">∇<sub>θ</sub> J(θ) = E<sub>τ∼π<sub>θ</sub></sub>[ R(τ) · ∑<sub>t</sub> ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub> | s<sub>t</sub>) ]</div>
+      <p>Empirically: sample trajectories, multiply score gradients by return (or a better surrogate below), and ascend. This is the REINFORCE family: <strong>high-return</strong> actions get reinforced; <strong>low-return</strong> actions get suppressed.</p>
+      <p><strong>Optimization sign.</strong> Supervised learning usually <em>minimizes</em> a loss with gradient descent. Here we <em>maximize</em> <code>J(θ)</code> with <strong>gradient ascent</strong>: update <code>θ ← θ + α ∇<sub>θ</sub> J(θ)</code> (same mechanics as descent, opposite sign).</p>
+      <p><strong>Practical loop (conceptual).</strong> (1) Roll out trajectories from the current policy—grid-world cat or LM completions for prompts. (2) For each trajectory, accumulate rewards and retrieve the log-probabilities of taken actions. (3) Let automatic differentiation compute <code>∇<sub>θ</sub> log π<sub>θ</sub></code> (e.g., PyTorch <code>backward</code> through a surrogate loss that encodes those log-probs). (4) Scale by return/advantage and step <code>θ</code> uphill. (5) Refresh roll-outs and repeat.</p>
+      <div class="callout warn">Vanilla REINFORCE is workable on toy problems but becomes fragile for large LMs: Monte Carlo return estimates are noisy, and fresh roll-outs every tiny step are prohibitively expensive.</div>
+
+      <div class="demo" id="demoPG">
+        <h4>Interactive: policy-gradient direction (scalar toy)</h4>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-top:0">Toy: one action’s log-prob gradient is +1. Contribution to the update is proportional to <code>G × ∇log π</code> (ascent). Adjust return <code>G</code>.</p>
+        <label for="pgG">Monte Carlo return G</label>
+        <input type="range" id="pgG" min="-2" max="2" step="0.05" value="0.8" />
+        <canvas id="pgCanvas" width="560" height="180"></canvas>
+        <div class="out" id="pgOut"></div>
+      </div>
+    </section>
+
+    <section id="s06" class="section fade-in">
+      <div class="section-num">Section 06</div>
+      <h2>Variance reduction: causality, baselines, advantages</h2>
+      <p><strong>Reward-to-go / causality</strong>: past rewards do not depend on future actions. Replace full return with the sum of rewards from step <code>t</code> onward when weighting <code>∇ log π(a<sub>t</sub>|s<sub>t</sub>)</code>.</p>
+      <p><strong>Baseline</strong> <code>b(s<sub>t</sub>)</code>: subtracting a state-dependent baseline does not introduce bias in the policy gradient expectation but can greatly reduce variance. A common choice is the <strong>value function</strong> <code>V<sup>π</sup>(s)</code>—expected return from <code>s</code> following <code>π</code>.</p>
+      <p><strong>Q</strong> and <strong>advantage</strong>:</p>
+      <div class="math">Q<sup>π</sup>(s, a) = E[ return after taking a in s ]<br>A<sup>π</sup>(s, a) = Q<sup>π</sup>(s, a) − V<sup>π</sup>(s)</div>
+      <p>Positive advantage means the action was better than the policy’s average from that state; negative means worse. The usable gradient estimate uses <code>A<sub>t</sub></code> instead of total return.</p>
+      <p>In practice <code>V</code> is another head on the policy network (shared trunk, separate linear layer). It is trained to predict returns along sampled trajectories.</p>
+
+      <h3>Variance intuition: estimating the mean age of a country</h3>
+      <p>Suppose the true average age of the U.S. population is about <strong>40–45</strong> years. Census-perfect evaluation requires everyone (~330 million)—impossible. Instead you sample.</p>
+      <ul>
+        <li>Interview <strong>one</strong> random person who happens to be six → estimate 6—wildly wrong.</li>
+        <li>Interview a handful from a retirement home → estimate ~80—also wrong.</li>
+        <li>Interview <strong>1,000</strong> diverse people → much likelier to land near the true mean.</li>
+      </ul>
+      <p>The <strong>central limit theorem</strong> explains why larger samples stabilize the mean. Policy-gradient Monte Carlo is analogous: the sampled-trajectory gradient is unbiased but noisy; without enough data or variance reduction, updates point erratically. Increasing roll-outs is costly for LMs, so we reduce variance <em>algorithmically</em>.</p>
+
+      <h3>Reward-to-go (causality)</h3>
+      <p>Past rewards do not depend on future actions. When you weight <code>∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>)</code>, only returns from time <code>t</code> onward should appear—the <strong>reward-to-go</strong> from <code>t</code> to horizon <code>T</code>. Dropping irrelevant past terms removes noise that would otherwise push gradients off the true expectation’s direction.</p>
+
+      <h3>Baselines stay unbiased but cut variance</h3>
+      <p>Subtract a baseline <code>b(s<sub>t</sub>)</code> (often the state-value <code>V(s<sub>t</sub>)</code>). Under standard conditions the expected policy gradient is unchanged, yet the estimator’s variance can shrink dramatically—same spirit as the age example: less luck-driven swing.</p>
+
+      <h3>Value examples in language modeling</h3>
+      <p>After “Where is Shanghai?” if the prefix already reads “Shanghai is”, the next token is likely “in” then “China”—high expected return under a good reward model. If the model veered to “chocolate muffins”, future tokens probably drift away from a correct geographic answer: <strong>low</strong> expected return. Values summarize that forward-looking quality.</p>
+
+      <h3>Shared trunk, two heads</h3>
+      <p>Typical design: one transformer body, one linear head to vocabulary (policy / actor) and <strong>another</strong> single-output head predicting <code>V(s)</code> at each position. Gradients flow through shared layers while each head specializes.</p>
+
+      <div class="comparison">
+        <div class="card"><h3>Q<sup>π</sup>(s, a)</h3><p>Expected return if you take action <code>a</code> in state <code>s</code> now, then follow <code>π</code>. “How good is this specific move?”</p></div>
+        <div class="card"><h3>V<sup>π</sup>(s)</h3><p>Expected return if you start from <code>s</code> and always follow <code>π</code> for actions. “How good is this board / prefix on average under the current policy?”</p></div>
+      </div>
+
+      <p><strong>Advantage as relative quality.</strong> On a grid cell where moving down approaches the meat, <code>A(s, down)</code> is larger than <code>A(s, left)</code> if down is better than the average action from that cell. For “Where is Shanghai?”, choosing <code>Shanghai</code> as the first token should carry higher advantage than <code>chocolate</code> because it leads to completions the reward model prefers.</p>
+      <p>The policy update then <strong>increases</strong> log-probabilities of above-average actions and <strong>decreases</strong> those of below-average actions—always scaled by the advantage estimate.</p>
+    </section>
+
+    <section id="s07" class="section fade-in">
+      <div class="section-num">Section 07</div>
+      <h2>Advantage estimation &amp; GAE</h2>
+      <p>One-step TD residual:</p>
+      <div class="math">δ<sub>t</sub> = r<sub>t</sub> + γ V(s<sub>t+1</sub>) − V(s<sub>t</sub>)</div>
+      <p><strong>Generalized advantage estimation (GAE)</strong> blends bias and variance with parameter <code>λ ∈ [0,1]</code>:</p>
+      <div class="math">A<sub>t</sub> = Σ<sub>l=0</sub><sup>∞</sup> (γλ)<sup>l</sup> δ<sub>t+l</sub></div>
+      <p>Implemented backward along a trajectory: <code>A<sub>t</sub> = δ<sub>t</sub> + γλ A<sub>t+1</sub></code>. Larger <code>λ</code> uses more of the actual rewards (lower bias, higher variance); smaller <code>λ</code> leans on the value estimator.</p>
+
+      <h3>Bias–variance trade-off inside advantage estimation</h3>
+      <p>Approximate <code>Q</code> by truncating the reward chain after a few real rewards and replacing the tail with <code>V</code>. Stop after <em>too few</em> true rewards → <strong>high bias</strong> (the critic dominates and can be wrong). Use <em>many</em> raw rewards with little bootstrapping → <strong>high variance</strong>. <strong>GAE</strong> averages multiple such k-step shapes with weights that decay by powers of <code>λ</code>, interpolating between TD(0)-like and Monte-Carlo-like extremes.</p>
+
+      <h3>Backward pass on a toy trajectory</h3>
+      <p>Label states/actions <code>(s₀,a₀), (s₁,a₁), …</code> with rewards <code>r₀, r₁, …</code>. At the <strong>last</strong> useful index (say <code>t = 3</code>), there is no <code>A₄</code>; the recursion starts from a one-step TD residual involving the terminal value. Then</p>
+      <div class="formula">A₂ = δ₂ + (γλ) A₃, with δ₂ = r₂ + γ V(s₃) − V(s₂)</div>
+      <p>and similarly for earlier <code>t</code>. Code implementations often loop <strong>from last token to first</strong>, then reverse the advantage tensor so it aligns with time-forward indexing.</p>
+
+      <div class="demo" id="demoGAE">
+        <h4>Interactive: TD error and one-step advantage</h4>
+        <div class="row">
+          <div><label>r<sub>t</sub></label><input type="number" id="gaeR" value="0.2" step="0.1" /></div>
+          <div><label>V(s<sub>t</sub>)</label><input type="number" id="gaeV" value="1" step="0.1" /></div>
+          <div><label>V(s<sub>t+1</sub>)</label><input type="number" id="gaeVn" value="1.1" step="0.1" /></div>
+          <div><label>γ</label><input type="number" id="gaeGamma" value="0.99" step="0.01" min="0" max="1" /></div>
+        </div>
+        <div class="out" id="gaeOut"></div>
+      </div>
+    </section>
+
+    <section id="s08" class="section fade-in">
+      <div class="section-num">Section 08</div>
+      <h2>Importance sampling &amp; “old” vs “new” policy</h2>
+      <p>Fresh trajectory collection every gradient step is expensive for LMs. <strong>Importance sampling</strong> reweights data drawn from one distribution to estimate expectations under another. Multiply and divide by the proposal density <code>q</code> inside the integral, then regroup:</p>
+      <div class="formula">E<sub>x∼p</sub>[f(x)] = ∫ p(x) f(x) dx = ∫ q(x) · (p(x)/q(x)) f(x) dx = E<sub>x∼q</sub>[ (p(x)/q(x)) f(x) ]</div>
+      <p>In policy gradients, trajectories are often collected with policy <code>π<sub>θ<sub>old</sub></sub></code> (or the parameters frozen at rollout time). Updates use ratios <code>π<sub>θ</sub>(a|s) / π<sub>θ<sub>old</sub></sub>(a|s)</code> so multiple epochs of optimization can run on the same batch—<strong>off-policy</strong> correction—until the policies drift too far.</p>
+
+      <h3>Why this matters for LMs</h3>
+      <p>If every optimizer step required brand-new roll-outs, each tiny move <code>θ ← θ + α g</code> would trigger full generations, reward-model scoring, advantage computation, and log-prob traces—far too slow. <strong>Importance sampling</strong> lets you sample trajectories once, store them, and take <em>several</em> gradient steps using importance ratios before refreshing data.</p>
+
+      <h3>Offline / “behavior” vs online / “learning” policy</h3>
+      <p>Name the snapshot that generated data <code>π<sub>θ<sub>old</sub></sub></code> (offline / behavior). While optimizing, treat the current trainable weights as <code>π<sub>θ</sub></code> (online). They are the <em>same</em> network at different moments: freeze a copy for denominators, update the active weights for numerators, periodically sync.</p>
+      <div class="callout">Pseudocode shape: sample trajectories with the current policy into a replay buffer → for multiple mini-batches, recompute log-probs under the updated weights, form ratios and policy losses, call <code>backward</code> → after enough inner steps, regenerate trajectories. KL penalties and PPO clipping keep the mismatch between old and new from exploding.</div>
+
+      <div class="demo" id="demoIS">
+        <h4>Interactive: probability ratio</h4>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-top:0"><code>r = exp(log π<sub>new</sub> − log π<sub>old</sub>)</code></p>
+        <div class="row">
+          <div><label>log π<sub>new</sub></label><input type="number" id="logNew" value="-1.2" step="0.1" /></div>
+          <div><label>log π<sub>old</sub></label><input type="number" id="logOld" value="-1.5" step="0.1" /></div>
+        </div>
+        <div class="out" id="isOut"></div>
+      </div>
+    </section>
+
+    <section id="s09" class="section fade-in">
+      <div class="section-num">Section 09</div>
+      <h2>PPO: clipped surrogate objective</h2>
+      <p>Proximal Policy Optimization limits how much the policy can move in one update. Let <code>r<sub>t</sub>(θ) = π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) / π<sub>θ<sub>old</sub></sub>(a<sub>t</sub>|s<sub>t</sub>)</code>. The <strong>clipped</strong> objective (scalarized over tokens/batches) is:</p>
+      <div class="formula">L<sup>CLIP</sup>(θ) = E<sub>t</sub>[ min( r<sub>t</sub>(θ) Â<sub>t</sub>, clip(r<sub>t</sub>(θ), 1−ε, 1+ε) Â<sub>t</sub> ) ]</div>
+      <p>Taking the minimum is a pessimistic bound: large increases in probability ratio when <code>Â &gt; 0</code> (or large decreases when <code>Â &lt; 0</code>) are capped. That stabilizes training compared to unconstrained policy gradients.</p>
+      <p><strong>Reading the ratio.</strong> If the optimized policy assigns <em>much</em> higher probability than the snapshot policy to a token that already had positive advantage, <code>r<sub>t</sub></code> grows. Clipping at <code>1+ε</code> prevents an overly greedy jump. Symmetrically, when reducing an action’s probability (<code>Â &lt; 0</code>), clipping near <code>1−ε</code> stops the policy from crushing that action in one shot. The <code>min</code> chooses the more conservative (pessimistic) of the clipped and unclipped surrogate—so updates stay incremental even when raw ratios would suggest aggressive steps.</p>
+      <p>Full PPO-style loss in implementations often adds:</p>
+      <ul>
+        <li><strong>Value loss</strong>: regression of <code>V<sub>θ</sub></code> toward empirical returns (or TD(λ) targets).</li>
+        <li><strong>Entropy bonus</strong>: encourage exploration so the policy does not collapse prematurely.</li>
+      </ul>
+      <p><strong>Value head target from samples.</strong> Along a realized trajectory you can form targets for the critic by combining advantages and values: <code>Q̂<sub>t</sub> = Â<sub>t</sub> + V<sub>θ</sub>(s<sub>t</sub>)</code> (a Monte Carlo–style return proxy). The value loss pushes predictions toward those targets.</p>
+      <p><strong>Entropy motivation.</strong> Without entropy regularization, the policy might always replay the single token that once yielded high advantage—e.g., always emit “Shanghai” after a geography prompt. That is brittle. Keeping entropy high preserves probability mass on alternatives such as “it” leading to “It is in China…”, enabling continued exploration.</p>
+      <div class="callout warn">PyTorch optimizers default to <strong>minimization</strong>. Implementations therefore minimize <code>−L<sup>CLIP</sup></code> (plus value loss, minus entropy coefficient times entropy) so the effect matches maximizing the surrogate.</div>
+      <div class="comparison">
+        <div class="card"><h3>Unclipped term <code>r Â</code></h3><p>Can explode if the new policy deviates far from the data-collection policy—large policy updates destabilize training.</p></div>
+        <div class="card"><h3>Clipped term <code>clip(r) Â</code></h3><p>Flattens the objective beyond <code>[1−ε, 1+ε]</code>, yielding a trust-region-like effect without explicit quadratic penalty solves.</p></div>
+      </div>
+      <p>Optimization frameworks typically <em>minimize</em> negative surrogate plus value loss minus entropy scale.</p>
+
+      <div class="demo" id="demoPPO">
+        <h4>Interactive: PPO clip effect on objective term</h4>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-top:0">Compare <code>r · A</code> vs <code>clip(r, 1−ε, 1+ε) · A</code> (PPO takes the pessimistic branch via <code>min</code> when maximizing).</p>
+        <div class="row">
+          <div><label>Ratio r</label><input type="range" id="ppoR" min="0.5" max="1.5" step="0.01" value="1.2" /></div>
+          <div><label>Advantage Â</label><input type="range" id="ppoA" min="-2" max="2" step="0.05" value="1" /></div>
+          <div><label>ε</label><input type="range" id="ppoEps" min="0.05" max="0.3" step="0.01" value="0.2" /></div>
+        </div>
+        <canvas id="ppoCanvas" width="560" height="200"></canvas>
+        <div class="out" id="ppoOut"></div>
+      </div>
+    </section>
+
+    <section id="s10" class="section fade-in">
+      <div class="section-num">Section 10</div>
+      <h2>KL penalty &amp; reference model</h2>
+      <p>Reward models can be exploited: the policy might find high-scoring but incoherent patterns (“reward hacking”). A common fix is a <strong>reference policy</strong> <code>π<sub>ref</sub></code> (often the SFT model, frozen). Per-token penalties proportional to something like <code>KL( π<sub>θ</sub> ‖ π<sub>ref</sub> )</code> are subtracted from rewards or added to the loss so updates stay in-distribution.</p>
+      <p>In practice KL is approximated from log-prob differences along the sampled sequence. The effective per-step reward becomes “task reward” plus (negative) KL cost, shaping the advantage signal.</p>
+      <div class="formula">r̃<sub>t</sub> ≈ r<sub>RM</sub>(t) − β · KL<sub>t</sub>(π<sub>θ</sub> ‖ π<sub>ref</sub>)</div>
+      <p>Concrete failure mode from polite-only rewards: the model may loop “thank you” forever—maximally polite, nonsense to humans, yet high scalar reward. KL to a frozen <strong>unaligned</strong> reference penalizes drifting into such hacks by charging large divergence when logits move away from the pretrained/SFT behavior.</p>
+      <p>Implementation-wise, duplicate the policy weights, freeze them, and compare log-probabilities tokenwise between trainable and frozen forward passes—the KL penalty is often assembled from those differences (plus coefficients), while a classifier-style reward may attach only to the <strong>final</strong> token of the response.</p>
+
+      <div class="demo" id="demoKL">
+        <h4>Interactive: shaped reward with KL cost</h4>
+        <div class="row">
+          <div><label>Raw reward (RM)</label><input type="number" id="klRm" value="1.5" step="0.1" /></div>
+          <div><label>KL estimate</label><input type="number" id="klVal" value="0.15" step="0.01" min="0" /></div>
+          <div><label>β (penalty weight)</label><input type="number" id="klBeta" value="0.2" step="0.05" min="0" /></div>
+        </div>
+        <div class="out" id="klOut"></div>
+      </div>
+    </section>
+
+    <section id="s11" class="section fade-in">
+      <div class="section-num">Section 11</div>
+      <h2>Full RLHF pipeline</h2>
+      <div class="card pipeline">
+        <span>1. Pretrain LM (optional starting point).</span>
+        <span>2. Supervised fine-tuning (SFT) on demonstration data (optional but typical).</span>
+        <span>3. Collect preference data; train reward model <code>r<sub>φ</sub></code> with pairwise loss.</span>
+        <span>4. RL phase: sample completions from current policy; score with <code>r<sub>φ</sub></code>; add KL vs <code>π<sub>ref</sub></code>.</span>
+        <span>5. Compute logprobs, values, advantages (e.g., GAE); optimize PPO objective for several mini-batch epochs.</span>
+        <span>6. Periodically refresh rollouts with updated weights; repeat.</span>
+      </div>
+      <p>The loop couples three models: <strong>policy</strong> (trainable), <strong>reference</strong> (frozen, for KL), <strong>reward</strong> (frozen during RL, trained earlier). Value head rides on the policy trunk.</p>
+
+      <h3>Reference tutorial setup: sentiment as a proxy reward</h3>
+      <p>A pedagogical recipe (mirroring public TRL demos) swaps human preference batches for an <strong>IMDb sentiment classifier</strong>: positive movie reviews get high score, negative ones low score. Take a GPT-2–class model already familiar with review text, attach a <strong>frozen copy</strong> for KL, and optimize with PPO so generations become more positive while staying near the reference distribution.</p>
+      <p><strong>Prompt construction.</strong> Sample a review from IMDb, truncate a random prefix to use as the prompt, and let the policy continue the review up to a sampled max length—those continuations are trajectories. Score each continuation with the positive-class logit from the sentiment pipeline; that scalar is the “reward model” output. IMDb is a cheap stand-in for human preferences: labels exist at scale, the reward is fast to compute, and the lesson transfers once you swap in a pairwise-trained <code>r<sub>φ</sub></code>.</p>
+    </section>
+
+    <section id="s12" class="section fade-in">
+      <div class="section-num">Section 12</div>
+      <h2>Implementation notes: Hugging Face TRL</h2>
+      <p>The <code>trl</code> library exposes trainers such as <code>PPOTrainer</code> and <code>RewardTrainer</code>. A typical flow (conceptually):</p>
+      <ul>
+        <li><strong>Rollout</strong>: batched generation from the policy for prompts (queries).</li>
+        <li><strong>Forward pass</strong> on concatenated query+response: logits → <code>log_softmax</code> → gather chosen-token logprobs for response positions only (mask).</li>
+        <li><strong>Reference logprobs</strong>: same pass through frozen reference for KL.</li>
+        <li><strong>Rewards</strong>: e.g., classifier score on full response assigned to last token; KL penalty spread per token; then backward GAE for advantages.</li>
+        <li><strong>PPO update</strong>: recompute logprobs with current weights; form ratio <code>exp(log_new − log_old)</code>; clipped surrogate + value loss (+ optional entropy); Adam step.</li>
+      </ul>
+      <pre><code># Illustrative-only: TRL wires these pieces for you
+from trl import PPOConfig, PPOTrainer, AutoModelForCausalLMWithValueHead
+# policy with value head, ref model, reward model / scoring fn, tokenizer …</code></pre>
+      <p>Study the library source to see exact tensor shapes, masking, and where the sentiment or RM score is injected—behavior matches the math above even when spread across helper functions.</p>
+
+      <h3>Inside <code>PPOTrainer.step</code> (conceptual ordering)</h3>
+      <ol>
+        <li><strong>Validate tensors</strong> for dtypes/shapes; convert Python reward lists to tensors.</li>
+        <li><strong>Batched forward on the policy</strong> that produced the roll-outs: concatenate query+response, compute logits, apply <code>log_softmax</code>, <code>gather</code> the log-prob of the token that actually occurred at each response position. Mask so only generated tokens contribute (not prompt positions).</li>
+        <li><strong>Reference forward pass</strong> with identical masking to obtain frozen-policy log-probs for KL.</li>
+        <li><strong>Per-token “rewards”</strong>: typically negative KL penalty everywhere the response is active, plus the scalar classifier score placed on the <strong>last</strong> response token only (earlier positions may see only KL shaping). Backward GAE then propagates credit across time steps.</li>
+        <li><strong>Value predictions</strong> from the auxiliary head returned alongside logits during the forward pass.</li>
+        <li><strong>Advantages</strong>: compute <code>δ<sub>t</sub> = r<sub>t</sub> + γ V<sub>t+1</sub> − V<sub>t</sub></code> with appropriate masking for terminals; recurse <code>A<sub>t</sub> = δ<sub>t</sub> + γλ A<sub>t+1</sub></code> from the end of the sequence backward, then reverse to time order.</li>
+        <li><strong>Q-style returns for the critic</strong>: <code>Q̂<sub>t</sub> = Â<sub>t</sub> + V<sub>t</sub></code> supplies regression targets for the value loss (libraries may add clipping between old/new value predictions for stability).</li>
+        <li><strong>Mini-batch PPO phase</strong>: re-run forward passes on sharded data, form <code>r<sub>t</sub>(θ) = exp(log π<sub>θ</sub> − log π<sub>old</sub>)</code>, build clipped surrogate + value term + entropy (often via a numerically stable <code>logsumexp</code> formulation related to softmax entropy).</li>
+        <li><strong>Minimize</strong> the negated objectives with Adam-style optimizers; repeat inner epochs before sampling fresh trajectories.</li>
+      </ol>
+      <div class="callout">Libraries hide log-prob bookkeeping on purpose: users supply queries, responses, and rewards—TRL computes masks, KL penalties, advantages, and PPO losses internally.</div>
+      <p><strong>Entropy in code.</strong> Production trainers may compute entropy through stable reductions over logits (equivalent to treating Shannon entropy as a conjugate of the log-sum-exp potential—see standard softmax entropy derivations) rather than the textbook sum <code>−∑ p log p</code> in naive form.</p>
+
+      <h3>Terminology and synonyms</h3>
+      <ul>
+        <li><strong>Policy / actor</strong> — the trainable LM producing <code>π<sub>θ</sub>(a|s)</code>.</li>
+        <li><strong>Behavior / offline policy</strong> — snapshot used to generate stored trajectories (<code>π<sub>old</sub></code>).</li>
+        <li><strong>Online policy</strong> — weights being updated during inner PPO loops.</li>
+        <li><strong>Reward model (RM)</strong> — scalar scorer from preferences (or a surrogate such as sentiment).</li>
+        <li><strong>Reference model</strong> — frozen copy for KL trust-region.</li>
+        <li><strong>SFT</strong> — supervised fine-tuning before preference data or RL.</li>
+        <li><strong>GAE</strong> — generalized advantage estimation; blends TD residuals with <code>λ</code>.</li>
+        <li><strong>Reward hacking</strong> — optimizing the proxy reward while breaking human-meaningful quality.</li>
+      </ul>
+    </section>
+
+    <section id="playground" class="section fade-in">
+      <div class="section-num">Playground</div>
+      <h2>Playground: discounted return along a toy trajectory</h2>
+      <p>Edit per-step rewards for a 5-step trajectory; see discounted return <code>Σ γ<sup>t</sup> r<sub>t</sub></code>. This mirrors how terminal success with many zero intermediate rewards is valued less when delayed (smaller effective weight).</p>
+      <div class="demo">
+        <div class="row">
+          <div><label>γ</label><input type="range" id="plGamma" min="0.8" max="1" step="0.01" value="0.95" /></div>
+        </div>
+        <div class="row" id="plRewards"></div>
+        <div class="out" id="plOut"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var navToggle = document.getElementById("navToggle");
+      var navLinks = document.getElementById("navLinks");
+      if (navToggle && navLinks) {
+        navToggle.addEventListener("click", function () {
+          var open = navLinks.classList.toggle("open");
+          navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+      }
+
+      var sections = document.querySelectorAll(".section.fade-in");
+      var obs = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) e.target.classList.add("visible");
+          });
+        },
+        { root: null, rootMargin: "0px 0px -8% 0px", threshold: 0.08 }
+      );
+      sections.forEach(function (s) { obs.observe(s); });
+
+      function sigmoid(x) {
+        return 1 / (1 + Math.exp(-x));
+      }
+
+      function rewardDemo() {
+        var rp = parseFloat(document.getElementById("rPlus").value, 10);
+        var rm = parseFloat(document.getElementById("rMinus").value, 10);
+        var diff = rp - rm;
+        var s = sigmoid(diff);
+        var loss = -Math.log(Math.max(1e-8, s));
+        document.getElementById("rewardOut").textContent =
+          "r⁺ − r⁻ = " + diff.toFixed(2) +
+          "  |  σ(diff) = " + s.toFixed(4) +
+          "  |  L = −log σ = " + loss.toFixed(4) +
+          (diff > 0 ? "  (small loss: model prefers chosen)" : "  (large loss: wrong ranking)");
+      }
+      ["rPlus", "rMinus"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener("input", rewardDemo);
+      });
+      rewardDemo();
+
+      function pgDemo() {
+        var G = parseFloat(document.getElementById("pgG").value, 10);
+        var c = document.getElementById("pgCanvas");
+        if (!c) return;
+        var ctx = c.getContext("2d");
+        var w = c.width;
+        var h = c.height;
+        ctx.fillStyle = "#0a0a0f";
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = "#2a2a38";
+        ctx.beginPath();
+        ctx.moveTo(40, h / 2);
+        ctx.lineTo(w - 20, h / 2);
+        ctx.stroke();
+        var scale = 40;
+        var len = G * scale;
+        ctx.strokeStyle = G >= 0 ? "#5ce1c5" : "#ff6b8a";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(w / 2, h / 2);
+        ctx.lineTo(w / 2 + len, h / 2);
+        ctx.stroke();
+        ctx.fillStyle = "#9898a8";
+        ctx.font = "12px IBM Plex Mono, monospace";
+        ctx.fillText("∇log π (unit)", w / 2 + 8, h / 2 - 10);
+        document.getElementById("pgOut").textContent =
+          "Update ∝ G × ∇log π  →  " + (G >= 0 ? "reinforce this action" : "suppress this action") +
+          "  (G = " + G.toFixed(2) + ")";
+      }
+      var pgG = document.getElementById("pgG");
+      if (pgG) pgG.addEventListener("input", pgDemo);
+      pgDemo();
+
+      function gaeDemo() {
+        var r = parseFloat(document.getElementById("gaeR").value, 10);
+        var v = parseFloat(document.getElementById("gaeV").value, 10);
+        var vn = parseFloat(document.getElementById("gaeVn").value, 10);
+        var g = parseFloat(document.getElementById("gaeGamma").value, 10);
+        var delta = r + g * vn - v;
+        document.getElementById("gaeOut").textContent =
+          "δₜ = rₜ + γV(sₜ₊₁) − V(sₜ) = " + r.toFixed(2) + " + " + g.toFixed(2) + "×" + vn.toFixed(2) + " − " + v.toFixed(2) + " = " + delta.toFixed(4) +
+          "  (one-step TD error; GAE accumulates these with γλ)";
+      }
+      ["gaeR", "gaeV", "gaeVn", "gaeGamma"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener("input", gaeDemo);
+      });
+      gaeDemo();
+
+      function isDemo() {
+        var ln = parseFloat(document.getElementById("logNew").value, 10);
+        var lo = parseFloat(document.getElementById("logOld").value, 10);
+        var ratio = Math.exp(ln - lo);
+        document.getElementById("isOut").textContent =
+          "r = exp(" + ln.toFixed(3) + " − " + lo.toFixed(3) + ") = " + ratio.toFixed(4);
+      }
+      ["logNew", "logOld"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener("input", isDemo);
+      });
+      isDemo();
+
+      function ppoDemo() {
+        var r = parseFloat(document.getElementById("ppoR").value, 10);
+        var A = parseFloat(document.getElementById("ppoA").value, 10);
+        var eps = parseFloat(document.getElementById("ppoEps").value, 10);
+        var lo = 1 - eps;
+        var hi = 1 + eps;
+        var rc = Math.max(lo, Math.min(hi, r));
+        var u = r * A;
+        var c = rc * A;
+        var minv = Math.min(u, c);
+        var cnv = document.getElementById("ppoCanvas");
+        var ctx = cnv.getContext("2d");
+        var w = cnv.width;
+        var h = cnv.height;
+        ctx.fillStyle = "#0a0a0f";
+        ctx.fillRect(0, 0, w, h);
+        var pad = 40;
+        var rw = w - 2 * pad;
+        var rh = h - 2 * pad;
+        ctx.strokeStyle = "#2a2a38";
+        ctx.strokeRect(pad, pad, rw, rh);
+        var rMin = 0.5;
+        var rMax = 1.5;
+        function xOf(rt) {
+          return pad + ((rt - rMin) / (rMax - rMin)) * rw;
+        }
+        ctx.strokeStyle = "#7c9cff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (var xi = 0; xi <= 100; xi++) {
+          var rt = rMin + (xi / 100) * (rMax - rMin);
+          var yv = pad + rh / 2 - (rt * A) * (rh / 2) / 2;
+          if (xi === 0) ctx.moveTo(xOf(rt), yv);
+          else ctx.lineTo(xOf(rt), yv);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = "#ffb86c";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        for (var xj = 0; xj <= 100; xj++) {
+          var rt2 = rMin + (xj / 100) * (rMax - rMin);
+          var rtc = Math.max(lo, Math.min(hi, rt2));
+          var y2 = pad + rh / 2 - (rtc * A) * (rh / 2) / 2;
+          if (xj === 0) ctx.moveTo(xOf(rt2), y2);
+          else ctx.lineTo(xOf(rt2), y2);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#5ce1c5";
+        ctx.beginPath();
+        ctx.arc(xOf(r), pad + rh / 2 - (Math.max(lo, Math.min(hi, r)) * A) * (rh / 2) / 2, 6, 0, Math.PI * 2);
+        ctx.fill();
+        document.getElementById("ppoOut").textContent =
+          "r·A = " + u.toFixed(4) + "  |  clip(r," + lo.toFixed(2) + "," + hi.toFixed(2) + ")·A = " + c.toFixed(4) +
+          "  |  min (for max objective) = " + minv.toFixed(4);
+      }
+      ["ppoR", "ppoA", "ppoEps"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener("input", ppoDemo);
+      });
+      ppoDemo();
+
+      function klDemo() {
+        var rm = parseFloat(document.getElementById("klRm").value, 10);
+        var kl = parseFloat(document.getElementById("klVal").value, 10);
+        var b = parseFloat(document.getElementById("klBeta").value, 10);
+        var shaped = rm - b * kl;
+        document.getElementById("klOut").textContent =
+          "Shaped reward ≈ r_RM − β·KL = " + rm.toFixed(3) + " − " + b.toFixed(3) + "×" + kl.toFixed(3) + " = " + shaped.toFixed(4);
+      }
+      ["klRm", "klVal", "klBeta"].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener("input", klDemo);
+      });
+      klDemo();
+
+      var plRewards = document.getElementById("plRewards");
+      var plInputs = [];
+      for (var i = 0; i < 5; i++) {
+        var wrap = document.createElement("div");
+        var lab = document.createElement("label");
+        lab.textContent = "r" + i;
+        var inp = document.createElement("input");
+        inp.type = "number";
+        inp.step = "0.5";
+        inp.value = i === 4 ? "10" : "0";
+        inp.className = "plR";
+        wrap.appendChild(lab);
+        wrap.appendChild(inp);
+        plRewards.appendChild(wrap);
+        plInputs.push(inp);
+        inp.addEventListener("input", plUpdate);
+      }
+      var plGamma = document.getElementById("plGamma");
+      if (plGamma) plGamma.addEventListener("input", plUpdate);
+      function plUpdate() {
+        var g = parseFloat(plGamma.value, 10);
+        var sum = 0;
+        plInputs.forEach(function (inp, t) {
+          sum += Math.pow(g, t) * parseFloat(inp.value, 10);
+        });
+        document.getElementById("plOut").textContent =
+          "Discounted return R = " + sum.toFixed(4) + "  (γ = " + g.toFixed(2) + ")";
+      }
+      plUpdate();
+    })();
+  </script>
+</body>
+</html>

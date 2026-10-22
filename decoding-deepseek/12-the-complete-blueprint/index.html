@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Complete Blueprint — DeepSeek's Architecture Assembled</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 680px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; }
+.interactive-panel h3, .interactive-panel h4 { margin-bottom: 16px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+canvas { border-radius: var(--radius); display: block; max-width: 100%; }
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); display: inline-block; margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { background: rgba(251,191,36,0.08); border-left-color: var(--accent5); }
+.callout.ok { background: rgba(52,211,153,0.08); border-left-color: var(--accent3); }
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin: 24px 0; }
+.qa-box .q { font-weight: 700; color: var(--accent); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 14px 24px; text-align: center; font-size: 0.9rem; width: 100%; max-width: 560px; transition: all 0.3s; }
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow { font-size: 1.2rem; color: var(--text-dim); padding: 4px 0; }
+.dim-table, .data-table, .cheat-table { border-collapse: collapse; font-family: var(--mono); font-size: 0.82rem; width: 100%; margin: 16px 0; }
+.dim-table th, .dim-table td, .data-table th, .data-table td, .cheat-table th, .cheat-table td { padding: 10px 12px; border: 1px solid var(--border); text-align: left; }
+.dim-table th, .data-table th, .cheat-table th { background: var(--bg-card-alt); color: var(--accent); }
+.dim-table td, .data-table td, .cheat-table td { background: var(--bg-card); color: var(--text-dim); }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+.output-readout { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 16px; font-family: var(--mono); font-size: 0.85rem; color: var(--text); }
+.phase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 24px 0; }
+.phase-card { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
+.phase-num { font-size: 2rem; font-weight: 800; color: var(--accent); font-family: var(--mono); }
+ul.content-list { color: var(--text-dim); margin: 0 0 1em 1.5em; }
+ul.content-list li { margin-bottom: 0.45em; }
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid #2a2a3a; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+.arch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+@media (max-width: 700px) { .arch-grid { grid-template-columns: 1fr 1fr; } }
+.arch-block { background: var(--bg-card-alt); border: 2px solid var(--border); border-radius: 10px; padding: 14px 10px; text-align: center; font-size: 0.78rem; cursor: pointer; transition: all 0.25s; min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.arch-block:hover, .arch-block.sel { border-color: var(--accent); background: rgba(108,140,255,0.12); transform: translateY(-2px); }
+.arch-block .ab-icon { font-size: 1.2rem; }
+.arch-detail { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-top: 12px; min-height: 120px; font-size: 0.9rem; }
+.timeline-wrap { position: relative; margin: 24px 0; padding-left: 28px; }
+.timeline-wrap::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+.tl-item { position: relative; margin-bottom: 20px; padding: 16px 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: all 0.3s; }
+.tl-item::before { content: ''; position: absolute; left: -24px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: var(--border); border: 2px solid var(--bg); transition: all 0.3s; }
+.tl-item.active { border-color: var(--accent); background: rgba(108,140,255,0.08); }
+.tl-item.active::before { background: var(--accent); box-shadow: 0 0 12px rgba(108,140,255,0.5); }
+.tl-year { font-family: var(--mono); font-size: 0.75rem; color: var(--accent5); margin-bottom: 4px; }
+.tl-title { font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.tl-desc { font-size: 0.85rem; color: var(--text-dim); margin: 0; }
+.chapter-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 16px 0; }
+.ch-map-cell { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 12px 8px; text-align: center; font-size: 0.72rem; transition: all 0.2s; }
+.ch-map-cell:hover { border-color: var(--accent); }
+.ch-map-cell span { display: block; font-family: var(--mono); color: var(--accent); font-size: 0.65rem; margin-bottom: 4px; }
+.quiz-opt { display: block; width: 100%; text-align: left; margin: 8px 0; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-alt); color: var(--text-dim); cursor: pointer; font-family: var(--sans); font-size: 0.9rem; transition: all 0.2s; }
+.quiz-opt:hover { border-color: var(--accent); }
+.quiz-opt.correct { border-color: var(--accent3); background: rgba(52,211,153,0.12); color: var(--text); }
+.quiz-opt.wrong { border-color: var(--danger); background: rgba(248,113,113,0.12); }
+.cheat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 20px 0; }
+.cheat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.cheat-card h4 { color: var(--accent2); font-size: 0.9rem; margin-bottom: 10px; }
+.cheat-card .formula { font-size: 0.78rem; text-align: left; padding: 10px 14px; margin: 8px 0 0; }
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token { display: inline-flex; padding: 6px 14px; border-radius: 8px; font-family: var(--mono); font-size: 0.85rem; font-weight: 600; }
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+
+/* ===== Chapter 12 extras ===== */
+.text-input, select.text-input { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--mono); font-size: 0.9rem; width: 100%; outline: none; }
+.text-input:focus, select.text-input:focus { border-color: var(--accent); }
+.highlight-row td { background: rgba(108,140,255,0.08) !important; color: var(--text) !important; }
+.section-divider { height: 1px; background: var(--border); margin: 40px 0; }
+.mono-block { font-family: var(--mono); font-size: 0.85rem; color: var(--text); background: var(--bg-card-alt); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); margin: 12px 0; }
+.blueprint-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; background: rgba(108,140,255,0.15); color: var(--accent); font-family: var(--mono); font-size: 0.75rem; letter-spacing: 1px; margin-bottom: 16px; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<nav class="breadcrumb-nav">
+  <a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span>
+  <a href="../../">Learning Blogs</a><span class="bc-sep">›</span>
+  <a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span>
+  <span class="bc-current">The Complete Blueprint</span>
+</nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">The Complete Blueprint</a>
+  <div class="nav-links">
+    <a href="#s0">Capstone</a>
+    <a href="#s1">Five Pillars</a>
+    <a href="#s2">Attention Arc</a>
+    <a href="#s3">MoE Arc</a>
+    <a href="#s4">MTP &amp; FP8</a>
+    <a href="#s5">Architecture</a>
+    <a href="#s6">V3 Specs</a>
+    <a href="#s7">Cheat Sheet</a>
+    <a href="#s8">Timeline</a>
+    <a href="#s9">Forward</a>
+    <a href="#s10">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <p style="font-family:var(--mono); color:var(--accent); letter-spacing:3px; font-size:0.85rem; margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 12 · FINAL</p>
+    <h1>The Complete Blueprint</h1>
+    <p class="subtitle">DeepSeek's Architecture Assembled — a capstone that unifies every innovation from Multi-Head Latent Attention to Mixture of Experts, Multi-Token Prediction, and FP8 quantization into one coherent system mapped to the DeepSeek-V3 technical report.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">5</span><span class="stat-label">Core Innovations</span></div>
+      <div class="stat"><span class="stat-val">671B</span><span class="stat-label">Total Parameters</span></div>
+      <div class="stat"><span class="stat-val">37B</span><span class="stat-label">Active Per Token</span></div>
+      <div class="stat"><span class="stat-val">7</span><span class="stat-label">Interactive Demos</span></div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      This capstone assembles every building block, paper section, and formula into one reference blueprint — the unified map for reading DeepSeek-V3 §2 and implementing its components.
+    </p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>The Capstone: Twelve Chapters to One Architecture</h2>
+
+    <p>
+      DeepSeek's technical report is dense: the architecture section alone — MLA, MoE, and MTP — spans roughly <strong>sixteen pages</strong>, each encoding months of research. <em>Decoding DeepSeek</em> maps every concept to its location in the 53-page DeepSeek-V3 PDF at implementation depth.
+    </p>
+
+    <h3 style="margin-top:28px;">The North Star Document</h3>
+    <p>
+      Everything maps to the <strong>DeepSeek-V3 technical report</strong> (with DeepSeek-V2 for MLA history). The paper is the authoritative source; this chapter is the assembly manual. Ten lines on multi-head latent attention encode KV cache motivation, MQA/GQA trade-offs, latent compression, the absorption trick, query down-projection, decoupled RoPE, and production-scale memory formulas.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Chapter-to-Paper Map</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:16px;">Click a chapter to see which DeepSeek-V3 paper section it covers.</p>
+      <div class="chapter-map" id="chapterMap">
+        <div class="ch-map-cell" data-paper="§1 Intro, scaling context"><span>Ch 01</span>The Landscape</div>
+        <div class="ch-map-cell" data-paper="§2.1 Attention prerequisites"><span>Ch 02</span>Attention Mechanism</div>
+        <div class="ch-map-cell" data-paper="§2.1 Multi-head attention baseline"><span>Ch 03</span>Multi-Headed Hydra</div>
+        <div class="ch-map-cell" data-paper="§2.1.2 KV cache → MLA motivation"><span>Ch 04</span>Cache Chronicles</div>
+        <div class="ch-map-cell" data-paper="§2.1.2 Low-rank KV compression"><span>Ch 05</span>Latent Attention</div>
+        <div class="ch-map-cell" data-paper="§2.1.3 RoPE foundations"><span>Ch 06</span>Encoding Position</div>
+        <div class="ch-map-cell" data-paper="§2.1.3 Decoupled RoPE + MLA"><span>Ch 07</span>MLA Meets RoPE</div>
+        <div class="ch-map-cell" data-paper="§2.1.2 MoE foundations"><span>Ch 08</span>Expert Council</div>
+        <div class="ch-map-cell" data-paper="§2.1.2 Aux-loss-free, shared experts"><span>Ch 09</span>DeepSeek MoE</div>
+        <div class="ch-map-cell" data-paper="§2.2 Multi-token prediction"><span>Ch 10</span>MTP</div>
+        <div class="ch-map-cell" data-paper="§3.3 FP8 training"><span>Ch 11</span>FP8 Quantization</div>
+        <div class="ch-map-cell" data-paper="§2 Full architecture (this chapter)"><span>Ch 12</span>Complete Blueprint</div>
+      </div>
+      <div class="output-readout" id="paperMapReadout">Select a chapter above to see its paper mapping.</div>
+    </div>
+
+    <h3 style="margin-top:28px;">Scope: What This Book Covers — and What It Deliberately Omits</h3>
+    <p>
+      This chapter focuses on <strong>Section 2</strong> of the DeepSeek-V3 paper (architecture) and <strong>Section 3.3</strong> (FP8 training). Hardware kernels, cluster topology, full pre-training pipelines, and post-training (GRPO, distillation) are out of scope — DeepSeek-R1 builds on V3 via a separate post-training stack.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>Covered in This Book</h3>
+        <ul class="content-list">
+          <li>Multi-Head Latent Attention + RoPE</li>
+          <li>DeepSeek Mixture of Experts</li>
+          <li>Multi-Token Prediction (training)</li>
+          <li>FP8 / mixed-precision quantization</li>
+          <li>Rotary positional encodings</li>
+        </ul>
+      </div>
+      <div class="card card-alt">
+        <h3>Future Chapters</h3>
+        <ul class="content-list">
+          <li>Large-scale pre-training pipelines</li>
+          <li>Reinforcement learning post-training</li>
+          <li>GRPO and rule-based rewards</li>
+          <li>Knowledge distillation (671B → 1.5B)</li>
+          <li>Dual pipeline training orchestration</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: why devote twelve chapters to architecture when the paper is only 53 pages?</div>
+      <p>Because density is not brevity. A single MLA page encodes months of research. Figure 3 (MTP) assumes prior Meta 2024 work; Figures 6–7 (quantization) use dense block diagrams. Without the prerequisite derivations in Chapters 01–11, the paper alone leaves most of §2 opaque.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Five Architectural Pillars — The DeepSeek Innovation Stack</h2>
+
+    <p>
+      DeepSeek narrowed architectural innovation to five aspects — each solving a distinct bottleneck in pre-training or inference:
+    </p>
+
+    <div class="phase-grid">
+      <div class="phase-card"><div class="phase-num">①</div><h3 style="margin-top:8px;">Multi-Head Latent Attention</h3><p style="font-size:0.85rem;margin:0;">KV cache compression without MQA/GQA quality loss</p></div>
+      <div class="phase-card"><div class="phase-num">②</div><h3 style="margin-top:8px;">Mixture of Experts</h3><p style="font-size:0.85rem;margin:0;">671B capacity, ~37B active compute per token</p></div>
+      <div class="phase-card"><div class="phase-num">③</div><h3 style="margin-top:8px;">Multi-Token Prediction</h3><p style="font-size:0.85rem;margin:0;">Pre-training signal density (not used at inference)</p></div>
+      <div class="phase-card"><div class="phase-num">④</div><h3 style="margin-top:8px;">FP8 Quantization</h3><p style="font-size:0.85rem;margin:0;">Mixed-precision training at scale</p></div>
+      <div class="phase-card"><div class="phase-num">⑤</div><h3 style="margin-top:8px;">Rotary Positional Encodings</h3><p style="font-size:0.85rem;margin:0;">Integrated via decoupled RoPE in MLA</p></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Component Comparison</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);">Compare standard transformer components vs DeepSeek's replacements.</p>
+      <div class="btn-group" id="compBtns">
+        <button class="btn active" data-comp="attn">Attention</button>
+        <button class="btn" data-comp="ffn">Feed-Forward</button>
+        <button class="btn" data-comp="train">Training</button>
+        <button class="btn" data-comp="pos">Position</button>
+        <button class="btn" data-comp="mem">Memory</button>
+      </div>
+      <div class="comparison" id="compPanel">
+        <div class="card"><h3>Standard (GPT/Llama)</h3><p id="compStd">Multi-Head Attention (MHA): full K/V cached per head. Memory scales as 2 × L × B × S × N × D<sub>H</sub>.</p></div>
+        <div class="card card-alt"><h3>DeepSeek-V3</h3><p id="compDS">Multi-Head Latent Attention + decoupled RoPE: joint latent cache C<sub>KV</sub> plus small RoPE key K<sub>R</sub>. ~57× less KV memory vs MHA at N=128.</p></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Three Master Building Blocks</h3>
+    <p>
+      At the highest level, three innovations define DeepSeek's transformer block design:
+    </p>
+    <ol class="content-list" style="margin-left:1.5em;">
+      <li><strong>Multi-Head Latent Attention with RoPE</strong> — attention that compresses the KV cache into a low-rank latent space while preserving multi-head quality through the absorption trick and decoupled positional encoding.</li>
+      <li><strong>DeepSeek Mixture of Experts</strong> — sparse FFN layers with fine-grained expert segmentation, shared expert isolation, and auxiliary-loss-free load balancing.</li>
+      <li><strong>Multi-Token Prediction</strong> — predicting multiple future tokens during pre-training to densify the learning signal (DeepSeek does not use MTP during inference).</li>
+    </ol>
+    <p>
+      Quantization and RoPE are supporting pillars — essential for production training and for making MLA work at scale — but the three blocks above are what define DeepSeek's transformer block design.
+    </p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Phase 1: The Attention Arc — From Self-Attention to MLA + RoPE</h2>
+
+    <p>
+      Chapters 01–07 trace one arc: standard attention → KV cache pressure → MQA/GQA compromises → MLA latent compression → RoPE → decoupled integration. The unified insight: content representation (latent cache + absorption) and position encoding (RoPE on a small subspace) must stay separable for compression to survive at scale. Full derivations live in <a href="../02-the-attention-mechanism/">Ch 02</a>–<a href="../07-mla-meets-rope/">Ch 07</a>.
+    </p>
+    <div class="flow">
+      <div class="flow-step">Key-Value Cache — repeated K/V computation during inference; cache saves compute but costs memory</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Multi-Query Attention (MQA) — share K/V across all heads; low memory, degraded quality</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Grouped-Query Attention (GQA) — share K/V across groups of heads; partial fix</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Multi-Head Latent Attention (MLA) — compress into latent matrix; best of both worlds</div>
+    </div>
+    <p>
+      MLA (<a href="../05-latent-attention-unlocked/">Ch 05</a>) caches a low-rank latent C<sub>KV</sub> and recovers keys via the absorption trick. RoPE (<a href="../06-encoding-position/">Ch 06</a>) breaks naive MLA integration — rotating full keys destroys position-independent caching. <strong>Decoupled RoPE</strong> (<a href="../07-mla-meets-rope/">Ch 07</a>) splits content (Q<sub>C</sub>, K<sub>C</sub>) from position (Q<sub>R</sub>, K<sub>R</sub>) subspaces; V3 §2.1.3 documents this in eleven equations mapping directly to those two paths.
+    </p>
+
+    <div class="formula">Attention(Q,K,V) = softmax(QK<sup>T</sup> / √d + mask) · V</div>
+    <div class="formula">MLA + RoPE: scores = Q<sub>C</sub>K<sub>C</sub><sup>T</sup> + Q<sub>R</sub>K<sub>R</sub><sup>T</sup> &nbsp; (content path + position path)</div>
+    <div class="formula">KV cache (MLA+RoPE): 2 × L × B × S × (D<sub>L</sub> + D<sub>HR</sub>) vs MHA: 2 × L × B × S × N × D<sub>H</sub></div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Attention Evolution Timeline</h4>
+      <canvas id="attnEvolutionCanvas" width="560" height="220"></canvas>
+      <div class="btn-group">
+        <button class="btn" id="attnPrev">← Previous</button>
+        <button class="btn" id="attnNext">Next →</button>
+      </div>
+      <div class="output-readout" id="attnEvolutionReadout"></div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Paper mapping:</strong> DeepSeek-V3 §2.1.2 (low-rank KV compression) and §2.1.3 (decoupled RoPE). DeepSeek-V2 explains basic MLA first, then adds RoPE — easier to follow historically. V3 presents the combined form directly.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Phase 2: Mixture of Experts — DeepSeek's Expert Council</h2>
+
+    <p>
+      Chapters 08–09 cover MoE from vanilla routing through DeepSeek's three modifications. The V3 paper compresses routing math, load balancing, and architectural changes into roughly one page — see <a href="../08-the-expert-council/">Ch 08</a> for foundations and <a href="../09-deepseeks-expert-revolution/">Ch 09</a> for production DeepSeek-MoE.
+    </p>
+
+    <p>
+      Vanilla MoE replaces dense FFNs with routed expert FFNs plus a gating network; only top-k experts activate per token. Traditional load balancing adds auxiliary loss to the training objective, which can degrade next-token quality when balancing spikes. DeepSeek-V3 removes L_aux entirely.
+    </p>
+    <div class="comparison">
+      <div class="card">
+        <h3>Auxiliary-Loss-Free Load Balancing</h3>
+        <p style="margin:0;">Architectural bias terms added to router logits — no L_aux in the loss function. Balancing without contaminating the language modeling objective.</p>
+      </div>
+      <div class="card card-alt">
+        <h3>Shared Expert Isolation</h3>
+        <p style="margin:0;">Some experts always activate (shared across all tokens); others are routed. Shared experts capture universal patterns; routed experts specialize.</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:0;">
+      <h3>Fine-Grained Expert Segmentation</h3>
+      <p style="margin:0;">Many small experts instead of few large ones — e.g., 256+ routed experts with top-6 activation instead of 8 large experts with top-2. Finer specialization, better load distribution, higher sparsity.</p>
+    </div>
+
+    <div class="formula">DeepSeek-V3 MoE: ~256 routed experts · top-6 per token · + shared experts · 671B total · ~37B active</div>
+
+    <p>
+      All 671B weights reside in memory; each forward pass activates roughly 5.5% (~37B) via top-6 routing plus shared experts. See the specs table in §06 for the full parameter breakdown.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · MoE Router Simulator</h4>
+      <label class="slider-container"><label>Experts N: <span class="slider-value" id="moeNVal">256</span></label><input type="range" id="moeNSlider" min="8" max="256" step="8" value="256"></label>
+      <label class="slider-container"><label>Top-k: <span class="slider-value" id="moeKVal">6</span></label><input type="range" id="moeKSlider" min="1" max="16" step="1" value="6"></label>
+      <canvas id="moeRouterCanvas" width="560" height="180"></canvas>
+      <div class="output-readout" id="moeRouterReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Phase 3 &amp; 4: Multi-Token Prediction and FP8 Quantization</h2>
+
+    <h3>Multi-Token Prediction (Chapter 10)</h3>
+    <p>
+      MTP adds auxiliary heads that predict multiple future tokens during pre-training, densifying the learning signal per forward pass. DeepSeek uses MTP <strong>only during pre-training</strong>; inference remains standard autoregressive decoding. See <a href="../10-predicting-many-futures/">Ch 10</a> and V3 §2.2 (Figure 3, eqs 21–25).
+    </p>
+
+    <div class="formula">Standard LM loss: L = −Σ log P(x<sub>t+1</sub> | x<sub≤t</sub>)</div>
+    <div class="formula">MTP extends: additional heads predict x<sub>t+2</sub>, x<sub>t+3</sub>, … with shared trunk</div>
+
+    <h3 style="margin-top:36px;">FP8 Quantization (Chapter 11)</h3>
+    <p>
+      V3 §3.3 documents five FP8 training aspects: mixed-precision framework, fine-grain block quantization, high-precision accumulation, E4M3/E5M2 format trade-offs, and online scale computation. See <a href="../11-the-quantization-frontier/">Ch 11</a> for Figures 6–7 and full derivations.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Training vs Inference: What Applies When</h4>
+      <div class="btn-group" id="phaseBtns">
+        <button class="btn active" data-phase="pretrain">Pre-Training</button>
+        <button class="btn" data-phase="inference">Inference</button>
+      </div>
+      <table class="data-table" id="phaseTable">
+        <tr><th>Component</th><th>Pre-Training</th><th>Inference</th></tr>
+        <tr><td>MLA + RoPE</td><td>✓ Full</td><td>✓ Full (KV cache)</td></tr>
+        <tr><td>MoE routing</td><td>✓ Top-k experts</td><td>✓ Top-k experts</td></tr>
+        <tr><td>Multi-Token Prediction</td><td>✓ Active</td><td>✗ Not used</td></tr>
+        <tr><td>FP8 weights</td><td>✓ Mixed precision</td><td>✓ Quantized inference</td></tr>
+        <tr><td>Auxiliary load balancing loss</td><td>✗ Loss-free (V3)</td><td>✓ Bias terms only</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>The Complete Architecture — Interactive Explorer</h2>
+
+    <p>
+      A DeepSeek-V3 transformer block is not mysterious once you see the assembly. Token embeddings enter; RMSNorm stabilizes activations; MLA+RoPE attention mixes information across the sequence with a compressed KV cache; a second RMSNorm precedes the MoE feed-forward layer where the router selects experts; residual connections wrap both sub-layers. Stack 61 of these blocks; apply a final norm and output projection; you have a 671B-parameter language model with 37B active compute per token.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Full Architecture Explorer</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">Click any block to inspect its role in the DeepSeek-V3 forward pass.</p>
+      <div class="arch-grid" id="archGrid">
+        <div class="arch-block" data-id="embed"><span class="ab-icon">📥</span>Token Embedding</div>
+        <div class="arch-block" data-id="norm1"><span class="ab-icon">📐</span>RMSNorm</div>
+        <div class="arch-block" data-id="mla"><span class="ab-icon">🧠</span>MLA + RoPE</div>
+        <div class="arch-block" data-id="res1"><span class="ab-icon">➕</span>Residual</div>
+        <div class="arch-block" data-id="norm2"><span class="ab-icon">📐</span>RMSNorm</div>
+        <div class="arch-block" data-id="moe"><span class="ab-icon">🎯</span>MoE Router</div>
+        <div class="arch-block" data-id="experts"><span class="ab-icon">👥</span>256 Experts (top-6)</div>
+        <div class="arch-block" data-id="shared"><span class="ab-icon">🔗</span>Shared Experts</div>
+        <div class="arch-block" data-id="res2"><span class="ab-icon">➕</span>Residual</div>
+        <div class="arch-block" data-id="mtp"><span class="ab-icon">🔮</span>MTP Heads (train)</div>
+        <div class="arch-block" data-id="cache"><span class="ab-icon">💾</span>Latent KV Cache</div>
+        <div class="arch-block" data-id="fp8"><span class="ab-icon">⚡</span>FP8 Matmuls</div>
+      </div>
+      <div class="arch-detail" id="archDetail">
+        <strong style="color:var(--accent);">Select a component</strong> above to see its specification, paper reference, and chapter link.
+      </div>
+      <canvas id="archFlowCanvas" width="560" height="280" style="margin-top:16px;"></canvas>
+    </div>
+
+    <h3 style="margin-top:28px;">Token Journey Through the Full Stack</h3>
+    <p>Trace the token <strong>"quantum"</strong> entering a DeepSeek-V3 forward pass at inference time:</p>
+    <div class="flow" id="tokenFlow">
+      <div class="flow-step" data-step="0">Step 1: Token ID → embedding vector (d_model = 7168)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" data-step="1">Step 2: RMSNorm → MLA: Q<sub>C</sub>, Q<sub>R</sub> from input; attend via latent cache C<sub>KV</sub> + RoPE path</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" data-step="2">Step 3: Residual add → RMSNorm → MoE router logits → top-6 of 256 routed experts + shared experts</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" data-step="3">Step 4: Expert outputs weighted and summed → residual → next layer (×61 layers)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" data-step="4">Step 5: Final norm → output projection → logits for next token</div>
+    </div>
+    <div class="btn-group"><button class="btn" id="flowAnimBtn">▶ Animate Token Flow</button><button class="btn" id="flowResetBtn">Reset</button></div>
+    <div class="token-row" id="tokenFlowDisplay"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>DeepSeek-V2/V3 Paper Specifications</h2>
+
+    <p>
+      The following table consolidates production-scale dimensions referenced across the DeepSeek-V2 and DeepSeek-V3 technical reports and derived throughout the preceding chapters. These are the numbers you should memorize for interviews, implementation, and capacity planning.
+    </p>
+
+    <table class="dim-table">
+      <tr><th>Parameter</th><th>Symbol</th><th>DeepSeek-V3 Value</th><th>Notes</th></tr>
+      <tr><td>Total parameters</td><td>—</td><td><strong>671B</strong></td><td>All experts stored</td></tr>
+      <tr><td>Active parameters / token</td><td>—</td><td><strong>~37B</strong></td><td>~5.5% of total</td></tr>
+      <tr><td>Transformer layers</td><td>L</td><td><strong>61</strong></td><td>MoE in most FFN layers</td></tr>
+      <tr><td>Attention heads</td><td>N</td><td><strong>128</strong></td><td>MLA + RoPE</td></tr>
+      <tr><td>Head dimension</td><td>D<sub>H</sub></td><td><strong>128</strong></td><td>Per head</td></tr>
+      <tr><td>Latent compression dim</td><td>D<sub>L</sub></td><td><strong>512</strong></td><td>4 × D<sub>H</sub></td></tr>
+      <tr><td>RoPE head dim</td><td>D<sub>HR</sub></td><td><strong>64</strong></td><td>D<sub>H</sub> / 2</td></tr>
+      <tr><td>Model dimension</td><td>d_model</td><td><strong>7168</strong></td><td>Hidden size</td></tr>
+      <tr><td>Context length</td><td>S</td><td><strong>128K</strong></td><td>Production inference</td></tr>
+      <tr><td>Routed experts / layer</td><td>—</td><td><strong>256+</strong></td><td>Fine-grained segmentation</td></tr>
+      <tr><td>Experts activated / token</td><td>k</td><td><strong>6</strong></td><td>Plus shared experts</td></tr>
+      <tr><td>KV cache / token (MLA+RoPE)</td><td>—</td><td><strong>~1.1 KB</strong></td><td>vs ~64 KB MHA (per layer, fp16)</td></tr>
+      <tr><td>KV cache @ 128K context</td><td>—</td><td><strong>~6–7 GB</strong></td><td>vs ~390 GB MHA equivalent</td></tr>
+    </table>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Parameter &amp; Memory Calculator</h4>
+      <div class="two-col">
+        <div>
+          <label class="slider-container"><label>Layers L: <span class="slider-value" id="pcLVal">61</span></label><input type="range" id="pcLSlider" min="12" max="96" step="1" value="61"></label>
+          <label class="slider-container"><label>Heads N: <span class="slider-value" id="pcNVal">128</span></label><input type="range" id="pcNSlider" min="8" max="128" step="8" value="128"></label>
+          <label class="slider-container"><label>Head dim D<sub>H</sub>: <span class="slider-value" id="pcHVal">128</span></label><input type="range" id="pcHSlider" min="64" max="256" step="64" value="128"></label>
+        </div>
+        <div>
+          <label class="slider-container"><label>Context S: <span class="slider-value" id="pcSVal">128000</span></label><input type="range" id="pcSSlider" min="4096" max="128000" step="4096" value="128000"></label>
+          <label class="slider-container"><label>Latent D<sub>L</sub>: <span class="slider-value" id="pcDLVal">512</span></label><input type="range" id="pcDLSlider" min="128" max="1024" step="128" value="512"></label>
+          <label class="slider-container"><label>RoPE D<sub>HR</sub>: <span class="slider-value" id="pcDHRVal">64</span></label><input type="range" id="pcDHRSlider" min="32" max="128" step="32" value="64"></label>
+        </div>
+      </div>
+      <canvas id="pcCanvas" width="560" height="200"></canvas>
+      <div class="output-readout" id="pcReadout"></div>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Memory vs compute:</strong> 671B total parameters must fit in GPU HBM for inference — you pay storage for all experts. Active compute per token is ~37B — you pay FLOPs only for routed experts and always-active attention/embedding layers. Do not conflate total params with inference cost.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Reference Card — Formulas, Dimensions, and Paper Sections</h2>
+
+    <p>Print this section mentally before you implement. Every formula below appeared in prior chapters; this is the unified cheat sheet.</p>
+
+    <div class="cheat-grid">
+      <div class="cheat-card">
+        <h4>Attention (MHA baseline)</h4>
+        <div class="formula">Attn = softmax(QK<sup>T</sup>/√d<sub>h</sub> + M) V</div>
+        <p style="font-size:0.82rem;margin:0;">Ch 02–03 · Standard multi-head</p>
+      </div>
+      <div class="cheat-card">
+        <h4>MLA Absorption</h4>
+        <div class="formula">scores = (X W<sub>Q</sub> W<sub>UK</sub><sup>T</sup>) (X W<sub>DKV</sub>)<sup>T</sup></div>
+        <p style="font-size:0.82rem;margin:0;">Ch 05 · Cache only X W<sub>DKV</sub></p>
+      </div>
+      <div class="cheat-card">
+        <h4>MLA + RoPE (decoupled)</h4>
+        <div class="formula">S = Q<sub>C</sub>K<sub>C</sub><sup>T</sup> + Q<sub>R</sub>K<sub>R</sub><sup>T</sup></div>
+        <p style="font-size:0.82rem;margin:0;">Ch 07 · V3 eqs 1–19</p>
+      </div>
+      <div class="cheat-card">
+        <h4>KV Cache Memory</h4>
+        <div class="formula">MHA: 2LBSHD<sub>H</sub>N · bytes</div>
+        <div class="formula">MLA: 2LBS(D<sub>L</sub>+D<sub>HR</sub>) · bytes</div>
+        <p style="font-size:0.82rem;margin:0;">Ch 04, 07 · Ratio ≈ 4N/9 at D<sub>L</sub>=4D<sub>H</sub>, D<sub>HR</sub>=D<sub>H</sub>/2</p>
+      </div>
+      <div class="cheat-card">
+        <h4>MoE Router</h4>
+        <div class="formula">g = softmax(X W<sub>r</sub> + b)</div>
+        <div class="formula">y = Σ<sub>i∈TopK</sub> g<sub>i</sub> · Expert<sub>i</sub>(x)</div>
+        <p style="font-size:0.82rem;margin:0;">Ch 08–09 · + shared experts always on</p>
+      </div>
+      <div class="cheat-card">
+        <h4>Load Balancing (traditional)</h4>
+        <div class="formula">L_aux = α Σ f<sub>i</sub> · P<sub>i</sub></div>
+        <p style="font-size:0.82rem;margin:0;">Ch 08 · V3 replaces with bias trick (Ch 09)</p>
+      </div>
+      <div class="cheat-card">
+        <h4>Multi-Token Prediction</h4>
+        <div class="formula">L = L<sub>1</sub> + λ Σ L<sub>k</sub> (future tokens)</div>
+        <p style="font-size:0.82rem;margin:0;">Ch 10 · V3 §2.2 eqs 21–25</p>
+      </div>
+      <div class="cheat-card">
+        <h4>FP8 Block Quantization</h4>
+        <div class="formula">Ŵ = round(W / s) · s &nbsp; per block</div>
+        <p style="font-size:0.82rem;margin:0;">Ch 11 · V3 §3.3</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Paper Section Quick Reference</h3>
+    <table class="cheat-table">
+      <tr><th>Topic</th><th>DeepSeek-V3 Section</th><th>Chapter</th></tr>
+      <tr><td>Architecture overview</td><td>§2</td><td>Ch 01, 12</td></tr>
+      <tr><td>Multi-Head Latent Attention</td><td>§2.1.2</td><td>Ch 04–05</td></tr>
+      <tr><td>Decoupled RoPE</td><td>§2.1.3</td><td>Ch 06–07</td></tr>
+      <tr><td>DeepSeek MoE</td><td>§2.1.2</td><td>Ch 08–09</td></tr>
+      <tr><td>Multi-Token Prediction</td><td>§2.2</td><td>Ch 10</td></tr>
+      <tr><td>FP8 Training</td><td>§3.3, 3.3.1–3.3.3</td><td>Ch 11</td></tr>
+      <tr><td>Post-training / R1</td><td>Separate reports</td><td>Future chapters</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Timeline of DeepSeek Papers and Releases</h2>
+
+    <p>
+      DeepSeek's research papers built the architectural stack incrementally — each release adding one layer to the blueprint below.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Innovation Timeline</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">Click an entry to highlight its contribution to the final architecture.</p>
+      <div class="timeline-wrap" id="timeline">
+        <div class="tl-item active" data-innov="mla">
+          <div class="tl-year">2024 · DeepSeek-V2</div>
+          <div class="tl-title">Multi-Head Latent Attention</div>
+          <p class="tl-desc">Introduced low-rank KV joint compression and decoupled RoPE. First production MLA at scale. §2.1.2–2.1.3.</p>
+        </div>
+        <div class="tl-item" data-innov="moe">
+          <div class="tl-year">2024 · DeepSeek-MoE / V2</div>
+          <div class="tl-title">DeepSeek Mixture of Experts</div>
+          <p class="tl-desc">Fine-grained expert segmentation, shared expert isolation, auxiliary-loss-free balancing. Foundation for 671B/37B scale.</p>
+        </div>
+        <div class="tl-item" data-innov="v3">
+          <div class="tl-year">Late 2024 · DeepSeek-V3</div>
+          <div class="tl-title">671B Foundational Model</div>
+          <p class="tl-desc">53-page technical report. Combines MLA+RoPE, DeepSeek-MoE, MTP, FP8 training. Sets stage for R1.</p>
+        </div>
+        <div class="tl-item" data-innov="mtp">
+          <div class="tl-year">2024 · V3 §2.2</div>
+          <div class="tl-title">Multi-Token Prediction</div>
+          <p class="tl-desc">Training-only multi-step prediction heads. Builds on Meta 2024 MTP paper. Equations 21–25, Figure 3.</p>
+        </div>
+        <div class="tl-item" data-innov="fp8">
+          <div class="tl-year">2024 · V3 §3.3</div>
+          <div class="tl-title">FP8 Mixed-Precision Training</div>
+          <p class="tl-desc">Five-part quantization framework. Enables efficient 671B training. Figures 6–7.</p>
+        </div>
+        <div class="tl-item" data-innov="r1">
+          <div class="tl-year">January 2025 · DeepSeek-R1</div>
+          <div class="tl-title">Open-Source Reasoning Model</div>
+          <p class="tl-desc">Built on V3 weights. Large-scale RL with rule-based rewards (GRPO). Open weights released January 2025.</p>
+        </div>
+        <div class="tl-item" data-innov="book">
+          <div class="tl-year">2025 · Decoding DeepSeek Complete</div>
+          <div class="tl-title">Full Architectural Blueprint Published</div>
+          <p class="tl-desc">Twelve-chapter treatment of MLA, MoE, MTP, and FP8. From first principles to production-scale architecture.</p>
+        </div>
+      </div>
+      <canvas id="timelineCanvas" width="560" height="160"></canvas>
+      <div class="output-readout" id="timelineReadout">DeepSeek-V2 MLA: the attention breakthrough that made 128K context economical.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Forward-Looking: Building Your Own Foundational Model</h2>
+
+    <p>
+      DeepSeek-V3 §2 and §3.3 define a composable stack: MLA+RoPE for memory-efficient attention, MoE for sparse compute, MTP and FP8 for training efficiency. Post-training (GRPO, distillation) builds on this foundation but lies outside the architecture scope of Chapters 01–12.
+    </p>
+    <div class="phase-grid">
+      <div class="phase-card"><div class="phase-num">A</div><h3 style="margin-top:8px;font-size:1rem;">Architectural</h3><p style="font-size:0.82rem;margin:0;">MLA, Deep MoE, shared experts, fine segmentation, loss-free balancing</p></div>
+      <div class="phase-card"><div class="phase-num">B</div><h3 style="margin-top:8px;font-size:1rem;">Training Pipeline</h3><p style="font-size:0.82rem;margin:0;">MTP, FP8 mixed precision, dual pipeline orchestration</p></div>
+      <div class="phase-card"><div class="phase-num">C</div><h3 style="margin-top:8px;font-size:1rem;">Post-Training</h3><p style="font-size:0.82rem;margin:0;">Reinforcement learning, GRPO, knowledge distillation to smaller models</p></div>
+    </div>
+
+    <h3 style="margin-top:28px;">What Comes Next</h3>
+    <ul class="content-list">
+      <li><strong>Implement from scratch</strong> — MLA+RoPE attention module, MoE layer with loss-free balancing, MTP training heads, FP8 linear layers.</li>
+      <li><strong>Train DeepSeek-V3 mini</strong> — scale principles transfer; dimensions shrink for local hardware.</li>
+      <li><strong>Post-training for reasoning</strong> — DeepSeek-R1's step-by-step reasoning comes from RL post-training on top of V3, not from architecture alone.</li>
+      <li><strong>Distillation ecosystem</strong> — 671B teacher → models as small as 1.5B student.</li>
+    </ul>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Capstone Knowledge Quiz</h4>
+      <p id="quizQuestion" style="color:var(--text);font-weight:600;">Q1: Why does DeepSeek use decoupled RoPE instead of applying RoPE to the full latent key?</p>
+      <button class="quiz-opt" data-q="0" data-a="wrong">Because RoPE is slower than sinusoidal encoding</button>
+      <button class="quiz-opt" data-q="0" data-a="correct">Because RoPE on full keys breaks the absorption trick and destroys cache compression</button>
+      <button class="quiz-opt" data-q="0" data-a="wrong">Because RoPE only works on value vectors, not keys</button>
+      <button class="quiz-opt" data-q="0" data-a="wrong">Because DeepSeek-V3 does not use positional encoding at all</button>
+      <div class="output-readout" id="quizFeedback" style="margin-top:12px;">Select an answer. 5 questions total — score shown at the end.</div>
+      <div class="btn-group" style="margin-top:12px;"><button class="btn" id="quizNextBtn" disabled>Next Question →</button></div>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: can I really build this without a supercomputer?</div>
+      <p>Full 671B training requires datacenter-scale hardware, but every architectural component can be implemented and validated at mini scale — understand at production dimensions, implement at accessible scale.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Playground — Assemble Your Own DeepSeek Block</h2>
+
+    <p>Combine sliders for every major architectural knob. Watch how KV memory, active parameters, and effective capacity respond.</p>
+
+    <div class="interactive-panel">
+      <h4>Playground · Blueprint Configurator</h4>
+      <div class="two-col">
+        <div>
+          <label class="slider-container"><label>Total params (B): <span class="slider-value" id="pgTotalVal">671</span></label><input type="range" id="pgTotalSlider" min="7" max="671" step="1" value="671"></label>
+          <label class="slider-container"><label>Active %: <span class="slider-value" id="pgActiveVal">5.5</span></label><input type="range" id="pgActiveSlider" min="1" max="20" step="0.5" value="5.5"></label>
+          <label class="slider-container"><label>Context (K tokens): <span class="slider-value" id="pgCtxVal">128</span></label><input type="range" id="pgCtxSlider" min="4" max="128" step="4" value="128"></label>
+        </div>
+        <div>
+          <label class="slider-container"><label>Heads N: <span class="slider-value" id="pgNVal">128</span></label><input type="range" id="pgNSlider" min="8" max="128" step="8" value="128"></label>
+          <label class="slider-container"><label>Attn type:</label>
+            <select id="pgAttnSelect" class="text-input" style="margin-top:6px;">
+              <option value="mla">MLA + RoPE (DeepSeek)</option>
+              <option value="mha">MHA (baseline)</option>
+              <option value="gqa">GQA</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <canvas id="pgCanvas" width="560" height="240"></canvas>
+      <div class="output-readout" id="pgReadout"></div>
+    </div>
+
+    <h3 style="margin-top:36px;">Chapter Index — Full Book Map</h3>
+    <div class="chapter-map">
+      <a href="../01-the-landscape/" class="ch-map-cell"><span>Ch 01</span>The Landscape</a>
+      <a href="../02-the-attention-mechanism/" class="ch-map-cell"><span>Ch 02</span>Attention</a>
+      <a href="../03-the-multi-headed-hydra/" class="ch-map-cell"><span>Ch 03</span>Multi-Head</a>
+      <a href="../04-the-cache-chronicles/" class="ch-map-cell"><span>Ch 04</span>KV Cache</a>
+      <a href="../05-latent-attention-unlocked/" class="ch-map-cell"><span>Ch 05</span>MLA</a>
+      <a href="../06-encoding-position/" class="ch-map-cell"><span>Ch 06</span>RoPE</a>
+      <a href="../07-mla-meets-rope/" class="ch-map-cell"><span>Ch 07</span>MLA+RoPE</a>
+      <a href="../08-the-expert-council/" class="ch-map-cell"><span>Ch 08</span>MoE</a>
+    </div>
+
+    <div class="callout" style="margin-top:32px;">
+      <p><strong>Final word:</strong> DeepSeek's architecture is engineering, not magic — MLA, MoE, MTP, and FP8 are understandable, implementable, and composable.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s2b">
+  <div class="container">
+    <span class="section-num">02b</span>
+    <h2>Chapter-by-Chapter Recap — The Full Learning Arc</h2>
+
+    <p>
+      The table below maps each chapter to its role in the final architecture — a revision index before implementation.
+    </p>
+
+    <table class="data-table">
+      <tr><th>Ch</th><th>Title</th><th>Core Concepts</th><th>Paper Link</th></tr>
+      <tr><td>01</td><td>The Landscape</td><td>DeepSeek story, scaling laws, 671B/37B, token journey, four pillars</td><td>§1, overview</td></tr>
+      <tr><td>02</td><td>Attention Mechanism</td><td>Q/K/V matrices, dot-product scores, causal mask, context vectors</td><td>§2.1 prerequisites</td></tr>
+      <tr><td>03</td><td>Multi-Headed Hydra</td><td>Head splitting, parallel perspectives, concat + W_O projection</td><td>§2.1 MHA baseline</td></tr>
+      <tr><td>04</td><td>Cache Chronicles</td><td>KV cache derivation, MQA, GQA, 400 GB problem at 100K context</td><td>§2.1.2 motivation</td></tr>
+      <tr><td>05</td><td>Latent Attention Unlocked</td><td>MLA, W_DKV/W_UK absorption, latent dim D_L, coded from scratch</td><td>§2.1.2 eqs 1–11</td></tr>
+      <tr><td>06</td><td>Encoding Position</td><td>Integer → binary → sinusoidal → RoPE rotation on Q/K pairs</td><td>§2.1.3 RoPE</td></tr>
+      <tr><td>07</td><td>MLA Meets RoPE</td><td>Decoupled RoPE, Q_C/Q_R split, why naive RoPE breaks MLA, eqs 1–19</td><td>§2.1.3 full</td></tr>
+      <tr><td>08</td><td>Expert Council</td><td>Router softmax, top-k, auxiliary loss, load balancing loss, capacity factor</td><td>§2.1.2 MoE base</td></tr>
+      <tr><td>09</td><td>DeepSeek MoE Rewritten</td><td>Loss-free balancing, shared experts, fine-grained 256+ experts</td><td>§2.1.2 DeepSeek-MoE</td></tr>
+      <tr><td>10</td><td>Multi-Token Prediction</td><td>MTP heads, training-only, Meta 2024 basis, eqs 21–25, Figure 3</td><td>§2.2</td></tr>
+      <tr><td>11</td><td>FP8 Quantization</td><td>Mixed precision, fine-grain blocks, accumulation, mantissa, online quant</td><td>§3.3.1–3.3.3</td></tr>
+      <tr><td>12</td><td>Complete Blueprint</td><td>Capstone assembly — this chapter</td><td>§2 full map</td></tr>
+    </table>
+
+    <h3 style="margin-top:28px;">Paper Density vs Chapter Depth</h3>
+    <p>
+      Twelve chapters cover roughly <strong>sixteen pages</strong> of V3 architecture content — MLA alone spans Ch 04–07 (KV cache → MQA → GQA → MLA → RoPE → decoupled integration); MoE spans Ch 08–09; MTP and FP8 each have dedicated chapters for §2.2 and §3.3.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Chapter-to-Innovation Flow Map</h4>
+      <canvas id="lectureFlowCanvas" width="560" height="320"></canvas>
+      <div class="btn-group">
+        <button class="btn active" data-phase="attn">Phase 1: Attention</button>
+        <button class="btn" data-phase="moe">Phase 2: MoE</button>
+        <button class="btn" data-phase="mtp">Phase 3: MTP</button>
+        <button class="btn" data-phase="quant">Phase 4: FP8</button>
+      </div>
+      <div class="output-readout" id="lectureFlowReadout">Phase 1: Chapters 01–07 — from LLM basics through MLA+RoPE integration (11 paper equations).</div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3b">
+  <div class="container">
+    <span class="section-num">03b</span>
+    <h2>Deep Dive: How Each Innovation Maps to the Transformer Block</h2>
+
+    <h3>The Standard Transformer Block (Baseline)</h3>
+    <p>
+      Before DeepSeek, a transformer decoder block contained two sub-layers: multi-head self-attention and a dense feed-forward network (typically SwiGLU), each wrapped in residual connections and preceded by layer normalization. Every parameter in the FFN activated for every token. Every head stored its own key and value in the KV cache during inference.
+    </p>
+    <div class="formula">Block(x) = x + FFN(Norm(x + Attention(Norm(x))))</div>
+
+    <h3 style="margin-top:28px;">The DeepSeek-V3 Transformer Block</h3>
+    <p>
+      DeepSeek's block replaces both sub-layers with optimized variants while preserving the same residual + norm structure:
+    </p>
+    <div class="formula">Block(x) = x + MoE(Norm(x + MLA_RoPE(Norm(x))))</div>
+    <p>
+      <strong>MLA_RoPE</strong> replaces MHA: same external interface (d_model in, d_model out) but internally uses latent compression, absorption, and decoupled positional encoding. <strong>MoE</strong> replaces dense FFN: same interface but internally routes to a sparse subset of expert FFNs plus always-on shared experts.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>Attention Sub-Layer</h3>
+        <ul class="content-list">
+          <li>Input: (batch, seq, 7168)</li>
+          <li>Q via W_DQ → W_UQ (query down-projection saves activation memory)</li>
+          <li>Latent cache: C_KV = X · W_DKV (512-dim per token)</li>
+          <li>RoPE path: Q_R, K_R with shared W_KR across heads (64-dim)</li>
+          <li>Output: weighted sum of values via W_UV up-projection</li>
+          <li>KV stored per layer: 512 + 64 = 576 dims (fp16 → ~1.1 KB/layer/token)</li>
+        </ul>
+      </div>
+      <div class="card card-alt">
+        <h3>MoE Sub-Layer</h3>
+        <ul class="content-list">
+          <li>Router: softmax(X · W_gate + bias) over 256+ experts</li>
+          <li>Top-6 routed experts selected per token</li>
+          <li>Shared experts: always computed, output added to routed sum</li>
+          <li>Loss-free balancing: dynamic bias adjustment, no L_aux term</li>
+          <li>Expert FFN: SwiGLU with smaller intermediate dim per expert</li>
+          <li>Total expert params dominate the 671B count</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Concrete Memory Walkthrough</h3>
+    <p>
+      Consider inference with batch B=1, context S=100,000 tokens, layers L=61, fp16 (2 bytes/element), heads N=128, D_H=128, D_L=512, D_HR=64:
+    </p>
+    <p><strong>Standard MHA KV cache:</strong></p>
+    <div class="formula">2 × L × B × S × N × D_H × 2 bytes = 2 × 61 × 100,000 × 128 × 128 × 2 ≈ 390 GB</div>
+    <p><strong>MLA + RoPE KV cache:</strong></p>
+    <div class="formula">2 × L × B × S × (D_L + D_HR) × 2 bytes = 2 × 61 × 100,000 × 576 × 2 ≈ 6.7 GB</div>
+    <p>
+      Ratio: 390 / 6.7 ≈ <strong>58×</strong>. This is why DeepSeek can serve 128K context — the attention memory bottleneck that makes long-context MHA impractical is largely eliminated.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>The 57× formula:</strong> At the per-layer per-token level, MHA stores 2 × N × D_H elements; MLA+RoPE stores 2 × (D_L + D_HR). With D_L = 4 × D_H and D_HR = D_H / 2: ratio = (2 × N × D_H) / (2 × (4D_H + D_H/2)) = N × D_H / (4.5 × D_H) = 2N / 9. For N=128: 256/9 ≈ <strong>28.4×</strong> by element count; reported ~57× includes joint latent (single cache vs separate K/V) and implementation constants.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4b">
+  <div class="container">
+    <span class="section-num">04b</span>
+    <h2>Multi-Token Prediction and FP8 — Training Pipeline Summary</h2>
+
+    <p>
+      <strong>MTP (Ch 10, §2.2):</strong> auxiliary heads predict x<sub>t+2</sub>, x<sub>t+3</sub>, … from a shared trunk during pre-training only — densifying the gradient signal without changing inference. Not speculative decoding.
+    </p>
+
+    <div class="qa-box">
+      <div class="q">A common question is: if MTP predicts multiple tokens, why not use it for faster inference?</div>
+      <p>DeepSeek uses MTP only during pre-training. Inference remains autoregressive — one token at a time — because MTP heads improve representation quality, not generation speed.</p>
+    </div>
+
+    <p>
+      <strong>FP8 (Ch 11, §3.3):</strong> mixed-precision framework, fine-grain block scaling, FP32 accumulation, E4M3/E5M2 formats, and online scale computation. See the table in §07 and the extended formula card in §07b for details.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Hardware note:</strong> This chapter covers architectural FP8 decisions (what to quantize, why). Custom CUDA kernels are an engineering layer on top.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5b">
+  <div class="container">
+    <span class="section-num">05b</span>
+    <h2>DeepSeek-V3 and R1 — Model Lineage</h2>
+
+    <p>
+      DeepSeek-R1 (January 2025) applies post-training RL (GRPO) on top of V3 weights — same transformer block, different training objective. Chapters 01–12 cover V3 architecture (Parts A and B); Part C (post-training) is reserved for future chapters.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>DeepSeek-V3 (Foundational)</h3>
+        <p style="margin:0;">671B parameters. Pre-trained with MLA+RoPE, MoE, MTP, FP8. Basis for all distilled variants.</p>
+      </div>
+      <div class="card card-alt">
+        <h3>DeepSeek-R1 (Reasoning)</h3>
+        <p style="margin:0;">Built on V3 weights. Post-training with large-scale RL and rule-based rewards. Step-by-step reasoning — not an architectural change.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Distillation:</strong> DeepSeek distilled V3 into students as small as <strong>1.5B parameters</strong> — architecture understanding (Ch 01–12) precedes distillation mechanics.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6b">
+  <div class="container">
+    <span class="section-num">06b</span>
+    <h2>Implementation Checklist — From Blueprint to Code</h2>
+
+    <p>Before you claim to understand DeepSeek, verify you can implement each component. This checklist maps directly to the paper sections and book chapters.</p>
+
+    <table class="data-table">
+      <tr><th>Component</th><th>Can You Implement?</th><th>Key Test</th><th>Chapter</th></tr>
+      <tr><td>Causal multi-head attention</td><td>□</td><td>Correct mask, shape (B,H,S,D_H)</td><td>Ch 02–03</td></tr>
+      <tr><td>KV cache append during inference</td><td>□</td><td>Cache grows by 1 token/step, no recompute</td><td>Ch 04</td></tr>
+      <tr><td>MLA with absorption trick</td><td>□</td><td>Cache stores only C_KV, not full K/V</td><td>Ch 05</td></tr>
+      <tr><td>RoPE on Q/K pairs</td><td>□</td><td>Rotation depends on position m, not added to embedding</td><td>Ch 06</td></tr>
+      <tr><td>Decoupled MLA + RoPE</td><td>□</td><td>Two score terms: Q_C K_C^T + Q_R K_R^T</td><td>Ch 07</td></tr>
+      <tr><td>MoE router + top-k</td><td>□</td><td>Expert outputs weighted by gate softmax</td><td>Ch 08</td></tr>
+      <tr><td>Loss-free load balancing</td><td>□</td><td>Dynamic bias, no L_aux in total loss</td><td>Ch 09</td></tr>
+      <tr><td>MTP training heads</td><td>□</td><td>Multiple future-token losses, inactive at inference</td><td>Ch 10</td></tr>
+      <tr><td>FP8 block quantization</td><td>□</td><td>Per-block scale s, round(W/s)*s</td><td>Ch 11</td></tr>
+      <tr><td>Full transformer block</td><td>□</td><td>Norm → MLA → residual → Norm → MoE → residual</td><td>Ch 12</td></tr>
+    </table>
+
+    <h3 style="margin-top:28px;">Minimal MLA + RoPE Module (Reference Skeleton)</h3>
+    <p>The following skeleton captures the decoupled structure you should recognize in any full implementation:</p>
+    <div class="code-block">
+<span class="kw">class</span> <span class="cls">MLAAttention</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x, cache_c_kv, cache_k_r, pos):
+        <span class="cmt"># Query paths</span>
+        q_c = self.w_uq(self.w_dq(x))          <span class="cmt"># content query</span>
+        q_r = self.w_qr(x)                      <span class="cmt"># RoPE query</span>
+        q_r = apply_rope(q_r, pos)
+        <span class="cmt"># Keys from cache + RoPE path</span>
+        k_c = cache_c_kv @ self.w_uk.T          <span class="cmt"># absorbed content key</span>
+        k_r = apply_rope(cache_k_r, pos)        <span class="cmt"># shared RoPE key</span>
+        <span class="cmt"># Decoupled scores</span>
+        scores = q_c @ k_c.T + q_r @ k_r.T
+        attn = softmax(scores / sqrt(d)) @ v_from_cache
+        <span class="kw">return</span> attn
+    </div>
+
+    <h3 style="margin-top:28px;">Minimal MoE Layer (Reference Skeleton)</h3>
+    <div class="code-block">
+<span class="kw">class</span> <span class="cls">DeepSeekMoE</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x):
+        gates = softmax(x @ self.w_gate + self.load_balance_bias)
+        top_k_val, top_k_idx = topk(gates, k=<span class="num">6</span>)
+        out = sum(top_k_val[i] * self.experts[top_k_idx[i]](x) <span class="kw">for</span> i <span class="kw">in</span> range(<span class="num">6</span>))
+        out += sum(self.shared_expert(x) <span class="kw">for</span> self.shared_expert <span class="kw">in</span> self.shared)
+        <span class="kw">return</span> out
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: should I implement basic MLA first, or jump straight to MLA+RoPE?</div>
+      <p>Implement basic MLA first (Chapter 05). Verify the absorption trick works — cache only C_KV, recover keys via W_UK. Then add RoPE and discover why naive combination breaks. Then implement decoupled RoPE (Chapter 07). This mirrors DeepSeek-V2 → V3 evolution and makes the decoupling trick feel inevitable rather than arbitrary.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7b">
+  <div class="container">
+    <span class="section-num">07b</span>
+    <h2>Extended Formula Reference — Every Key Equation</h2>
+
+    <p>Complete formula card for interview preparation and implementation verification. Each equation maps to a specific chapter derivation.</p>
+
+    <div class="cheat-grid">
+      <div class="cheat-card">
+        <h4>Self-Attention Scores</h4>
+        <div class="formula">A = softmax(QK<sup>T</sup> / √d_k + M)</div>
+        <p style="font-size:0.8rem;margin:0;">M = causal mask (−∞ above diagonal)</p>
+      </div>
+      <div class="cheat-card">
+        <h4>Multi-Head Concat</h4>
+        <div class="formula">MHA(X) = Concat(head₁,…,head_H) W_O</div>
+        <p style="font-size:0.8rem;margin:0;">head_i = Attention(X W_Qi, X W_Ki, X W_Vi)</p>
+      </div>
+      <div class="cheat-card">
+        <h4>MQA Memory</h4>
+        <div class="formula">Cache: 2 × L × B × S × D_H</div>
+        <p style="font-size:0.8rem;margin:0;">Single shared K/V — N heads share one cache</p>
+      </div>
+      <div class="cheat-card">
+        <h4>GQA Memory</h4>
+        <div class="formula">Cache: 2 × L × B × S × G × D_H</div>
+        <p style="font-size:0.8rem;margin:0;">G groups, N/G heads per group share K/V</p>
+      </div>
+      <div class="cheat-card">
+        <h4>MLA Latent Cache</h4>
+        <div class="formula">C_KV = X · W_DKV &nbsp; (S × D_L)</div>
+        <p style="font-size:0.8rem;margin:0;">D_L ≪ N × D_H — core compression</p>
+      </div>
+      <div class="cheat-card">
+        <h4>Absorption Trick</h4>
+        <div class="formula">Q' = X · W_Q · W_UK<sup>T</sup></div>
+        <p style="font-size:0.8rem;margin:0;">Absorb W_UK into query side</p>
+      </div>
+      <div class="cheat-card">
+        <h4>RoPE Rotation</h4>
+        <div class="formula">R_m(x) = x · cos(mθ) + rotate(x) · sin(mθ)</div>
+        <p style="font-size:0.8rem;margin:0;">Applied to Q_R, K_R pairs only in MLA</p>
+      </div>
+      <div class="cheat-card">
+        <h4>Decoupled MLA Scores</h4>
+        <div class="formula">S = Q_C K_C<sup>T</sup> + Q_R K_R<sup>T</sup></div>
+        <p style="font-size:0.8rem;margin:0;">Content + position paths summed</p>
+      </div>
+      <div class="cheat-card">
+        <h4>MoE Gate</h4>
+        <div class="formula">g = TopK(softmax(X W_g + b), k=6)</div>
+        <p style="font-size:0.8rem;margin:0;">b = dynamic load balance bias (V3)</p>
+      </div>
+      <div class="cheat-card">
+        <h4>Auxiliary Loss (pre-V3)</h4>
+        <div class="formula">L_aux = α · N · Σ f_i · P_i</div>
+        <p style="font-size:0.8rem;margin:0;">V3 replaces with bias trick — no L_aux</p>
+      </div>
+      <div class="cheat-card">
+        <h4>MTP Loss</h4>
+        <div class="formula">L = L_LM + λ Σ_k L_MTP(k)</div>
+        <p style="font-size:0.8rem;margin:0;">Training only — k = future offsets</p>
+      </div>
+      <div class="cheat-card">
+        <h4>FP8 Quantization</h4>
+        <div class="formula">Q(W) = round(W / s_block) · s_block</div>
+        <p style="font-size:0.8rem;margin:0;">s computed online per block per step</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Production Dimensions — Memorize These</h3>
+    <table class="cheat-table">
+      <tr><th>Symbol</th><th>Value</th><th>Relationship</th></tr>
+      <tr><td>d_model</td><td>7168</td><td>Hidden dimension throughout</td></tr>
+      <tr><td>L</td><td>61</td><td>Transformer layers</td></tr>
+      <tr><td>N</td><td>128</td><td>Attention heads</td></tr>
+      <tr><td>D_H</td><td>128</td><td>Head dimension (N × D_H = 16384 split across heads)</td></tr>
+      <tr><td>D_L</td><td>512</td><td>4 × D_H — latent compression rank</td></tr>
+      <tr><td>D_HR</td><td>64</td><td>D_H / 2 — RoPE subspace per head</td></tr>
+      <tr><td>Experts</td><td>256+</td><td>Routed experts per MoE layer</td></tr>
+      <tr><td>top-k</td><td>6</td><td>Routed experts activated per token</td></tr>
+      <tr><td>Total params</td><td>671B</td><td>All weights stored</td></tr>
+      <tr><td>Active params</td><td>~37B</td><td>Per token forward pass</td></tr>
+      <tr><td>Context</td><td>128K</td><td>Production context window</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-attn-deep">
+  <div class="container">
+    <span class="section-num">A1</span>
+    <h2>Attention Arc — Unified Summary</h2>
+
+    <p>
+      The attention stack connects five layers: <strong>MHA baseline</strong> (Ch 02–03) → <strong>KV cache + MQA/GQA</strong> (Ch 04) → <strong>MLA latent compression + absorption</strong> (Ch 05) → <strong>RoPE</strong> (Ch 06) → <strong>decoupled MLA+RoPE</strong> (Ch 07). Each step addresses a specific bottleneck; together they reduce KV memory ~57× vs MHA at N=128 while preserving quality.
+    </p>
+
+    <div class="formula">Memory_KV(MHA) = 2 × L × B × S × N × D_H × sizeof(fp16)</div>
+    <div class="formula">MLA+RoPE cache: C_KV (D_L=512) + K_R (D_HR=64) per token per layer</div>
+    <div class="formula">S = Q_C K_C<sup>T</sup> + Q_R K_R<sup>T</sup> &nbsp; (content path + position path)</div>
+
+    <p>
+      Key constraint: RoPE on full keys breaks position-independent caching. Decoupled RoPE isolates rotation to a small D_HR=64 subspace with shared K_R across heads. Full derivations: <a href="../04-the-cache-chronicles/">Ch 04</a>–<a href="../07-mla-meets-rope/">Ch 07</a>.
+    </p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-moe-deep">
+  <div class="container">
+    <span class="section-num">A2</span>
+    <h2>MoE Arc — Unified Summary</h2>
+
+    <p>
+      MoE replaces dense FFNs with routed expert FFNs: <strong>y = Σ g<sub>i</sub> · Expert<sub>i</sub>(x)</strong> where g = TopK(softmax(x W_g), k). Vanilla MoE (Ch 08) uses auxiliary load-balancing loss; DeepSeek-V3 (Ch 09) replaces it with dynamic router bias, adds always-on shared experts, and uses fine-grained segmentation (256+ experts, top-6).
+    </p>
+
+    <div class="formula">L_aux = α · N · Σ f_i · P_i &nbsp; (traditional — V3 removes this)</div>
+    <div class="formula">DeepSeek-V3: g = softmax(x W_g + b) &nbsp; top-6 of 256+ routed + shared experts</div>
+
+    <p>
+      <strong>671B / 37B:</strong> all expert weights stored in memory; ~5.5% active per token (top-6 routing + shared experts + always-on attention). Full routing walkthrough: <a href="../08-the-expert-council/">Ch 08</a>–<a href="../09-deepseeks-expert-revolution/">Ch 09</a>.
+    </p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-closing">
+  <div class="container">
+    <span class="section-num">FIN</span>
+    <h2>Closing — From Blueprint to Implementation</h2>
+
+    <p>
+      The reference sections above map every V3 paper element to its chapter derivation. The natural next steps: read §2 with the chapter map beside you, implement modules independently, assemble into a mini transformer block, then scale when hardware permits.
+    </p>
+
+    <div class="phase-grid">
+      <div class="phase-card"><div class="phase-num">1</div><h3 style="margin-top:8px;font-size:0.95rem;">Read the Paper</h3><p style="font-size:0.82rem;margin:0;">Open DeepSeek-V3 §2 with the chapter map beside you.</p></div>
+      <div class="phase-card"><div class="phase-num">2</div><h3 style="margin-top:8px;font-size:0.95rem;">Implement Modules</h3><p style="font-size:0.82rem;margin:0;">MLA+RoPE attention, MoE layer, MTP heads, FP8 linear — one at a time.</p></div>
+      <div class="phase-card"><div class="phase-num">3</div><h3 style="margin-top:8px;font-size:0.95rem;">Assemble Block</h3><p style="font-size:0.82rem;margin:0;">Norm → MLA → residual → Norm → MoE → residual. Stack into mini model.</p></div>
+      <div class="phase-card"><div class="phase-num">4</div><h3 style="margin-top:8px;font-size:0.95rem;">Train Mini</h3><p style="font-size:0.82rem;margin:0;">Validate loss curves and generation on accessible hardware.</p></div>
+      <div class="phase-card"><div class="phase-num">5</div><h3 style="margin-top:8px;font-size:0.95rem;">Scale Up</h3><p style="font-size:0.82rem;margin:0;">More experts, longer context, larger d_model when hardware permits.</p></div>
+      <div class="phase-card"><div class="phase-num">6</div><h3 style="margin-top:8px;font-size:0.95rem;">Post-Train</h3><p style="font-size:0.82rem;margin:0;">Future chapters: GRPO, RL, distillation.</p></div>
+    </div>
+
+    <p style="text-align:center;margin-top:32px;font-family:var(--mono);color:var(--accent);">
+      Decoding DeepSeek · Chapter 12 of 12 · The Complete Blueprint
+    </p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-paper-index">
+  <div class="container">
+    <span class="section-num">REF</span>
+    <h2>DeepSeek-V3 Paper — Equation and Figure Index</h2>
+
+    <p>
+      Use this index when reading the technical report alongside these chapters. Every entry maps a paper element to the chapter where it is derived from first principles.
+    </p>
+
+    <table class="data-table">
+      <tr><th>Paper Element</th><th>Description</th><th>Chapter Coverage</th></tr>
+      <tr><td>§2 Architecture Overview</td><td>Full model schematic</td><td>Ch 01, 12</td></tr>
+      <tr><td>§2.1.2 MLA eqs 1–11</td><td>Latent compression, projections, cache</td><td>Ch 04–05, 07</td></tr>
+      <tr><td>§2.1.3 Decoupled RoPE eqs 12–19</td><td>Q_C/Q_R split, K_R shared, score sum</td><td>Ch 06–07</td></tr>
+      <tr><td>§2.1.2 MoE routing</td><td>Gate softmax, top-k selection</td><td>Ch 08</td></tr>
+      <tr><td>§2.1.2 Loss-free balancing</td><td>Dynamic router bias</td><td>Ch 09</td></tr>
+      <tr><td>§2.1.2 Shared experts</td><td>Always-on expert pathway</td><td>Ch 09</td></tr>
+      <tr><td>§2.1.2 Fine-grained segmentation</td><td>256+ small experts</td><td>Ch 09</td></tr>
+      <tr><td>§2.2 MTP eqs 21–25</td><td>Multi-step prediction loss</td><td>Ch 10</td></tr>
+      <tr><td>§2.2 Figure 3</td><td>MTP architecture diagram</td><td>Ch 10</td></tr>
+      <tr><td>§3.3 FP8 framework</td><td>Mixed precision training flow</td><td>Ch 11</td></tr>
+      <tr><td>§3.3.1 Fine-grain quant</td><td>Block-wise scale factors</td><td>Ch 11</td></tr>
+      <tr><td>§3.3.2 Accumulation precision</td><td>FP32 accumulators for FP8 matmul</td><td>Ch 11</td></tr>
+      <tr><td>§3.3.3 Online quantization</td><td>Dynamic scale per forward pass</td><td>Ch 11</td></tr>
+      <tr><td>Figure 6</td><td>FP8 training dataflow overview</td><td>Ch 11</td></tr>
+      <tr><td>Figure 7</td><td>Quantization block detail</td><td>Ch 11</td></tr>
+    </table>
+
+    <h3 style="margin-top:28px;">Equation Group 1–11: MLA Core (§2.1.2)</h3>
+    <p>When you encounter these in the paper, read them as sequential pipeline steps:</p>
+    <ol class="content-list" style="margin-left:1.5em;">
+      <li><strong>Eq 1–3:</strong> Input projection to latent space — C_KV = X · W_DKV. This is what gets cached.</li>
+      <li><strong>Eq 4–6:</strong> Query projections — W_DQ, W_UQ path (V3) or direct W_Q (V2 basic).</li>
+      <li><strong>Eq 7–8:</strong> Key/value up-projection from latent — W_UK, W_UV.</li>
+      <li><strong>Eq 9:</strong> Absorption form — scores without explicit K matrix materialization.</li>
+      <li><strong>Eq 10–11:</strong> Output projection and multi-head assembly.</li>
+    </ol>
+
+    <h3 style="margin-top:28px;">Equation Group 12–19: Decoupled RoPE (§2.1.3)</h3>
+    <ol class="content-list" style="margin-left:1.5em;">
+      <li><strong>Eq 12–14:</strong> Split Q into Q_C (content) and Q_R (RoPE) components.</li>
+      <li><strong>Eq 15:</strong> Shared K_R = X · W_KR — one RoPE key across all heads, cached per token.</li>
+      <li><strong>Eq 16–17:</strong> Apply RoPE rotation R_m to Q_R and K_R based on position m.</li>
+      <li><strong>Eq 18:</strong> Combined scores = content scores + RoPE scores.</li>
+      <li><strong>Eq 19:</strong> Softmax, weighted value sum, output projection.</li>
+    </ol>
+
+    <h3 style="margin-top:28px;">Equation Group 21–25: Multi-Token Prediction (§2.2)</h3>
+    <ol class="content-list" style="margin-left:1.5em;">
+      <li><strong>Eq 21:</strong> Main next-token loss L_LM — standard cross-entropy.</li>
+      <li><strong>Eq 22–23:</strong> MTP head projections from shared hidden state h_t.</li>
+      <li><strong>Eq 24:</strong> Multi-step targets — predict x_{t+2}, x_{t+3}, … from same h_t.</li>
+      <li><strong>Eq 25:</strong> Combined loss L = L_LM + λ · Σ L_MTP(k). Active pre-training only.</li>
+    </ol>
+
+    <div class="callout">
+      <p><strong>Reading strategy:</strong> Open the DeepSeek-V3 PDF to §2.1.2 with this chapter beside it. For each equation, locate the corresponding derivation in Chapters 04–07.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-serve">
+  <div class="container">
+    <span class="section-num">SERVE</span>
+    <h2>Serving This Chapter Locally</h2>
+
+    <p>This chapter is a self-contained HTML file — no build tools, no external dependencies, no frameworks. All CSS and JavaScript are inlined.</p>
+
+    <div class="code-block">
+cd learning_blogs/decoding-deepseek/12-the-complete-blueprint<br>
+python3 -m http.server 8080<br>
+# Open http://localhost:8080 in your browser
+    </div>
+
+    <p>
+      Interactive demos require JavaScript enabled. All canvases resize to container width on mobile. The architecture explorer, parameter calculator, timeline, quiz, and playground function offline once loaded.
+    </p>
+
+    <table class="data-table">
+      <tr><th>Demo</th><th>Section</th><th>What It Shows</th></tr>
+      <tr><td>Chapter-to-Paper Map</td><td>§00</td><td>Chapter → V3 paper section mapping</td></tr>
+      <tr><td>Component Comparison</td><td>§01</td><td>Standard vs DeepSeek per subsystem</td></tr>
+      <tr><td>Attention Evolution</td><td>§02</td><td>MHA → MQA → GQA → MLA → MLA+RoPE</td></tr>
+      <tr><td>MoE Router Simulator</td><td>§03</td><td>Top-k sparsity visualization</td></tr>
+      <tr><td>Architecture Explorer</td><td>§05</td><td>Clickable block diagram + forward pass</td></tr>
+      <tr><td>Parameter Calculator</td><td>§06</td><td>KV cache GB for MHA vs MLA+RoPE</td></tr>
+      <tr><td>Innovation Timeline</td><td>§08</td><td>DeepSeek paper release history</td></tr>
+      <tr><td>Knowledge Quiz</td><td>§09</td><td>5-question capstone assessment</td></tr>
+      <tr><td>Blueprint Playground</td><td>§10</td><td>Combined configurator</td></tr>
+      <tr><td>Chapter Flow Map</td><td>§02b</td><td>Four-phase chapter visualization</td></tr>
+    </table>
+
+    <h3 style="margin-top:28px;">Recommended Reading Order for the Paper</h3>
+    <p>If you are reading the DeepSeek-V3 technical report for the first time after these chapters, follow this order:</p>
+    <div class="flow">
+      <div class="flow-step">1. §1 Introduction — context for scale and training budget (Ch 01)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">2. §2.1.2 MLA — now readable after Ch 04–05 (basic) and Ch 07 (RoPE)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">3. §2.1.2 MoE — now readable after Ch 08–09</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">4. §2.2 MTP — now readable after Ch 10 (read Meta 2024 MTP paper if stuck)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">5. §3.3 FP8 — now readable after Ch 11 (Figures 6–7)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">6. Evaluation sections — connect benchmark numbers to architectural choices</div>
+    </div>
+
+    <h3 style="margin-top:28px;">From Blueprint to Implementation</h3>
+    <p>
+      Implementation builds on the derivations and skeletons in §06b — training loops, data pipelines, and checkpoint management for a mini model on local hardware.
+    </p>
+
+    <h3 style="margin-top:28px;">Glossary — Key Terms Across All Chapters</h3>
+    <table class="cheat-table">
+      <tr><th>Term</th><th>Definition</th><th>Chapter</th></tr>
+      <tr><td>Absorption trick</td><td>Merge W_Q with W_UK<sup>T</sup> so queries interact directly with latent cache without materializing keys</td><td>Ch 05</td></tr>
+      <tr><td>Causal mask</td><td>Upper-triangular −∞ mask preventing attention to future tokens</td><td>Ch 02</td></tr>
+      <tr><td>Decoupled RoPE</td><td>Split attention into content (no RoPE) and position (RoPE) subspaces</td><td>Ch 07</td></tr>
+      <tr><td>Expert collapse</td><td>Router sends all tokens to few experts; others never train</td><td>Ch 08</td></tr>
+      <tr><td>FP8 E4M3</td><td>8-bit float: 4 exponent bits, 3 mantissa bits — used for weights</td><td>Ch 11</td></tr>
+      <tr><td>FP8 E5M2</td><td>8-bit float: 5 exponent bits, 2 mantissa bits — used for activations</td><td>Ch 11</td></tr>
+      <tr><td>GQA</td><td>Grouped-Query Attention — G groups share K/V</td><td>Ch 04</td></tr>
+      <tr><td>GRPO</td><td>Group Relative Policy Optimization — DeepSeek-R1 post-training</td><td>Future</td></tr>
+      <tr><td>KV cache</td><td>Stored keys and values from prior tokens during autoregressive inference</td><td>Ch 04</td></tr>
+      <tr><td>Latent cache C_KV</td><td>Low-rank compressed representation stored per token in MLA</td><td>Ch 05</td></tr>
+      <tr><td>Loss-free balancing</td><td>Dynamic router bias replaces L_aux for expert load balance</td><td>Ch 09</td></tr>
+      <tr><td>MLA</td><td>Multi-Head Latent Attention — DeepSeek's KV compression mechanism</td><td>Ch 05–07</td></tr>
+      <tr><td>MoE</td><td>Mixture of Experts — sparse FFN with router-selected experts</td><td>Ch 08–09</td></tr>
+      <tr><td>MQA</td><td>Multi-Query Attention — single shared K/V across all heads</td><td>Ch 04</td></tr>
+      <tr><td>MTP</td><td>Multi-Token Prediction — multi-step targets during pre-training only</td><td>Ch 10</td></tr>
+      <tr><td>RoPE</td><td>Rotary Positional Embedding — rotation-based relative position encoding</td><td>Ch 06–07</td></tr>
+      <tr><td>Router</td><td>Gate network selecting which experts activate per token</td><td>Ch 08</td></tr>
+      <tr><td>Shared experts</td><td>Always-active MoE experts for universal patterns</td><td>Ch 09</td></tr>
+      <tr><td>Sparsity</td><td>Fraction of parameters not computed per forward pass</td><td>Ch 08</td></tr>
+      <tr><td>Top-k routing</td><td>Only k experts with highest gate values activate</td><td>Ch 08</td></tr>
+    </table>
+
+    <div class="qa-box" style="margin-top:28px;">
+      <div class="q">A common question is: what is the single most important innovation in DeepSeek-V3?</div>
+      <p>There is no single answer — the innovations compound. But if forced to choose: <strong>Multi-Head Latent Attention with decoupled RoPE</strong> is the most distinctive architectural contribution. It solves the long-context memory bottleneck that would otherwise make 128K inference impractical at 671B scale, without the quality degradation of MQA/GQA. MoE provides compute efficiency; MTP and FP8 provide training efficiency; MLA+RoPE makes the whole system servable.</p>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: how does <em>Decoding DeepSeek</em> compare to <em>Build LLM from Scratch</em>?</div>
+      <p><em>Build LLM from Scratch</em> (Sebastian Raschka) teaches transformer fundamentals by building a GPT-style model from zero. <em>Decoding DeepSeek</em> is the advanced sequel: it assumes you understand attention, layer norms, and training loops, then dives into frontier innovations — MLA, MoE, MTP, FP8 — that GPT-2/3 do not use. Together they form a progression: foundations first, then cutting-edge architecture.</p>
+    </div>
+
+    <p style="margin-top:24px;">
+      <em>Decoding DeepSeek</em> — twelve chapters from LLM foundations to this architectural blueprint. Use the reference tools above to read the DeepSeek-V3 paper and implement its components.
+    </p>
+
+    <div class="card" style="text-align:center;margin-top:32px;border-color:var(--accent);">
+      <p style="font-family:var(--mono);color:var(--accent);letter-spacing:2px;font-size:0.8rem;margin-bottom:8px;">BOOK COMPLETE</p>
+      <h3 style="color:var(--text);margin-bottom:12px;">Decoding DeepSeek — All 12 Chapters</h3>
+      <p style="margin:0 0 12px;font-size:0.9rem;">01 Landscape · 02 Attention · 03 Multi-Head · 04 KV Cache · 05 MLA · 06 RoPE · 07 MLA+RoPE · 08 MoE · 09 DeepSeek MoE · 10 MTP · 11 FP8 · <strong>12 Blueprint</strong></p>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Decoding DeepSeek · Chapter 12 · The Complete Blueprint — Final Chapter</p>
+  <p style="margin-top:8px;">Five pillars assembled · MLA + MoE + MTP + FP8 + RoPE</p>
+  <p style="margin-top:8px;font-size:0.8rem;">DeepSeek-V3: 671B total · 37B active · 128K context · 61 layers</p>
+  <p style="margin-top:8px;font-size:0.75rem;color:var(--text-dim);">Self-contained HTML · No external dependencies · Serve with python3 -m http.server</p>
+  <p style="margin-top:4px;font-size:0.75rem;color:var(--text-dim);">Chapter 12 of 12 — Capstone reference</p>
+  <p style="margin-top:8px;"><a href="../">← Back to Decoding DeepSeek</a> · <a href="../01-the-landscape/">Start from Chapter 01</a></p>
+</footer>
+
+<script>
+// ===== ARCH DETAIL DATA =====
+const ARCH_INFO = {
+  embed: { title: 'Token Embedding', paper: '§2', ch: 'Ch 01', text: 'Maps token IDs to d_model=7168 vectors. Shared across all 61 layers. Vocabulary embedding matrix is among the largest single tensors.' },
+  norm1: { title: 'RMSNorm (pre-attention)', paper: '§2', ch: 'Ch 01', text: 'Root Mean Square Layer Normalization stabilizes activations without mean centering. Applied before MLA sub-layer.' },
+  mla: { title: 'MLA + Decoupled RoPE', paper: '§2.1.2–2.1.3', ch: 'Ch 04–07', text: '128 heads, D_H=128, D_L=512, D_HR=64. Content path uses latent cache C_KV; position path uses Q_R, K_R with RoPE. ~57× KV compression vs MHA.' },
+  res1: { title: 'Residual Connection (attention)', paper: '§2', ch: 'Ch 01', text: 'Output = input + Attention(input). Enables gradient flow through 61 layers.' },
+  norm2: { title: 'RMSNorm (pre-FFN)', paper: '§2', ch: 'Ch 01', text: 'Second normalization before MoE feed-forward sub-layer.' },
+  moe: { title: 'MoE Router', paper: '§2.1.2', ch: 'Ch 08–09', text: 'Linear gate: softmax(X W_r + bias). Top-6 of 256+ routed experts. Loss-free balancing via dynamic bias — no L_aux.' },
+  experts: { title: 'Routed Experts (256+, top-6)', paper: '§2.1.2', ch: 'Ch 09', text: 'Fine-grained expert segmentation. Each expert is a smaller FFN. Only 6 activate per token per layer — core of 671B/37B ratio.' },
+  shared: { title: 'Shared Experts', paper: '§2.1.2', ch: 'Ch 09', text: 'Always-active experts capture universal patterns (syntax, common tokens). Isolated from routed experts — shared expert isolation.' },
+  res2: { title: 'Residual Connection (FFN)', paper: '§2', ch: 'Ch 01', text: 'Output = input + MoE(input). Second residual in each block.' },
+  mtp: { title: 'MTP Heads (training only)', paper: '§2.2', ch: 'Ch 10', text: 'Additional prediction heads for x_{t+2}, x_{t+3}, … during pre-training. Not active during inference. Equations 21–25.' },
+  cache: { title: 'Latent KV Cache', paper: '§2.1.2', ch: 'Ch 04–07', text: 'Stores C_KV (D_L=512) + K_R (D_HR=64) per token per layer. ~1.1 KB/token/layer vs ~64 KB for MHA.' },
+  fp8: { title: 'FP8 Matmuls', paper: '§3.3', ch: 'Ch 11', text: 'Mixed-precision block quantization for weights and activations. Fine-grain scaling, high-precision accumulation. Enables 671B training efficiency.' }
+};
+
+const COMP_DATA = {
+  attn: { std: 'Multi-Head Attention (MHA): full K/V cached per head. Memory ∝ 2×L×B×S×N×D_H.', ds: 'MLA + decoupled RoPE: joint latent cache C_KV + small K_R. ~57× less KV memory at N=128.' },
+  ffn: { std: 'Dense FFN: all parameters active for every token. SwiGLU activation, d_ff ≈ 4×d_model.', ds: 'MoE FFN: 256+ routed experts, top-6 + shared experts. 671B stored, ~37B computed per token.' },
+  train: { std: 'Standard next-token prediction. FP16/BF16 training. Auxiliary MoE losses common.', ds: 'MTP multi-token heads during pre-training. FP8 mixed precision. Loss-free MoE balancing — no L_aux.' },
+  pos: { std: 'Absolute or sinusoidal embeddings added to token vectors. Contaminates semantic space.', ds: 'RoPE applied to Q_R/K_R subspace only. Decoupled from latent content path. No embedding contamination.' },
+  mem: { std: 'KV cache @ 128K, 61 layers, MHA: ~390 GB (infeasible for single-node inference).', ds: 'KV cache @ 128K, MLA+RoPE: ~6–7 GB. Makes long-context serving economical.' }
+};
+
+const ATTN_STAGES = [
+  { name: 'Self-Attention', mem: 1.0, qual: 1.0, desc: 'Single perspective. Full Q,K,V per token. No cache optimization.' },
+  { name: 'Multi-Head (MHA)', mem: 1.0, qual: 1.0, desc: 'N parallel heads. Best quality. KV cache = 2×L×B×S×N×D_H.' },
+  { name: 'MQA', mem: 0.12, qual: 0.92, desc: 'Shared K/V across heads. ~8× memory savings. Quality degradation on benchmarks.' },
+  { name: 'GQA', mem: 0.25, qual: 0.96, desc: 'Grouped shared K/V. Partial fix. Still shares content across head groups.' },
+  { name: 'MLA', mem: 0.04, qual: 0.99, desc: 'Latent compression + absorption. Near-MHA quality. Cache stores D_L dims.' },
+  { name: 'MLA + RoPE', mem: 0.035, qual: 1.0, desc: 'Production DeepSeek. Decoupled position path. Pareto frontier.' }
+];
+
+const QUIZ = [
+  { q: 'Q1: Why does DeepSeek use decoupled RoPE instead of applying RoPE to the full latent key?',
+    correct: 'Because RoPE on full keys breaks the absorption trick and destroys cache compression',
+    explain: 'RoPE is position-dependent. If applied to full keys, you cannot cache a position-independent latent — MLA\'s core efficiency vanishes.' },
+  { q: 'Q2: Is Multi-Token Prediction used during DeepSeek-V3 inference?',
+    correct: 'No — MTP is pre-training only; inference is standard autoregressive decoding',
+    explain: 'MTP densifies training signal. At inference, the model generates one token at a time like any autoregressive LM.' },
+  { q: 'Q3: What is DeepSeek-V3\'s total vs active parameter count?',
+    correct: '671B total, ~37B active per token (~5.5%)',
+    explain: 'MoE stores all expert weights but computes through top-6 routed + shared experts per layer.' },
+  { q: 'Q4: Why did DeepSeek replace auxiliary load balancing loss?',
+    correct: 'Because L_aux added to training loss hurts next-token prediction quality',
+    explain: 'Loss-free balancing uses dynamic bias on router logits — architectural balance without contaminating L_LM.' },
+  { q: 'Q5: What is the approximate KV cache compression of MLA+RoPE vs MHA at N=128 heads?',
+    correct: 'About 57× (formula: 4N/9 with D_L=4D_H, D_HR=D_H/2)',
+    explain: 'MHA stores 2×N×D_H per token per layer; MLA+RoPE stores 2×(D_L+D_HR) = 2×(512+64) = 1152 vs 32768.' }
+];
+
+let attnStage = 0, quizIdx = 0, quizScore = 0, quizAnswered = false;
+
+// ===== ARCH EXPLORER =====
+document.querySelectorAll('.arch-block').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.arch-block').forEach(b => b.classList.remove('sel'));
+    el.classList.add('sel');
+    const d = ARCH_INFO[el.dataset.id];
+    document.getElementById('archDetail').innerHTML =
+      `<strong style="color:var(--accent);">${d.title}</strong><br><span class="tag tag-blue">${d.paper}</span> <span class="tag tag-purple">${d.ch}</span><p style="margin:12px 0 0;color:var(--text-dim);">${d.text}</p>`;
+    drawArchFlow(el.dataset.id);
+  });
+});
+
+function drawArchFlow(highlight) {
+  const c = document.getElementById('archFlowCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  const blocks = ['embed','norm1','mla','res1','norm2','moe','experts','out'];
+  const labels = ['Embed','Norm','MLA','+','Norm','Route','Experts','Logits'];
+  const xs = [30, 100, 170, 240, 310, 380, 450, 520];
+  blocks.forEach((b, i) => {
+    const lit = highlight && (ARCH_INFO[highlight]?.title.toLowerCase().includes(labels[i].toLowerCase()) || b === highlight || (highlight==='shared'&&b==='experts') || (highlight==='cache'&&b==='mla') || (highlight==='fp8'&&b==='experts') || (highlight==='mtp'&&b==='out'));
+    ctx.fillStyle = lit ? 'rgba(108,140,255,0.35)' : 'rgba(18,18,26,1)';
+    ctx.strokeStyle = lit ? '#6c8cff' : '#2a2a3a';
+    ctx.lineWidth = lit ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(xs[i]-28, 100, 56, 44, 8);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = lit ? '#e0e0e8' : '#8888a0';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[i], xs[i], 127);
+    if (i < blocks.length - 1) {
+      ctx.strokeStyle = '#444';
+      ctx.beginPath();
+      ctx.moveTo(xs[i]+28, 122);
+      ctx.lineTo(xs[i+1]-28, 122);
+      ctx.stroke();
+    }
+  });
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('× 61 layers', c.width/2, 200);
+  ctx.fillText('DeepSeek-V3 Forward Pass (inference)', c.width/2, 30);
+}
+drawArchFlow(null);
+
+// ===== CHAPTER MAP =====
+document.querySelectorAll('#chapterMap .ch-map-cell').forEach(el => {
+  el.style.cursor = 'pointer';
+  el.addEventListener('click', () => {
+    document.getElementById('paperMapReadout').textContent = el.dataset.paper || 'Chapter mapping';
+  });
+});
+
+// ===== COMPONENT COMPARISON =====
+document.querySelectorAll('#compBtns .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#compBtns .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const d = COMP_DATA[btn.dataset.comp];
+    document.getElementById('compStd').textContent = d.std;
+    document.getElementById('compDS').textContent = d.ds;
+  });
+});
+
+// ===== ATTENTION EVOLUTION =====
+function drawAttnEvolution() {
+  const s = ATTN_STAGES[attnStage];
+  const c = document.getElementById('attnEvolutionCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  ATTN_STAGES.forEach((st, i) => {
+    const x = 40 + i * 85;
+    const h = st.mem * 160;
+    ctx.fillStyle = i === attnStage ? '#6c8cff' : 'rgba(108,140,255,0.25)';
+    ctx.fillRect(x, 180 - h, 60, h);
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(st.name.split(' ')[0], x + 30, 195);
+  });
+  ctx.fillStyle = '#34d399';
+  ctx.fillRect(40, 20, s.qual * 480, 12);
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Stage ${attnStage+1}/6: ${s.name}`, 40, 55);
+  document.getElementById('attnEvolutionReadout').innerHTML =
+    `<strong>${s.name}</strong> — Memory index: ${(s.mem*100).toFixed(0)}% · Quality index: ${(s.qual*100).toFixed(0)}%<br>${s.desc}`;
+}
+document.getElementById('attnPrev').onclick = () => { attnStage = Math.max(0, attnStage-1); drawAttnEvolution(); };
+document.getElementById('attnNext').onclick = () => { attnStage = Math.min(ATTN_STAGES.length-1, attnStage+1); drawAttnEvolution(); };
+drawAttnEvolution();
+
+// ===== MOE ROUTER =====
+function updateMoeRouter() {
+  const N = +document.getElementById('moeNSlider').value;
+  const k = Math.min(+document.getElementById('moeKSlider').value, N);
+  document.getElementById('moeNVal').textContent = N;
+  document.getElementById('moeKVal').textContent = k;
+  document.getElementById('moeKSlider').max = N;
+  const c = document.getElementById('moeRouterCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  const cols = Math.min(N, 32);
+  const cellW = (c.width - 40) / cols;
+  for (let i = 0; i < cols; i++) {
+    const active = i < k;
+    ctx.fillStyle = active ? 'rgba(52,211,153,0.7)' : 'rgba(42,42,58,0.8)';
+    ctx.fillRect(20 + i * cellW, 40, cellW - 2, 100);
+  }
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = '12px monospace';
+  ctx.fillText(`Showing ${cols} of ${N} experts · top-${k} active (green)`, 20, 25);
+  const pct = (k / N * 100).toFixed(1);
+  document.getElementById('moeRouterReadout').innerHTML =
+    `Active fraction: <strong>${pct}%</strong> · Sparsity: <strong>${(100-pct).toFixed(1)}%</strong> · DeepSeek-V3: 6/256 ≈ 2.3% per MoE layer`;
+}
+['moeNSlider','moeKSlider'].forEach(id => document.getElementById(id).oninput = updateMoeRouter);
+updateMoeRouter();
+
+// ===== PARAM CALCULATOR =====
+function updateParamCalc() {
+  const L = +document.getElementById('pcLSlider').value;
+  const N = +document.getElementById('pcNSlider').value;
+  const H = +document.getElementById('pcHSlider').value;
+  const S = +document.getElementById('pcSSlider').value;
+  const DL = +document.getElementById('pcDLSlider').value;
+  const DHR = +document.getElementById('pcDHRSlider').value;
+  ['pcLVal','pcNVal','pcHVal','pcSVal','pcDLVal','pcDHRVal'].forEach((id,i) => {
+    document.getElementById(id).textContent = [L,N,H,S,DL,DHR][i];
+  });
+  const bytes = 2;
+  const mha = 2 * L * S * N * H * bytes;
+  const mla = 2 * L * S * (DL + DHR) * bytes;
+  const ratio = mha / mla;
+  const c = document.getElementById('pcCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  const maxB = Math.max(mha, mla);
+  ctx.fillStyle = 'rgba(248,113,113,0.6)';
+  ctx.fillRect(60, 40, 180, mha/maxB * 140);
+  ctx.fillStyle = 'rgba(52,211,153,0.7)';
+  ctx.fillRect(320, 40, 180, mla/maxB * 140);
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = '11px monospace';
+  ctx.fillText('MHA KV', 130, 30);
+  ctx.fillText('MLA+RoPE KV', 370, 30);
+  ctx.fillText((mha/1e9).toFixed(2)+' GB', 120, 200);
+  ctx.fillText((mla/1e9).toFixed(2)+' GB', 370, 200);
+  document.getElementById('pcReadout').innerHTML =
+    `Context ${(S/1000).toFixed(0)}K · L=${L} · Ratio: <strong style="color:var(--accent3)">${ratio.toFixed(1)}×</strong> · MHA: ${(mha/1e9).toFixed(2)} GB · MLA+RoPE: ${(mla/1e9).toFixed(2)} GB`;
+}
+['pcLSlider','pcNSlider','pcHSlider','pcSSlider','pcDLSlider','pcDHRSlider'].forEach(id =>
+  document.getElementById(id).oninput = updateParamCalc);
+updateParamCalc();
+
+// ===== TIMELINE =====
+document.querySelectorAll('.tl-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.tl-item').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('timelineReadout').textContent = el.querySelector('.tl-desc').textContent;
+    drawTimeline(el.dataset.innov);
+  });
+});
+
+function drawTimeline(active) {
+  const c = document.getElementById('timelineCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  const items = ['mla','moe','v3','mtp','fp8','r1'];
+  const labels = ['V2 MLA','MoE','V3 671B','MTP','FP8','R1'];
+  items.forEach((k, i) => {
+    const x = 40 + i * 85;
+    ctx.beginPath();
+    ctx.arc(x, 80, k === active ? 18 : 12, 0, Math.PI*2);
+    ctx.fillStyle = k === active ? '#6c8cff' : '#2a2a3a';
+    ctx.fill();
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[i], x, 120);
+    if (i < items.length-1) {
+      ctx.strokeStyle = '#333';
+      ctx.beginPath();
+      ctx.moveTo(x+15, 80);
+      ctx.lineTo(x+70, 80);
+      ctx.stroke();
+    }
+  });
+}
+drawTimeline('mla');
+
+// ===== TOKEN FLOW ANIMATION =====
+let flowTimer = null;
+document.getElementById('flowAnimBtn').onclick = () => {
+  const steps = document.querySelectorAll('#tokenFlow .flow-step');
+  let i = 0;
+  clearInterval(flowTimer);
+  steps.forEach(s => s.classList.remove('active'));
+  document.getElementById('tokenFlowDisplay').innerHTML = '<span class="token token-word">quantum</span>';
+  flowTimer = setInterval(() => {
+    steps.forEach(s => s.classList.remove('active'));
+    if (i < steps.length) { steps[i].classList.add('active'); i++; }
+    else clearInterval(flowTimer);
+  }, 900);
+};
+document.getElementById('flowResetBtn').onclick = () => {
+  clearInterval(flowTimer);
+  document.querySelectorAll('#tokenFlow .flow-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('tokenFlowDisplay').innerHTML = '';
+};
+
+// ===== QUIZ =====
+function setupQuiz() {
+  const q = QUIZ[quizIdx];
+  document.getElementById('quizQuestion').textContent = q.q;
+  document.querySelectorAll('.quiz-opt').forEach((btn, i) => {
+    btn.className = 'quiz-opt';
+    btn.style.display = i < 4 ? 'block' : 'none';
+    btn.disabled = false;
+    btn.onclick = () => {
+      if (quizAnswered) return;
+      quizAnswered = true;
+      const correct = btn.textContent === q.correct;
+      if (correct) { btn.classList.add('correct'); quizScore++; }
+      else { btn.classList.add('wrong'); document.querySelectorAll('.quiz-opt').forEach(b => { if (b.textContent === q.correct) b.classList.add('correct'); }); }
+      document.getElementById('quizFeedback').innerHTML = q.explain + (correct ? ' ✓' : ' ✗');
+      document.getElementById('quizNextBtn').disabled = false;
+    };
+  });
+  // set option texts
+  const opts = document.querySelectorAll('.quiz-opt');
+  if (quizIdx === 0) return;
+}
+document.getElementById('quizNextBtn').onclick = () => {
+  quizIdx++;
+  quizAnswered = false;
+  document.getElementById('quizNextBtn').disabled = true;
+  if (quizIdx >= QUIZ.length) {
+    document.getElementById('quizQuestion').textContent = `Complete! Score: ${quizScore}/${QUIZ.length}`;
+    document.querySelectorAll('.quiz-opt').forEach(b => b.style.display = 'none');
+    document.getElementById('quizFeedback').textContent = quizScore >= 4 ? 'Excellent — you hold the full blueprint.' : 'Review chapters 04–11 and retry.';
+    document.getElementById('quizNextBtn').style.display = 'none';
+    return;
+  }
+  const q = QUIZ[quizIdx];
+  document.getElementById('quizQuestion').textContent = q.q;
+  const wrongs = [
+    ['RoPE is slower','RoPE on values only','No positional encoding'],
+    ['Yes, for faster generation','Yes, with speculative decoding only','Only for code tokens'],
+    ['175B / 37B','671B / 671B','37B / 671B inverted'],
+    ['MoE does not need balancing','More loss always helps','Use dropout instead'],
+    ['About 2×','About 10×','No compression — MLA uses more memory']
+  ];
+  const allOpts = [q.correct, ...wrongs[quizIdx]];
+  allOpts.sort(() => Math.random()-0.5);
+  document.querySelectorAll('.quiz-opt').forEach((btn, i) => {
+    btn.style.display = 'block';
+    btn.className = 'quiz-opt';
+    btn.textContent = allOpts[i];
+    btn.onclick = () => {
+      if (quizAnswered) return;
+      quizAnswered = true;
+      const correct = btn.textContent === q.correct;
+      if (correct) { btn.classList.add('correct'); quizScore++; }
+      else { btn.classList.add('wrong'); document.querySelectorAll('.quiz-opt').forEach(b => { if (b.textContent === q.correct) b.classList.add('correct'); }); }
+      document.getElementById('quizFeedback').innerHTML = q.explain;
+      document.getElementById('quizNextBtn').disabled = false;
+    };
+  });
+};
+
+// ===== PLAYGROUND =====
+function updatePlayground() {
+  const total = +document.getElementById('pgTotalSlider').value;
+  const activePct = +document.getElementById('pgActiveSlider').value;
+  const ctxK = +document.getElementById('pgCtxSlider').value;
+  const N = +document.getElementById('pgNSlider').value;
+  const attn = document.getElementById('pgAttnSelect').value;
+  document.getElementById('pgTotalVal').textContent = total;
+  document.getElementById('pgActiveVal').textContent = activePct;
+  document.getElementById('pgCtxVal').textContent = ctxK;
+  document.getElementById('pgNVal').textContent = N;
+  const active = total * activePct / 100;
+  const S = ctxK * 1000;
+  const L = 61, H = 128, DL = 512, DHR = 64;
+  let kvGB;
+  if (attn === 'mha') kvGB = 2 * L * S * N * H * 2 / 1e9;
+  else if (attn === 'gqa') kvGB = 2 * L * S * (N/8) * H * 2 / 1e9;
+  else kvGB = 2 * L * S * (DL + DHR) * 2 / 1e9;
+  const c = document.getElementById('pgCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.fillStyle = 'rgba(108,140,255,0.3)';
+  ctx.fillRect(40, 60, (total/671)*480, 40);
+  ctx.fillStyle = 'rgba(52,211,153,0.6)';
+  ctx.fillRect(40, 60, (active/671)*480, 40);
+  ctx.fillStyle = 'rgba(244,114,182,0.5)';
+  ctx.fillRect(40, 130, Math.min(kvGB/400, 1)*480, 30);
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = '11px monospace';
+  ctx.fillText(`Total ${total}B | Active ${active.toFixed(1)}B`, 40, 50);
+  ctx.fillText(`KV cache ~${kvGB.toFixed(1)} GB (${attn.toUpperCase()})`, 40, 120);
+  document.getElementById('pgReadout').innerHTML =
+    `<strong>Blueprint config:</strong> ${total}B total · ${active.toFixed(1)}B active (${activePct}%) · ${ctxK}K context · ${attn.toUpperCase()} attention · KV ≈ ${kvGB.toFixed(1)} GB`;
+}
+['pgTotalSlider','pgActiveSlider','pgCtxSlider','pgNSlider'].forEach(id => document.getElementById(id).oninput = updatePlayground);
+document.getElementById('pgAttnSelect').onchange = updatePlayground;
+updatePlayground();
+
+// ===== SCROLL =====
+// Nav bar appears after 400px scroll. Fade-in sections animate on viewport entry.
+const nav = document.getElementById('nav');
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    if (el.getBoundingClientRect().top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', onScroll);
+onScroll();
+
+// Chapter 12 Complete — Decoding DeepSeek capstone
+// Interactive demos: arch explorer, timeline, param calc, MoE router,
+// attention evolution, chapter flow, component comparison, quiz, playground
+
+// ===== CHAPTER FLOW MAP =====
+const LECTURE_PHASES = {
+  attn: { label: 'Phase 1: Attention (Ch 01–07)', nodes: ['LLM Basics','Self-Attn','Causal','MHA','KV Cache','MQA','GQA','MLA','RoPE','MLA+RoPE'], desc: 'From token embeddings through decoupled RoPE. 11 paper equations decoded.' },
+  moe: { label: 'Phase 2: MoE (Ch 08–09)', nodes: ['MoE Intro','Hands-on Demo','Aux Loss','Load Balance','DeepSeek MoE'], desc: 'Vanilla MoE → balancing → loss-free + shared + fine-grained.' },
+  mtp: { label: 'Phase 3: MTP (Ch 10)', nodes: ['MTP Intro','DeepSeek MTP','MTP Code'], desc: 'Section 2.2. Equations 21–25. Figure 3. Training only.' },
+  quant: { label: 'Phase 4: FP8 (Ch 11)', nodes: ['Quant Intro','Mixed Prec','Fine-grain','Accum/Mantissa','Online Quant'], desc: 'Section 3.3. Figures 6–7. Five-aspect framework.' }
+};
+
+function drawLectureFlow(phase) {
+  const p = LECTURE_PHASES[phase];
+  const c = document.getElementById('lectureFlowCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(p.label, c.width/2, 24);
+  const n = p.nodes.length;
+  const startX = (c.width - (n-1)*58) / 2;
+  p.nodes.forEach((node, i) => {
+    const x = startX + i * 58;
+    ctx.beginPath();
+    ctx.arc(x, 100, 22, 0, Math.PI*2);
+    ctx.fillStyle = i === n-1 ? 'rgba(108,140,255,0.4)' : 'rgba(18,18,26,1)';
+    ctx.fill();
+    ctx.strokeStyle = '#6c8cff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#e0e0e8';
+    ctx.font = '8px monospace';
+    ctx.fillText(String(i+1), x, 104);
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '7px sans-serif';
+    const words = node.split(' ');
+    words.forEach((w, wi) => ctx.fillText(w, x, 140 + wi*10));
+    if (i < n-1) {
+      ctx.strokeStyle = '#444';
+      ctx.beginPath();
+      ctx.moveTo(x+22, 100);
+      ctx.lineTo(x+36, 100);
+      ctx.stroke();
+    }
+  });
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px sans-serif';
+  ctx.fillText(p.desc, c.width/2, 280);
+  document.getElementById('lectureFlowReadout').textContent = p.label + ' — ' + p.desc;
+}
+
+document.querySelectorAll('[data-phase]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-phase]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    drawLectureFlow(btn.dataset.phase);
+  });
+});
+drawLectureFlow('attn');
+
+</script>
+
+<!-- Decoding DeepSeek Chapter 12: The Complete Blueprint -->
+</body>
+</html>

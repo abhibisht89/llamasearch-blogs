@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Byte Pair Encoding (BPE) — LLMs from Scratch</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 85vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.12) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 32px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.source-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim); margin-top: 8px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 20px 0; }
+.comparison { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 24px 0; }
+@media (max-width: 800px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.92rem; }
+.callout p { margin-bottom: 0.5em; color: var(--text); }
+.callout p:last-child { margin-bottom: 0; }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; margin: 28px 0; }
+.btn { display: inline-flex; align-items: center; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-alt); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); margin: 4px 4px 4px 0; }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.token-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; font-family: var(--mono); font-size: 0.82rem; }
+.token-pill { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card-alt); }
+.token-pill.merge { border-color: var(--accent3); background: rgba(52,211,153,0.12); color: var(--accent3); }
+.merge-log { max-height: 200px; overflow-y: auto; font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 12px; }
+.merge-log div { margin-bottom: 5px; }
+table.freq { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.8rem; margin: 16px 0; }
+table.freq th, table.freq td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+table.freq th { background: var(--bg-card-alt); color: var(--accent); }
+table.freq td { color: var(--text-dim); }
+.code-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 20px 0; }
+.code-header { padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem; color: var(--accent); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; color: var(--text); white-space: pre-wrap; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .str { color: var(--accent5); } .cmt { color: var(--text-dim); font-style: italic; }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.88rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 65%; }
+.nav-links a { font-size: 0.68rem; color: var(--text-dim); white-space: nowrap; }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+ul.dense { color: var(--text-dim); margin: 0 0 1em 1.2em; }
+ul.dense li { margin-bottom: 0.35em; }
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; background: #111118; border-bottom: 1px solid #23232f; padding: 10px 24px; font-size: 0.82rem; color: #8888a0; }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+body { padding-top: 44px !important; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Neurons All the Way Down</a><span class="bc-sep">›</span><span class="bc-current">BPE Tokenizer</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Neurons · 08 BPE</a>
+  <div class="nav-links">
+    <a href="#s0">Intro</a><a href="#s1">Three types</a><a href="#s2">Compression</a><a href="#s3">Rules</a>
+    <a href="#s4">Corpus</a><a href="#s5">Demo</a><a href="#s6">Train vs infer</a><a href="#s7">Bytes</a>
+    <a href="#s8">Vocab</a><a href="#s9">Special</a><a href="#s10">Code</a><a href="#s11">Next</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Byte Pair Encoding (BPE)</h1>
+    <p class="subtitle">The tokenizer behind GPT-2, GPT-3, and early ChatGPT: why subword BPE beats pure word- or character-level schemes, how the 1994 compression algorithm becomes a vocabulary, and how <code>tiktoken</code> handles words the training corpus never saw.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">12</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">2</span><span class="stat-label">Demos</span></div>
+      <div class="stat"><span class="stat-val">50,257</span><span class="stat-label">GPT-2 vocab</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Why BPE matters for modern LLMs</h2>
+    <p>Many introductions to language models mention “tokenization” without explaining <strong>byte pair encoding (BPE)</strong>. Yet GPT-2, GPT-3, and the original ChatGPT stack all rely on BPE-style subword tokenizers. If you only know word-level or character-level schemes, you will misread vocabulary size, context length, and why models stumble on spelling or rare strings.</p>
+    <p>A simple word-level tokenizer — split text into words, sort the vocabulary, assign integer IDs (plus punctuation tokens) — works for teaching but breaks on real text: unknown words, morphology (<code>boy</code> vs <code>boys</code>), and huge English lexicons (~170k–200k word types).</p>
+    <div class="callout">
+      <p><strong>Today’s goal:</strong> understand BPE intuitively on a worked corpus, then use <code>tiktoken</code> for the same algorithm GPT-2 ships with — including <code>&lt;|endoftext|&gt;</code> and out-of-vocabulary strings.</p>
+    </div>
+    <p>The full production pipeline also adds UTF-8 bytes, regex pretokenization, and a separate training pass that freezes merge ranks for inference.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Three tokenizer families</h2>
+    <p>Production systems usually pick among three designs. Each optimizes a different failure mode.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent);">Word-level</h3>
+        <p><code>The fox chased the dog</code> → five tokens. Simple and short sequences.</p>
+        <ul class="dense">
+          <li><strong>Pro:</strong> one token per common word</li>
+          <li><strong>Con:</strong> OOV words (e.g. <code>football</code> missing from a tiny corpus)</li>
+          <li><strong>Con:</strong> <code>boy</code> and <code>boys</code> get unrelated IDs — root meaning lost</li>
+          <li><strong>Con:</strong> vocabulary can approach 200k types</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3);">Character-level</h3>
+        <p><code>my hobby is playing cricket</code> → one token per letter (spaces optional).</p>
+        <ul class="dense">
+          <li><strong>Pro:</strong> tiny vocab (~256 symbols for English bytes/letters)</li>
+          <li><strong>Pro:</strong> no OOV — any string decomposes to known characters</li>
+          <li><strong>Con:</strong> sequences are much longer (<code>dinosaur</code> → 8 tokens)</li>
+          <li><strong>Con:</strong> word-level meaning is not explicit in the ID stream</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2);">Subword (BPE)</h3>
+        <p>Best-of-both: frequent words stay whole; rare words split into reusable pieces.</p>
+        <ul class="dense">
+          <li><strong>Pro:</strong> manageable vocab (~50k for GPT-2)</li>
+          <li><strong>Pro:</strong> captures roots (<code>token</code>, <code>tokens</code>, <code>tokenize</code>) and suffixes (<code>-ization</code>)</li>
+          <li><strong>Pro:</strong> OOV handled via subwords + characters</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout ok">
+      <p><strong>Subword rule 1:</strong> frequent words stay unsplit.<br>
+      <strong>Subword rule 2:</strong> rare words split into meaningful smaller units (down to characters if needed).</p>
+    </div>
+    <p>Examples: if <code>boy</code> appears often, keep it as one token; if <code>boys</code> is rare, split into <code>boy</code> + <code>s</code>. Similarly <code>tokenization</code> and <code>modernization</code> can share a suffix piece <code>ization</code> while keeping different stems — something neither pure word nor pure character tokenization exposes cleanly.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>BPE as compression (1994)</h2>
+    <p>BPE began as a <strong>data compression</strong> trick (Gage, 1994): scan the byte stream, find the <strong>most frequent adjacent pair</strong>, replace every non-overlapping occurrence with a new symbol not already in the alphabet, repeat until no pair appears more than once (or until you hit a budget).</p>
+    <p>The classic Wikipedia walkthrough uses the string <code>aaabdaaab</code> over alphabet <code>{a,b,c,d}</code>:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.2em;">
+      <li>Most frequent pair: <code>aa</code> (four times) → mint symbol <code>Z</code>, replace → <code>ZabdZaabc</code></li>
+      <li>Next winner: <code>ab</code> (twice) → mint <code>Y</code> → <code>ZydZyac</code></li>
+      <li>Optional further merge: <code>zy</code> → <code>X</code> → <code>Xdyac</code></li>
+    </ol>
+    <p>You trade a <strong>longer alphabet</strong> for a <strong>shorter sequence</strong>. LLM tokenizers reuse the same merge loop, but the “symbols” become vocabulary IDs instead of compression placeholders.</p>
+    <p>On byte-level BPE, the same Wikipedia string <code>aaabdaaabac</code> with three merges yields IDs <code>[258, 100, 258, 97, 99]</code> — bytes <code>a=97, b=98, c=99, d=100</code>, merges starting at ID <strong>256</strong>. The compressed story “XdXac” with <code>Z=aa, Y=ab, X=zy</code> is the same idea with human-readable merge names instead of integers.</p>
+    <div class="interactive-panel">
+      <h3>Demo 1 — Compression BPE on a string</h3>
+      <p>Type a short string (letters only for clarity). Each step merges the most frequent <em>adjacent</em> pair into a new symbol <code>Z, Y, X, …</code></p>
+      <input type="text" id="compressInput" value="aaabdaaab" style="width:100%;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card-alt);color:var(--text);font-family:var(--mono);">
+      <div style="margin:14px 0;">
+        <button type="button" class="btn" id="compressStep">Apply next merge</button>
+        <button type="button" class="btn" id="compressReset">Reset</button>
+      </div>
+      <p style="font-size:0.85rem;color:var(--text-dim);">Step <span id="compressStepN">0</span> · length <span id="compressLen">0</span></p>
+      <div class="token-row" id="compressTokens"></div>
+      <div class="merge-log" id="compressLog"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>From compression to LLM vocabulary</h2>
+    <p>For language models, BPE still repeatedly merges the <strong>most common pair</strong> in the training corpus — but the objective is a <strong>subword vocabulary</strong>, not minimal file size.</p>
+    <div class="formula">Rule 1 (LLM): frequent words → single tokens &nbsp;·&nbsp; Rule 2 (LLM): rare words → split into subwords</div>
+    <p>Before merging, production pipelines often mark <strong>word boundaries</strong>. In the worked corpus below, each word is suffixed with an end marker written <code>&lt;/w&gt;</code>. That lets the model tell “this <code>est</code> ends a word” from “<code>est</code> in the middle of <code>estimate</code>.”</p>
+    <div class="callout warn">
+      <p>Without an end marker, a merge like <code>est</code> would be ambiguous between <code>finest</code>, <code>lowest</code>, and unrelated words such as <code>estimate</code> or <code>highest</code>. Merging <code>est</code> + <code>&lt;/w&gt;</code> into <code>est&lt;/w&gt;</code> encodes “syllable at end of token.”</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Worked corpus: <code>old</code>, <code>older</code>, <code>finest</code>, <code>lowest</code></h2>
+    <p>Suppose the training set contains only these words with counts:</p>
+    <table class="freq">
+      <thead><tr><th>Word</th><th>Count</th><th>After boundary marker</th></tr></thead>
+      <tbody>
+        <tr><td>old</td><td>7</td><td>o l d &lt;/w&gt;</td></tr>
+        <tr><td>older</td><td>3</td><td>o l d e r &lt;/w&gt;</td></tr>
+        <tr><td>finest</td><td>9</td><td>f i n e s t &lt;/w&gt;</td></tr>
+        <tr><td>lowest</td><td>4</td><td>l o w e s t &lt;/w&gt;</td></tr>
+      </tbody>
+    </table>
+    <p>Character-level tokenization would stop at 12 symbol types. BPE instead discovers cross-word pieces:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.2em;">
+      <li><strong>Merge <code>e</code>+<code>s</code> → <code>es</code></strong> (13× across finest + lowest) — standalone <code>s</code> count drops to zero: <code>s</code> always followed <code>e</code> here.</li>
+      <li><strong>Merge <code>es</code>+<code>t</code> → <code>est</code></strong> (13×) — captures shared rhyme in finest/lowest.</li>
+      <li><strong>Merge <code>est</code>+<code>&lt;/w&gt;</code> → <code>est&lt;/w&gt;</code></strong> (13×) — marks word-final <code>est</code>.</li>
+      <li><strong>Merge <code>o</code>+<code>l</code> → <code>ol</code></strong> (10× in old + older), then <strong><code>ol</code>+<code>d</code> → <code>old</code></strong> (10×) — shared root for old/older.</li>
+    </ol>
+    <p>This walkthrough <em>does not</em> merge <code>f</code>+<code>i</code>+<code>n</code> into one token: those letters appear only inside <code>finest</code>, so a merge would not generalize across words. BPE favors pairs that recur in <strong>multiple word types</strong>.</p>
+    <p>After pruning zero-frequency symbols, the vocabulary lands near <strong>11 tokens</strong> (e.g. <code>l, o, w, e, r, d, i, n, f, old, est&lt;/w&gt;</code>) instead of four whole words or dozens of raw characters.</p>
+    <div class="comparison" style="grid-template-columns:1fr 1fr;">
+      <div class="card"><h3>finest</h3><p><code>f</code> <code>i</code> <code>n</code> <code>est&lt;/w&gt;</code></p></div>
+      <div class="card"><h3>lowest</h3><p><code>l</code> <code>o</code> <code>w</code> <code>est&lt;/w&gt;</code></p></div>
+      <div class="card"><h3>old</h3><p><code>old</code> <code>&lt;/w&gt;</code> (or <code>old&lt;/w&gt;</code> once boundary merges are applied)</p></div>
+      <div class="card"><h3>older</h3><p><code>old</code> <code>e</code> <code>r</code> <code>&lt;/w&gt;</code></p></div>
+    </div>
+    <div class="callout ok">
+      <p>Word-level tokenization missed that <code>old</code> is the root of <code>older</code> and that <code>est</code> is shared. Character-level missed the reusable <code>est</code> chunk. Subword BPE captured both.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Interactive merge trainer</h2>
+    <p>Step through the same global pair-counting procedure on the worked corpus. Each click merges the highest-count pair that appears in <strong>at least two different words</strong> (so <code>f</code>+<code>i</code> in only <code>finest</code> stays unmerged). The log shows which pair won and the new token name.</p>
+    <div class="interactive-panel">
+      <h3>Demo 2 — Corpus BPE (worked example)</h3>
+      <button type="button" class="btn" id="corpusStep">Apply next merge</button>
+      <button type="button" class="btn" id="corpusReset">Reset</button>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-top:12px;">Merges applied: <span id="corpusMergeN">0</span> · Active token types: <span id="corpusVocabN">0</span></p>
+      <div class="merge-log" id="corpusLog" style="max-height:280px;"></div>
+      <h3 style="margin-top:20px;font-size:1rem;">Current pair frequencies (top)</h3>
+      <table class="freq" id="corpusPairTable"><thead><tr><th>Pair</th><th>Count</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Training vs inference: the merge rule flips</h2>
+    <p>The whiteboard demos pick the <strong>most frequent pair</strong> — that is the rule during <strong>training</strong>, when you are building the merge table from corpus statistics.</p>
+    <p>At <strong>inference</strong> (encoding new text), you no longer maximize frequency. You scan the current byte/character sequence for adjacent pairs that exist in the frozen merge table and apply the pair with the <strong>lowest merge rank</strong> (the merge learned earliest). Repeat until nothing mergeable remains. That rank order is what makes everyone agree on token boundaries.</p>
+    <div class="comparison" style="grid-template-columns:1fr 1fr;">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Training</h3>
+        <p>Count pairs → merge the <strong>highest-count</strong> pair → mint new ID → repeat until vocab budget.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent);">Encoding (inference)</h3>
+        <p>Among pairs present in the string that appear in <code>merges</code>, merge the one with <strong>minimum rank</strong> → repeat until done.</p>
+      </div>
+    </div>
+    <div class="callout warn">
+      <p>Mixing these two rules is a common bug in from-scratch tokenizers. Clean implementations separate <code>train()</code> (frequency) from <code>encode()</code> (rank). OpenAI’s released GPT-2 code is <strong>inference-only</strong> — it ships merge ranks, not training logic.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Byte-level BPE on UTF-8 (production GPT-style)</h2>
+    <p>Toy examples often use character symbols for clarity. GPT-2 and descendants run BPE on <strong>UTF-8 bytes</strong>: the base vocabulary is exactly <strong>256</strong> byte values (IDs 0–255). Each merge mints ID 256, 257, … whose payload is the concatenation of its two parent byte sequences.</p>
+    <p>Byte-level BPE avoids a huge, evolving Unicode code-point table. Any string that UTF-8 encodes is representable; rare emoji or scripts fall back to multi-byte pieces instead of a single <code>&lt;unk&gt;</code>.</p>
+    <p>Before byte merges, GPT-family tokenizers apply a fixed <strong>regex pretokenization</strong> step that splits text into chunks (contractions, letter runs, numbers, punctuation). BPE then runs <em>inside</em> each chunk so merges do not glue words to trailing punctuation — e.g. preventing one token for <code>dog.</code>, <code>dog!</code>, <code>dog?</code> from splintering the vocabulary.</p>
+    <div class="code-panel">
+      <div class="code-header">gpt2_pretokenize.py (pattern sketch)</div>
+      <pre class="code-block"><span class="cmt"># GPT-2 RegexTokenizer — Unicode-aware pretokenization</span>
+PAT = <span class="str">r"'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"</span>
+<span class="cmt"># chunks = regex.split(text) → run byte-BPE inside each chunk</span></pre>
+    </div>
+    <p>Many “model can’t spell / count letters” failures are really <strong>token boundary</strong> artifacts — the LM predicts IDs, not graphemes.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Vocabulary size and compression tradeoffs</h2>
+    <p>On a toy corpus you stop when useful pairs are exhausted. On web-scale data you fix a <strong>target vocabulary size</strong> (GPT-2: <strong>50,257</strong> = 256 bytes + 50,000 merges + one special) or a merge count.</p>
+    <table class="freq">
+      <thead><tr><th>Vocab grows…</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Sequence length</td><td><strong>↓ fewer tokens</strong> per document (more bytes per token)</td></tr>
+        <tr><td>Embedding + LM head</td><td><strong>↑ more parameters</strong> (one row per token ID)</td></tr>
+        <tr><td>Updates per rare ID</td><td><strong>↓ data starvation</strong> — many rows see few gradients</td></tr>
+        <tr><td>OOV / rare words</td><td>Usually <strong>↑ better</strong> — more whole-word merges, less fragmentation</td></tr>
+      </tbody>
+    </table>
+    <p>A useful metric is <strong>compression ratio</strong> = bytes in text ÷ tokens produced. English often lands around <strong>~1.5–4 bytes/token</strong> depending on tokenizer and script; Korean or code-heavy text can be worse. When comparing models, normalize by bytes or use tokenizer-agnostic scores — raw perplexity across different tokenizers is misleading.</p>
+    <p>Compared with ~170k English word types, ~50k subwords shrinks the softmax while keeping sequences denser than character tokenization. BPE inherits OOV robustness by decomposing unknown strings into known subwords or raw bytes.</p>
+    <div class="callout">
+      <p><strong>Sweet spot:</strong> frontier models cluster in the <strong>tens of thousands to ~100k</strong> range (GPT-2 ~50k, GPT-4 <code>cl100k_base</code> ~100k). Millions of tokens rarely help — memory, softmax cost, and under-trained rows dominate.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Special tokens: EOS, padding, and chat templates</h2>
+    <p>Beyond merge-learned subwords, models reserve IDs for <strong>control symbols</strong>. These are not produced by ordinary BPE on letters; the runtime matches literal strings and swaps in reserved IDs.</p>
+    <table class="freq">
+      <thead><tr><th>Token</th><th>Role</th><th>GPT-2 example</th></tr></thead>
+      <tbody>
+        <tr><td><strong>EOS / end-of-document</strong></td><td>Marks document boundaries in pretraining; model learns not to attend across it</td><td><code>&lt;|endoftext|&gt;</code> → ID <strong>50256</strong></td></tr>
+        <tr><td><strong>BOS</strong></td><td>Explicit sequence start (where used)</td><td>Often folded into template or first context token</td></tr>
+        <tr><td><strong>PAD</strong></td><td>Aligns batch lengths; must be <strong>masked out</strong> of loss and attention</td><td>Common in fine-tuning, less in pure causal LM generation</td></tr>
+        <tr><td><strong>Chat / instruction</strong></td><td>Structure multi-turn prompts for SFT models</td><td><code>&lt;|im_start|&gt;user</code>, role markers, tool IDs</td></tr>
+      </tbody>
+    </table>
+    <p>GPT-2 pretraining concatenates documents separated by <code>&lt;|endoftext|&gt;</code>. Instruction-tuned stacks add many more specials; extending a tokenizer means appending rows to the embedding matrix and LM head (often small random init, then train).</p>
+    <div class="code-panel">
+      <div class="code-header">tiktoken — special-token safety</div>
+      <pre class="code-block"><span class="kw">import</span> tiktoken
+enc = tiktoken.get_encoding(<span class="str">"cl100k_base"</span>)
+<span class="cmt"># Must opt in — otherwise user text containing &lt;|endoftext|&gt; is a footgun</span>
+ids = enc.encode(<span class="str">"&lt;|endoftext|&gt;hello"</span>, allowed_special=<span class="str">"all"</span>)</pre>
+    </div>
+    <p>Production libraries mirror this with <code>register_special_tokens()</code> and <code>allowed_special</code> on <code>encode()</code>. Treat special strings as part of your prompt-injection surface when hardening APIs.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2><code>tiktoken</code> and implementing BPE yourself</h2>
+    <p>Training BPE on billions of tokens is engineering-heavy; inference only needs frozen merge ranks. The <code>tiktoken</code> library loads GPT-2 encodings in one line (Rust core, Python wrapper).</p>
+    <div class="code-panel">
+      <div class="code-header">tokenizer_demo.py</div>
+      <pre class="code-block"><span class="kw">import</span> tiktoken
+
+tokenizer = tiktoken.get_encoding(<span class="str">"gpt2"</span>)
+
+text = (
+    <span class="str">"Hello, do you like tea?&lt;|endoftext|&gt;"</span>
+    <span class="str">"In the sunlit terraces of someunknownplace."</span>
+)
+token_ids = tokenizer.encode(text)
+<span class="kw">print</span>(token_ids)       <span class="cmt"># includes 50256 for &lt;|endoftext|&gt;</span>
+<span class="kw">print</span>(tokenizer.decode(token_ids))</pre>
+    </div>
+    <p>The OOV sentence <code>someunknownplace</code> and gibberish like <code>akwirwier</code> still encode: BPE walks left-to-right, applying merges until only known subwords or bytes remain. Decode round-trips the original UTF-8 string.</p>
+    <h3 style="margin-top:28px;font-size:1.1rem;color:var(--text);">Train your own tokenizer</h3>
+    <p>When you need reproducible training (not just inference), a typical stack provides three layers:</p>
+    <ul class="dense">
+      <li><strong>BasicTokenizer</strong> — byte-level BPE directly on UTF-8 text (no regex split)</li>
+      <li><strong>RegexTokenizer</strong> — GPT-2-style pretokenization + BPE + special tokens</li>
+      <li><strong>GPT4Tokenizer</strong> — matches <code>cl100k_base</code> from tiktoken for verification</li>
+    </ul>
+    <div class="code-panel">
+      <div class="code-header">train_bpe.py — quick start (Wikipedia toy string)</div>
+      <pre class="code-block"><span class="kw">from</span> minbpe <span class="kw">import</span> BasicTokenizer
+tokenizer = BasicTokenizer()
+text = <span class="str">"aaabdaaabac"</span>
+tokenizer.train(text, <span class="str">256</span> + <span class="str">3</span>)  <span class="cmt"># 256 byte tokens + 3 merges</span>
+<span class="kw">print</span>(tokenizer.encode(text))   <span class="cmt"># [258, 100, 258, 97, 99]</span>
+tokenizer.save(<span class="str">"toy"</span>)           <span class="cmt"># toy.model + toy.vocab</span></pre>
+    </div>
+    <p>Install: <code>pip install tiktoken minbpe</code>.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>What comes next</h2>
+    <p>Token IDs are not embeddings yet. The next step in the pipeline is <strong>data sampling</strong>, <strong>batch size</strong>, and <strong>context length</strong> before vectors enter the transformer blocks.</p>
+    <div class="card">
+      <h3>Progress checklist</h3>
+      <ul class="dense">
+        <li>✓ Text → token IDs (simple word tokenizer, then BPE)</li>
+        <li>→ Token embeddings (next)</li>
+        <li>→ Batched sequences with context windows</li>
+        <li>→ Forward pass through GPT blocks</li>
+      </ul>
+    </div>
+    <p><strong>Practice:</strong> run <code>tiktoken.get_encoding("gpt2")</code> on rare names, code, and multilingual text; train the Wikipedia string with <code>BasicTokenizer</code>; compare byte/token compression ratio on your own samples.</p>
+  </div>
+</section>
+
+<footer class="footer fade-in">
+  <div class="container">
+    Interactive chapter · Neurons All the Way Down · Byte Pair Encoding
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var nav = document.getElementById('nav');
+  window.addEventListener('scroll', function () {
+    nav.classList.toggle('visible', window.scrollY > 100);
+  }, { passive: true });
+  document.querySelectorAll('.fade-in').forEach(function (el) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.08 });
+    io.observe(el);
+  });
+
+  /* Demo 1: compression on a string */
+  var compressOrig = 'aaabdaaab';
+  var compressState = [];
+  var compressLog = [];
+  var mergeNames = 'ZYXWVUTSRQPONMLKJIHGF'.split('');
+
+  function compressInit() {
+    compressOrig = document.getElementById('compressInput').value.replace(/[^a-zA-Z]/g, '') || 'aaabdaaab';
+    compressState = compressOrig.split('');
+    compressLog = [];
+    renderCompress();
+  }
+
+  function pairCounts(arr) {
+    var c = {};
+    for (var i = 0; i < arr.length - 1; i++) {
+      var k = arr[i] + '|' + arr[i + 1];
+      c[k] = (c[k] || 0) + 1;
+    }
+    return c;
+  }
+
+  function mergeOnce(arr) {
+    var stats = pairCounts(arr);
+    var bestK = null, bestC = 0;
+    Object.keys(stats).forEach(function (k) {
+      if (stats[k] > bestC) { bestC = stats[k]; bestK = k; }
+    });
+    if (!bestK || bestC < 2) return null;
+    var parts = bestK.split('|');
+    var a = parts[0], b = parts[1];
+    var name = mergeNames[compressLog.length] || ('M' + compressLog.length);
+    var out = [];
+    for (var i = 0; i < arr.length; i++) {
+      if (i < arr.length - 1 && arr[i] === a && arr[i + 1] === b) {
+        out.push(name);
+        i++;
+      } else out.push(arr[i]);
+    }
+    return { arr: out, pair: a + b, name: name, count: bestC };
+  }
+
+  function renderCompress() {
+    var row = document.getElementById('compressTokens');
+    row.innerHTML = '';
+    compressState.forEach(function (t) {
+      var s = document.createElement('span');
+      s.className = 'token-pill' + (/^[A-Z]$/.test(t) && t.length === 1 ? ' merge' : '');
+      s.textContent = t;
+      row.appendChild(s);
+    });
+    document.getElementById('compressStepN').textContent = String(compressLog.length);
+    document.getElementById('compressLen').textContent = String(compressState.length);
+    var log = document.getElementById('compressLog');
+    log.innerHTML = compressLog.map(function (m, i) {
+      return '<div>Step ' + (i + 1) + ': merge "' + m.pair + '" ×' + m.count + ' → ' + m.name + '</div>';
+    }).join('') || '<div>Click “Apply next merge” to run BPE compression.</div>';
+  }
+
+  document.getElementById('compressStep').addEventListener('click', function () {
+    var r = mergeOnce(compressState);
+    if (!r) { document.getElementById('compressLog').innerHTML += '<div style="color:var(--accent5);">No pair appears twice — stopping.</div>'; return; }
+    compressState = r.arr;
+    compressLog.push(r);
+    renderCompress();
+  });
+  document.getElementById('compressReset').addEventListener('click', compressInit);
+  document.getElementById('compressInput').addEventListener('change', compressInit);
+  compressInit();
+
+  /* Demo 2: worked corpus with </w> */
+  var END = '</w>';
+  var corpusWords = [
+    { word: 'old', count: 7 },
+    { word: 'older', count: 3 },
+    { word: 'finest', count: 9 },
+    { word: 'lowest', count: 4 }
+  ];
+  var corpusSeqs = [];
+  var corpusMerges = [];
+
+  function wordToChars(w) {
+    return w.split('').concat([END]);
+  }
+
+  function corpusReset() {
+    corpusSeqs = corpusWords.map(function (o) {
+      return { chars: wordToChars(o.word), count: o.count };
+    });
+    corpusMerges = [];
+    corpusRender();
+  }
+
+  function globalPairCounts() {
+    var c = {};
+    corpusSeqs.forEach(function (entry, wi) {
+      var ch = entry.chars;
+      for (var i = 0; i < ch.length - 1; i++) {
+        var k = ch[i] + ' ' + ch[i + 1];
+        if (!c[k]) c[k] = { count: 0, words: {} };
+        c[k].count += entry.count;
+        c[k].words[wi] = true;
+      }
+    });
+    return c;
+  }
+
+  function bestPair(stats) {
+    var bestK = null, bestC = 0, bestWords = 0;
+    Object.keys(stats).forEach(function (k) {
+      var wordTypes = Object.keys(stats[k].words).length;
+      if (wordTypes < 2) return;
+      if (stats[k].count > bestC) {
+        bestC = stats[k].count;
+        bestK = k;
+        bestWords = wordTypes;
+      }
+    });
+    return { key: bestK, count: bestC, wordTypes: bestWords };
+  }
+
+  function applyMerge(pairKey) {
+    var parts = pairKey.split(' ');
+    var a = parts[0], b = parts.slice(1).join(' ');
+    var newTok = a + b;
+    corpusSeqs.forEach(function (entry) {
+      var ch = entry.chars;
+      var next = [];
+      for (var i = 0; i < ch.length; i++) {
+        if (i < ch.length - 1 && ch[i] === a && ch[i + 1] === b) {
+          next.push(newTok);
+          i++;
+        } else next.push(ch[i]);
+      }
+      entry.chars = next;
+    });
+    corpusMerges.push({ pair: pairKey, token: newTok });
+  }
+
+  function activeTokens() {
+    var set = {};
+    corpusSeqs.forEach(function (e) {
+      e.chars.forEach(function (t) { set[t] = true; });
+    });
+    return Object.keys(set).sort();
+  }
+
+  function corpusRender() {
+    document.getElementById('corpusMergeN').textContent = String(corpusMerges.length);
+    document.getElementById('corpusVocabN').textContent = String(activeTokens().length);
+    var log = document.getElementById('corpusLog');
+    if (!corpusMerges.length) {
+      log.innerHTML = '<div>Corpus: old×7, older×3, finest×9, lowest×4 — each word ends with ' + END + '</div>';
+    } else {
+      log.innerHTML = corpusMerges.map(function (m, i) {
+        return '<div>Merge ' + (i + 1) + ': "' + m.pair + '" → <strong>' + m.token + '</strong></div>';
+      }).join('');
+      log.innerHTML += '<div style="margin-top:10px;color:var(--text);">Tokens: ' + activeTokens().join(', ') + '</div>';
+      var lines = corpusSeqs.map(function (e, idx) {
+        return corpusWords[idx].word + ' → ' + e.chars.join(' · ');
+      });
+      log.innerHTML += '<div style="margin-top:8px;">' + lines.join('<br>') + '</div>';
+    }
+    var stats = globalPairCounts();
+    var keys = Object.keys(stats).sort(function (a, b) { return stats[b].count - stats[a].count; });
+    var tbody = document.querySelector('#corpusPairTable tbody');
+    tbody.innerHTML = keys.slice(0, 12).map(function (k) {
+      var w = Object.keys(stats[k].words).length;
+      var eligible = w >= 2 ? '' : ' style="opacity:0.45" title="Only one word type — skipped in this example"';
+      return '<tr' + eligible + '><td>' + k + '</td><td>' + stats[k].count + ' (' + w + ' words)</td></tr>';
+    }).join('');
+  }
+
+  document.getElementById('corpusStep').addEventListener('click', function () {
+    var pick = bestPair(globalPairCounts());
+    if (!pick.key || pick.count < 2) {
+      document.getElementById('corpusLog').innerHTML += '<div style="color:var(--accent5);">No pair with count ≥ 2 across ≥2 word types — done.</div>';
+      return;
+    }
+    applyMerge(pick.key);
+    corpusRender();
+  });
+  document.getElementById('corpusReset').addEventListener('click', corpusReset);
+  corpusReset();
+})();
+</script>
+</body>
+</html>

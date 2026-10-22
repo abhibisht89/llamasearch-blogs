@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chunking Strategies — The Highest-Leverage RAG Decision | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 44px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover, .main-nav a.active { color: var(--accent); }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(167, 139, 250, 0.14), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(34, 211, 238, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(244, 114, 182, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.55rem, 4vw, 2.65rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 22px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .callout.warn { border-left-color: var(--accent5); }
+    .callout.ok { border-left-color: var(--accent3); }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0; }
+    @media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      font-size: 0.92rem;
+      color: var(--text-dim);
+    }
+    .comparison > div h4 { margin: 0 0 10px; color: var(--text); font-size: 0.95rem; }
+    .demo {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .demo h4 { margin: 0 0 14px; color: var(--text); font-size: 1rem; }
+    .demo-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
+    button.btn, .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+    }
+    button.btn:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
+    button.btn.primary { background: rgba(34, 211, 238, 0.15); border-color: var(--accent); color: var(--accent); }
+    button.btn.on { background: rgba(167, 139, 250, 0.2); border-color: var(--accent2); color: var(--accent2); }
+    textarea.input, input.input, select.input {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    textarea.input { min-height: 100px; resize: vertical; }
+    .slider-row { display: flex; align-items: center; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+    .slider-row label { min-width: 160px; color: var(--text-dim); font-size: 0.88rem; }
+    .slider-row input[type="range"] { flex: 1; min-width: 120px; max-width: 320px; }
+    .slider-val { font-family: var(--mono); color: var(--accent5); min-width: 3.5rem; }
+    .chunk-preview {
+      font-size: 0.88rem;
+      line-height: 1.75;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .sim-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 0.8rem; color: var(--text-dim); }
+    .sim-bar-wrap { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+    .sim-bar { height: 100%; border-radius: 5px; transition: width 0.2s; }
+    .sim-bar.high { background: linear-gradient(90deg, var(--accent3), var(--accent)); }
+    .sim-bar.low { background: linear-gradient(90deg, var(--danger), var(--accent5)); }
+    .breakpoint-tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(248, 113, 113, 0.2);
+      color: var(--danger);
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .late-tokens { display: flex; flex-wrap: wrap; gap: 4px; margin: 16px 0; }
+    .late-token {
+      width: 22px;
+      height: 28px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      font-size: 0.55rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      cursor: default;
+    }
+    .late-token.in-chunk { background: rgba(34, 211, 238, 0.2); border-color: var(--accent); color: var(--accent); }
+    .late-token.boundary { box-shadow: 0 0 0 2px var(--accent2); }
+    .playground-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 860px) { .playground-grid { grid-template-columns: 1fr; } }
+    .stat-row { display: flex; flex-wrap: wrap; gap: 16px; margin: 12px 0; font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); }
+    .stat-row span strong { color: var(--accent5); }
+    .sep-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+    .sep-pill {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+    }
+    .sep-pill em { color: var(--accent2); font-style: normal; }
+    .context-toggle { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .prompt-preview {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      max-height: 280px;
+      overflow-y: auto;
+      color: var(--text-dim);
+    }
+    footer.page-foot {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+    table.spec {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 16px 0;
+    }
+    table.spec th, table.spec td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      color: var(--text-dim);
+    }
+    table.spec th { background: var(--bg-card); color: var(--text); }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../index.html">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../index.html">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Chunking Strategies</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="mainNav">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="Page sections">
+    <a href="#s0">00 · Why it matters</a>
+    <a href="#s1">01 · Fixed-size</a>
+    <a href="#s2">02 · Recursive</a>
+    <a href="#s3">03 · Semantic</a>
+    <a href="#s4">04 · Structure</a>
+    <a href="#s5">05 · Contextual</a>
+    <a href="#s6">06 · Late chunking</a>
+    <a href="#s7">07 · Recommendations</a>
+    <a href="#s8">08 · Playground</a>
+  </nav>
+
+  <header class="hero">
+    <span class="chapter-badge">Part 17 · Search Zero to Hero</span>
+    <h1>Chunking Strategies<br /><span style="color: var(--accent2);">The Highest-Leverage RAG Decision</span></h1>
+    <p class="subtitle">
+      <strong style="color: var(--text);">Chunking</strong> is how you cut documents into units before <code>embedding</code> and <code>retrieval</code>.
+      It shapes what your index can “see,” what gets matched to a query, and what evidence the model reads.
+      Fixed-size splits, recursive separators, meaning-based boundaries, structure-aware rules, contextual prefixes, and late chunking each trade implementation cost against boundary quality.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">∞</div><div class="lbl">Valid strategies</div></div>
+      <div class="hero-stat"><div class="val">1×</div><div class="lbl">Pipeline choice</div></div>
+      <div class="hero-stat"><div class="val">k</div><div class="lbl">Chunks retrieved</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>00 · Why chunking matters</h2>
+    <p>
+      In a typical retrieval-augmented generation (<code>RAG</code>) stack, raw documents rarely flow whole into a vector database.
+      They are first transformed into <strong>chunks</strong>: contiguous spans of text that become rows in your index—each with an embedding vector, optional metadata, and sometimes links back to a parent file or section.
+      That transformation is <em>chunking</em>: the policy that decides where the scissors go.
+    </p>
+    <p>
+      Chunk boundaries sit upstream of embedding, retrieval, and generation.
+      A weak embedding model on well-chosen chunks can still retrieve useful evidence; a state-of-the-art model on badly fragmented or bloated chunks will confidently surface the wrong paragraphs.
+      The generator only reads what retrieval promotes into the prompt window, so evidence that was never retrieved—or arrives without enough local context—limits answer quality regardless of prompt wording.
+    </p>
+    <p>
+      The dilemma is structural. If chunks are <strong>too small</strong>, each vector encodes a narrow slice of meaning: pronouns lose their antecedents, definitions detach from terms, and legal clauses split from the headings that disambiguate them.
+      If chunks are <strong>too large</strong>, each embedding becomes an average of many topics; similarity search drifts toward “vaguely related” passages, and the model wastes attention on irrelevant sentences bundled into the same hit.
+    </p>
+    <p>
+      There is <strong>no universal best strategy</strong>.
+      What works for uniform internal memos may fail for <code>HTML</code> knowledge bases, <code>PDF</code> manuals with two-column layouts, or repositories where the unit of truth is a function body rather than a paragraph.
+      The right approach is the one that aligns chunk boundaries with how your users ask questions and how meaning is organized in the source material.
+    </p>
+    <h3>What “good” looks like</h3>
+    <p>
+      Good chunks are <strong>semantically coherent</strong> (mostly one topic or task), <strong>self-contained enough</strong> to answer targeted queries without mandatory off-chunk context, and <strong>sized appropriately</strong> for your embedding model and retriever.
+      They should also carry <strong>metadata</strong> when possible—source title, section path, page span, version—so filters and rerankers can exploit structure downstream.
+    </p>
+    <ul class="fancy">
+      <li><strong>Retrieval precision</strong> benefits when chunks line up with natural question targets (procedures, definitions, policies, examples).</li>
+      <li><strong>Generator faithfulness</strong> benefits when each retrieved block includes the local context the model needs to interpret specialized terms.</li>
+      <li><strong>Operational cost</strong> shifts with chunk count: more chunks mean more embeddings, more index storage, and often more candidates to rerank.</li>
+    </ul>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>01 · Fixed-size chunking</h2>
+    <p>
+      The simplest policy is <strong>fixed-size chunking</strong>: walk the document in steps of <code>N</code> characters or tokens and cut, optionally sliding the window so neighboring chunks <strong>overlap</strong>.
+      Libraries and benchmarks often cite token budgets (for example <code>512</code> tokens) because embedding models were trained with specific sequence lengths; in product code you might approximate tokens with a byte-pair estimate or count with the same tokenizer your embedder uses.
+    </p>
+    <p>
+      <strong>Overlap</strong> (for example <code>100</code> tokens shared between consecutive chunks) reduces the chance that a critical sentence sits on a hard boundary with half its content in one chunk and half in another.
+      Overlap is not free: it multiplies storage and indexing work, and highly redundant chunks can skew retrieval if the same fact appears in many near-duplicate vectors.
+    </p>
+    <div class="comparison">
+      <div>
+        <h4>Pros</h4>
+        Trivial to implement, deterministic, fast on huge files, easy to reason about average chunk length and index size. Ideal for first prototypes and uniform narrative text.
+      </div>
+      <div>
+        <h4>Cons</h4>
+        Ignores grammar and document structure: you can sever sentences, tables, and list items arbitrarily. Boundaries are arbitrary with respect to meaning, so two related facts may land in non-adjacent chunks with no overlap bridge.
+      </div>
+    </div>
+    <p>
+      <strong>When to use:</strong> early experimentation, logs or streams with weak structure, or when you must guarantee strict token budgets per index row for compliance or latency reasons.
+      Move to richer strategies when retrieval quality plateaus or when your sources have clear headings, code fences, or markup.
+    </p>
+
+    <div class="demo" id="fixedDemo">
+      <h4>Interactive demo: fixed windows</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">
+        Chunk size is measured in <strong>characters</strong> here (for a rough token estimate in Latin script, divide by about <code>4</code>).
+        Overlap cannot exceed chunk size. Colors show distinct chunks after splitting the sample document.
+      </p>
+      <div class="slider-row">
+        <label for="fixedSize">Chunk size (chars)</label>
+        <input type="range" id="fixedSize" min="40" max="320" value="120" />
+        <span class="slider-val" id="fixedSizeVal">120</span>
+      </div>
+      <div class="slider-row">
+        <label for="fixedOverlap">Overlap (chars)</label>
+        <input type="range" id="fixedOverlap" min="0" max="120" value="24" />
+        <span class="slider-val" id="fixedOverlapVal">24</span>
+      </div>
+      <div id="fixedOut" class="chunk-preview" aria-live="polite"></div>
+      <p id="fixedMeta" style="margin:12px 0 0;font-size:0.82rem;color:var(--text-dim);"></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>02 · Recursive character splitting</h2>
+    <p>
+      <strong>Recursive character splitting</strong> is a practical default in many frameworks: try to split on large structural separators first, then recurse with finer separators until pieces fit under a maximum size.
+      A common hierarchy (as in LangChain’s <code>RecursiveCharacterTextSplitter</code>) is:
+      <code>"\n\n"</code> (paragraphs) → <code>"\n"</code> (lines) → <code>". "</code> (sentence-like breaks) → <code>" "</code> (words) → empty string (characters).
+    </p>
+    <p>
+      The algorithm prefers to keep paragraphs intact; only when a block still exceeds the limit does it walk down the separator list.
+      The result is usually more readable than raw fixed windows, and chunk boundaries more often fall on natural pauses—though it is still fundamentally a <em>textual</em> heuristic, not a semantic understanding of topic shifts.
+      Recursive splitting is a common default because it improves on blind fixed slicing without an embedding pass at ingest time.
+    </p>
+    <p>
+      You still choose <code>chunk_size</code> and <code>chunk_overlap</code> in character or token units.
+      Overlap applies when reassembling or when further splitting merges fragments; tune it the same way you would for fixed-size chunking, typically as a fraction of the chunk budget.
+    </p>
+
+    <div class="demo">
+      <h4>Separator hierarchy (conceptual)</h4>
+      <div class="sep-pills" id="sepPills"></div>
+      <p style="margin:0 0 12px;font-size:0.88rem;color:var(--text-dim);">
+        The splitter walks this list top-to-bottom whenever a segment is still too long.
+      </p>
+      <div class="slider-row">
+        <label for="recMax">Max chunk (chars)</label>
+        <input type="range" id="recMax" min="80" max="400" value="200" />
+        <span class="slider-val" id="recMaxVal">200</span>
+      </div>
+      <div id="recOut" class="chunk-preview" aria-live="polite"></div>
+      <p id="recMeta" style="margin:12px 0 0;font-size:0.82rem;color:var(--text-dim);"></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>03 · Semantic chunking</h2>
+    <p>
+      <strong>Semantic chunking</strong> aims to cut where the <em>meaning</em> shifts rather than at every <code>N</code> characters.
+      A representative approach—popularized in discussions of Greg Kamradt’s experiments—embeds each sentence (or a short sliding window of sentences), measures similarity between neighbors, and treats sharp drops in cosine similarity as <strong>topic boundaries</strong> where a new chunk should start.
+    </p>
+    <p>
+      Variants compare adjacent single sentences, adjacent windows, or cumulative context against the next window; all share the idea that <strong>embedding space geometry</strong> approximates topical continuity.
+      When similarity falls below a threshold <code>τ</code>, you start a fresh chunk and group subsequent high-similarity sentences together until the next drop.
+    </p>
+    <div class="comparison">
+      <div>
+        <h4>Pros</h4>
+        Chunks tend to align with subject changes—helpful for long essays, policy compendia, and raw dialogue logs where paragraph breaks are missing or misleading.
+      </div>
+      <div>
+        <h4>Cons</h4>
+        Requires an embedding pass during ingestion (cost and latency). Threshold <code>τ</code> is data-sensitive: too low merges unrelated material; too high fragments coherent sections. Short sentences can produce noisy vectors.
+      </div>
+    </div>
+    <p>
+      For production, pair semantic boundaries with a <strong>maximum chunk size</strong> cap so outliers do not create enormous single vectors, and consider normalizing or smoothing similarity scores across a document to reduce single-sentence spikes.
+    </p>
+
+    <div class="demo" id="semDemo">
+      <h4>Interactive demo: adjacent-sentence similarity</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">
+        This page uses a lightweight <strong>bag-of-words cosine similarity</strong> between consecutive sentences to illustrate the idea—no external API calls.
+        Real pipelines use your production <code>embedding</code> model; the relative shape of the similarity curve is what you tune against.
+      </p>
+      <div class="slider-row">
+        <label for="semThresh">Breakpoint if similarity &lt;</label>
+        <input type="range" id="semThresh" min="0" max="100" value="35" />
+        <span class="slider-val" id="semThreshVal">0.35</span>
+      </div>
+      <div id="semBars"></div>
+      <div id="semChunks" class="chunk-preview" style="margin-top:16px;"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>04 · Structure-aware chunking</h2>
+    <p>
+      <strong>Structure-aware chunking</strong> uses explicit document signals—headings, lists, tables, code fences, page blocks—instead of guessing from whitespace alone.
+      For <code>HTML</code>, splitting on tags like <code>&lt;h1&gt;</code>, <code>&lt;h2&gt;</code>, and <code>&lt;h3&gt;</code> keeps sections intact; for <code>Markdown</code>, lines beginning with <code>#</code> through <code>######</code> define a natural outline tree.
+    </p>
+    <p>
+      <code>PDF</code> sources often need layout analysis (reading order, columns, headers/footers) before structure is trustworthy; many teams run specialized extractors or vision models to recover headings and blocks.
+      For source code, the logical unit is frequently a <strong>function</strong>, <strong>class</strong>, or <strong>method</strong>; tree-sitter or language servers can chunk by AST nodes while preserving syntax validity inside each span.
+    </p>
+    <div class="comparison">
+      <div>
+        <h4>Pros</h4>
+        Chunks map to how humans navigate the material (chapters, API methods, config keys).
+      </div>
+      <div>
+        <h4>Cons</h4>
+        Section lengths vary wildly—a short <code>README</code> heading may cover one line while another section spans pages—so you may still need secondary splitting inside oversized sections.
+      </div>
+    </div>
+
+    <div class="demo">
+      <h4>Interactive demo: split on Markdown headings</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">
+        Edit the sample; each <code>#</code> header starts a new chunk. Very long sections are left intact here—production systems usually recurse with recursive or fixed splitting inside each section.
+      </p>
+      <textarea class="input" id="mdInput" rows="8"></textarea>
+      <button type="button" class="btn primary" id="mdRun">Re-split</button>
+      <div id="mdOut" class="chunk-preview" style="margin-top:12px;"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>05 · Contextual retrieval (Anthropic’s approach)</h2>
+    <p>
+      Even perfect physical boundaries can produce <strong>orphaned chunks</strong>: a passage that made sense on page seven reads like gibberish without the contract title, product name, or jurisdiction stated only in the introduction.
+      <strong>Contextual retrieval</strong> addresses this by prepending a short, human-readable <strong>contextual prefix</strong> to each chunk before embedding (and often before storage), summarizing where the chunk lives in the broader document and what it is about.
+    </p>
+    <p>
+      A typical prefix might read: “This passage is from a software licensing agreement for Product X; it discusses payment terms and audit rights.”
+      Prefixes are usually generated by an <code>LLM</code> with the full document (or a rolling summary) in view, then cached alongside the chunk text.
+    </p>
+    <p>
+      Anthropic reported roughly a <strong>49% reduction</strong> in failed retrievals when contextualizing chunks in a published enterprise benchmark (exact figures depend on corpus and eval).
+      Prefixes help embeddings capture local wording when the chunk’s role in the document is spelled out explicitly.
+      Costs include extra <code>LLM</code> calls at ingest time and longer strings to embed; mitigations include batching, caching stable documents, and generating concise prefixes with a small, fast model.
+    </p>
+
+    <div class="demo">
+      <h4>Interactive demo: with vs. without contextual prefix</h4>
+      <div class="context-toggle">
+        <button type="button" class="btn on" id="ctxBare">Chunk only</button>
+        <button type="button" class="btn" id="ctxFull">With contextual prefix</button>
+      </div>
+      <div class="prompt-preview" id="ctxPreview"></div>
+      <p style="margin:12px 0 0;font-size:0.82rem;color:var(--text-dim);">
+        Toggle to see how much disambiguation a short document-level cue adds for retrieval and reranking—even before the generator sees the text.
+      </p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>06 · Late chunking</h2>
+    <p>
+      Classical pipelines <strong>chunk before embedding</strong>: each span is encoded in isolation, so cross-chunk context never influences the vector representation.
+      <strong>Late chunking</strong> flips the order: pass the <strong>entire document</strong> (or the largest feasible segment that fits the model’s context) through the transformer once, then <strong>slice the sequence of token embeddings</strong> at your chunk boundaries to produce per-chunk vectors.
+    </p>
+    <p>
+      Because every token’s representation was computed with global self-attention (within that forward pass), each slice is <strong>context-aware</strong> of the rest of the document—pronouns, definitions, and section themes leak appropriately into local vectors without concatenating the whole file into every chunk at rest.
+      Jina AI and others have popularized embedding models and documentation oriented toward this workflow; it pairs naturally with <strong>long-context</strong> encoders.
+      You need a model that exposes token-level outputs and supports long sequences; memory and latency scale with document length, and very long sources may still require hierarchical splitting before each late-chunking pass.
+    </p>
+
+    <div class="demo" id="lateDemo">
+      <h4>Interactive demo: one forward pass, many slice points</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">
+        Each box represents a token after a hypothetical full-document encoding. Use the slider to choose how many tokens belong to the first chunk; the rest form a second chunk.
+        Highlighting shows which tokens contribute to which exported embedding vector—conceptually, slices along the sequence dimension.
+      </p>
+      <div class="slider-row">
+        <label for="lateSplit">First chunk length (tokens)</label>
+        <input type="range" id="lateSplit" min="3" max="17" value="8" />
+        <span class="slider-val" id="lateSplitVal">8</span>
+      </div>
+      <div class="late-tokens" id="lateTokens" aria-label="Token grid"></div>
+      <p id="lateExplain" style="margin:0;font-size:0.85rem;color:var(--text-dim);"></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>07 · Practical recommendations</h2>
+    <p>
+      Start with <strong>recursive character splitting</strong> unless you already know your corpus demands structure-first or semantic rules.
+      It is the best “boring default” for mixed prose: cheap, predictable, and kinder to readers than raw fixed windows.
+    </p>
+    <table class="spec">
+      <thead>
+        <tr><th>Knob</th><th>Starting range</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>chunk_size</code></td>
+          <td><code>256–512</code> tokens (typical)</td>
+          <td>Align with embedder sweet spot; smaller for precise facts, larger for narrative context.</td>
+        </tr>
+        <tr>
+          <td><code>overlap</code></td>
+          <td><code>10–20%</code> of chunk size</td>
+          <td>Reduces edge cuts; watch for duplicate retrieval hits.</td>
+        </tr>
+        <tr>
+          <td>Metadata</td>
+          <td>title, path, header, page</td>
+          <td>Enables filtering, parent expansion, and UI source chips.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Always evaluate with <strong>real user queries</strong> from logs or interviews—not generic “vibes” on a handful of hand-picked questions.
+      Build a small labeled set (query → relevant chunk ids) and measure recall@<code>k</code>, mean reciprocal rank, or task success after generation.
+    </p>
+    <h3>Parent document pattern</h3>
+    <p>
+      A powerful hybrid is <strong>parent document retrieval</strong>: embed smaller, precise “child” chunks for search, but when a child hits, return a wider <strong>parent</strong> span (section or page) to the model.
+      You keep retrieval sharp while giving the generator enough surrounding prose to interpret the hit.
+    </p>
+    <h3>Agentic chunking</h3>
+    <p>
+      Some teams use <strong>agentic chunking</strong>: an <code>LLM</code> or tool-using agent proposes split points, classifies passages, or labels chunks with structured metadata before indexing.
+      Quality can be excellent; cost and nondeterminism rise, so guard with schemas, spot checks, and regression tests on chunk cardinality.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s8">
+    <h2>08 · Chunking laboratory (playground)</h2>
+    <p>
+      Paste any document below, pick a strategy, and tune parameters.
+      <strong>Fixed</strong> and <strong>recursive</strong> use character budgets on this page; <strong>semantic</strong> uses the same local bag-of-words similarity as the earlier demo (a stand-in for embedding-based breakpoints).
+      Output shows <strong>color-highlighted chunks</strong>, total count, and average chunk length.
+    </p>
+
+    <div class="demo">
+      <h4>Laboratory</h4>
+      <textarea class="input" id="labDoc" rows="10" placeholder="Paste your document here…"></textarea>
+      <div class="playground-grid">
+        <div>
+          <label for="labStrategy" style="color:var(--text-dim);font-size:0.88rem;">Strategy</label>
+          <select class="input" id="labStrategy">
+            <option value="fixed">Fixed-size</option>
+            <option value="recursive">Recursive</option>
+            <option value="semantic">Semantic (local similarity)</option>
+          </select>
+          <div class="slider-row">
+            <label for="labSize">Chunk size (chars)</label>
+            <input type="range" id="labSize" min="60" max="400" value="180" />
+            <span class="slider-val" id="labSizeVal">180</span>
+          </div>
+          <div class="slider-row">
+            <label for="labOverlap">Overlap (chars)</label>
+            <input type="range" id="labOverlap" min="0" max="200" value="36" />
+            <span class="slider-val" id="labOverlapVal">36</span>
+          </div>
+          <div class="slider-row" id="labSemRow">
+            <label for="labSem">Semantic threshold</label>
+            <input type="range" id="labSem" min="0" max="100" value="40" />
+            <span class="slider-val" id="labSemVal">0.40</span>
+          </div>
+        </div>
+        <div>
+          <div class="stat-row" id="labStats"></div>
+          <button type="button" class="btn primary" id="labRun">Run chunking</button>
+          <p style="font-size:0.8rem;color:var(--text-dim);margin:8px 0 0;">Tip: for semantic mode, overlap and chunk size apply as a max segment length after breakpoints.</p>
+        </div>
+      </div>
+      <div id="labOut" class="chunk-preview" style="margin-top:16px;min-height:120px;"></div>
+    </div>
+  </section>
+
+  <footer class="page-foot">
+    Chunking strategies · Part of <a href="../index.html" style="color:var(--accent);">Search Zero to Hero</a>
+  </footer>
+
+  <script>
+(function () {
+  var navToggle = document.getElementById('navToggle');
+  var mainNav = document.getElementById('mainNav');
+  var navLinks = mainNav.querySelectorAll('a');
+
+  navToggle.addEventListener('click', function () {
+    var open = mainNav.classList.toggle('visible');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!mainNav.contains(e.target) && e.target !== navToggle) {
+      mainNav.classList.remove('visible');
+      navToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  var sections = document.querySelectorAll('section.fade-in');
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) en.target.classList.add('visible');
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -8% 0px' });
+  sections.forEach(function (s) { obs.observe(s); });
+
+  function onScrollNav() {
+    var y = window.scrollY + 120;
+    var cur = null;
+    sections.forEach(function (s) {
+      if (s.offsetTop <= y) cur = s.id;
+    });
+    navLinks.forEach(function (a) {
+      a.classList.toggle('active', cur && a.getAttribute('href') === '#' + cur);
+    });
+  }
+  window.addEventListener('scroll', onScrollNav, { passive: true });
+  onScrollNav();
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  var CHUNK_PALETTE = [
+    'rgba(167, 139, 250, 0.22)',
+    'rgba(34, 211, 238, 0.18)',
+    'rgba(52, 211, 153, 0.2)',
+    'rgba(251, 191, 36, 0.2)',
+    'rgba(244, 114, 182, 0.2)',
+    'rgba(248, 113, 113, 0.18)',
+    'rgba(56, 189, 248, 0.18)',
+    'rgba(192, 132, 252, 0.18)'
+  ];
+
+  function renderColoredChunks(chunks, target) {
+    var html = '';
+    chunks.forEach(function (c, i) {
+      var bg = CHUNK_PALETTE[i % CHUNK_PALETTE.length];
+      html += '<span style="background:' + bg + ';border-radius:4px;padding:2px 0;">' + escapeHtml(c) + '</span>';
+    });
+    target.innerHTML = html;
+  }
+
+  function fixedSizeChunks(text, size, overlap) {
+    if (size <= 0) return [];
+    overlap = Math.min(Math.max(0, overlap), size - 1);
+    var out = [];
+    var step = Math.max(1, size - overlap);
+    for (var i = 0; i < text.length; i += step) {
+      out.push(text.slice(i, i + size));
+      if (i + size >= text.length) break;
+    }
+    return out.filter(Boolean);
+  }
+
+  function splitRecursive(text, chunkSize, chunkOverlap) {
+    var separators = ['\n\n', '\n', '. ', ' ', ''];
+    function splitWithSeparator(t, seps) {
+      var separator = seps[0];
+      var newSeps = seps.slice(1);
+      var finalChunks = [];
+      if (separator === '') {
+        for (var i = 0; i < t.length; i += chunkSize - chunkOverlap) {
+          finalChunks.push(t.substring(i, Math.min(i + chunkSize, t.length)));
+        }
+        return finalChunks.filter(Boolean);
+      }
+      var splits = t.split(separator);
+      var goodSplits = [];
+      for (var j = 0; j < splits.length; j++) {
+        var s = splits[j];
+        if (s === undefined || s === '') continue;
+        if (s.length < chunkSize) {
+          goodSplits.push(s);
+        } else {
+          goodSplits = goodSplits.concat(splitWithSeparator(s, newSeps));
+        }
+      }
+      var merged = [];
+      var current = '';
+      for (var k = 0; k < goodSplits.length; k++) {
+        var g = goodSplits[k];
+        var withSep = current ? current + separator + g : g;
+        if (withSep.length <= chunkSize) {
+          current = withSep;
+        } else {
+          if (current) merged.push(current);
+          if (g.length <= chunkSize) {
+            current = g;
+          } else {
+            merged = merged.concat(splitWithSeparator(g, newSeps));
+            current = '';
+          }
+        }
+      }
+      if (current) merged.push(current);
+      return merged;
+    }
+    var raw = splitWithSeparator(text, separators);
+    return postOverlapMerge(raw, chunkSize, chunkOverlap);
+  }
+
+  function postOverlapMerge(chunks, chunkSize, chunkOverlap) {
+    if (chunkOverlap <= 0) return chunks;
+    var out = [];
+    for (var i = 0; i < chunks.length; i++) {
+      var c = chunks[i];
+      if (c.length <= chunkSize) {
+        out.push(c);
+        continue;
+      }
+      var st = 0;
+      while (st < c.length) {
+        out.push(c.slice(st, st + chunkSize));
+        st += chunkSize - chunkOverlap;
+      }
+    }
+    return out;
+  }
+
+  function tokenizeWords(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(function (w) { return w.length > 1; });
+  }
+
+  function sentenceSplit(text) {
+    return text.split(/(?<=[.!?])\s+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+
+  function bowVector(words, vocab) {
+    var v = [];
+    for (var i = 0; i < vocab.length; i++) v.push(0);
+    words.forEach(function (w) {
+      var idx = vocab.indexOf(w);
+      if (idx >= 0) v[idx] += 1;
+    });
+    return v;
+  }
+
+  function cosineSim(a, b) {
+    var dot = 0, na = 0, nb = 0;
+    for (var i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      na += a[i] * a[i];
+      nb += b[i] * b[i];
+    }
+    if (na === 0 || nb === 0) return 0;
+    return dot / (Math.sqrt(na) * Math.sqrt(nb));
+  }
+
+  function buildVocab(sentences) {
+    var set = {};
+    sentences.forEach(function (sent) {
+      tokenizeWords(sent).forEach(function (w) { set[w] = true; });
+    });
+    return Object.keys(set).sort();
+  }
+
+  function semanticChunksFromSentences(sentences, threshold, maxChars) {
+    if (!sentences.length) return [];
+    var vocab = buildVocab(sentences);
+    var vecs = sentences.map(function (s) { return bowVector(tokenizeWords(s), vocab); });
+    var chunks = [];
+    var buf = sentences[0];
+    for (var i = 1; i < sentences.length; i++) {
+      var sim = cosineSim(vecs[i - 1], vecs[i]);
+      if (sim < threshold || (buf + ' ' + sentences[i]).length > maxChars) {
+        chunks.push(buf);
+        buf = sentences[i];
+      } else {
+        buf += ' ' + sentences[i];
+      }
+    }
+    chunks.push(buf);
+    return chunks;
+  }
+
+  var sampleDoc = [
+    'Chunking decides what your retriever can match. If you slice in the middle of a definition, downstream systems see fragments instead of ideas.',
+    'Fixed-size splitting is predictable but blind to paragraphs. Recursive splitting respects newlines first, then sentences, then words.',
+    'Semantic methods embed sentences and cut when similarity drops. They cost more at ingest but follow topic boundaries.',
+    'Always measure on real queries. Synthetic demos hide failure modes that only appear in production language and edge cases.'
+  ].join('\n\n');
+
+  /* Fixed demo */
+  var fixedSizeEl = document.getElementById('fixedSize');
+  var fixedOverlapEl = document.getElementById('fixedOverlap');
+  var fixedOut = document.getElementById('fixedOut');
+  var fixedMeta = document.getElementById('fixedMeta');
+  var fixedSizeVal = document.getElementById('fixedSizeVal');
+  var fixedOverlapVal = document.getElementById('fixedOverlapVal');
+
+  function syncOverlapMax() {
+    var sz = parseInt(fixedSizeEl.value, 10);
+    fixedOverlapEl.max = String(Math.max(0, sz - 1));
+    if (parseInt(fixedOverlapEl.value, 10) > sz - 1) fixedOverlapEl.value = String(Math.max(0, sz - 1));
+  }
+
+  function runFixedDemo() {
+    syncOverlapMax();
+    var size = parseInt(fixedSizeEl.value, 10);
+    var overlap = parseInt(fixedOverlapEl.value, 10);
+    fixedSizeVal.textContent = String(size);
+    fixedOverlapVal.textContent = String(overlap);
+    var chunks = fixedSizeChunks(sampleDoc, size, overlap);
+    renderColoredChunks(chunks, fixedOut);
+    var avg = chunks.length ? Math.round(chunks.reduce(function (a, c) { return a + c.length; }, 0) / chunks.length) : 0;
+    fixedMeta.textContent = chunks.length + ' chunks · avg length ' + avg + ' chars (~' + Math.round(avg / 4) + ' tokens est.) · overlap reduces boundary cuts but increases index rows.';
+  }
+  fixedSizeEl.addEventListener('input', runFixedDemo);
+  fixedOverlapEl.addEventListener('input', runFixedDemo);
+  runFixedDemo();
+
+  /* Recursive demo UI */
+  var sepList = ['\\n\\n', '\\n', '. ', ' ', '"" (chars)'];
+  var sepPills = document.getElementById('sepPills');
+  sepList.forEach(function (s, idx) {
+    var span = document.createElement('span');
+    span.className = 'sep-pill';
+    span.innerHTML = '<em>' + (idx + 1) + '</em> · ' + escapeHtml(s);
+    sepPills.appendChild(span);
+  });
+
+  var recMax = document.getElementById('recMax');
+  var recMaxVal = document.getElementById('recMaxVal');
+  var recOut = document.getElementById('recOut');
+  var recMeta = document.getElementById('recMeta');
+
+  function runRecDemo() {
+    var maxLen = parseInt(recMax.value, 10);
+    recMaxVal.textContent = String(maxLen);
+    var chunks = splitRecursive(sampleDoc, maxLen, Math.min(20, Math.floor(maxLen * 0.15)));
+    renderColoredChunks(chunks, recOut);
+    var avg = chunks.length ? Math.round(chunks.reduce(function (a, c) { return a + c.length; }, 0) / chunks.length) : 0;
+    recMeta.textContent = chunks.length + ' chunks · avg ' + avg + ' chars · overlap fixed at ~15% for this demo.';
+  }
+  recMax.addEventListener('input', runRecDemo);
+  runRecDemo();
+
+  /* Semantic demo */
+  var semThresh = document.getElementById('semThresh');
+  var semThreshVal = document.getElementById('semThreshVal');
+  var semBars = document.getElementById('semBars');
+  var semChunks = document.getElementById('semChunks');
+
+  function runSemDemo() {
+    var th = parseInt(semThresh.value, 10) / 100;
+    semThreshVal.textContent = th.toFixed(2);
+    var sents = sentenceSplit(sampleDoc.replace(/\n\n/g, ' '));
+    var vocab = buildVocab(sents);
+    var vecs = sents.map(function (s) { return bowVector(tokenizeWords(s), vocab); });
+    semBars.innerHTML = '';
+    for (var i = 0; i < sents.length - 1; i++) {
+      var sim = cosineSim(vecs[i], vecs[i + 1]);
+      var row = document.createElement('div');
+      row.className = 'sim-row';
+      var pct = Math.round(sim * 100);
+      var barWrap = document.createElement('div');
+      barWrap.className = 'sim-bar-wrap';
+      var bar = document.createElement('div');
+      bar.className = 'sim-bar ' + (sim < th ? 'low' : 'high');
+      bar.style.width = Math.max(4, pct) + '%';
+      barWrap.appendChild(bar);
+      var lab = document.createElement('span');
+      lab.style.minWidth = '200px';
+      lab.innerHTML = 'sent ' + (i + 1) + ' ↔ ' + (i + 2) + ': <code style="font-size:0.75rem;">' + sim.toFixed(2) + '</code>';
+      if (sim < th) {
+        var tag = document.createElement('span');
+        tag.className = 'breakpoint-tag';
+        tag.textContent = 'breakpoint';
+        lab.appendChild(tag);
+      }
+      row.appendChild(lab);
+      row.appendChild(barWrap);
+      semBars.appendChild(row);
+    }
+    var schunks = semanticChunksFromSentences(sents, th, 400);
+    renderColoredChunks(schunks, semChunks);
+  }
+  semThresh.addEventListener('input', runSemDemo);
+  runSemDemo();
+
+  /* Markdown structure demo */
+  var mdDefault = '# Overview\nRAG systems need thoughtful chunk boundaries.\n\n## Licensing\nPayment is net-30 unless otherwise stated in an addendum.\n\n## Security\nRotate API keys quarterly and store them in a secrets manager.\n\n### Exceptions\nBreak-glass accounts require VP approval within 24 hours.';
+  var mdInput = document.getElementById('mdInput');
+  mdInput.value = mdDefault;
+
+  function splitMarkdownHeadings(src) {
+    var lines = src.split(/\r?\n/);
+    var chunks = [];
+    var buf = [];
+    function flush() {
+      if (buf.length) chunks.push(buf.join('\n'));
+      buf = [];
+    }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (/^#{1,6}\s/.test(line)) {
+        flush();
+      }
+      buf.push(line);
+    }
+    flush();
+    return chunks.filter(Boolean);
+  }
+
+  document.getElementById('mdRun').addEventListener('click', function () {
+    var ch = splitMarkdownHeadings(mdInput.value);
+    renderColoredChunks(ch, document.getElementById('mdOut'));
+  });
+  document.getElementById('mdRun').click();
+
+  /* Contextual retrieval toggle */
+  var bareChunk = 'Payment is net-30 unless otherwise stated in an addendum.';
+  var ctxPrefix = 'Context: This excerpt is from the "Billing & contracts" section of the internal Finance handbook (2025 revision). It sits under licensing terms for vendor SaaS tools.\n\nChunk:\n';
+  var ctxPreview = document.getElementById('ctxPreview');
+  var ctxBare = document.getElementById('ctxBare');
+  var ctxFull = document.getElementById('ctxFull');
+
+  function setCtxMode(full) {
+    ctxBare.classList.toggle('on', !full);
+    ctxFull.classList.toggle('on', full);
+    ctxPreview.textContent = full ? ctxPrefix + bareChunk : bareChunk;
+  }
+  ctxBare.addEventListener('click', function () { setCtxMode(false); });
+  ctxFull.addEventListener('click', function () { setCtxMode(true); });
+  setCtxMode(false);
+
+  /* Late chunking visual */
+  var lateSplit = document.getElementById('lateSplit');
+  var lateSplitVal = document.getElementById('lateSplitVal');
+  var lateTokens = document.getElementById('lateTokens');
+  var lateExplain = document.getElementById('lateExplain');
+  var pseudoTokens = ['The', 'agreement', 'governs', 'use', 'of', 'the', 'API', 'across', 'regions', 'and', 'sets', 'audit', 'rights', 'for', 'compliance', 'teams', 'annually', '.'];
+
+  function runLateDemo() {
+    var n = parseInt(lateSplit.value, 10);
+    lateSplitVal.textContent = String(n);
+    lateTokens.innerHTML = '';
+    for (var i = 0; i < pseudoTokens.length; i++) {
+      var d = document.createElement('div');
+      d.className = 'late-token' + (i < n ? ' in-chunk' : '');
+      if (i === n) d.classList.add('boundary');
+      d.title = 'token ' + (i + 1);
+      d.textContent = String(i + 1);
+      lateTokens.appendChild(d);
+    }
+    lateExplain.textContent = 'Chunk A exports the embedding slice for tokens 1–' + n + '; chunk B exports tokens ' + (n + 1) + '–' + pseudoTokens.length + '. Both slices inherit attention context from the same full-document forward pass.';
+  }
+  lateSplit.addEventListener('input', runLateDemo);
+  runLateDemo();
+
+  /* Playground */
+  var labDoc = document.getElementById('labDoc');
+  var labStrategy = document.getElementById('labStrategy');
+  var labSize = document.getElementById('labSize');
+  var labOverlap = document.getElementById('labOverlap');
+  var labSem = document.getElementById('labSem');
+  var labSizeVal = document.getElementById('labSizeVal');
+  var labOverlapVal = document.getElementById('labOverlapVal');
+  var labSemVal = document.getElementById('labSemVal');
+  var labSemRow = document.getElementById('labSemRow');
+  var labStats = document.getElementById('labStats');
+  var labOut = document.getElementById('labOut');
+
+  labDoc.value = sampleDoc;
+
+  function updateLabLabels() {
+    labSizeVal.textContent = labSize.value;
+    labOverlapVal.textContent = labOverlap.value;
+    labSemVal.textContent = (parseInt(labSem.value, 10) / 100).toFixed(2);
+    labSemRow.style.display = labStrategy.value === 'semantic' ? 'flex' : 'none';
+  }
+  labSize.addEventListener('input', updateLabLabels);
+  labOverlap.addEventListener('input', updateLabLabels);
+  labSem.addEventListener('input', updateLabLabels);
+  labStrategy.addEventListener('change', updateLabLabels);
+  updateLabLabels();
+
+  function runLab() {
+    var text = labDoc.value;
+    var strat = labStrategy.value;
+    var size = parseInt(labSize.value, 10);
+    var overlap = parseInt(labOverlap.value, 10);
+    var chunks = [];
+    if (!text.trim()) {
+      labOut.textContent = '(empty document)';
+      labStats.innerHTML = '';
+      return;
+    }
+    if (strat === 'fixed') {
+      overlap = Math.min(overlap, Math.max(0, size - 1));
+      chunks = fixedSizeChunks(text, size, overlap);
+    } else if (strat === 'recursive') {
+      chunks = splitRecursive(text, size, Math.min(overlap, size - 1));
+    } else {
+      var sents = sentenceSplit(text.replace(/\n+/g, ' '));
+      var th = parseInt(labSem.value, 10) / 100;
+      chunks = semanticChunksFromSentences(sents, th, size * 3);
+    }
+    renderColoredChunks(chunks, labOut);
+    var total = chunks.reduce(function (a, c) { return a + c.length; }, 0);
+    var avg = chunks.length ? Math.round(total / chunks.length) : 0;
+    labStats.innerHTML = '<span><strong>' + chunks.length + '</strong> chunks</span><span>avg <strong>' + avg + '</strong> chars</span><span>~<strong>' + Math.round(avg / 4) + '</strong> tokens (est.)</span>';
+  }
+  document.getElementById('labRun').addEventListener('click', runLab);
+  runLab();
+})();
+  </script>
+</body>
+</html>

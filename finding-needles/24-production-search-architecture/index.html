@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Production Search Architecture — Design Patterns That Scale | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 96px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover, .main-nav a.active { color: var(--accent); }
+    .nav-toggle {
+      display: none;
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    @media (max-width: 640px) {
+      .nav-toggle { display: block; }
+      .main-nav.collapsed { display: none; }
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(52, 211, 153, 0.08), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(34, 211, 238, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(167, 139, 250, 0.1), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.45rem, 4vw, 2.5rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent4);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent2);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .demo-box {
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin: 20px 0;
+    }
+    .demo-box h4 { margin: 0 0 12px; font-size: 0.95rem; color: var(--accent3); }
+    table.data { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 16px 0; }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    table.data th { background: var(--bg-card-alt); color: var(--text-dim); font-weight: 600; }
+    table.data td { font-family: var(--mono); color: var(--text-dim); }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 0.78rem; }
+    .bar-row span.name { width: 100px; color: var(--text-dim); flex-shrink: 0; }
+    .bar-track { flex: 1; height: 10px; background: var(--bg-card-alt); border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+    .bar-fill { height: 100%; border-radius: 5px; transition: width 0.25s ease; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+    .bar-fill.t1 { background: linear-gradient(90deg, var(--accent3), var(--accent)); }
+    .bar-fill.t2 { background: linear-gradient(90deg, var(--query), var(--accent2)); }
+    .bar-fill.t3 { background: linear-gradient(90deg, var(--accent4), var(--danger)); }
+    .bar-fill.warn { background: linear-gradient(90deg, var(--accent5), var(--danger)); }
+    .slider-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; font-size: 0.85rem; color: var(--text-dim); }
+    .slider-row input[type="range"] { flex: 1; min-width: 140px; accent-color: var(--accent); }
+    .btn {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--accent3);
+      cursor: pointer;
+    }
+    .btn:hover { border-color: var(--accent3); }
+    .stat-pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--accent3);
+      margin-right: 8px;
+      margin-top: 8px;
+    }
+    .footer-note { text-align: center; padding: 48px 24px 80px; color: var(--text-dim); font-size: 0.85rem; }
+    .formula {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      background: var(--bg-card-alt);
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      color: var(--text);
+      margin: 16px 0;
+      overflow-x: auto;
+    }
+    .tier-flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .tier-card {
+      flex: 1 1 140px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--bg-card);
+      text-align: center;
+    }
+    .tier-card .label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+    .tier-card .big { font-family: var(--mono); font-size: 1.1rem; color: var(--accent); margin: 6px 0; }
+    .tier-arrow { align-self: center; color: var(--text-dim); font-size: 1.2rem; }
+    pre.json-lite {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      line-height: 1.5;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    pre.json-lite .hl { background: rgba(34, 211, 238, 0.2); border-radius: 4px; padding: 0 2px; cursor: pointer; }
+    pre.json-lite .hl:hover { background: rgba(167, 139, 250, 0.25); }
+    .es-legend { font-size: 0.8rem; color: var(--text-dim); min-height: 48px; margin-top: 8px; }
+    .gantt {
+      position: relative;
+      height: 120px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin: 16px 0;
+      overflow: hidden;
+    }
+    .gantt-row { position: absolute; left: 0; right: 0; height: 28px; display: flex; align-items: center; padding-left: 8px; font-size: 0.72rem; color: var(--text-dim); }
+    .gantt-bar {
+      position: absolute;
+      height: 18px;
+      border-radius: 6px;
+      top: 5px;
+      font-size: 0.65rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding-left: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+    }
+    .gantt-bar.bm25 { background: linear-gradient(90deg, #0ea5e9, #6366f1); }
+    .gantt-bar.ann { background: linear-gradient(90deg, #a855f7, #ec4899); }
+    .gantt-bar.fuse { background: linear-gradient(90deg, #14b8a6, #22c55e); }
+    .gantt-bar.rerank { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+    .ingest-steps { display: grid; gap: 8px; margin: 12px 0; }
+    .ingest-step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+    .ingest-step input { accent-color: var(--accent3); }
+    .ingest-step.on { border-color: var(--accent3); background: rgba(52, 211, 153, 0.06); }
+    .pg-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .pg-comp {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--bg-card);
+    }
+    .pg-comp label { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-dim); cursor: pointer; }
+    .pg-comp .meta { font-family: var(--mono); font-size: 0.7rem; color: var(--accent5); margin-top: 8px; }
+    .compare-table { font-size: 0.8rem; width: 100%; border-collapse: collapse; margin-top: 12px; }
+    .compare-table th, .compare-table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+    .compare-table th { background: var(--bg-card-alt); color: var(--text-dim); }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Production Architecture</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="true" aria-controls="mainNav">Nav</button>
+  <nav class="main-nav" id="mainNav" aria-label="On this page">
+    <a href="#s0">Prototype → prod</a>
+    <a href="#s1">Three-tier</a>
+    <a href="#s2">Elasticsearch</a>
+    <a href="#s3">Ingestion</a>
+    <a href="#s4">Query pipeline</a>
+    <a href="#s5">Google-scale</a>
+    <a href="#s6">Perplexity-style</a>
+    <a href="#s7">Latency &amp; failures</a>
+    <a href="#s8">Playground</a>
+  </nav>
+
+  <header class="hero">
+    <span class="chapter-badge">Search Zero to Hero · 24 / 26</span>
+    <h1>Production Search Architecture — Design Patterns That Scale</h1>
+    <p class="subtitle">
+      Moving from a prototype that “returns something reasonable” to a system that survives traffic spikes, hardware faults, and shifting product goals
+      requires <strong>architecture</strong>, not just model choice. Topics include <code>multi-stage retrieval</code>,
+      <code>Lucene</code>-shaped storage, <code>ingestion</code> and <code>query</code> pipelines, conceptual patterns at web scale, the
+      <code>search + LLM</code> synthesis stack, and operational patterns: <code>caching</code>, <code>timeouts</code>, <code>circuit breakers</code>,
+      and <code>graceful degradation</code>.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">9</div><div class="lbl">Sections</div></div>
+      <div class="hero-stat"><div class="val">6+</div><div class="lbl">Interactives</div></div>
+      <div class="hero-stat"><div class="val">p99</div><div class="lbl">Budget focus</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>00 · From Prototype to Production</h2>
+    <p>
+      A search demo that works on a laptop is not the same object as search in production. Prototypes optimize for <strong>demonstrating relevance on a
+      curated slice</strong>; production systems must answer thousands or millions of queries per second while staying inside strict
+      <code>latency</code> envelopes, remaining <code>available</code> when dependencies wobble, and continuously defending
+      <code>relevance</code> against drift, spam, and changing corpora.
+    </p>
+    <p>
+      The gap between “search that works” and “search that scales” is rarely a single missing algorithm. It is usually a bundle of concerns:
+      <strong>how candidates are generated</strong>, <strong>how scores are computed under time pressure</strong>, <strong>how indexes are built and refreshed</strong>,
+      <strong>how queries are parsed and routed</strong>, and <strong>what happens when the slowest component stalls</strong>.
+    </p>
+    <h3>The three pillars</h3>
+    <ul class="fancy">
+      <li><strong>Reliability</strong> — the system returns coherent results during partial outages, respects <code>SLAs</code>, and fails in controlled ways
+        (for example, skipping an expensive <code>reranker</code> rather than timing out the whole page).</li>
+      <li><strong>Latency</strong> — end-to-end time from query receipt to rendered results stays within product budgets; tail
+        latency (<code>p95</code>, <code>p99</code>) often matters more than the median.</li>
+      <li><strong>Relevance</strong> — retrieved and ranked items actually help the user; this pillar is where <code>BM25</code>, <code>dense retrieval</code>,
+        <code>cross-encoders</code>, and <code>learning-to-rank</code> models live, but only if the infrastructure can afford to run them on time.</li>
+    </ul>
+    <div class="callout">
+      Typical core-path targets (excluding client rendering): <strong><code>p50</code> under ~100ms</strong>,
+      <strong><code>p99</code> under ~500ms</strong>. Exact numbers vary by surface—mobile web, API, autocomplete—and product.
+    </div>
+    <p>
+      The sections below cover staged retrieval with explicit budgets, engine internals relevant to tuning, pipelines that separate
+      <code>write path</code> from <code>read path</code>, and degradation when the full stack is temporarily unavailable.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>01 · Three-Tier Retrieval Architecture</h2>
+    <p>
+      The retrieve-then-rerank pattern (<a href="../10-cross-encoder-reranking/index.html" style="color:var(--accent);">Chapter 10</a>) scales to
+      <strong>multiple tiers</strong>: each tier shrinks the candidate set and spends more work per document than the tier before it. Scoring the full
+      corpus with the most expressive similarity function on every query is too slow and expensive for production.
+    </p>
+    <h3>Tier 1: Candidate generation</h3>
+    <p>
+      The first tier’s job is <strong>high recall, low cost</strong>. Typical generators include <code>BM25</code> over an inverted index,
+      <code>approximate nearest neighbor</code> (<code>ANN</code>) search in a vector index, and learned sparse methods such as
+      <code>SPLADE</code>-style expansions. A common order-of-magnitude target is to surface on the order of <strong>hundreds to a few thousand</strong>
+      candidates—say <code>top 1000</code>—so downstream stages have something rich to work with without scoring the whole collection.
+    </p>
+    <h3>Tier 2: Feature computation and lightweight scoring</h3>
+    <p>
+      The second tier enriches a smaller pool—often near <code>top 100</code>—with additional features: shallow neural scores, lexical overlaps beyond the
+      first-stage score, metadata matches, freshness signals, popularity, and simple learned models that are still cheap to evaluate in batch. This tier
+      is where many teams first introduce <code>learning-to-rank</code> models that are intentionally <strong>not</strong> full <code>cross-encoders</code>
+      on every term interaction.
+    </p>
+    <h3>Tier 3: Heavy reranking</h3>
+    <p>
+      The final tier spends disproportionate compute on a tiny list—think <code>top 20</code>—using <code>cross-encoder</code> transformers,
+      large <code>LTR</code> ensembles with expensive features, or multi-vector late interaction. The point is precision: these models are often several
+      orders of magnitude more costly per document than <code>BM25</code>, so they must run on short lists.
+    </p>
+    <div class="callout">
+      Each tier is an explicit trade: <strong>speed versus quality</strong>. Dropping tier three improves latency and cuts tail risk, but
+      head-to-head relevance on hard queries usually suffers. Shrinking tier one too aggressively leaves tier three ranking the wrong candidate set.
+    </div>
+    <p>
+      A representative latency allocation for the core retrieval stack (excluding network and serialization) might budget on the order of
+      <strong>~10ms</strong> for tier one, <strong>~20ms</strong> for tier two, and <strong>~50ms</strong> for tier three, recognizing that real systems
+      overlap work, batch GPU inference, and co-locate indexes to shave milliseconds. The slider below compares tier totals against a
+      <code>100ms</code> median target.
+    </p>
+    <div class="demo-box">
+      <h4>Interactive: three-tier pipeline and latency breakdown</h4>
+      <p style="margin-top:0;font-size:0.88rem;color:var(--text-dim);">
+        Adjust per-tier latency (milliseconds). Bars scale relative to a 120ms reference width. The pill summarizes total pipeline time for tiers 1–3 only.
+      </p>
+      <div class="tier-flow" aria-hidden="true">
+        <div class="tier-card"><div class="label">Tier 1</div><div class="big" id="t1Count">1000</div><div style="font-size:0.75rem;color:var(--text-dim);">candidates</div></div>
+        <span class="tier-arrow">→</span>
+        <div class="tier-card"><div class="label">Tier 2</div><div class="big" id="t2Count">100</div><div style="font-size:0.75rem;color:var(--text-dim);">candidates</div></div>
+        <span class="tier-arrow">→</span>
+        <div class="tier-card"><div class="label">Tier 3</div><div class="big" id="t3Count">20</div><div style="font-size:0.75rem;color:var(--text-dim);">candidates</div></div>
+      </div>
+      <div class="slider-row">
+        <label for="latT1">Tier 1 ms</label>
+        <input type="range" id="latT1" min="2" max="40" value="10" />
+        <span id="latT1Val" style="font-family:var(--mono);color:var(--accent3);">10</span>
+      </div>
+      <div class="slider-row">
+        <label for="latT2">Tier 2 ms</label>
+        <input type="range" id="latT2" min="4" max="80" value="20" />
+        <span id="latT2Val" style="font-family:var(--mono);color:var(--query);">20</span>
+      </div>
+      <div class="slider-row">
+        <label for="latT3">Tier 3 ms</label>
+        <input type="range" id="latT3" min="10" max="200" value="50" />
+        <span id="latT3Val" style="font-family:var(--mono);color:var(--accent4);">50</span>
+      </div>
+      <div id="tierBars"></div>
+      <p style="font-size:0.85rem;">
+        <span class="stat-pill" id="tierTotalPill">T1+T2+T3: —</span>
+        <span class="stat-pill" id="tierBudgetPill">vs 100ms p50 target: —</span>
+      </p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>02 · Elasticsearch and Lucene Internals</h2>
+    <p>
+      <code>Elasticsearch</code> is a distributed document search and analytics engine built on <code>Apache Lucene</code>. At a high level, each
+      <code>Elasticsearch</code> <code>shard</code> is a Lucene index: a collection of <strong>segments</strong> on disk plus supporting data structures.
+      That layering matters when tuning <code>refresh intervals</code>, planning merges, or diagnosing hot queries on particular nodes.
+    </p>
+    <h3>Segments: immutable, merge-on-write</h3>
+    <p>
+      Lucene writes new data as fresh, immutable <code>segments</code>. Updates are realized as deletes plus new documents; background <code>merge</code>
+      policies consolidate segments to keep read amplification under control. Fewer, larger segments generally improve query throughput but make
+      near-real-time visibility and indexing latency trade differently than many tiny segments.
+    </p>
+    <h3>Analyzers: character filters, tokenizer, token filters</h3>
+    <p>
+      Text passes through an <code>analyzer</code> at index and query time (not always symmetric in advanced setups). The pipeline is
+      <code>character filters</code> (cleanup), a <code>tokenizer</code> (split into tokens), then <code>token filters</code> (lowercasing, stemming,
+      synonyms). Mismatches between indexing and querying analyzers are a classic source of “works in Kibana, fails in production.”
+    </p>
+    <h3>BM25 in Lucene</h3>
+    <p>
+      Lucene’s default similarity is <code>BM25</code> (<a href="../03-bm25-algorithm/index.html" style="color:var(--accent);">Chapter 3</a>)—the
+      engine underneath most lexical first-stage retrievers.
+    </p>
+    <h3>Inverted index, doc values, stored fields</h3>
+    <p>
+      Posting lists and term lookup follow the inverted-index model from
+      <a href="../01-how-search-works/index.html" style="color:var(--accent);">Chapter 1</a> (with TF-IDF lineage in
+      <a href="../02-tfidf-scoring-relevance/index.html" style="color:var(--accent);">Chapter 2</a>). Lucene also stores columnar
+      <code>doc values</code> for sorting and aggregations, and <code>stored fields</code> for snippets and highlighting.
+    </p>
+    <h3>Near-real-time search</h3>
+    <p>
+      A <code>refresh</code> makes recent indexing visible to search. The <code>refresh interval</code> trades freshness against merge and caching behavior:
+      aggressive refresh improves perceived immediacy but increases segment churn and indexing cost; relaxed refresh improves bulk throughput but delays visibility.
+    </p>
+    <h3>Shard allocation</h3>
+    <p>
+      <code>Elasticsearch</code> distributes <code>primary</code> and <code>replica</code> shards across nodes for fault tolerance and query parallelism.
+      Hot shards—skewed by routing keys or bursty tenants—show up as uneven <code>CPU</code> and heap pressure; capacity planning must watch per-shard
+      document counts and query fan-out, not only cluster totals.
+    </p>
+    <div class="demo-box">
+      <h4>Interactive: Elasticsearch query anatomy</h4>
+      <p style="margin-top:0;font-size:0.88rem;color:var(--text-dim);">
+        Click highlighted fragments in the simplified <code>bool</code> query. Each piece maps to a different subsystem: scoring, filtering, pagination,
+        and source projection.
+      </p>
+      <pre class="json-lite" id="esQueryPre" aria-label="Sample bool query"><span class="hl" data-es="root">{</span>
+  <span class="hl" data-es="q">"query"</span>: {
+    <span class="hl" data-es="bool">"bool"</span>: {
+      <span class="hl" data-es="must">"must"</span>: [{ "match": { "title": "vector search" } }],
+      <span class="hl" data-es="filter">"filter"</span>: [{ "term": { "locale": "en" } }],
+      <span class="hl" data-es="should">"should"</span>: [{ "match": { "body": "Lucene" } }]
+    }
+  },
+  <span class="hl" data-es="from">"from"</span>: 0,
+  <span class="hl" data-es="size">"size"</span>: 20,
+  <span class="hl" data-es="src">"_source"</span>: ["title", "url", "published_at"]
+<span class="hl" data-es="root">}</span></pre>
+      <div class="es-legend" id="esLegend">Click a highlighted span for an explanation.</div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>03 · Ingestion Pipeline Design</h2>
+    <p>
+      The <code>write path</code>—everything from raw content arrival to searchable documents—is where teams win or lose on freshness, cost, and
+      correctness. A production ingestion stack is a directed graph of stages: <strong>parse</strong>, <strong>clean</strong>, <strong>enrich</strong>,
+      <strong>index</strong>, and often <strong>embed</strong>.
+    </p>
+    <h3>Document processing</h3>
+    <p>
+      Parsing turns PDFs, HTML, JSON, and proprietary formats into normalized text and structure. Cleaning removes boilerplate, normalizes whitespace,
+      strips PII where required, and applies language detection. Enrichment adds derived fields: entity tags, category classifiers, quality scores, and
+      security labels. Each stage should be idempotent where possible so replays after failures do not duplicate side effects.
+    </p>
+    <h3>Metadata extraction</h3>
+    <p>
+      Dates anchor freshness ranking; entities power knowledge panels and filters; categories drive routing to specialized indexes or query planners.
+      Keeping metadata <strong>schema-stable</strong> avoids reindex storms when a new field suddenly becomes hot in aggregations.
+    </p>
+    <h3>Embedding computation</h3>
+    <p>
+      Dense vectors are usually computed in <strong>batches</strong> on <code>GPU</code> workers for throughput, with <code>CPU</code> fallbacks for
+      low-priority queues. Backpressure here directly translates into stale vectors if the read path does not guard against missing embeddings.
+    </p>
+    <h3>Multi-index strategy</h3>
+    <p>
+      Mature systems often maintain separate physical indexes: a <strong>text</strong> index for sparse signals, a <strong>vector</strong> index for
+      <code>ANN</code>, and a <strong>metadata</strong> index or doc-value-heavy shard set for structured filters. The alternative—one giant mapping with
+      every field type—simplifies operations early and complicates scaling later.
+    </p>
+    <h3>Write throughput and schema design</h3>
+    <p>
+      <code>Bulk</code> APIs amortize network round trips; tuning <code>refresh_interval</code> upward during large backfills reduces merge pressure.
+      <code>Denormalization</code> duplicates data to avoid expensive joins at query time; <code>nested</code> objects preserve one-to-many structure inside
+      a document at the cost of indexing complexity and slower updates for large nested arrays.
+    </p>
+    <div class="demo-box">
+      <h4>Interactive: ingestion path toggles and throughput hint</h4>
+      <p style="margin-top:0;font-size:0.88rem;color:var(--text-dim);">
+        Enable stages to model a richer pipeline. The score is a toy “throughput index” (higher is better) that penalizes optional heavy stages; bulk size
+        and refresh interval sliders illustrate common levers.
+      </p>
+      <div class="ingest-steps" id="ingestSteps">
+        <label class="ingest-step on"><input type="checkbox" checked data-ing="parse" /> Parse &amp; normalize sources</label>
+        <label class="ingest-step on"><input type="checkbox" checked data-ing="clean" /> Clean &amp; deduplicate text</label>
+        <label class="ingest-step"><input type="checkbox" data-ing="ner" /> Entity extraction (NER)</label>
+        <label class="ingest-step"><input type="checkbox" data-ing="emb" /> Batch embedding (GPU)</label>
+        <label class="ingest-step on"><input type="checkbox" checked data-ing="bulk" /> Bulk indexer</label>
+      </div>
+      <div class="slider-row">
+        <label for="bulkSz">Bulk batch size (docs)</label>
+        <input type="range" id="bulkSz" min="100" max="5000" step="100" value="1000" />
+        <span id="bulkSzVal" style="font-family:var(--mono);">1000</span>
+      </div>
+      <div class="slider-row">
+        <label for="refIv">Refresh interval (sec)</label>
+        <input type="range" id="refIv" min="1" max="30" value="5" />
+        <span id="refIvVal" style="font-family:var(--mono);">5</span>
+      </div>
+      <p><span class="stat-pill" id="ingestScorePill">Throughput index: —</span></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>04 · Query Pipeline Design</h2>
+    <p>
+      The <code>read path</code> is a pipeline: <strong>understand the query</strong>, <strong>retrieve candidates</strong>, <strong>score and fuse</strong>,
+      <strong>rerank</strong>, then <strong>post-process</strong> for presentation and policy. Production systems differ in how many of these stages run
+      on the critical synchronous path versus asynchronously cached or precomputed.
+    </p>
+    <h3>Query understanding</h3>
+    <p>
+      Spelling correction, query segmentation, intent classification, and synonym expansion happen here. Errors propagate: a misclassified intent sends
+      retrieval down the wrong index branch. Many teams cache understanding outputs keyed by normalized query strings with short <code>TTL</code>s.
+    </p>
+    <h3>Parallel retrieval and score fusion</h3>
+    <p>
+      Running <code>BM25</code> and <code>ANN</code> <strong>in parallel</strong> hides some latency behind the maximum rather than the sum, assuming your
+      orchestration layer waits on both futures before fusion. <code>Score fusion</code> combines ranked lists—common patterns include reciprocal rank
+      fusion (<code>RRF</code>), weighted linear blends after score normalization, and learned fusion models trained on click data.
+    </p>
+    <h3>Post-processing</h3>
+    <p>
+      After ranking comes <code>deduplication</code> (near-duplicate URLs or syndicated content), <code>diversity</code> injection (MMR-style re-ordering),
+      and <code>business rules</code> (boosting subscribed content, demoting low-trust domains). These steps protect user trust even when the base ranker
+      is statistically optimal on offline metrics.
+    </p>
+    <h3>Presentation</h3>
+    <p>
+      Snippets and <code>highlighting</code> require access to stored fields or fast passage retrieval. <code>Facets</code> and aggregations lean on
+      <code>doc values</code> and careful cardinality limits to avoid blowing the latency budget on heavy analytic expansions during interactive search.
+    </p>
+    <div class="demo-box">
+      <h4>Interactive: query pipeline timeline (parallel retrieval)</h4>
+      <p style="margin-top:0;font-size:0.88rem;color:var(--text-dim);">
+        Bars are positioned on a 0–120ms axis. <code>BM25</code> and <code>ANN</code> overlap; fusion begins after the slower retriever completes; reranking
+        runs on the fused shortlist. Drag durations to see how parallelism changes the critical path.
+      </p>
+      <div class="slider-row">
+        <label for="gBm25">BM25 ms</label>
+        <input type="range" id="gBm25" min="5" max="60" value="18" />
+        <span id="gBm25Val" style="font-family:var(--mono);">18</span>
+      </div>
+      <div class="slider-row">
+        <label for="gAnn">ANN ms</label>
+        <input type="range" id="gAnn" min="5" max="60" value="24" />
+        <span id="gAnnVal" style="font-family:var(--mono);">24</span>
+      </div>
+      <div class="slider-row">
+        <label for="gFuse">Fusion ms</label>
+        <input type="range" id="gFuse" min="2" max="30" value="8" />
+        <span id="gFuseVal" style="font-family:var(--mono);">8</span>
+      </div>
+      <div class="slider-row">
+        <label for="gRerank">Rerank ms</label>
+        <input type="range" id="gRerank" min="10" max="120" value="42" />
+        <span id="gRerankVal" style="font-family:var(--mono);">42</span>
+      </div>
+      <div class="gantt" id="gantt" aria-label="Pipeline timeline"></div>
+      <p><span class="stat-pill" id="ganttCrit">Critical path: —</span></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>05 · Google Search Architecture (Conceptual)</h2>
+    <p>
+      Public documentation and research papers sketch a distributed system of extraordinary scale. No outsider has the full blueprint; the value for builders
+      is the <strong>pattern language</strong>: crawling, sharded indexing, multi-phase ranking, neural re-ranking, and freshness subsystems.
+    </p>
+    <h3>Web crawling at planetary scale</h3>
+    <p>
+      <code>Googlebot</code> and companion crawlers fetch pages subject to <code>robots.txt</code>, crawl budgets, and politeness constraints. A
+      <code>URL frontier</code> prioritizes links by predicted importance, change rate, and spam scores. Distributed workers respect per-host rate limits so
+      one aggressive domain cannot starve the rest of the web.
+    </p>
+    <h3>The index</h3>
+    <p>
+      The web index spans on the order of <strong>tens to hundreds of billions</strong> of documents, sharded across thousands of machines. Sharding strategies
+      partition by content hash, language, or vertical to localize working sets and enable specialized ranking stacks per segment.
+    </p>
+    <h3>Three-phase ranking</h3>
+    <p>
+      Conceptually, ranking proceeds in waves: a fast <strong>initial retrieval</strong> stage pulls plausible candidates, a <strong>lightweight scoring</strong>
+      layer applies cheaper features at moderate depth, and a <strong>deep ranking</strong> stage applies heavyweight models to a short list—the same
+      tiered retrieve-then-rerank structure as Section 01, specialized for web-scale corpora and spam-heavy distributions.
+    </p>
+    <h3>Neural components</h3>
+    <p>
+      Systems like <code>RankBrain</code>, <code>BERT</code>-class models, and multimodal efforts such as <code>MUM</code> illustrate a long-running theme:
+      neural models slot into specific layers where their marginal value exceeds their cost, often reranking or re-interpreting queries rather than scoring
+      every document with a full transformer cross-attention.
+    </p>
+    <h3>Result surfaces</h3>
+    <p>
+      <code>Knowledge panels</code>, <code>featured snippets</code>, and <code>People Also Ask</code> blocks are separate retrieval and generation pipelines
+      gated by query intent. They complicate latency accounting because the main organic list and auxiliary modules compete for the same user attention budget.
+    </p>
+    <h3>Freshness</h3>
+    <p>
+      The web changes continuously. News indexes, trending detectors, and selective re-crawling of high-churn sites address <strong>staleness</strong> without
+      re-fetching the entire corpus every minute. Real-time signals (fresh links, social velocity) feed auxiliary ranking features with tight validation to
+      avoid manipulation.
+    </p>
+    <div class="card">
+      <p style="margin:0;font-size:0.9rem;color:var(--text-dim);">
+        <strong style="color:var(--text);">Pattern.</strong> Web search at this scale is a set of subsystems—crawl, index, retrieve, rank, enrich—with
+        different freshness, cost, and risk profiles. Smaller products reuse the same decomposition at reduced scale.
+      </p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>06 · Perplexity-Style Architecture (Conceptual)</h2>
+    <p>
+      A newer class of products pairs classic retrieval with large language model <code>generation</code>. The user still issues a query, but the visible
+      answer is synthesized prose backed by citations drawn from retrieved passages.
+    </p>
+    <h3>Search plus LLM synthesis</h3>
+    <p>
+      A typical pattern: <strong>expand or rewrite the query</strong>, <strong>fan out to one or more search backends</strong> (web indexes, news APIs,
+      proprietary corpora), <strong>retrieve passages</strong>, <strong>deduplicate and compress context</strong>, then <strong>generate</strong> with a model
+      instructed to ground statements in provided evidence.
+    </p>
+    <h3>Speed and streaming</h3>
+    <p>
+      Autoregressive generation is slow compared to returning ten blue links. Products mitigate perceived latency with <code>streaming</code> tokens to the
+      client, progressive disclosure of citations, and speculative prefetch of likely follow-ups.
+    </p>
+    <h3>Source verification</h3>
+    <p>
+      Models hallucinate; production stacks add checks that cited URLs appear in the retrieved set, that quoted spans exist in source text, and that
+      confidence triggers human-review workflows for sensitive topics.
+    </p>
+    <h3>Multi-step reasoning</h3>
+    <p>
+      Follow-up queries and tool use create <strong>chains of retrieval</strong>. Each hop adds latency and failure modes; orchestrators need budgets per hop
+      and circuit breakers on tool calls just like traditional microservices.
+    </p>
+    <h3>Search-as-a-service economics</h3>
+    <p>
+      Many implementations depend on third-party search APIs billed per thousand queries, plus model inference priced per token. Margin-aware routing chooses
+      cheaper retrievers for low-value intents and reserves premium indexes for high-intent commerce or compliance-sensitive lookups.
+    </p>
+    <div class="demo-box">
+      <h4>Interactive: synthesis latency stack (toy)</h4>
+      <p style="margin-top:0;font-size:0.88rem;color:var(--text-dim);">
+        Adjust retrieval breadth and generation depth. This does not model a real product; it illustrates how token generation dominates once retrieval is
+        already sub-second.
+      </p>
+      <div class="slider-row">
+        <label for="synRet">Retrieval ms</label>
+        <input type="range" id="synRet" min="50" max="800" value="220" />
+        <span id="synRetVal" style="font-family:var(--mono);">220</span>
+      </div>
+      <div class="slider-row">
+        <label for="synTok">Output tokens</label>
+        <input type="range" id="synTok" min="64" max="1024" step="32" value="320" />
+        <span id="synTokVal" style="font-family:var(--mono);">320</span>
+      </div>
+      <div class="slider-row">
+        <label for="synTps">Tokens/sec (model)</label>
+        <input type="range" id="synTps" min="20" max="200" value="65" />
+        <span id="synTpsVal" style="font-family:var(--mono);">65</span>
+      </div>
+      <p><span class="stat-pill" id="synTotalPill">Approx. generation + retrieval: —</span></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>07 · Latency Optimization and Failure Handling</h2>
+    <p>
+      Production search is a composition of caches, queues, and remote calls. Optimization is not only “make the model faster” but also
+      <strong>avoid redundant work</strong> and <strong>define acceptable partial results</strong>.
+    </p>
+    <h3>Caching layers</h3>
+    <ul class="fancy">
+      <li><strong>Query result cache</strong> — keyed by normalized query and facet parameters; powerful for head traffic, dangerous if stale for rapidly
+        changing corpora.</li>
+      <li><strong>Embedding cache</strong> — stores query vectors for repeated or near-duplicate queries.</li>
+      <li><strong>Posting cache / filter cache</strong> — engine-internal structures reuse hot inverted lists and bitsets.</li>
+    </ul>
+    <h3>Graceful degradation</h3>
+    <p>
+      If the <code>cross-encoder</code> service breaches its <code>SLO</code>, return <code>tier-two</code> scores. If <code>ANN</code> is degraded, fall
+      back to lexical-only retrieval and mark the response for monitoring. Users prefer imperfect ordering to errors.
+    </p>
+    <h3>Circuit breakers and timeouts</h3>
+    <p>
+      <code>Circuit breakers</code> stop hammering unhealthy dependencies, giving them time to recover and protecting thread pools from exhaustion.
+      <strong>Per-component timeouts</strong> align with a global budget: if fusion is allotted 15ms, waiting 200ms defeats the purpose.
+    </p>
+    <h3>Monitoring</h3>
+    <p>
+      Watch <code>p50</code>/<code>p95</code>/<code>p99</code> latency by stage, error rates by dependency, queue depths on indexing pipelines, and offline
+      <code>relevance</code> metrics on golden query sets. Regressions in neural rankers sometimes appear only in segment-specific slices—aggregate dashboards
+      lie kindly.
+    </p>
+    <h3>Load shedding and deployments</h3>
+    <p>
+      Under extreme load, <code>load shedding</code> drops optional features—personalization, expensive facets, deep reranking—first. <code>Blue-green</code> or
+      <code>canary</code> deployments let you ship new models without taking the cluster offline; paired with shadow traffic, they reduce the blast radius of
+      ranking changes.
+    </p>
+    <div class="demo-box">
+      <h4>Interactive: cache hit rate and effective latency</h4>
+      <p style="margin-top:0;font-size:0.88rem;color:var(--text-dim);">
+        Assume origin retrieval costs <code>80ms</code> when uncached and <code>4ms</code> when cached. Adjust hit rate to see expected latency reduction
+        for the cached subsystem.
+      </p>
+      <div class="slider-row">
+        <label for="cacheHit">Cache hit rate %</label>
+        <input type="range" id="cacheHit" min="0" max="100" value="55" />
+        <span id="cacheHitVal" style="font-family:var(--mono);">55</span>
+      </div>
+      <p><span class="stat-pill" id="cacheLatPill">Expected latency (toy): —</span></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s8">
+    <h2>08 · Playground — Search Architecture Designer</h2>
+    <p>
+      Compose a fictional stack below. Latency and quality scores are <strong>illustrative</strong>; production systems require measurement. Each optional
+      component trades latency for relevance, and failures have different blast radii.
+    </p>
+    <div class="demo-box">
+      <h4>Architecture designer</h4>
+      <div class="pg-grid">
+        <div class="pg-comp">
+          <label><input type="checkbox" id="pgBm25" checked disabled /> <code>BM25</code> (baseline lexical)</label>
+          <div class="meta">~12ms · quality +0.25</div>
+        </div>
+        <div class="pg-comp">
+          <label><input type="checkbox" id="pgDense" checked /> <code>Dense ANN</code></label>
+          <div class="meta">+18ms · quality +0.22</div>
+        </div>
+        <div class="pg-comp">
+          <label><input type="checkbox" id="pgFusion" checked /> <code>Score fusion</code> (<code>RRF</code>)</label>
+          <div class="meta">+6ms · quality +0.08</div>
+        </div>
+        <div class="pg-comp">
+          <label><input type="checkbox" id="pgFeat" checked /> <code>Feature LTR</code> (light)</label>
+          <div class="meta">+14ms · quality +0.12</div>
+        </div>
+        <div class="pg-comp">
+          <label><input type="checkbox" id="pgRerank" checked /> <code>Cross-encoder</code> rerank</label>
+          <div class="meta">+48ms · quality +0.28</div>
+        </div>
+        <div class="pg-comp">
+          <label><input type="checkbox" id="pgLtr" /> <code>Heavy LTR</code> ensemble</label>
+          <div class="meta">+22ms · quality +0.10</div>
+        </div>
+      </div>
+      <div class="slider-row">
+        <label for="pgFail">Simulate component failure</label>
+        <select id="pgFail">
+          <option value="none">None (healthy)</option>
+          <option value="dense">Dense index unavailable</option>
+          <option value="fusion">Fusion service timeout</option>
+          <option value="feat">Feature LTR degraded</option>
+          <option value="rerank">Cross-encoder circuit open</option>
+        </select>
+      </div>
+      <p><span class="stat-pill" id="pgLat">Estimated path latency: —</span><span class="stat-pill" id="pgQual">Quality index: —</span></p>
+      <p id="pgNarr" style="font-size:0.88rem;color:var(--text-dim);margin-bottom:0;"></p>
+      <table class="compare-table" aria-label="Component summary">
+        <thead><tr><th>Component</th><th>Active</th><th>Latency</th><th>Notes</th></tr></thead>
+        <tbody id="pgTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="footer-note">Search Zero to Hero · Part 24 of 26 · Production search architecture patterns</p>
+
+  <script>
+(function () {
+  var navToggle = document.getElementById('navToggle');
+  var mainNav = document.getElementById('mainNav');
+  if (navToggle && mainNav) {
+    navToggle.addEventListener('click', function () {
+      var collapsed = mainNav.classList.toggle('collapsed');
+      navToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+  }
+
+  var sections = document.querySelectorAll('section.fade-in');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    sections.forEach(function (s) { io.observe(s); });
+  } else {
+    sections.forEach(function (s) { s.classList.add('visible'); });
+  }
+
+  var navLinks = document.querySelectorAll('.main-nav a[href^="#"]');
+  function onScrollNav() {
+    var y = window.scrollY || 0;
+    var active = null;
+    sections.forEach(function (sec) {
+      var top = sec.getBoundingClientRect().top + y - 140;
+      if (y >= top) active = sec.id;
+    });
+    navLinks.forEach(function (a) {
+      var id = a.getAttribute('href').slice(1);
+      a.classList.toggle('active', id === active);
+    });
+  }
+  window.addEventListener('scroll', onScrollNav, { passive: true });
+  onScrollNav();
+
+  function barRow(name, pct, cls) {
+    var fillCls = 'bar-fill' + (cls ? ' ' + cls : '');
+    return '<div class="bar-row"><span class="name">' + name + '</span><div class="bar-track"><div class="' + fillCls + '" style="width:' + pct + '%"></div></div><span style="font-family:var(--mono);color:var(--text-dim);">' + Math.round(pct) + '%</span></div>';
+  }
+
+  function updateTierDemo() {
+    var t1 = +document.getElementById('latT1').value;
+    var t2 = +document.getElementById('latT2').value;
+    var t3 = +document.getElementById('latT3').value;
+    document.getElementById('latT1Val').textContent = String(t1);
+    document.getElementById('latT2Val').textContent = String(t2);
+    document.getElementById('latT3Val').textContent = String(t3);
+    var maxRef = 120;
+    var wrap = document.getElementById('tierBars');
+    var p1 = Math.min(100, (t1 / maxRef) * 100);
+    var p2 = Math.min(100, (t2 / maxRef) * 100);
+    var p3 = Math.min(100, (t3 / maxRef) * 100);
+    wrap.innerHTML =
+      barRow('Tier 1', p1, 't1') +
+      barRow('Tier 2', p2, 't2') +
+      barRow('Tier 3', p3, 't3');
+    var total = t1 + t2 + t3;
+    document.getElementById('tierTotalPill').textContent = 'T1+T2+T3: ' + total + ' ms';
+    var ok = total <= 100;
+    document.getElementById('tierBudgetPill').textContent = (ok ? 'Within' : 'Over') + ' 100ms p50 target (' + (total - 100) + ' ms delta)';
+    document.getElementById('tierBudgetPill').style.color = ok ? 'var(--accent3)' : 'var(--danger)';
+  }
+  ['latT1', 'latT2', 'latT3'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateTierDemo);
+  });
+  updateTierDemo();
+
+  var esMap = {
+    root: 'Top-level wrapper: combines query body with pagination and response shaping.',
+    q: '"query" holds the scoring subtree executed by Lucene (unless replaced by rescorers).',
+    bool: '"bool" composes must/should/filter clauses; filter context skips scoring and is cacheable.',
+    must: '"must" clauses contribute to relevance scoring and participate in BM25-style ranking.',
+    filter: '"filter" clauses constrain the document set without affecting score (ideal for exact terms).',
+    should: '"should" clauses optionally boost matching documents depending on minimum_should_match.',
+    from: '"from" sets pagination offset; large values can be expensive because deep paging skips many hits.',
+    size: '"size" caps returned hits; interacts with total hit tracking and track_total_hits settings.',
+    src: '"_source" selects stored fields to return, reducing payload size versus fetching entire documents.'
+  };
+  document.querySelectorAll('.json-lite .hl[data-es]').forEach(function (span) {
+    span.addEventListener('click', function () {
+      var k = span.getAttribute('data-es');
+      document.getElementById('esLegend').textContent = esMap[k] || '';
+    });
+  });
+
+  function refreshIngest() {
+    var score = 100;
+    document.querySelectorAll('.ingest-step').forEach(function (row) {
+      var cb = row.querySelector('input[type="checkbox"]');
+      row.classList.toggle('on', cb.checked);
+    });
+    document.querySelectorAll('#ingestSteps input[type="checkbox"]').forEach(function (cb) {
+      var k = cb.getAttribute('data-ing');
+      if (k === 'ner' && cb.checked) score -= 12;
+      if (k === 'emb' && cb.checked) score -= 18;
+      if (!cb.checked && (k === 'parse' || k === 'clean' || k === 'bulk')) score -= 40;
+    });
+    var bulk = +document.getElementById('bulkSz').value;
+    var ref = +document.getElementById('refIv').value;
+    document.getElementById('bulkSzVal').textContent = String(bulk);
+    document.getElementById('refIvVal').textContent = String(ref);
+    score += Math.min(25, Math.floor(bulk / 400));
+    score += Math.min(15, ref);
+    document.getElementById('ingestScorePill').textContent = 'Throughput index: ' + score + ' (toy model)';
+  }
+  document.getElementById('ingestSteps').addEventListener('change', refreshIngest);
+  document.getElementById('bulkSz').addEventListener('input', refreshIngest);
+  document.getElementById('refIv').addEventListener('input', refreshIngest);
+  refreshIngest();
+
+  function placeBar(rowTop, leftPct, widthPct, cls, label) {
+    return '<div class="gantt-row" style="top:' + rowTop + 'px;">' +
+      '<div class="gantt-bar ' + cls + '" style="left:' + leftPct + '%;width:' + widthPct + '%;">' + label + '</div></div>';
+  }
+
+  function updateGantt() {
+    var bm = +document.getElementById('gBm25').value;
+    var ann = +document.getElementById('gAnn').value;
+    var fuse = +document.getElementById('gFuse').value;
+    var rer = +document.getElementById('gRerank').value;
+    document.getElementById('gBm25Val').textContent = String(bm);
+    document.getElementById('gAnnVal').textContent = String(ann);
+    document.getElementById('gFuseVal').textContent = String(fuse);
+    document.getElementById('gRerankVal').textContent = String(rer);
+    var axis = 120;
+    function pct(ms) { return Math.min(100, (ms / axis) * 100); }
+    var t0 = 0;
+    var tPar = Math.max(bm, ann);
+    var tFuseStart = tPar;
+    var tFuseEnd = tFuseStart + fuse;
+    var tRerStart = tFuseEnd;
+    var tRerEnd = tRerStart + rer;
+    var g = document.getElementById('gantt');
+    g.innerHTML =
+      placeBar(6, pct(t0), pct(bm), 'bm25', 'BM25 ' + bm + 'ms') +
+      placeBar(32, pct(t0), pct(ann), 'ann', 'ANN ' + ann + 'ms') +
+      placeBar(58, pct(tFuseStart), pct(fuse), 'fuse', 'Fusion ' + fuse + 'ms') +
+      placeBar(84, pct(tRerStart), pct(rer), 'rerank', 'Rerank ' + rer + 'ms');
+    var crit = tRerEnd;
+    document.getElementById('ganttCrit').textContent = 'Critical path: ~' + Math.round(crit) + 'ms (sequential fusion + rerank after parallel retrieval)';
+  }
+  ['gBm25', 'gAnn', 'gFuse', 'gRerank'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', updateGantt);
+  });
+  updateGantt();
+
+  function updateSyn() {
+    var r = +document.getElementById('synRet').value;
+    var tok = +document.getElementById('synTok').value;
+    var tps = +document.getElementById('synTps').value;
+    document.getElementById('synRetVal').textContent = String(r);
+    document.getElementById('synTokVal').textContent = String(tok);
+    document.getElementById('synTpsVal').textContent = String(tps);
+    var gen = (tok / tps) * 1000;
+    document.getElementById('synTotalPill').textContent = 'Approx. retrieval+generation: ' + Math.round(r + gen) + ' ms';
+  }
+  ['synRet', 'synTok', 'synTps'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', updateSyn);
+  });
+  updateSyn();
+
+  function updateCache() {
+    var h = +document.getElementById('cacheHit').value / 100;
+    document.getElementById('cacheHitVal').textContent = String(Math.round(h * 100));
+    var origin = 80;
+    var fast = 4;
+    var exp = h * fast + (1 - h) * origin;
+    document.getElementById('cacheLatPill').textContent = 'Expected latency (toy): ' + exp.toFixed(1) + ' ms';
+  }
+  document.getElementById('cacheHit').addEventListener('input', updateCache);
+  updateCache();
+
+  var pg = {
+    bm25: { on: true, ms: 12, q: 0.25, note: 'Always on in this playground.' },
+    dense: { id: 'pgDense', ms: 18, q: 0.22, note: 'Parallel lexical+vector retrieval.' },
+    fusion: { id: 'pgFusion', ms: 6, q: 0.08, note: 'RRF or weighted merge.' },
+    feat: { id: 'pgFeat', ms: 14, q: 0.12, note: 'Light LTR on hand-crafted features.' },
+    rerank: { id: 'pgRerank', ms: 48, q: 0.28, note: 'Transformer cross-attention.' },
+    ltr: { id: 'pgLtr', ms: 22, q: 0.10, note: 'Heavy ensemble; often async in real stacks.' }
+  };
+
+  function pgActive(key) {
+    if (key === 'bm25') return true;
+    var id = pg[key].id;
+    return document.getElementById(id).checked;
+  }
+
+  function updatePg() {
+    var fail = document.getElementById('pgFail').value;
+    var lat = 0;
+    var qual = 0;
+    var notes = [];
+
+    function add(key) {
+      if (!pgActive(key)) return;
+      var penalty = 0;
+      var qpen = 0;
+      if (fail === 'dense' && key === 'dense') { penalty = 1; qpen = 0.22; notes.push('Dense index down: falling back to lexical-only.'); }
+      if (fail === 'fusion' && key === 'fusion') { penalty = 1; qpen = 0.08; notes.push('Fusion timed out: using BM25 ordering only.'); }
+      if (fail === 'feat' && key === 'feat') { penalty = 1; qpen = 0.12; notes.push('Feature LTR skipped: tier-two scores omitted.'); }
+      if (fail === 'rerank' && key === 'rerank') { penalty = 1; qpen = 0.28; notes.push('Cross-encoder circuit open: returning prerank list.'); }
+      if (!penalty) {
+        lat += pg[key].ms;
+        qual += pg[key].q;
+      }
+    }
+
+    add('bm25');
+    add('dense');
+    add('fusion');
+    add('feat');
+    add('rerank');
+    add('ltr');
+
+    document.getElementById('pgLat').textContent = 'Estimated path latency: ' + lat + ' ms';
+    document.getElementById('pgQual').textContent = 'Quality index: ' + qual.toFixed(2) + ' (unitless demo score)';
+    var narr = document.getElementById('pgNarr');
+    if (notes.length) narr.textContent = notes.join(' ');
+    else narr.textContent = 'All selected components healthy; latency sums sequential stages on this toy model.';
+
+    var tbody = document.getElementById('pgTableBody');
+    tbody.innerHTML = '';
+    function row(name, key) {
+      var active = pgActive(key);
+      var tr = document.createElement('tr');
+      var status = active ? 'yes' : 'no';
+      var ms = active ? pg[key].ms + ' ms' : '—';
+      var note = pg[key].note;
+      if (fail === 'dense' && key === 'dense' && active) { status = 'degraded'; ms = '0 ms'; note = 'Removed from path; recall may drop.'; }
+      if (fail === 'fusion' && key === 'fusion' && active) { status = 'degraded'; ms = '0 ms'; note = 'Bypassed; single-stream order.'; }
+      if (fail === 'feat' && key === 'feat' && active) { status = 'degraded'; ms = '0 ms'; note = 'Skipped tier-two model.'; }
+      if (fail === 'rerank' && key === 'rerank' && active) { status = 'degraded'; ms = '0 ms'; note = 'Serving preranked list.'; }
+      tr.innerHTML = '<td>' + name + '</td><td>' + status + '</td><td>' + ms + '</td><td style="color:var(--text-dim);font-size:0.78rem;">' + note + '</td>';
+      tbody.appendChild(tr);
+    }
+    row('BM25', 'bm25');
+    row('Dense ANN', 'dense');
+    row('Fusion', 'fusion');
+    row('Feature LTR', 'feat');
+    row('Cross-encoder', 'rerank');
+    row('Heavy LTR', 'ltr');
+  }
+
+  Object.keys(pg).forEach(function (k) {
+    if (pg[k].id) {
+      var el = document.getElementById(pg[k].id);
+      if (el) el.addEventListener('change', updatePg);
+    }
+  });
+  document.getElementById('pgFail').addEventListener('change', updatePg);
+  updatePg();
+})();
+  </script>
+</body>
+</html>

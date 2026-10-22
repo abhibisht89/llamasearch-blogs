@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cross-Encoder Reranking — Precision at the Cost of Speed | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c8cff;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover { color: var(--accent); }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108, 140, 255, 0.14), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(244, 114, 182, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.85rem, 5vw, 3rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--accent3); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 22px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .callout.warn { border-left-color: var(--accent5); }
+    .callout.ok { border-left-color: var(--accent3); }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 22px 0;
+    }
+    @media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .comparison h4 { margin: 0 0 10px; font-size: 0.95rem; color: var(--accent2); }
+    .interactive-panel {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel h4 { margin: 0 0 14px; font-size: 1rem; color: var(--text); }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: rgba(108, 140, 255, 0.15); border-color: var(--accent); color: var(--accent); }
+    label.lbl { display: block; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 6px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    input[type="text"], textarea {
+      width: 100%;
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    textarea { min-height: 100px; resize: vertical; font-family: var(--mono); font-size: 0.85rem; }
+    .rank-list { list-style: none; padding: 0; margin: 0; }
+    .rank-item {
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      gap: 10px;
+      align-items: start;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: var(--bg-card);
+      font-size: 0.88rem;
+    }
+    .rank-item .idx { font-family: var(--mono); color: var(--accent3); font-weight: 600; }
+    .rank-item .score { font-family: var(--mono); color: var(--accent5); font-size: 0.8rem; }
+    .rank-item.moved { border-color: var(--accent4); box-shadow: 0 0 0 1px rgba(244, 114, 182, 0.25); }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.8rem; }
+    .bar-row span.lbl { width: 100px; color: var(--text-dim); flex-shrink: 0; }
+    .bar-bg { flex: 1; height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; border: 1px solid var(--border); }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; }
+    .bar-fill.ret { background: linear-gradient(90deg, var(--accent3), var(--accent)); }
+    .bar-fill.rerank { background: linear-gradient(90deg, var(--accent4), var(--accent2)); }
+    .token-flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      margin: 14px 0;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+    .tok {
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+    .tok.cls { background: rgba(108, 140, 255, 0.2); border-color: var(--accent); color: var(--accent); }
+    .tok.sep { color: var(--text-dim); border-style: dashed; }
+    .tok.q { background: rgba(52, 211, 153, 0.12); border-color: var(--accent3); }
+    .tok.d { background: rgba(167, 139, 250, 0.12); border-color: var(--accent2); }
+    .curve-chart { height: 200px; position: relative; margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; }
+    .curve-svg { width: 100%; height: 100%; display: block; }
+    .distill-viz { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-top: 12px; }
+    @media (max-width: 640px) { .distill-viz { grid-template-columns: 1fr; } }
+    .model-box {
+      text-align: center;
+      padding: 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+    .model-box.teacher { border-color: var(--accent4); }
+    .model-box.student { border-color: var(--accent3); }
+    .arrow-big { font-size: 1.5rem; color: var(--accent5); text-align: center; }
+    footer.site-foot {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <style class="breadcrumb-styles">
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+  </style>
+
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Cross-Encoder Reranking</span>
+  </nav>
+
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="Section navigation">
+    <a href="#s0">00 · Retrieve–Rerank</a>
+    <a href="#s1">01 · How Cross-Encoders Work</a>
+    <a href="#s2">02 · Training</a>
+    <a href="#s3">03 · Bi vs Cross</a>
+    <a href="#s4">04 · Pipeline Design</a>
+    <a href="#s5">05 · Distillation</a>
+    <a href="#s6">06 · Practical Tips</a>
+    <a href="#s7">07 · Playground</a>
+  </nav>
+
+  <header class="hero">
+    <span class="chapter-badge">Chapter 10 of 26 · Search Zero to Hero</span>
+    <h1>Cross-Encoder Reranking</h1>
+    <p class="subtitle">
+      Production search rarely stops at the first retrieval stage. This chapter explains why the
+      <strong style="color: var(--text);">retrieve-then-rerank</strong> pattern is the default architecture for high-precision systems,
+      how <code>cross-encoders</code> score query–document pairs with full attention, and how to balance latency against ranking quality.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">~10ms</div><div class="lbl">Typical first-stage retrieval</div></div>
+      <div class="hero-stat"><div class="val">50–200ms</div><div class="lbl">Cross-encoder rerank window</div></div>
+      <div class="hero-stat"><div class="val">5–10%</div><div class="lbl">Typical nDCG lift vs bi-encoder</div></div>
+      <div class="hero-stat"><div class="val">100–1000×</div><div class="lbl">Cross vs bi speed gap (rough)</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>00 · The Retrieve-Then-Rerank Pattern</h2>
+    <p>
+      Large-scale search begins with a <strong>first-stage retriever</strong> that must be extremely fast over millions or billions of documents.
+      Classical sparse methods like <code>BM25</code> and modern dense methods using <code>bi-encoders</code> both fit this role: they produce a cheap,
+      differentiable score or distance for every (or many) candidates, often implemented with inverted indexes or approximate nearest neighbor (ANN) structures.
+    </p>
+    <p>
+      That speed comes with a structural limitation: the retriever scores each document with only <em>shallow</em> interaction between query and text.
+      A bi-encoder maps the query and each document to independent vectors; relevance is a similarity in embedding space, not a joint read of both sequences.
+      Sparse retrieval matches lexical overlap but cannot deeply resolve paraphrase, negation, or fine-grained entailment without heavier machinery.
+    </p>
+    <p>
+      The <strong>second stage</strong> accepts a short list—often <code>top-100</code> or <code>top-1000</code>—and applies a <code>cross-encoder</code> that ingests
+      query and document together. This stage is slower because it runs a full transformer forward pass per pair, but it can exploit
+      <strong>cross-attention</strong> between every query token and every document token. In production, that is the standard trade-off:
+      cast a wide, fast net; then discriminate precisely among survivors.
+    </p>
+    <p>
+      <strong>Latency budgeting</strong> is how teams ship this in practice. First-stage retrieval stays cheap relative to reranking; cross-encoder cost grows with
+      <code>k</code>, model size, sequence length, GPU batching, and whether you cascade multiple rerankers. The explorer below uses relative units for planning—not benchmarks of a specific stack.
+    </p>
+
+    <div class="interactive-panel" id="demoLatency">
+      <h4>Interactive · Latency budget explorer</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">Adjust relative times to see how the two-stage budget composes. Values are normalized for visualization.</p>
+      <label class="lbl" for="rngRet">First-stage retrieval (relative ms): <span id="valRet">10</span></label>
+      <input type="range" id="rngRet" min="4" max="40" value="10" />
+      <label class="lbl" for="rngRerank">Cross-encoder on top-<span id="valK">50</span> (relative ms): <span id="valRerank">80</span></label>
+      <input type="range" id="rngK" min="10" max="200" value="50" />
+      <input type="range" id="rngRerank" min="20" max="240" value="80" />
+      <div class="bar-row"><span class="lbl">Retrieval</span><div class="bar-bg"><div class="bar-fill ret" id="barRet" style="width:20%"></div></div><span id="pctRet" style="font-family:var(--mono);color:var(--accent3);">20%</span></div>
+      <div class="bar-row"><span class="lbl">Reranking</span><div class="bar-bg"><div class="bar-fill rerank" id="barRerank" style="width:80%"></div></div><span id="pctRerank" style="font-family:var(--mono);color:var(--accent4);">80%</span></div>
+      <p style="font-size:0.82rem;margin-bottom:0;color:var(--text-dim);">Total illustrative latency: <code id="totalMs">90</code> (relative units). Larger <code>k</code> usually increases rerank cost superlinearly without batching optimizations.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--text);">Operational takeaway</h3>
+      <p style="margin-bottom:0;">
+        Treat reranking as an optional but high-value layer behind the same API: if <code>p95</code> latency allows another <code>50ms</code>, you often buy measurable gains in
+        <code>nDCG</code>, click-through rate, or downstream task success. If the product is autocomplete or sub-20ms SLAs, keep retrieval-only or use distilled bi-encoders instead.
+      </p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>01 · How Cross-Encoders Work</h2>
+    <p>
+      A <code>cross-encoder</code> for ranking is still a transformer encoder at its core—commonly initialized from <code>BERT</code>, <code>RoBERTa</code>, or <code>DeBERTa</code>.
+      The crucial difference from dual-encoder retrieval is the <strong>input construction</strong>: the query and the candidate document are concatenated into
+      one token sequence with special separators, then fed through the full stack of self-attention layers.
+    </p>
+    <p>
+      A typical pattern is <code>[CLS] query_tokens [SEP] document_tokens [SEP]</code>. The final hidden state at <code>[CLS]</code> (or a pooled combination of states)
+      feeds a small <strong>classification head</strong> that outputs either a relevance logit or a distribution over ordinal grades. That scalar is your
+      <code>relevance score</code> for the pair. Because every layer can attend across the boundary between query and document, the model can represent
+      interactions like “this phrase in the query is contradicted by this sentence in the document”—something a single dot product between two fixed vectors struggles to capture.
+    </p>
+
+    <div class="interactive-panel" id="demoArch">
+      <h4>Interactive · Token layout inspector</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">Edit the sample query and document snippets (short text). The diagram shows how segments are arranged for the cross-encoder.</p>
+      <label class="lbl" for="archQ">Query</label>
+      <input type="text" id="archQ" value="python asyncio tutorial" />
+      <label class="lbl" for="archD">Document title snippet</label>
+      <input type="text" id="archD" value="Async IO in Python 3 — event loops" />
+      <div class="token-flow" id="archFlow" aria-live="polite"></div>
+      <p style="font-size:0.82rem;margin:0;color:var(--text-dim);">In real systems, text is tokenized by a <code>WordPiece</code>-style subword vocabulary; this demo uses word-level placeholders for intuition.</p>
+    </div>
+
+    <div class="formula">
+      [CLS] ⊕ Tokenize(q) ⊕ [SEP] ⊕ Tokenize(d) ⊕ [SEP] → Encoder<sub>L</sub> → h<sub>[CLS]</sub> → w<sup>T</sup>h + b → score(q, d)
+    </div>
+
+    <p>
+      <strong>Why it is more powerful than bi-encoders.</strong> Bi-encoders compute <code>f(q)</code> and <code>g(d)</code> separately; relevance is <code>sim(f(q), g(d))</code>.
+      Information that only appears when both sides are read together—coreference, negation scope, fine overlap of multi-word expressions—has no dedicated channel except what happens to land in the two embeddings.
+      The cross-encoder’s <code>self-attention</code> is fully “cross” between query and document positions, so it performs <strong>joint reasoning</strong> over the pair.
+    </p>
+    <div class="callout warn">
+      <strong>Cost.</strong> You cannot pre-compute a document-side representation that suffices for arbitrary future queries. Each new query requires new forward passes for every candidate document you want to score.
+      Complexity is <code>O(N)</code> in the number of scored pairs for that query, versus <code>O(1)</code> amortized lookup per document after indexing with a bi-encoder (plus the one-time cost of encoding the query).
+    </div>
+    <p>
+      That is why cross-encoders are reserved for <strong>top-k reranking</strong>: you deliberately shrink <code>N</code> so that the expensive joint computation fires only on a manageable candidate set.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>02 · Training Cross-Encoders</h2>
+    <p>
+      Training data for ranking models traditionally arrives as <strong>triples</strong> <code>(query, document, relevance_label)</code>. The label may be binary—relevant or not—or
+      graded on an ordinal scale such as <code>0–4</code> as in some TREC pooling judgments. Graded labels reflect degrees of usefulness: a document may be on-topic but shallow,
+      or highly authoritative and complete.
+    </p>
+    <p>
+      <strong>Loss functions</strong> follow the label type. Binary relevance pairs naturally use <code>binary cross-entropy</code> against a sigmoid on the relevance logit.
+      Graded labels are often treated as regression targets with <code>mean squared error (MSE)</code> on normalized scores, or as ordinal classification with appropriate link functions.
+      Pairwise and listwise objectives—ranking SVM variants, <code>ListNet</code>-style surrogates—appear in research and some industrial trainers when full ranked lists are available.
+    </p>
+    <p>
+      <strong>Data sources</strong> include public passage collections such as <code>MS MARCO</code>, ad-hoc retrieval benchmarks from <code>TREC</code>, and proprietary human judgments from search logs
+      (explicit ratings) or implicit signals (clicks, dwell time) carefully debiased. Fine-tuning almost always starts from a strong pretrained checkpoint:
+      <code>BERT-base</code>, <code>RoBERTa</code>, or <code>DeBERTa-v3</code> gives the cross-encoder linguistic coverage before it specializes on relevance.
+    </p>
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--text);">Example checkpoint</h3>
+      <p>
+        The <code>cross-encoder/ms-marco-MiniLM-L-6-v2</code> model is widely used as a default reranker: six transformer layers make it relatively small and fast while retaining strong accuracy on passage ranking tasks distilled from MS MARCO supervision.
+        Larger <code>DeBERTa</code>-based variants trade latency for marginal gains—worth it when quality is paramount and hardware allows.
+      </p>
+    </div>
+    <div class="comparison">
+      <div>
+        <h4>Binary setup</h4>
+        <p style="margin:0;font-size:0.9rem;color:var(--text-dim);">Labels in <code>{0,1}</code>. Optimize BCE; threshold scores for deployment or keep raw logits for ranking sort.</p>
+      </div>
+      <div>
+        <h4>Graded setup</h4>
+        <p style="margin:0;font-size:0.9rem;color:var(--text-dim);">Labels in <code>{0,…,4}</code>. MSE or ordinal loss; better calibrated scores for blending with other signals.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>03 · Bi-Encoder vs Cross-Encoder — The Full Comparison</h2>
+    <p>
+      As introduced in Chapter 6 (and extended in Chapter 7), <strong>bi-encoders</strong> encode query and document independently for fast ANN retrieval with shallow interaction;
+      <strong>cross-encoders</strong> score pairs jointly with full cross-attention—more accurate per pair, but <strong>orders of magnitude</strong> slower at large <code>N</code>.
+    </p>
+    <div class="callout">
+      <strong>Sweet spot.</strong> Use a bi-encoder (or BM25 hybrid) to retrieve <code>top-k</code>, then a cross-encoder to rerank. You keep ANN-scale coverage and pay the heavy model only where it matters.
+    </div>
+
+    <div class="interactive-panel" id="demoBiCross">
+      <h4>Interactive · Side-by-side ranking (simulated)</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+        Scores are computed in-browser with a toy lexical + interaction heuristic: the “bi-encoder” proxy rewards token overlap; the “cross-encoder” proxy adds phrase match and negation handling.
+        This is <em>not</em> a real neural model—it illustrates how rankings <strong>diverge</strong> when joint scoring resolves ambiguity better.
+      </p>
+      <label class="lbl" for="bcQ">Query</label>
+      <input type="text" id="bcQ" value="install docker on mac without desktop" />
+      <div class="btn-group">
+        <button type="button" class="btn primary" id="bcRun">Recompute rankings</button>
+        <button type="button" class="btn" id="bcPreset1">Preset: negation</button>
+        <button type="button" class="btn" id="bcPreset2">Preset: phrase</button>
+      </div>
+      <div class="comparison" style="margin-top:16px;">
+        <div>
+          <h4>Bi-encoder proxy (overlap)</h4>
+          <ul class="rank-list" id="biList"></ul>
+        </div>
+        <div>
+          <h4>Cross-encoder proxy (joint)</h4>
+          <ul class="rank-list" id="crossList"></ul>
+        </div>
+      </div>
+      <p style="font-size:0.82rem;margin:0;color:var(--text-dim);" id="bcDiffSummary"></p>
+    </div>
+
+    <div class="comparison">
+      <div>
+        <h4>Bi-encoder</h4>
+        <ul style="margin:0;padding-left:18px;color:var(--text-dim);font-size:0.92rem;">
+          <li>Independent encoding</li>
+          <li>Pre-computable document side</li>
+          <li>Fast ANN retrieval</li>
+          <li>Shallow query–doc interaction</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Cross-encoder</h4>
+        <ul style="margin:0;padding-left:18px;color:var(--text-dim);font-size:0.92rem;">
+          <li>Joint encoding</li>
+          <li>Not pre-computable per query</li>
+          <li>Slow per pair</li>
+          <li>Deep interaction via attention</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>04 · Reranking Pipeline Design</h2>
+    <p>
+      Choosing <code>k</code>—how many candidates enter the reranker—is the central knob. Larger <code>k</code> improves the chance that the true best documents are still in the pool
+      (higher recall at the reranker input) but increases GPU time and memory. Values like <code>20</code>, <code>100</code>, and <code>1000</code> appear in real systems depending on stage latency budgets and
+      whether multiple rerankers are chained.
+    </p>
+    <p>
+      <strong>Batch inference</strong> on GPU amortizes fixed launch costs: scoring 64 short pairs in one forward pass is far more throughput-efficient than 64 serial calls.
+      Production stacks often pack variable-length sequences with attention masks, or use optimized runtimes (ONNX TensorRT, specialized kernels) to shrink wall-clock time.
+    </p>
+    <p>
+      <strong>Cascading rerankers</strong> stack a cheap model on <code>top-100</code> and a heavy model on <code>top-20</code> emerging from the first rerank. Each stage trims the list for the next, preserving most of the accuracy of the final cross-encoder while bounding average cost.
+      <strong>Caching</strong> repeated queries—common in B2B search or support portals—stores ordered candidate IDs or even scores to skip recomputation within a TTL.
+    </p>
+
+    <div class="interactive-panel" id="demoCurve">
+      <h4>Interactive · Rerank depth vs recall / latency (illustrative)</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+        The curves use smooth analytic stand-ins: recall rises with diminishing returns; latency grows faster than linear as <code>k</code> increases without ideal batching.
+        Tune the “retriever quality” slider to see how a weaker first stage pushes you toward larger <code>k</code>.
+      </p>
+      <label class="lbl" for="rngRecallStrength">First-stage retriever strength (0.5 – 1.5): <span id="valRS">1</span></label>
+      <input type="range" id="rngRecallStrength" min="50" max="150" value="100" />
+      <label class="lbl" for="rngDepth">Candidates reranked (k): <span id="valDepth">100</span></label>
+      <input type="range" id="rngDepth" min="10" max="500" value="100" />
+      <div class="curve-chart"><svg class="curve-svg" id="curveSvg" viewBox="0 0 400 200" preserveAspectRatio="none"></svg></div>
+      <p style="font-size:0.85rem;margin:10px 0 0;color:var(--text-dim);">
+        At <code>k = <span id="kOut">100</span></code>: estimated rerank latency factor <code id="latOut">1.00×</code> · recall-at-input <code id="recOut">0.00</code> (model illustrative).
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--text);">Checklist for engineers</h3>
+      <p>
+        Log <code>p50</code>/<code>p95</code> rerank latency separately from retrieval; track <code>nDCG@k</code> offline when labels exist; A/B test online metrics when they do not.
+        If latency spikes at peak traffic, reduce <code>k</code>, narrow passages (chunking), or fall back to the first stage only under load shedding.
+      </p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>05 · Distillation — Making Cross-Encoders Faster</h2>
+    <p>
+      When cross-encoder latency is still too high—yet you want better-than-bi-encoder interaction—<strong>knowledge distillation</strong> trains a student model to imitate the teacher’s behavior.
+      The teacher is typically a large cross-encoder; the student is often a <code>bi-encoder</code> (dual tower) that recovers a scoring function compatible with ANN indexes.
+    </p>
+    <p>
+      Training pairs consist of queries and documents with teacher scores or teacher-implied rankings. A common objective is <strong>margin-MSE</strong>: penalize differences between student and teacher scores while amplifying separation between positives and hard negatives.
+      Listwise variants match entire ranked orders produced by the teacher. The practical result is a student that approaches teacher quality while retaining <code>O(1)</code> lookup semantics at serving time.
+    </p>
+    <p>
+      Modern strong retrievers such as <code>ColBERTv2</code> and the <code>E5</code> family leverage related ideas—multi-stage training, teacher signals, and sometimes late interaction—to close the gap between fast retrieval and cross-encoder precision.
+      Distillation does not magically remove all limits, but it shifts the Pareto frontier in the right direction for many workloads.
+    </p>
+
+    <div class="interactive-panel" id="demoDistill">
+      <h4>Interactive · Teacher → student score alignment</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">Drag the slider to simulate distillation epochs: student scores move toward teacher scores for four fixed pairs.</p>
+      <label class="lbl" for="rngEpoch">Distillation progress: <span id="valEpoch">0</span>%</label>
+      <input type="range" id="rngEpoch" min="0" max="100" value="0" />
+      <div class="distill-viz">
+        <div class="model-box teacher">
+          <div style="font-size:0.75rem;color:var(--accent4);margin-bottom:6px;">Teacher (cross-encoder)</div>
+          <div id="teacherBars" style="font-family:var(--mono);font-size:0.78rem;text-align:left;"></div>
+        </div>
+        <div class="arrow-big">→</div>
+        <div class="model-box student">
+          <div style="font-size:0.75rem;color:var(--accent3);margin-bottom:6px;">Student (bi-encoder)</div>
+          <div id="studentBars" style="font-family:var(--mono);font-size:0.78rem;text-align:left;"></div>
+        </div>
+      </div>
+      <p style="font-size:0.82rem;margin:12px 0 0;color:var(--text-dim);">Mean absolute error: <code id="maeOut">0.00</code></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>06 · Practical Tips</h2>
+    <p>
+      <strong>When to rerank:</strong> whenever your latency budget tolerates roughly tens to a couple hundred milliseconds of extra work per query and you care about ranking quality more than absolute minimum response time.
+      Reranking is standard in enterprise search, support knowledge bases, legal discovery assistants, and e-commerce browse-to-search flows.
+    </p>
+    <p>
+      <strong>Model selection:</strong> start with <code>ms-marco-MiniLM</code>-class cross-encoders for a strong speed/quality balance on English passages; move to <code>DeBERTa</code>-based checkpoints when offline metrics justify the cost.
+      Integration paths include the <code>sentence_transformers.cross_encoder.CrossEncoder</code> API in Python and hosted <strong>rerank endpoints</strong> from providers (for example <code>Cohere Rerank</code>) when you prefer not to operate GPU infrastructure.
+    </p>
+    <p>
+      <strong>Monitoring:</strong> dashboard rerank stage latency percentiles, error rates, and timeout fallbacks; compare <code>nDCG</code> or task success with rerank on vs off.
+      <strong>When not to rerank:</strong> keystroke-level autocomplete, high-frequency trading adjacent tools, and rigid sub-20ms SLAs are poor fits unless you use aggressive caching or distilled students only.
+    </p>
+    <div class="callout ok">
+      <strong>Hybrid reminder.</strong> Combine sparse and dense first-stage signals, then let the cross-encoder arbitrate among the union. Rerankers are especially good at fixing cases where recall was right but initial ordering was wrong.
+    </div>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>07 · Playground</h2>
+    <p>
+      Enter a query and several document lines below (one document per line). The playground sorts them with the same transparent heuristics as the earlier demo: a bi-encoder proxy and a cross-encoder proxy.
+      Rows highlighted in pink changed rank position between the two orderings—those are the decisions a reranker typically overturns.
+    </p>
+
+    <div class="interactive-panel" id="playground">
+      <h4>Interactive reranker lab</h4>
+      <label class="lbl" for="pgQ">Query</label>
+      <input type="text" id="pgQ" value="cheap flights NYC to London nonstop" />
+      <label class="lbl" for="pgDocs">Documents (one per line)</label>
+      <textarea id="pgDocs">Budget NYC-LON direct routes this month
+Nonstop JFK to Heathrow deals under $500
+Driving directions from NYC to London (humor)
+London travel guide — history and museums
+Red eye flights NYC London with one stop ORD</textarea>
+      <div class="btn-group">
+        <button type="button" class="btn primary" id="pgRun">Rank &amp; compare</button>
+        <button type="button" class="btn" id="pgClear">Clear highlights</button>
+      </div>
+      <div class="comparison">
+        <div>
+          <h4>Bi-encoder proxy</h4>
+          <ul class="rank-list" id="pgBi"></ul>
+        </div>
+        <div>
+          <h4>Cross-encoder proxy</h4>
+          <ul class="rank-list" id="pgCross"></ul>
+        </div>
+      </div>
+      <p style="font-size:0.82rem;color:var(--text-dim);margin:0;" id="pgSummary"></p>
+    </div>
+
+    <p style="margin-top:1.5rem;color:var(--text-dim);font-size:0.92rem;">
+      Cross-encoder reranking is the precision layer after any first-stage retriever—expensive per pair, but bounded by top-<code>k</code>.
+    </p>
+  </section>
+
+  <footer class="site-foot">
+    Search Zero to Hero · Chapter 10 · Cross-Encoder Reranking · Single-file reference
+  </footer>
+
+  <script>
+(function () {
+  var navToggle = document.getElementById('navToggle');
+  var mainNav = document.getElementById('mainNav');
+  if (navToggle && mainNav) {
+    navToggle.addEventListener('click', function () {
+      var open = mainNav.classList.toggle('visible');
+      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    mainNav.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        mainNav.classList.remove('visible');
+        navToggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
+  function onScrollNav() {
+    if (!mainNav) return;
+    if (window.scrollY > 280) mainNav.classList.add('visible');
+    else if (!navToggle || navToggle.getAttribute('aria-expanded') !== 'true') mainNav.classList.remove('visible');
+  }
+  window.addEventListener('scroll', onScrollNav, { passive: true });
+
+  var sections = document.querySelectorAll('section.fade-in');
+  var io = new IntersectionObserver(function (ents) {
+    ents.forEach(function (e) {
+      if (e.isIntersecting) e.target.classList.add('visible');
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+  sections.forEach(function (s) { io.observe(s); });
+
+  function tokenize(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  }
+
+  function biScore(q, doc) {
+    var qt = new Set(tokenize(q));
+    var dt = tokenize(doc);
+    if (!dt.length) return 0;
+    var hit = 0;
+    dt.forEach(function (t) { if (qt.has(t)) hit++; });
+    return hit / Math.sqrt(dt.length + 1);
+  }
+
+  function crossScore(q, doc) {
+    var base = biScore(q, doc);
+    var ql = q.toLowerCase();
+    var dl = doc.toLowerCase();
+    var bonus = 0;
+    var qBig = ql.replace(/\s+/g, ' ');
+    var dBig = dl.replace(/\s+/g, ' ');
+    tokenize(q).forEach(function (t, i, arr) {
+      if (i < arr.length - 1) {
+        var bg = arr[i] + ' ' + arr[i + 1];
+        if (dBig.indexOf(bg) >= 0) bonus += 0.35;
+      }
+    });
+    if ((ql.indexOf('without') >= 0 || ql.indexOf('no ') >= 0) && (dl.indexOf('without') >= 0 || dl.indexOf('no ') >= 0)) bonus += 0.2;
+    if ((ql.indexOf('without') >= 0 || ql.indexOf('no ') >= 0) && (dl.indexOf('with ') >= 0 || dl.indexOf('desktop') >= 0 && ql.indexOf('without') >= 0)) bonus -= 0.15;
+    if (dl.indexOf('humor') >= 0 || dl.indexOf('joke') >= 0) bonus -= 0.25;
+    if ((ql.indexOf('nonstop') >= 0 || ql.indexOf('direct') >= 0) && (dl.indexOf('nonstop') >= 0 || dl.indexOf('direct') >= 0)) bonus += 0.4;
+    if ((ql.indexOf('nonstop') >= 0 || ql.indexOf('direct') >= 0) && dl.indexOf('stop') >= 0 && dl.indexOf('nonstop') < 0) bonus -= 0.3;
+    return base + bonus;
+  }
+
+  function rankDocs(q, docs, scorer) {
+    return docs.map(function (d, i) {
+      return { text: d, i: i, score: scorer(q, d) };
+    }).sort(function (a, b) { return b.score - a.score; });
+  }
+
+  function renderRankList(ul, ordered, idPrefix) {
+    ul.innerHTML = '';
+    ordered.forEach(function (row, rank) {
+      var li = document.createElement('li');
+      li.className = 'rank-item';
+      li.dataset.orig = String(row.i);
+      li.innerHTML = '<span class="idx">' + (rank + 1) + '</span><span>' + escapeHtml(row.text) + '</span><span class="score">' + row.score.toFixed(3) + '</span>';
+      ul.appendChild(li);
+    });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function diffRanks(biOrd, crossOrd) {
+    var pos = {};
+    crossOrd.forEach(function (r, idx) { pos[r.i] = idx; });
+    var moved = [];
+    biOrd.forEach(function (r, idx) {
+      if (pos[r.i] !== idx) moved.push(r.i);
+    });
+    return moved;
+  }
+
+  function highlightMoved(ul, movedSet) {
+    ul.querySelectorAll('.rank-item').forEach(function (li) {
+      var o = parseInt(li.dataset.orig, 10);
+      if (movedSet[o]) li.classList.add('moved');
+    });
+  }
+
+  var demoLatency = document.getElementById('demoLatency');
+  if (demoLatency) {
+    var rngRet = document.getElementById('rngRet');
+    var rngRerank = document.getElementById('rngRerank');
+    var rngK = document.getElementById('rngK');
+    function latUpdate() {
+      var ret = parseInt(rngRet.value, 10);
+      var k = parseInt(rngK.value, 10);
+      var rr = parseInt(rngRerank.value, 10);
+      var kBoost = 1 + Math.log10(1 + k / 50);
+      var effRerank = Math.round(rr * kBoost);
+      var total = ret + effRerank;
+      document.getElementById('valRet').textContent = String(ret);
+      document.getElementById('valK').textContent = String(k);
+      document.getElementById('valRerank').textContent = String(rr);
+      document.getElementById('totalMs').textContent = String(total);
+      var pr = total ? (100 * ret / total) : 0;
+      var prr = total ? (100 * effRerank / total) : 0;
+      document.getElementById('barRet').style.width = pr.toFixed(1) + '%';
+      document.getElementById('barRerank').style.width = prr.toFixed(1) + '%';
+      document.getElementById('pctRet').textContent = pr.toFixed(0) + '%';
+      document.getElementById('pctRerank').textContent = prr.toFixed(0) + '%';
+    }
+    ['input', 'change'].forEach(function (ev) {
+      rngRet.addEventListener(ev, latUpdate);
+      rngRerank.addEventListener(ev, latUpdate);
+      rngK.addEventListener(ev, latUpdate);
+    });
+    latUpdate();
+  }
+
+  var archQ = document.getElementById('archQ');
+  var archD = document.getElementById('archD');
+  var archFlow = document.getElementById('archFlow');
+  function renderArch() {
+    if (!archFlow) return;
+    var q = archQ.value || '';
+    var d = archD.value || '';
+    var qTok = tokenize(q).slice(0, 8);
+    var dTok = tokenize(d).slice(0, 10);
+    archFlow.innerHTML = '';
+    function addTok(text, cls) {
+      var sp = document.createElement('span');
+      sp.className = 'tok ' + cls;
+      sp.textContent = text;
+      archFlow.appendChild(sp);
+    }
+    addTok('[CLS]', 'cls');
+    qTok.forEach(function (t) { addTok(t, 'q'); });
+    addTok('[SEP]', 'sep');
+    dTok.forEach(function (t) { addTok(t, 'd'); });
+    addTok('[SEP]', 'sep');
+  }
+  if (archQ && archD) {
+    ['input', 'change'].forEach(function (ev) {
+      archQ.addEventListener(ev, renderArch);
+      archD.addEventListener(ev, renderArch);
+    });
+    renderArch();
+  }
+
+  var DEFAULT_DOCS = [
+    'Docker Desktop installer for Mac — GUI setup',
+    'Install Docker Engine on macOS without Docker Desktop (Homebrew)',
+    'What is Docker? beginner introduction',
+    'Mac system preferences and display settings'
+  ];
+
+  function runBiCross() {
+    var q = document.getElementById('bcQ').value;
+    var docs = DEFAULT_DOCS;
+    var biOrd = rankDocs(q, docs, biScore);
+    var crossOrd = rankDocs(q, docs, crossScore);
+    renderRankList(document.getElementById('biList'), biOrd, 'b');
+    renderRankList(document.getElementById('crossList'), crossOrd, 'c');
+    var moved = diffRanks(biOrd, crossOrd);
+    var set = {};
+    moved.forEach(function (i) { set[i] = true; });
+    highlightMoved(document.getElementById('biList'), set);
+    highlightMoved(document.getElementById('crossList'), set);
+    var msg = moved.length ? ('Documents that changed rank between proxies: ' + moved.length + ' of ' + docs.length + '.') : 'Both proxies agree on the full ordering.';
+    document.getElementById('bcDiffSummary').textContent = msg;
+  }
+  var bcRun = document.getElementById('bcRun');
+  if (bcRun) bcRun.addEventListener('click', runBiCross);
+  var bcPreset1 = document.getElementById('bcPreset1');
+  if (bcPreset1) bcPreset1.addEventListener('click', function () {
+    document.getElementById('bcQ').value = 'python tutorial without numpy';
+    runBiCross();
+  });
+  var bcPreset2 = document.getElementById('bcPreset2');
+  if (bcPreset2) bcPreset2.addEventListener('click', function () {
+    document.getElementById('bcQ').value = 'async file download python';
+    runBiCross();
+  });
+  runBiCross();
+
+  var rngRS = document.getElementById('rngRecallStrength');
+  var rngDepth = document.getElementById('rngDepth');
+  var curveSvg = document.getElementById('curveSvg');
+  function recallAtK(k, strength) {
+    var s = strength / 100;
+    return 1 - Math.exp(-(k / 80) * s);
+  }
+  function latencyFactor(k) {
+    return Math.pow(k / 50, 1.25);
+  }
+  function drawCurve() {
+    if (!curveSvg) return;
+    var strength = parseInt(rngRS.value, 10);
+    var k0 = parseInt(rngDepth.value, 10);
+    var W = 400, H = 200, pad = 28;
+    var pathR = [];
+    var pathL = [];
+    for (var i = 0; i <= 100; i++) {
+      var k = 10 + (500 - 10) * (i / 100);
+      var r = recallAtK(k, strength);
+      var l = latencyFactor(k);
+      var x = pad + (W - 2 * pad) * (i / 100);
+      var yr = H - pad - (H - 2 * pad) * r;
+      var yl = H - pad - (H - 2 * pad) * Math.min(1, l / 8);
+      pathR.push((i ? 'L' : 'M') + x.toFixed(1) + ',' + yr.toFixed(1));
+      pathL.push((i ? 'L' : 'M') + x.toFixed(1) + ',' + yl.toFixed(1));
+    }
+    var rec = recallAtK(k0, strength);
+    var lat = latencyFactor(k0);
+    var xk = pad + (W - 2 * pad) * ((k0 - 10) / (500 - 10));
+    var yk = H - pad - (H - 2 * pad) * rec;
+    curveSvg.innerHTML =
+      '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#2a2a3a" stroke-width="1"/>' +
+      '<line x1="' + pad + '" y1="' + pad + '" x2="' + pad + '" y2="' + (H - pad) + '" stroke="#2a2a3a" stroke-width="1"/>' +
+      '<path d="' + pathR.join(' ') + '" fill="none" stroke="#34d399" stroke-width="2"/>' +
+      '<path d="' + pathL.join(' ') + '" fill="none" stroke="#f472b6" stroke-width="2"/>' +
+      '<circle cx="' + xk.toFixed(1) + '" cy="' + yk.toFixed(1) + '" r="5" fill="#fbbf24" stroke="#0a0a0f" stroke-width="2"/>' +
+      '<text x="' + (pad + 4) + '" y="' + (pad + 4) + '" fill="#8888a0" font-size="9" font-family="monospace">recall</text>' +
+      '<text x="' + (W - 54) + '" y="' + (H - 10) + '" fill="#8888a0" font-size="9" font-family="monospace">k →</text>';
+    document.getElementById('valRS').textContent = (strength / 100).toFixed(2);
+    document.getElementById('valDepth').textContent = String(k0);
+    document.getElementById('kOut').textContent = String(k0);
+    document.getElementById('latOut').textContent = lat.toFixed(2) + '×';
+    document.getElementById('recOut').textContent = rec.toFixed(3);
+  }
+  if (rngRS && rngDepth) {
+    ['input', 'change'].forEach(function (ev) {
+      rngRS.addEventListener(ev, drawCurve);
+      rngDepth.addEventListener(ev, drawCurve);
+    });
+    drawCurve();
+  }
+
+  var teacherScores = [0.92, 0.55, 0.78, 0.34];
+  var studentStart = [0.62, 0.72, 0.5, 0.4];
+  var rngEpoch = document.getElementById('rngEpoch');
+  function renderDistill() {
+    var t = parseInt(rngEpoch.value, 10) / 100;
+    var sBars = document.getElementById('studentBars');
+    var tBars = document.getElementById('teacherBars');
+    if (!sBars || !tBars) return;
+    var mae = 0;
+    var htmlS = '';
+    var htmlT = '';
+    for (var i = 0; i < teacherScores.length; i++) {
+      var st = studentStart[i] + (teacherScores[i] - studentStart[i]) * t;
+      mae += Math.abs(st - teacherScores[i]);
+      htmlT += 'pair ' + (i + 1) + ': ' + teacherScores[i].toFixed(2) + '<br/>';
+      htmlS += 'pair ' + (i + 1) + ': ' + st.toFixed(2) + '<br/>';
+    }
+    tBars.innerHTML = htmlT;
+    sBars.innerHTML = htmlS;
+    document.getElementById('maeOut').textContent = (mae / teacherScores.length).toFixed(3);
+    document.getElementById('valEpoch').textContent = String(Math.round(t * 100));
+  }
+  if (rngEpoch) {
+    ['input', 'change'].forEach(function (ev) { rngEpoch.addEventListener(ev, renderDistill); });
+    renderDistill();
+  }
+
+  function runPlayground() {
+    var q = document.getElementById('pgQ').value;
+    var raw = document.getElementById('pgDocs').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+    if (!raw.length) return;
+    var biOrd = rankDocs(q, raw, biScore);
+    var crossOrd = rankDocs(q, raw, crossScore);
+    renderRankList(document.getElementById('pgBi'), biOrd, 'pb');
+    renderRankList(document.getElementById('pgCross'), crossOrd, 'pc');
+    var moved = diffRanks(biOrd, crossOrd);
+    var set = {};
+    moved.forEach(function (i) { set[i] = true; });
+    highlightMoved(document.getElementById('pgBi'), set);
+    highlightMoved(document.getElementById('pgCross'), set);
+    document.getElementById('pgSummary').textContent = moved.length
+      ? ('Highlight: ' + moved.length + ' document(s) changed position after cross-style rescoring.')
+      : 'Both orderings match for this input.';
+  }
+  var pgRun = document.getElementById('pgRun');
+  if (pgRun) pgRun.addEventListener('click', runPlayground);
+  var pgClear = document.getElementById('pgClear');
+  if (pgClear) pgClear.addEventListener('click', function () {
+    document.querySelectorAll('#pgBi .rank-item, #pgCross .rank-item').forEach(function (li) { li.classList.remove('moved'); });
+  });
+  runPlayground();
+})();
+  </script>
+</body>
+</html>

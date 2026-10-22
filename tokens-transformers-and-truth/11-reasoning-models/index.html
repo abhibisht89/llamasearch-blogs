@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reasoning Models & Test-Time Scaling — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+.token-correct { background: rgba(52,211,153,0.25); color: var(--accent3); border: 1px solid rgba(52,211,153,0.5); }
+.token-wrong { background: rgba(248,113,113,0.15); color: var(--danger); border: 1px solid rgba(248,113,113,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Chart container ===== */
+.chart-container { position: relative; margin: 20px 0; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  background: rgba(248, 113, 113, 0.08);
+  border-left-color: var(--danger);
+}
+.callout.warn p { color: var(--text); }
+.callout.ok {
+  background: rgba(52, 211, 153, 0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text); }
+
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== GRPO Group Display ===== */
+.grpo-group { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.grpo-sample {
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  min-width: 120px;
+  text-align: center;
+  transition: all 0.3s;
+}
+.grpo-sample.winner { border-color: var(--accent3); background: rgba(52,211,153,0.1); }
+.grpo-sample.loser { border-color: var(--danger); background: rgba(248,113,113,0.05); }
+
+/* ===== Table ===== */
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.data-table th, .data-table td { padding: 10px 14px; border: 1px solid var(--border); text-align: center; }
+.data-table th { background: var(--bg-card-alt); color: var(--accent); }
+.data-table td { background: var(--bg-card); color: var(--text-dim); }
+.data-table td.highlight { background: rgba(108,140,255,0.15); color: var(--text); }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Input fields ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* ===== Interview questions (hint / reveal) ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: border-color 0.2s, background 0.2s;
+}
+.hint-btn:hover, .reveal-btn:hover {
+  border-color: var(--accent);
+  background: rgba(108, 140, 255, 0.1);
+}
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.hint-box.visible { display: block; }
+.answer {
+  display: none;
+  margin-top: 16px;
+  padding: 16px 18px;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: 8px;
+}
+.answer.visible { display: block; }
+.solution-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.answer .explanation { color: var(--text); font-size: 0.92rem; line-height: 1.6; }
+.answer .explanation strong { color: var(--text); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Reasoning Models</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">Reasoning Models & Test-Time Scaling</a>
+  <div class="nav-links">
+    <a href="#s0">Overview</a>
+    <a href="#s1">GRPO Algorithm</a>
+    <a href="#s2">Verifiable Rewards</a>
+    <a href="#s3">ORM vs PRM</a>
+    <a href="#s4">Reasoning Chains</a>
+    <a href="#s5">Test-Time Scaling</a>
+    <a href="#s6">Best-of-N & Voting</a>
+    <a href="#s7">Train vs Test Compute</a>
+    <a href="#s8">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Reasoning Models & Test-Time Scaling</h1>
+    <p class="subtitle">
+      How models learn to reason before answering — from GRPO and verifiable rewards to test-time compute scaling and majority voting.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">12</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">6</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1</span>
+        <span class="stat-label">Playground</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Modern language models produce chains of reasoning before giving a final answer — especially for math, coding, and complex reasoning tasks. The chapter covers how reinforcement learning trains this behavior, the role of verifiable rewards, outcome vs process reward models, and how scaling compute at inference time improves performance.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 0: OVERVIEW ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>From Chain of Thought to Trained Reasoning</h2>
+
+    <p>
+      The idea of models <strong>reasoning before predicting</strong> a final answer is not new. Chain-of-thought prompting — asking a model to "think step by step" before answering — emerged as a powerful technique for math and coding tasks. As models scale up in data and parameters, the ability to benefit from chain-of-thought reasoning increases. But how do we actually <strong>train</strong> this behavior?
+    </p>
+
+    <p>
+      In supervised fine-tuning, we have prompts and expert answers — but we typically do not have the exact reasoning process the expert used. A model's reasoning may not look like a human's, and we may not want to force it to mimic one. Instead, we can give the model flexibility to discover what works. Reinforcement learning with verifiable rewards provides exactly that.
+    </p>
+
+    <h3 style="margin-top:28px;">Two Dimensions of Scaling</h3>
+    <p>
+      So far we've discussed <strong>train-time scaling</strong>: more data, more parameters, more compute during training. But there is another dimension: <strong>test-time scaling</strong>. At inference, we can control the thinking budget — how many tokens the model is allowed to produce between special think and endthink tags before giving its final answer. As models spend more compute on reasoning at test time, their performance increases. This is not immediately interpretable — we can't always point to a specific token and say "that's why it got better" — but the effect is real and significant.
+    </p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Reasoning models allocate a separate <strong>thinking budget</strong> at inference — tokens between think and endthink tags before the final answer. Training with verifiable rewards (math, code, format checks) plus group-relative policy optimization can teach this behavior without human preference labels on every step. Test-time scaling — spending more tokens on reasoning at inference — often yields gains comparable to scaling pre-training for hard reasoning tasks.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">RL Algorithms and Rewards at a Glance</h3>
+    <p>
+      <strong>Reinforce</strong> uses a simple policy gradient with an optional baseline. <strong>PO (Policy Optimization)</strong> adds policy ratio clipping and multiple updates per batch, with a trained value function for the baseline. <strong>GRPO</strong> drops the value function and reward model, uses a group of rollouts per prompt, and normalizes advantages by group statistics. All three can work with different reward types. <strong>RLHF</strong> uses reward models trained on human preferences (Bradley-Terry). <strong>RLVR</strong> uses verifiable rewards — correctness, format, execution — with no human judgments.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent); font-size:1rem;">Reinforce</h3>
+        <p>Single gradient step per batch, no clipping. The objective is still “move policy toward high-advantage actions,” but without the trust-region machinery that stabilizes large language model fine-tuning.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:1rem;">Clipped PO-style training</h3>
+        <p>Policy ratio ρ = π<sub>θ</sub>(a|s) / π<sub>θ_old</sub>(a|s) with clipping, multiple optimization steps on the <em>same</em> rollouts before refreshing data, and (classically) a learned value baseline plus KL control toward an SFT reference.</p>
+      </div>
+    </div>
+
+    <div class="formula">
+      L<sub>reinforce</sub> ∝ − A(x, y) · log π<sub>θ</sub>(y | x) &nbsp;&nbsp;(advantage may fold in reward, baseline, and sometimes KL — implementations often minimize the negative)
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Orthogonal choices:</strong> GRPO is often paired with verifiable rewards, and classical PO-style pipelines often pair with learned reward models — but the pairing is not mandatory. You can run GRPO with a standard reward model, or use verifiable checks inside a PO-style loop. What changed in practice is economics: verifiable signals plus group baselines remove an entire “reward-model-sized” network from the training stack. Learned rewards can still be gamed; verifiable rewards are narrow but cheap, reproducible, and less ambiguous where they apply.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 1: GRPO ALGORITHM ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>The GRPO Algorithm</h2>
+
+    <p>
+      Using the GRPO framework from <a href="../10-reinforcement-learning-for-llms/index.html">Chapter 10</a> — group rollouts, z-scored advantages, and PPO-style ratio clipping — reasoning training mainly changes the <strong>reward source</strong>. Where tasks permit, learned reward models give way to <strong>verifiable rewards</strong> (correctness, format, execution). The policy still samples <strong>G</strong> completions per prompt; advantages are measured relative to peers on the same prompt.
+    </p>
+
+    <h3 style="margin-top:28px;">Group Z-Scoring</h3>
+    <p>
+      Given a single prompt <strong>x</strong>, we generate <strong>G</strong> different responses <strong>y₁, y₂, ..., y₍G₎</strong> by sampling from the policy model. For each response we compute a reward <strong>r(x, yᵢ)</strong>. We then compute the group mean and standard deviation, and use them to z-score the rewards into advantages:
+    </p>
+
+    <div class="formula">
+      A_gr(x, yᵢ) = (r(x, yᵢ) − μ) / σ
+    </div>
+
+    <div class="formula">
+      μ = (1/G) Σ<sub>j=1..G</sub> r(x, yⱼ) &nbsp;&nbsp; ; &nbsp;&nbsp; σ = std({ r(x, y₁), …, r(x, y<sub>G</sub>) }) &nbsp;&nbsp; (implementations use σ + ε for stability)
+    </div>
+
+    <p>
+      where μ is the mean reward over the group and σ is the standard deviation. The loss uses the same policy ratio clipping as PO, but with this group-relative advantage. The KL divergence is subtracted as a separate term (or omitted). In code, σ is almost always stabilized as σ + ε with tiny ε so that a flat group does not explode the division.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3); font-size:1rem;">Compute trade-off vs classical PO</h3>
+        <p>GRPO removes a value network that is typically as large as the policy — freeing memory for wider batches or larger groups. You “pay” with decoding: you must produce G completions per prompt instead of one, and long reasoning traces make that cost sharp.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent4); font-size:1rem;">Prompt diversity inside a batch</h3>
+        <p>A minimalist GRPO micro-batch might fix one prompt and spend all G samples exploring its posterior. With more compute, practice often uses many prompts × groups each. <strong>Gradient accumulation</strong> can simulate larger effective batches when hardware is limited — relevant for course projects and small clusters.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Why group normalization?</strong> When only one response in the group is correct (rare success), raw rewards give zero advantage to all incorrect responses — we wouldn't decrease their probability. Mean-centering gives negative advantage to losers. Z-score normalization further amplifies the rare success, putting more emphasis on learning from it.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>GRPO Algorithm Visualizer</h3>
+      <p>Simulate a group of 8 rollouts for a math prompt. Adjust how many are correct and see how rewards, mean-centering, and z-score normalization affect the advantages.</p>
+
+      <div class="slider-container">
+        <label>Number of correct responses (1–8): <span class="slider-value" id="grpoCorrectVal">1</span></label>
+        <input type="range" id="grpoCorrectSlider" min="1" max="8" value="1" step="1">
+      </div>
+
+      <div class="grpo-group" id="grpoGroup"></div>
+
+      <table class="data-table" id="grpoTable" style="margin-top: 16px;"></table>
+
+      <div id="grpoExplanation" style="margin-top: 12px; font-size: 0.85rem; color: var(--text-dim);"></div>
+    </div>
+
+    <p>
+      Within a group, the scalar advantage A<sub>gr</sub>(x, yᵢ) is broadcast to every token in completion yᵢ — how long “thinking” chains get reinforced when only the final parsed answer is graded. Policy ratio clipping and multi-step reuse of rollouts follow Chapter 10.
+    </p>
+
+    <h3 style="margin-top:28px;">Edge Cases</h3>
+    <p>
+      If <strong>all</strong> responses in the group are incorrect, we get no update — there is no positive signal. If <strong>all</strong> are correct, we also get no update — the model is already doing well on that prompt. Updates occur only when there is nonzero variance: some correct, some incorrect. Curriculum learning — starting with easier prompts and gradually introducing harder ones — helps when the model initially fails on everything.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Identical wrong answers still waste a group:</strong> For a trivial arithmetic prompt, every sampled completion might be incorrect yet numerically distinct, yielding rich contrast once mean-centered. But if every rollout is wrong <em>and</em> receives the same reward (for example all zero under a strict verifier), the empirical standard deviation can vanish and the z-score path becomes ill-conditioned — another reason ε is standard in denominators and why data mixes matter.</p>
+    </div>
+
+    <p>
+      The <strong>rare-failure</strong> mirror of rare success is symmetric: if seven of eight rollouts are correct and one is wrong, mean-centering and z-scoring assign a strongly negative advantage to the lone failure — aggressively downweighting that trajectory so the policy concentrates on the shared correct pattern.
+    </p>
+
+    <div class="callout">
+      <p><strong>Clipping vs z-scoring:</strong> Clipping limits how far the <em>policy ratio</em> can move per token, not the numeric value of the advantage by itself. After the first inner step you remeasure ρ; some tokens may hit the clip and stop updating while others remain inside the trust region. Large z-scored advantages are a target strength, not a guarantee of an unbounded parameter change — the two mechanisms interact rather than one simply negating the other.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>High-variance groups:</strong> With non-binary rewards (e.g., a rubric from 0–6), suppose one response gets 6 and the rest get 0. Mean-centering alone would give that winner a large advantage. Z-score normalization makes the advantage the same as in the binary 1-vs-0 case — treating "one winner" groups equally regardless of reward scale. This prevents a single high-scoring prompt from dominating updates.</p>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Optional KL removal:</strong> Many GRPO variants drop the KL-to-SFT term entirely without measurable quality regression on math-style suites — possibly because verifiable rewards already pin the policy to correct outputs, or because task-specific data prevents the worst kinds of drift. When KL is absent, exploration increases (the model is less tightly tied to the reference tokenizer distribution), which can help or hurt depending on data coverage; treat it as a tunable stability knob rather than a moral imperative.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 2: VERIFIABLE REWARDS ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Verifiable Rewards</h2>
+
+    <p>
+      <strong>Verifiable rewards</strong> are cheap and quick to obtain. For a math problem like "what is 29 + 48?", we don't need a neural reward model — we simply check if the answer is 77. For code, we run unit tests. For formatting, we check if the response follows the expected structure (think tokens, answer tags, etc.).
+    </p>
+
+    <h3 style="margin-top:28px;">Types of Verifiable Rewards</h3>
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Correctness</h3>
+        <p>Binary (0/1) or graded. Math: exact match or distance from correct answer. Code: unit tests pass or fail.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2);">Format</h3>
+        <p>Did the response use the correct structure? Think tokens, answer tags, proper formatting. Often combined with correctness — wrong format can yield zero reward even if the answer is correct.</p>
+      </div>
+    </div>
+
+    <p>
+      Execution-based rewards extend to agents: did the agent successfully book a flight? Did it get a confirmation email? These require interaction with the environment but are still verifiable.
+    </p>
+
+    <h3 style="margin-top:28px;">RLVR: Reinforcement Learning with Verifiable Rewards</h3>
+    <p>
+      The paradigm of using verifiable rewards is called <strong>RLVR</strong>. Unlike RLHF (reinforcement learning from human feedback), RLVR requires no human preference judgments. The trade-off: we are limited to tasks where we can cheaply verify success. Creative tasks like "write a great story about a cat and a unicorn" are harder to reward this way.
+    </p>
+
+    <p>
+      For preference-based reward modeling, the <em>ideal</em> data collection protocol asks humans to rank completions that were themselves produced by the SFT policy you intend to improve — the scorer and the trainable generator stay matched. In <em>practice</em>, many public datasets and industrial pipelines pool judgments across model families and generations to amortize labeling cost, then train one large reward model that is reused whenever a new policy is fine-tuned. That mismatch can change off-policy quirks but is widespread.
+    </p>
+
+    <p>
+      Binary verifiable rewards (0 or 1) do not assume a fixed binomial distribution. The spread in a group is entirely problem- and policy-dependent — on a hard prompt every rollout might fail; on a medium prompt perhaps exactly one sample succeeds. Group statistics adapt to whatever empirical contrast you observe.
+    </p>
+
+    <p>
+      <strong>Thinking delimiters</strong> (think / endthink, plus answer wrappers) are ordinary vocabulary tokens, analogous to control tokens like BOS — not a separate modality. The SFT stage must expose the model to enough formatted examples that it can emit the template before RL tightens correctness. Format rewards (1 if tags are well-formed, 0 otherwise) can be summed with correctness, or combined logically (“no credit unless format <em>and</em> answer are correct”).
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Outcome-only verification cannot audit faithfulness:</strong> If the scratch work is sloppy or even misleading while the boxed answer matches the checker, RLVR still assigns full credit unless you add auxiliary signals (for example process supervision). Conversely, a polished chain with a wrong final line fails entirely under pure outcome grading.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Reasoning Chain Demo</h3>
+      <p>Step through a simple math problem. The model reasons between think tags, then produces the final answer. Only the answer is verified — but the entire chain receives the gradient when the answer is correct.</p>
+
+      <div class="card card-alt" style="margin-bottom: 16px;">
+        <p style="color: var(--text-dim); margin-bottom: 8px;">Prompt: Solve 2x + 5 = 17 for x.</p>
+        <div id="reasoningChainDisplay" class="token-row"></div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" id="reasoningPrev">← Previous</button>
+        <button class="btn active" id="reasoningNext">Next Step →</button>
+        <button class="btn" id="reasoningReset">Reset</button>
+      </div>
+
+      <div id="reasoningExplanation" style="margin-top: 12px; font-size: 0.85rem; color: var(--text-dim);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: ORM VS PRM ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Outcome vs Process Reward Models</h2>
+
+    <p>
+      <strong>Outcome Reward Models (ORM)</strong> score only the final answer. Did the model get it right? This is what we use with verifiable rewards: binary or graded correctness. <strong>Process Reward Models (PRM)</strong> score intermediate steps. Did the model reach a correct sub-result at step 3? Did it make a logical error in the middle?
+    </p>
+
+    <h3 style="margin-top:28px;">Trade-offs</h3>
+    <p>
+      ORMs are simpler and cheaper — we only need to verify the final output. But they don't guide the reasoning process. A model might follow a wrong chain of reasoning and still get the right answer by luck, or follow a correct chain but write the wrong final answer. PRMs provide step-level supervision: they can reward correct intermediate values and penalize logical errors. This can improve faithfulness of the reasoning trace, but requires more annotation and a more complex reward setup.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>ORM vs PRM Comparison</h3>
+      <p>Compare how outcome-based and process-based rewards score the same reasoning chain. Toggle between scoring modes.</p>
+
+      <div class="btn-group">
+        <button class="btn active" id="ormBtn">Outcome (ORM)</button>
+        <button class="btn" id="prmBtn">Process (PRM)</button>
+      </div>
+
+      <div class="card card-alt" style="margin-top: 16px;">
+        <p style="color: var(--text-dim); margin-bottom: 12px;">Reasoning chain for "What is 15 − 7?"</p>
+        <div id="ormPrmChain" class="token-row"></div>
+        <div id="ormPrmScore" style="margin-top: 12px; font-family: var(--mono); font-size: 0.95rem;"></div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Faithfulness:</strong> Thinking tokens are not guaranteed to be faithful to what the model "actually" did. The model might follow one chain in the thinking tokens, get to the right answer, then output the wrong final answer. Or it might produce misleading reasoning. Process supervision can help, but it's an open challenge.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Process supervision in more detail</h3>
+    <p>
+      A <strong>process reward model</strong> (or hand-crafted checks) can award partial credit when intermediate algebraic states match a reference, when a proof step cites a valid lemma, or when code passes lint stages before final execution. Hooking those signals into GRPO-style training means the advantage is no longer a pure function of the final verifier — you are shaping the latent trajectory, not only the terminal box.
+    </p>
+
+    <div class="formula">
+      Example composite signal: &nbsp; R<sub>total</sub> = α · 𝟙[format OK] + β · 𝟙[intermediate value v reached] + γ · 𝟙[final answer correct]
+    </div>
+
+    <div class="callout ok">
+      <p><strong>When to reach for PRMs:</strong> Use them when errors are costly mid-trace (long code generation, multi-hop proofs) and when you can obtain reliable step labels. Stick to ORMs when annotation is unavailable and a cheap end-state check exists — the majority of open RLVR recipes still live in that regime.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: REASONING CHAINS ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Structure of Reasoning Chains</h2>
+
+    <p>
+      Reasoning models use special <strong>think</strong> and <strong>endthink</strong> tokens to delimit the reasoning region. The prompt instructs the model to put its thinking between these tags and box the final answer. Only the content between the answer tags is evaluated for correctness — but when the answer is correct, the entire response (including all thinking tokens) receives a positive advantage and gets upweighted.
+    </p>
+
+    <h3 style="margin-top:28px;">The "Aha Moment"</h3>
+    <p>
+      DeepSeek-R1 and similar models exhibit behaviors like <strong>backtracking</strong>: "Wait, let me re-evaluate... I made an error... Let me try again." They may restate the problem, decompose it into steps (a "bloom" phase), then reconstruct and verify (a "reconstruction" phase). These behaviors often emerge from a combination of RL training and mid-training — injecting instruction-following and reasoning examples during pre-training.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:1rem;">Classic CoT style (e.g., GPT-4o class)</h3>
+        <p>Polished step headers (“Step 1… Step 2…”) and a fairly formal tone. Useful for pedagogy-style answers.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3); font-size:1rem;">Reasoning-first open models</h3>
+        <p>Informal self-dialogue — “hmm,” “wait,” “let me double-check,” alternative interpretations spelled out — reads closer to messy human scratch work even though faithfulness is still not guaranteed.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Bloom and Reconstruction</h3>
+    <p>
+      Studies of reasoning chains find recurring patterns. The <strong>bloom phase</strong>: the model decomposes the problem into simpler steps. The <strong>reconstruction phase</strong>: it revisits earlier steps, checks for errors, considers alternative interpretations ("wait, let me re-evaluate..."), and consolidates before the final answer. Restating the problem at the start is common — though producing those tokens doesn't guarantee the model actually uses them internally. The thinking trace may not be fully faithful to the model's internal process.
+    </p>
+
+    <h3 style="margin-top:28px;">Training Dynamics</h3>
+    <p>
+      As GRPO training progresses, the average length of responses (thinking + answer) increases. At the same time, accuracy on math problems goes up. The model learns to use more thinking tokens when it helps. Rollouts are expensive — generating multiple samples per prompt — so we typically take multiple gradient steps on each batch before generating new rollouts. This makes better use of the compute.
+    </p>
+
+    <p>
+      Empirical curves from DeepSeek-R1-style training runs highlight the coupling: the horizontal axis is optimization steps while the vertical axis tracks both mean solution accuracy and mean generated length (reasoning span plus answer). The two rise together — evidence that the policy is not merely memorizing shorter templates but allocating additional latent computation when the reward landscape rewards it.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent5); font-size:1rem;">“Aha” behaviors in traces</h3>
+        <p>Open traces often show <strong>self-correction</strong>: the model explicitly pauses (“wait — let me re-evaluate”), revisits an earlier miscalculation, then continues. Planning paragraphs (“first I will … then …”) appear alongside informal hedging. These motifs make for compelling demos; interpret them cautiously because surface language may not map cleanly to internal computation.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent); font-size:1rem;">What we cannot see</h3>
+        <p>Even when a trace restates the word problem verbatim, that restatement might be stylistic. Faithfulness improves as models scale and as training mixes add process labels, yet verifying <em>causal</em> dependence between a specific sentence in think tokens and the final logits remains an open research problem.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Mid-Training</h3>
+    <p>
+      Many reasoning models use <strong>mid-training</strong>: during pre-training, some batches are replaced with instruction-following or reasoning data. This can inject examples of desired behaviors (backtracking, planning, structured reasoning) before RL. The exact mix and timing vary by lab — it remains more alchemy than science. The hypothesis is that much of the "emergent" reasoning behavior is encouraged by this data, not purely by RL.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: TEST-TIME SCALING ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Test-Time Compute Scaling</h2>
+
+    <p>
+      With a <strong>fixed</strong> model (fixed training compute, data, parameters), we can still improve performance by allowing the model to produce more tokens at inference. More thinking tokens → better accuracy on reasoning tasks. This is <strong>test-time scaling</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">The Scaling Curve</h3>
+    <p>
+      On competitive math datasets, increasing the thinking budget from minimal to thousands of tokens can substantially raise accuracy — often with diminishing returns. The effect parallels scaling training compute: both axes can lift hard reasoning benchmarks, which is why test-time depth is treated as a first-class scaling knob.
+    </p>
+
+    <p>
+      Instruction-tuned models trained before dedicated reasoning stages often solve grade-school items by interleaving scratch work and answers in one stream. Reasoning-specialized checkpoints add explicit segmented thinking, verifiable formatting, and RLVR-tuned habits — the same problem may elicit a shallow answer, a flat chain-of-thought, or a long self-checking trace.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Test-Time Compute Scaling</h3>
+      <p>Adjust the thinking budget (tokens) and see how accuracy on a math benchmark improves. This simulates the scaling curve from real models.</p>
+
+      <div class="slider-container">
+        <label>Thinking budget (tokens): <span class="slider-value" id="ttcBudgetVal">2000</span></label>
+        <input type="range" id="ttcBudgetSlider" min="100" max="8000" value="2000" step="100">
+      </div>
+
+      <div class="chart-container" style="position: relative; margin: 20px 0;">
+        <canvas id="ttcCanvas" width="840" height="280"></canvas>
+      </div>
+
+      <div id="ttcAccuracy" style="text-align: center; font-family: var(--mono); font-size: 1.1rem; margin-top: 8px;"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">When to Think Longer</h3>
+    <p>
+      For simple problems, extra thinking may not help much. For harder problems, more compute at test time pays off. The model doesn't always need to use the full budget — it can produce the endthink tag early when it's confident. But having a larger budget allows it to reason longer when needed.
+    </p>
+
+    <h3 style="margin-top:28px;">Simple Test-Time Scaling (S1)</h3>
+    <p>
+      A simplified approach: set a thinking budget and, if the model tries to produce endthink before reaching it, force it to output "wait" and continue. This can improve performance even without RL — the model is simply given more "chances" to reason. Training still helps for generalization across tasks, but the effect of more tokens at test time is significant regardless.
+    </p>
+
+    <p>
+      Concretely, the <strong>budget-forcing</strong> trick watches for premature closure: if the model assigns high probability to emitting endthink before the prescribed number of latent reasoning tokens, decoding overrides that choice and injects a continuation such as “Wait,” (comma included) so the sampler remains inside the thinking region. Every vocabulary token retains nonzero mass under a softmax, so the intervention is always feasible even when “wait” would rarely be sampled organically. The model is nudged to revisit prior claims; in curated demos this surfaces as explicit error acknowledgment (“my first answer was wrong — the final count is three Rs in raspberry”).
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Cherry-picking caveat:</strong> Stylized success stories circulate because they are memorable. Aggregate benchmarks still matter: budget forcing is a blunt instrument, yet empirical sweeps show steady gains in average accuracy as forced thinking length increases — parallel to the curves observed in fully RLVR-trained systems.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 6: BEST-OF-N AND MAJORITY VOTING ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Best-of-N and Majority Voting</h2>
+
+    <p>
+      At inference, we can generate <strong>N</strong> different responses and select one. <strong>Best-of-N</strong> uses a reward model (or verifier) to pick the highest-scoring response. <strong>Majority voting</strong> (self-consistency) picks the most common answer among the N samples. Both improve over single-sample decoding.
+    </p>
+
+    <h3 style="margin-top:28px;">Trade-offs</h3>
+    <p>
+      Best-of-N requires a way to score each response — a reward model or execution-based check. Majority voting works when answers are discrete and comparable (e.g., multiple-choice or short numeric answers). For open-ended generation, majority voting is less applicable. Tree search and beam search can also be used for reasoning — exploring multiple branches and using process reward models for step-level guidance.
+    </p>
+
+    <p>
+      The same optimization pressure that makes GRPO excel at verifiable tasks also tends to <strong>collapse output diversity</strong>: once a trajectory earns high reward, the policy gradient increases its probability mass, so alternate correct paths that were never sampled may never receive credit. Self-consistency voting partly mitigates inference-time variance, but training-time diversity — adaptive sampling temperature, entropy bonuses, or broader data mixes — remains an active engineering concern.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Hybrid trainers in the wild:</strong> Some production stacks blend ingredients from multiple recipes — for instance group-centered baselines reminiscent of GRPO with policy-gradient shells closer to vanilla reinforce. Treat named algorithms as templates: the important levers are stable ratios, trustworthy advantages, and verifiable or well-calibrated reward sources.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Best-of-N vs Majority Voting</h3>
+      <p>Generate N samples for a math problem. Compare selecting by highest reward (Best-of-N) vs most common answer (Majority Voting).</p>
+
+      <div class="slider-container">
+        <label>Number of samples (N): <span class="slider-value" id="bonNVal">5</span></label>
+        <input type="range" id="bonNSlider" min="3" max="15" value="5" step="1">
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" id="bonGenerate">Generate Samples</button>
+      </div>
+
+      <div id="bonSamples" style="margin-top: 16px;"></div>
+      <div id="bonResult" style="margin-top: 12px; font-family: var(--mono); font-size: 0.95rem;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 7: TRAIN VS TEST COMPUTE ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Train-Time vs Test-Time Compute Trade-off</h2>
+
+    <p>
+      We can improve model performance along two axes: <strong>train-time compute</strong> (bigger models, more data, longer training) and <strong>test-time compute</strong> (more samples, longer thinking, tree search). The optimal allocation depends on the task, latency requirements, and cost structure.
+    </p>
+
+    <h3 style="margin-top:28px;">Scaling Laws</h3>
+    <p>
+      Scaling laws describe how performance improves with compute. For test-time compute, accuracy often follows a power-law relationship with the number of tokens or samples. There are diminishing returns, but the gains can be substantial before flattening.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Train vs Test Compute Trade-off</h3>
+      <p>Allocate a fixed total compute budget between training (model size, data) and inference (samples per query, thinking tokens). See how the allocation affects accuracy.</p>
+
+      <div class="slider-container">
+        <label>Train compute share (0–100%): <span class="slider-value" id="tradeoffTrainVal">60</span>%</label>
+        <input type="range" id="tradeoffSlider" min="10" max="90" value="60" step="5">
+      </div>
+
+      <div class="chart-container" style="position: relative; margin: 20px 0;">
+        <canvas id="tradeoffCanvas" width="840" height="300"></canvas>
+      </div>
+
+      <div id="tradeoffSummary" style="margin-top: 12px; font-size: 0.9rem; color: var(--text-dim);"></div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Practical takeaway:</strong> For latency-sensitive applications, you may favor a larger, better-trained model with less test-time compute. For batch processing or when latency is less critical, generating more samples or allowing longer thinking can be very cost-effective.</p>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Systems bottleneck:</strong> When reasoning traces stretch to tens of thousands of tokens, the dominant wall-clock cost is often rollout generation, not backward passes. Large labs therefore invest heavily in asynchronous rollout workers, stale-sample tolerance analysis, and memory-aware scheduling — the same algorithmic ideas behave differently when the forward pass dominates your cluster.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 8: PLAYGROUND ===== -->
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Playground</h2>
+
+    <p>
+      Experiment with GRPO advantage computation, test-time scaling curves, and the train–test compute trade-off.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>GRPO Advantage Calculator</h3>
+      <p>Enter rewards for a group (comma-separated, e.g. 1,0,0,0,0,0,0,0). See raw, mean-centered, and z-scored advantages.</p>
+
+      <input type="text" class="text-input" id="grpoCalcInput" value="1,0,0,0,0,0,0,0">
+
+      <div id="grpoCalcResult"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Test-Time Scaling Curve Explorer</h3>
+      <p>Adjust the shape of the accuracy-vs-thinking-budget curve. See how different scaling exponents affect the relationship.</p>
+
+      <div class="slider-container">
+        <label>Scaling exponent (steepness): <span class="slider-value" id="scaleExpVal">0.35</span></label>
+        <input type="range" id="scaleExpSlider" min="10" max="60" value="35" step="5">
+      </div>
+
+      <div class="chart-container">
+        <canvas id="scaleExpCanvas" width="840" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p>
+    Reasoning Models & Test-Time Scaling — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+// ============================================================
+// UTILITY
+// ============================================================
+
+function toggleHint(id) {
+  const el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('visible');
+}
+
+function reveal(id) {
+  const el = document.getElementById(id + '-answer');
+  if (el) el.classList.add('visible');
+}
+
+const barColors = ['#6c8cff', '#a78bfa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#38bdf8', '#e879f9'];
+
+// ============================================================
+// SECTION 1: GRPO ALGORITHM VISUALIZER
+// ============================================================
+
+const grpoCorrectSlider = document.getElementById('grpoCorrectSlider');
+const grpoCorrectVal = document.getElementById('grpoCorrectVal');
+const grpoGroup = document.getElementById('grpoGroup');
+const grpoTable = document.getElementById('grpoTable');
+const grpoExplanation = document.getElementById('grpoExplanation');
+
+function updateGRPO() {
+  const G = 8;
+  const numCorrect = parseInt(grpoCorrectSlider.value);
+  grpoCorrectVal.textContent = numCorrect;
+
+  const rewards = [];
+  for (let i = 0; i < G; i++) {
+    rewards.push(i < numCorrect ? 1 : 0);
+  }
+
+  const mean = rewards.reduce((a, b) => a + b, 0) / G;
+  const variance = rewards.reduce((s, r) => s + Math.pow(r - mean, 2), 0) / G;
+  const std = Math.sqrt(variance) || 0.001;
+
+  const rawAdv = rewards.map(r => r);
+  const meanCentered = rewards.map(r => r - mean);
+  const zscored = rewards.map(r => std > 0 ? (r - mean) / std : 0);
+
+  // Render group
+  grpoGroup.innerHTML = '';
+  rewards.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'grpo-sample ' + (r === 1 ? 'winner' : 'loser');
+    div.textContent = 'y' + (i + 1) + ': ' + (r === 1 ? '✓' : '✗');
+    grpoGroup.appendChild(div);
+  });
+
+  // Render table
+  let tableHtml = '<thead><tr><th>Response</th><th>Reward</th><th>Raw Adv</th><th>Mean-Centered</th><th>GRPO (z-score)</th></tr></thead><tbody>';
+  rewards.forEach((r, i) => {
+    tableHtml += `<tr>
+      <td>y${i + 1}</td>
+      <td>${r}</td>
+      <td>${rawAdv[i].toFixed(2)}</td>
+      <td>${meanCentered[i].toFixed(3)}</td>
+      <td>${zscored[i].toFixed(3)}</td>
+    </tr>`;
+  });
+  tableHtml += '</tbody>';
+  grpoTable.innerHTML = tableHtml;
+
+  if (numCorrect === 0) {
+    grpoExplanation.textContent = 'All incorrect: no update. The model gets no gradient signal. Curriculum learning helps — start with easier prompts.';
+  } else if (numCorrect === G) {
+    grpoExplanation.textContent = 'All correct: no update. The model is already doing well on this prompt.';
+  } else if (numCorrect === 1) {
+    grpoExplanation.textContent = 'Rare success: z-score amplifies the single winning response. Losers get negative advantage — we decrease their probability.';
+  } else {
+    grpoExplanation.textContent = 'Mixed group: z-score gives positive advantage to correct responses, negative to incorrect. All contribute to the update.';
+  }
+}
+
+grpoCorrectSlider.addEventListener('input', updateGRPO);
+updateGRPO();
+
+// ============================================================
+// SECTION 2: REASONING CHAIN DEMO
+// ============================================================
+
+const reasoningSteps = [
+  { type: 'think', text: '⟨think⟩' },
+  { type: 'reason', text: '2x + 5 = 17 means 2x = 12' },
+  { type: 'reason', text: 'So x = 6' },
+  { type: 'reason', text: 'Verify: 2(6) + 5 = 17 ✓' },
+  { type: 'endthink', text: '⟨/think⟩' },
+  { type: 'answer', text: '⟨answer⟩' },
+  { type: 'answer', text: '6' },
+  { type: 'answer', text: '⟨/answer⟩' }
+];
+
+let reasoningStepIdx = 0;
+const reasoningChainDisplay = document.getElementById('reasoningChainDisplay');
+const reasoningExplanation = document.getElementById('reasoningExplanation');
+
+function renderReasoningChain() {
+  reasoningChainDisplay.innerHTML = '';
+  for (let i = 0; i <= reasoningStepIdx && i < reasoningSteps.length; i++) {
+    const s = reasoningSteps[i];
+    const span = document.createElement('span');
+    if (s.type === 'think' || s.type === 'endthink') span.className = 'token token-special';
+    else if (s.type === 'reason') span.className = 'token token-word';
+    else span.className = 'token token-correct';
+    span.textContent = s.text;
+    reasoningChainDisplay.appendChild(span);
+  }
+
+  if (reasoningStepIdx < reasoningSteps.length - 1) {
+    reasoningExplanation.textContent = 'Step ' + (reasoningStepIdx + 1) + ': ' + (reasoningSteps[reasoningStepIdx].type === 'reason' ? 'Reasoning step.' : reasoningSteps[reasoningStepIdx].type === 'answer' ? 'Producing final answer.' : 'Opening/closing tags.');
+  } else {
+    reasoningExplanation.textContent = 'Complete. Only the answer "6" is verified. Because it is correct, the entire chain (including all thinking tokens) receives positive advantage during GRPO training.';
+  }
+}
+
+document.getElementById('reasoningNext').addEventListener('click', () => {
+  if (reasoningStepIdx < reasoningSteps.length - 1) {
+    reasoningStepIdx++;
+    renderReasoningChain();
+  }
+});
+
+document.getElementById('reasoningPrev').addEventListener('click', () => {
+  if (reasoningStepIdx > 0) {
+    reasoningStepIdx--;
+    renderReasoningChain();
+  }
+});
+
+document.getElementById('reasoningReset').addEventListener('click', () => {
+  reasoningStepIdx = 0;
+  renderReasoningChain();
+});
+
+renderReasoningChain();
+
+// ============================================================
+// SECTION 3: ORM VS PRM
+// ============================================================
+
+const ormPrmChain = document.getElementById('ormPrmChain');
+const ormPrmScore = document.getElementById('ormPrmScore');
+const ormBtn = document.getElementById('ormBtn');
+const prmBtn = document.getElementById('prmBtn');
+
+const ormPrmSteps = [
+  { text: '15 − 7', type: 'reason' },
+  { text: '= 10 − 2', type: 'reason', correct: false },
+  { text: '= 8', type: 'reason', correct: true },
+  { text: 'Answer: 8', type: 'answer', correct: true }
+];
+
+function renderORMPRM(mode) {
+  ormPrmChain.innerHTML = '';
+  ormPrmSteps.forEach((s, i) => {
+    const span = document.createElement('span');
+    span.className = 'token ' + (s.correct === false ? 'token-wrong' : s.correct === true ? 'token-correct' : 'token-word');
+    span.textContent = s.text;
+    ormPrmChain.appendChild(span);
+  });
+
+  if (mode === 'orm') {
+    ormPrmScore.innerHTML = 'ORM score: <strong style="color:var(--accent3);">1</strong> — Final answer 8 is correct. We ignore the wrong intermediate step.';
+  } else {
+    ormPrmScore.innerHTML = 'PRM score: <strong style="color:var(--danger);">0.5</strong> — Step 2 is wrong (10−2 is not 15−7). Step 3 and answer are correct. Process model penalizes the error.';
+  }
+}
+
+ormBtn.addEventListener('click', () => {
+  ormBtn.classList.add('active');
+  prmBtn.classList.remove('active');
+  renderORMPRM('orm');
+});
+
+prmBtn.addEventListener('click', () => {
+  prmBtn.classList.add('active');
+  ormBtn.classList.remove('active');
+  renderORMPRM('prm');
+});
+
+renderORMPRM('orm');
+
+// ============================================================
+// SECTION 5: TEST-TIME COMPUTE SCALING
+// ============================================================
+
+const ttcBudgetSlider = document.getElementById('ttcBudgetSlider');
+const ttcBudgetVal = document.getElementById('ttcBudgetVal');
+const ttcCanvas = document.getElementById('ttcCanvas');
+const ttcAccuracy = document.getElementById('ttcAccuracy');
+
+function ttcAccuracyCurve(tokens) {
+  const base = 28;
+  const maxGain = 38;
+  const k = 0.0004;
+  return base + maxGain * (1 - Math.exp(-k * tokens));
+}
+
+function drawTTC() {
+  const budget = parseInt(ttcBudgetSlider.value);
+  ttcBudgetVal.textContent = budget;
+
+  const W = ttcCanvas.width;
+  const H = ttcCanvas.height;
+  const pad = { top: 20, right: 20, bottom: 40, left: 50 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  const ctx = ttcCanvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const maxTokens = 8000;
+  const acc = ttcAccuracyCurve(budget);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + (plotH / 5) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const val = 70 - i * 12;
+    const y = pad.top + (plotH / 5) * i;
+    ctx.fillText(val + '%', pad.left - 8, y + 4);
+  }
+  ctx.textAlign = 'center';
+  ctx.fillText('Thinking tokens', W / 2, H - 4);
+
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let t = 100; t <= maxTokens; t += 50) {
+    const x = pad.left + (t / maxTokens) * plotW;
+    const yVal = ttcAccuracyCurve(t);
+    const y = pad.top + plotH - ((yVal - 25) / 50) * plotH;
+    t === 100 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  const cx = pad.left + (budget / maxTokens) * plotW;
+  const cy = pad.top + plotH - ((acc - 25) / 50) * plotH;
+  ctx.fillStyle = '#6c8cff';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ttcAccuracy.innerHTML = 'Accuracy at ' + budget + ' tokens: <strong style="color:var(--accent);">' + acc.toFixed(1) + '%</strong>';
+}
+
+ttcBudgetSlider.addEventListener('input', drawTTC);
+drawTTC();
+
+// ============================================================
+// SECTION 6: BEST-OF-N VS MAJORITY VOTING
+// ============================================================
+
+const bonNSlider = document.getElementById('bonNSlider');
+const bonNVal = document.getElementById('bonNVal');
+const bonSamples = document.getElementById('bonSamples');
+const bonResult = document.getElementById('bonResult');
+
+bonNSlider.addEventListener('input', () => { bonNVal.textContent = bonNSlider.value; });
+
+document.getElementById('bonGenerate').addEventListener('click', () => {
+  const N = parseInt(bonNSlider.value);
+  const correctAnswer = 77;
+  const wrongAnswers = [76, 78, 75, 79, 72, 80];
+  const samples = [];
+  for (let i = 0; i < N; i++) {
+    const r = Math.random();
+    samples.push(r < 0.4 ? correctAnswer : wrongAnswers[Math.floor(Math.random() * wrongAnswers.length)]);
+  }
+
+  const rewards = samples.map(s => s === correctAnswer ? 1 : 0);
+  const bestIdx = rewards.reduce((best, r, i) => r > rewards[best] ? i : best, 0);
+  const bestOfN = samples[bestIdx];
+
+  const counts = {};
+  samples.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+  let maxCount = 0, majorityAns = samples[0];
+  for (const [ans, c] of Object.entries(counts)) {
+    if (c > maxCount) { maxCount = c; majorityAns = parseInt(ans); }
+  }
+
+  bonSamples.innerHTML = '<div class="token-row">' + samples.map((s, i) =>
+    '<span class="token ' + (s === correctAnswer ? 'token-correct' : 'token-wrong') + '">Sample ' + (i+1) + ': ' + s + '</span>'
+  ).join('') + '</div>';
+
+  bonResult.innerHTML = 'Correct answer: <strong style="color:var(--accent3);">77</strong><br>' +
+    'Best-of-N selects: <strong>' + bestOfN + '</strong> ' + (bestOfN === correctAnswer ? '✓' : '✗') + '<br>' +
+    'Majority voting selects: <strong>' + majorityAns + '</strong> ' + (majorityAns === correctAnswer ? '✓' : '✗');
+});
+
+// ============================================================
+// SECTION 7: TRAIN VS TEST COMPUTE TRADE-OFF
+// ============================================================
+
+const tradeoffSlider = document.getElementById('tradeoffSlider');
+const tradeoffTrainVal = document.getElementById('tradeoffTrainVal');
+const tradeoffCanvas = document.getElementById('tradeoffCanvas');
+const tradeoffSummary = document.getElementById('tradeoffSummary');
+
+function drawTradeoff() {
+  const trainPct = parseInt(tradeoffSlider.value);
+  tradeoffTrainVal.textContent = trainPct;
+
+  const W = tradeoffCanvas.width;
+  const H = tradeoffCanvas.height;
+  const pad = { top: 30, right: 20, bottom: 50, left: 50 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  const ctx = tradeoffCanvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const trainShare = trainPct / 100;
+  const testShare = 1 - trainShare;
+  const trainAcc = 25 + 35 * Math.pow(trainShare, 0.7);
+  const testAcc = 28 + 32 * Math.pow(testShare, 0.6);
+  const combined = 0.5 * trainAcc + 0.5 * testAcc;
+
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('Train compute share →', pad.left + plotW / 2 - 60, H - 8);
+  ctx.fillText('0%', pad.left - 5, H - pad.bottom + 20);
+  ctx.fillText('100%', W - pad.right - 25, H - pad.bottom + 20);
+
+  const barW = plotW / 3;
+  const x1 = pad.left;
+  const x2 = pad.left + barW + 20;
+  const x3 = pad.left + 2 * (barW + 20);
+
+  function drawBar(x, w, trainVal, testVal, label) {
+    const maxH = plotH - 30;
+    const h1 = (trainVal / 70) * maxH;
+    const h2 = (testVal / 70) * maxH;
+    ctx.fillStyle = 'rgba(108,140,255,0.6)';
+    ctx.fillRect(x, pad.top + maxH - h1, w * 0.4, h1);
+    ctx.fillStyle = 'rgba(52,211,153,0.6)';
+    ctx.fillRect(x + w * 0.45, pad.top + maxH - h2, w * 0.4, h2);
+    ctx.fillStyle = '#e0e0e8';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + w / 2, pad.top + maxH + 20);
+  }
+
+  drawBar(x1, barW, 25 + 35 * 0.1, 28 + 32 * 0.9, '10% train');
+  drawBar(x2, barW, 25 + 35 * Math.pow(trainShare, 0.7), 28 + 32 * Math.pow(testShare, 0.6), trainPct + '% train');
+  drawBar(x3, barW, 25 + 35 * 0.9, 28 + 32 * 0.1, '90% train');
+
+  tradeoffSummary.innerHTML = 'At ' + trainPct + '% train / ' + (100 - trainPct) + '% test: simulated train accuracy ≈ ' + trainAcc.toFixed(1) + '%, test accuracy ≈ ' + testAcc.toFixed(1) + '%. Optimal allocation depends on latency and cost constraints.';
+}
+
+tradeoffSlider.addEventListener('input', drawTradeoff);
+drawTradeoff();
+
+// ============================================================
+// SECTION 8: PLAYGROUND — GRPO CALC
+// ============================================================
+
+const grpoCalcInput = document.getElementById('grpoCalcInput');
+const grpoCalcResult = document.getElementById('grpoCalcResult');
+
+function updateGRPOCalc() {
+  const str = grpoCalcInput.value;
+  const rewards = str.split(',').map(s => parseFloat(s.trim())).filter(v => !isNaN(v));
+  if (rewards.length < 2) {
+    grpoCalcResult.innerHTML = '<span style="color:var(--text-dim);">Enter at least 2 comma-separated numbers.</span>';
+    return;
+  }
+  const G = rewards.length;
+  const mean = rewards.reduce((a, b) => a + b, 0) / G;
+  const variance = rewards.reduce((s, r) => s + Math.pow(r - mean, 2), 0) / G;
+  const std = Math.sqrt(variance) || 0.001;
+  const zscored = rewards.map(r => (r - mean) / std);
+
+  grpoCalcResult.innerHTML = '<div class="card card-alt"><p>Mean: <strong>' + mean.toFixed(4) + '</strong> | Std: <strong>' + std.toFixed(4) + '</strong></p><p>Z-scored advantages: ' + zscored.map(z => z.toFixed(3)).join(', ') + '</p></div>';
+}
+
+grpoCalcInput.addEventListener('input', updateGRPOCalc);
+updateGRPOCalc();
+
+// ============================================================
+// SECTION 8: SCALING EXPONENT EXPLORER
+// ============================================================
+
+const scaleExpSlider = document.getElementById('scaleExpSlider');
+const scaleExpVal = document.getElementById('scaleExpVal');
+const scaleExpCanvas = document.getElementById('scaleExpCanvas');
+
+function drawScaleExp() {
+  const exp = parseInt(scaleExpSlider.value) / 100;
+  scaleExpVal.textContent = exp.toFixed(2);
+
+  const W = scaleExpCanvas.width;
+  const H = scaleExpCanvas.height;
+  const pad = { top: 20, right: 20, bottom: 35, left: 50 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  const ctx = scaleExpCanvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let t = 0; t <= 8000; t += 100) {
+    const x = pad.left + (t / 8000) * plotW;
+    const acc = 28 + 38 * Math.pow(t / 8000, exp);
+    const y = pad.top + plotH - ((acc - 25) / 50) * plotH;
+    t === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px sans-serif';
+  ctx.fillText('Thinking tokens', W / 2, H - 4);
+}
+
+scaleExpSlider.addEventListener('input', drawScaleExp);
+drawScaleExp();
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    if (el.getBoundingClientRect().top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+</body>
+</html>

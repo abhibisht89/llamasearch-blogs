@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Position Encodings for Transformers — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  background: rgba(248,113,113,0.08);
+  border-left-color: var(--danger);
+}
+.callout.warn p { color: var(--text-dim); }
+.callout.ok {
+  background: rgba(52,211,153,0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text-dim); }
+
+/* ===== Q&A pullout ===== */
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--accent2);
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Table ===== */
+.bigram-table-wrapper { overflow-x: auto; margin: 20px 0; }
+.bigram-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  width: 100%;
+}
+.bigram-table th, .bigram-table td {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  text-align: center;
+  transition: background 0.3s, color 0.3s;
+}
+.bigram-table th {
+  background: var(--bg-card-alt);
+  color: var(--accent);
+  font-weight: 600;
+}
+.bigram-table td {
+  background: var(--bg-card);
+  color: var(--text-dim);
+}
+.bigram-table td.highlight-cell {
+  background: rgba(108,140,255,0.15);
+  color: var(--text);
+  font-weight: 700;
+}
+.bigram-table .row-header {
+  background: var(--bg-card-alt);
+  color: var(--accent2);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ===== Chart container ===== */
+.chart-container { position: relative; margin: 20px 0; }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Input fields ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* ===== Matrix grid ===== */
+.matrix-grid {
+  display: grid;
+  gap: 2px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  margin: 16px 0;
+}
+.matrix-cell {
+  padding: 6px 8px;
+  text-align: center;
+  border-radius: 4px;
+  min-width: 36px;
+}
+.alibi-matrices {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+  margin-top: 20px;
+}
+@media (max-width: 700px) {
+  .alibi-matrices { grid-template-columns: 1fr; }
+}
+
+/* ===== Interview questions: hint / reveal ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: border-color 0.2s, background 0.2s;
+}
+.hint-btn:hover, .reveal-btn:hover {
+  border-color: var(--accent);
+  background: rgba(108,140,255,0.08);
+}
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.28);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.hint-box.open { display: block; }
+.answer {
+  display: none;
+  margin-top: 14px;
+  padding: 16px 18px;
+  background: rgba(108,140,255,0.07);
+  border: 1px solid rgba(108,140,255,0.22);
+  border-radius: 8px;
+}
+.answer.revealed { display: block; }
+.solution-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.answer .explanation {
+  color: var(--text);
+  font-size: 0.92rem;
+  margin: 0;
+  line-height: 1.6;
+}
+.answer .explanation strong { color: var(--text); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Position Encoding And Efficiency</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">Position Encodings for Transformers</a>
+  <div class="nav-links">
+    <a href="#s0">Why Position</a>
+    <a href="#s1">Learned Absolute</a>
+    <a href="#s2">Sinusoidal</a>
+    <a href="#s3">Relative Motivation</a>
+    <a href="#s4">ALiBi</a>
+    <a href="#s5">RoPE</a>
+    <a href="#s6">Comparison</a>
+    <a href="#s7">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Position Encodings for Transformers</h1>
+    <p class="subtitle">
+      How transformers learn where words are — from learned embeddings to ALiBi and RoPE. A deep dive into position encoding methods and why relative position matters.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">7</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">6</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1</span>
+        <span class="stat-label">Playground</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Self-attention is permutation-invariant without positional side information. This chapter compares learned embeddings, sinusoidal encodings, ALiBi's linear biases, and RoPE — the rotation-based scheme behind Llama, Mistral, and most modern LLMs.
+    </p>
+    <p style="color: var(--text-dim); font-size: 0.78rem; max-width: 720px; margin: 12px auto 0; line-height: 1.5;">
+      <sup>*</sup> Many recent schemes are called <strong>position encodings</strong> rather than <strong>position embeddings</strong> because they modify queries and keys (RoPE) or attention logits (ALiBi) instead of adding a learned vector per index. Additive learned and sinusoidal schemes remain true embeddings in the usual sense.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 01: WHY POSITION MATTERS ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Why Position Matters</h2>
+
+    <p>
+      Self-attention scores depend only on content embeddings: permute the input and the Q·K<sup>T</sup> matrix permutes with it. As shown in <a href="../04-attention-and-transformers/">Chapter 04</a>, the model has no notion of order until position information is injected — "The cat sat on the mat" and "The mat sat on the cat" would yield identical attention patterns.
+    </p>
+
+    <p>
+      Element-wise addition of token embeddings alone does not break this symmetry. Position must enter either through additive vectors, modified Q/K projections, or logits biases.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h4 style="color:var(--accent); margin-bottom:10px;">Additive embeddings only</h4>
+        <p style="margin-bottom:0; font-size:0.9rem;">Summing token vectors is commutative: every permutation yields the same vector before any downstream layer.</p>
+      </div>
+      <div class="card card-alt">
+        <h4 style="color:var(--accent3); margin-bottom:10px;">Self-attention without position</h4>
+        <p style="margin-bottom:0; font-size:0.9rem;">Scores are content-driven dot products. Without positional terms, only token types matter — not their slot along the string.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Permutation Invariance Demo</h3>
+      <p>See how attention scores stay identical when you permute the input. Without position encoding, the model cannot distinguish order.</p>
+
+      <div class="btn-group">
+        <button class="btn active" onclick="setPermutation('original')">Original Order</button>
+        <button class="btn" onclick="setPermutation('shuffled')">Shuffled Order</button>
+      </div>
+
+      <div class="token-row" id="permTokens"></div>
+
+      <div class="formula" id="permFormula" style="font-size:0.85rem; margin-top:16px;"></div>
+
+      <p id="permExplanation" style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);"></p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Without position information, permuted sentences produce identical attention patterns. Position encoding breaks that symmetry.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 02: ABSOLUTE ADDITIVE POSITION EMBEDDINGS ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Absolute Additive Position Embeddings (Learned)</h2>
+
+    <p>
+      The simplest approach: <strong>learn a separate embedding vector P<sub>i</sub> for each position i</strong>. Add it to the word embedding C<sub>i</sub> before feeding into the transformer:
+    </p>
+
+    <div class="formula">
+      input<sub>i</sub> = C<sub>i</sub> + P<sub>i</sub>
+    </div>
+
+    <p>
+      This design injects <strong>absolute</strong> positional information: position 529 receives a different vector from position 528, 2, or 7. The model can therefore discriminate “exactly where in the window” a token appeared, not only what the token is.
+    </p>
+
+    <p>
+      These position embeddings are <strong>trained via backpropagation</strong> — just like word embeddings. The model learns what each position "means" during training. This approach was used extensively in BERT-era models.
+    </p>
+
+    <div class="formula">
+      For each index i: &nbsp; x<sub>i</sub> = C<sub>i</sub> + P<sub>i</sub> &nbsp; (P<sub>i</sub> ∈ ℝ<sup>d</sup> learned, one row per position up to max length)
+    </div>
+
+    <h3 style="margin-top:28px;">Critical Flaw: No Position Extrapolation</h3>
+    <p>
+      The fatal weakness: <strong>no extrapolation to longer sequences</strong>. At test time, if your sequence exceeds the maximum training length, there are no learned embeddings for those positions — a typical implementation raises an index error or requires an ad hoc extension of the table (with freshly initialized rows and usually fine-tuning).
+    </p>
+
+    <p>
+      You must choose a maximum sequence length during pre-training based on compute. Attention has quadratic complexity in sequence length, so longer contexts are expensive. A deeper model with more heads also consumes memory and FLOPs; for a fixed GPU budget, that often forces a shorter maximum context than a smaller stack could have used. Once the cap is fixed, naive learned-absolute models are locked to that length unless you change the embedding table.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Failure mode:</strong> Train with max length 512 and deploy on 1,024 tokens without architectural changes — indices 513…1,023 have no trained P<sub>i</sub>. There is nothing to add to the word embeddings for those slots, so the positional channel is simply missing.</p>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h4 style="color:var(--accent); margin-bottom:10px;">What absolute embeddings buy you</h4>
+        <p style="margin-bottom:0; font-size:0.9rem;">Simple implementation, strong in-distribution behavior within the trained window, and a direct handle on “I am the k-th token” — useful when the task cares about global index.</p>
+      </div>
+      <div class="card card-alt">
+        <h4 style="color:var(--danger); margin-bottom:10px;">What they do not buy you</h4>
+        <p style="margin-bottom:0; font-size:0.9rem;">O(L·d) extra parameters in the position table, no free lunch past L<sub>max</sub>, and sensitivity to shifts in absolute index when the same syntactic pattern moves earlier or later in the window.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Trade-off:</strong> Learned absolute embeddings are simple and effective within the training length. But they cannot generalize to sequences longer than what they were trained on. For models that need to handle variable or very long contexts, this is a deal-breaker.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 03: SINUSOIDAL POSITION EMBEDDINGS ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Sinusoidal Position Embeddings</h2>
+
+    <p>
+      Used in the original transformer paper ("Attention Is All You Need"). Instead of learning position vectors, use <strong>sine and cosine functions at different frequencies</strong>:
+    </p>
+
+    <div class="formula" style="font-size:0.85rem;">
+      PE(pos, 2d) = sin(pos / 10000<sup>2d/d_model</sup>) &nbsp;&nbsp; PE(pos, 2d+1) = cos(pos / 10000<sup>2d/d_model</sup>)
+    </div>
+
+    <p>
+      No learned parameters — the position encoding is deterministic. Still additive (added to word embeddings). The original Transformer paper suggested this family might extrapolate to longer contexts more gracefully than a finite learned lookup table, because the mapping from index to vector is a smooth periodic function rather than an arbitrary row per position.
+    </p>
+
+    <p>
+      Later empirical work painted a more sober picture: sinusoidal features are <strong>not</strong> a silver bullet for length generalization, and in practice they have largely been superseded by methods that target relative structure more directly (ALiBi, RoPE, and related ideas). They remain important historically and as a reference point when reading the original architecture.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Exam-style takeaway:</strong> Sinusoidal PE is still <em>additive at the input</em> (same interface as learned absolute), but the positional pattern itself is fixed by sines and cosines — no gradient updates change the wave frequencies, only the model’s use of those dimensions.</p>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Reality check:</strong> Do not assume “sinusoidal = strong zero-shot extrapolation.” The claim in the 2017 paper was optimistic relative to what later benchmarks found; modern stacks rarely rely on this mechanism.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 04: RELATIVE POSITION — MOTIVATION ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Relative Position — Motivation</h2>
+
+    <p>
+      Absolute position is rarely what matters. Knowing a word is at position 529 vs 528 doesn't help much. What matters is <strong>relative distance between tokens</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">A Concrete Example</h3>
+    <p>
+      Consider two sequences:
+    </p>
+
+    <div class="card card-alt">
+      <p style="margin-bottom:8px;"><strong>Sequence A:</strong> "my favorite LLM is Qwen" (positions 1–5)</p>
+      <p style="margin-bottom:0;"><strong>Sequence B:</strong> "I like honestly, my favorite LLM is Qwen" (positions 1–8 in this tokenization)</p>
+    </div>
+
+    <p>
+      In both sequences, "LLM" and "Qwen" are <strong>two steps apart along the string</strong> (in A, indexing from 1: LLM at 3 and Qwen at 5; in B with the eight-token split below: LLM at 6 and Qwen at 8). With absolute embeddings, the vectors added to those tokens differ between the two sentences, so the raw attention logits between the pair are not forced to match even though the <em>linguistic</em> configuration — the same local pattern with the same gap — is unchanged. A relative-friendly scheme aims to make those logits depend primarily on content and on <strong>how far apart</strong> the tokens are, not on their global indices.
+    </p>
+
+    <p>
+      The challenge: relative position changes for each pair of tokens. It's not as simple as adding a single vector to the input — we need a mechanism that encodes pairwise distances.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Absolute vs Relative Position Demo</h3>
+      <p>Two sequences with the same relative distance between "LLM" and "Qwen." With absolute encoding, attention differs. With relative encoding, it stays the same.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4 style="color:var(--accent2); margin-bottom:8px;">Sequence A (5 tokens)</h4>
+          <div class="token-row" id="absRelSeqA"></div>
+          <p style="font-size:0.85rem; margin-top:8px; color:var(--text-dim);">LLM↔Qwen: distance = 2</p>
+        </div>
+        <div class="card">
+          <h4 style="color:var(--accent3); margin-bottom:8px;">Sequence B (7 tokens)</h4>
+          <div class="token-row" id="absRelSeqB"></div>
+          <p style="font-size:0.85rem; margin-top:8px; color:var(--text-dim);">LLM↔Qwen: distance = 2</p>
+        </div>
+      </div>
+
+      <div id="absRelExplanation" style="margin-top:16px; font-size:0.9rem;"></div>
+    </div>
+
+    <div class="formula">
+      Goal (schematic): attention score for token pair (i, j) should depend on content and on (i − j) or |i − j|, not on the raw values of i and j alone.
+    </div>
+
+    <div class="callout">
+      <p><strong>Design tension:</strong> Absolute position is easy — add P<sub>i</sub> to each slot. Relative position is <em>pairwise</em>: every ordered pair (i, j) has its own offset j − i, so the mechanism must inject distance information into the attention computation itself (biases, rotations, or learned pairwise tables), not only into a single vector per token.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 05: ALiBi ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>ALiBi (Attention with Linear Biases)</h2>
+
+    <p>
+      Key idea: <strong>don't add anything to input embeddings at all</strong>. Compute QK<sup>T</sup> as normal (no position info). Then, <strong>after</strong> computing QK<sup>T</sup>, add a linear bias matrix:
+    </p>
+
+    <ul style="list-style:none; margin:16px 0;">
+      <li style="margin-bottom:8px;"><span style="color:var(--accent3);">●</span> Diagonal = 0 (same position → no bias)</li>
+      <li style="margin-bottom:8px;"><span style="color:var(--accent3);">●</span> Off-diagonal = negative linear values (−1, −2, −3, ...)</li>
+      <li><span style="color:var(--accent3);">●</span> The bias penalizes tokens that are farther apart</li>
+    </ul>
+
+    <p>
+      Multiply the structured bias by a scalar <strong>m</strong> (typically chosen in (0, 1] in the literature; the slope acts like a knob on how hard distance penalizes logits). <strong>m is a hyperparameter per head</strong> — it controls position sensitivity. A very small m shrinks every off-diagonal penalty toward zero, so the head behaves almost like vanilla content-only attention; a large m makes distant keys much less attractive before softmax. Different heads can use different slopes so some specialize in long-range patterns and others behave more locally.
+    </p>
+
+    <div class="formula">
+      ALiBi logits (conceptual): &nbsp; S<sub>ij</sub> = (Q K<sup>T</sup>)<sub>ij</sub> + m · (−|i − j|) &nbsp; for i ≥ j after causal masking conventions; diagonal pairs have offset 0.
+    </div>
+
+    <p>
+      <strong>No extra parameters to train</strong> for the positional pattern itself — only the choice of m per head (and the fixed template of negative distances). Empirically, models with ALiBi often <strong>extrapolate</strong> to sequences longer than the training window substantially better than learned absolute tables, because there are no position rows to overfit to a finite set of indices. Performance tends to improve as context grows, then plateaus; in reported experiments the benefit is often strongest up to roughly <strong>twice</strong> the training length — an empirical ceiling rather than a clean theorem.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Why extrapolation can help:</strong> The bias matrix for length L′ is the same recipe as for length L — extend the grid of pairwise distances. Nothing requires new rows in an embedding table, so the model is not missing parameters for “position 800” the way a learned P<sub>800</sub> would be missing if the table only went to 512.</p>
+    </div>
+
+    <p>
+      <strong>Effect on mass:</strong> Suppose m = 1 and the raw dot product Q<sub>4</sub>·K<sub>1</sub> is 2.1. After adding a bias of −3 for that pair (three steps back along the causal direction), the logit becomes −0.9. Relative to other keys in the same row, softmax may now assign almost no mass to that distant key even though content alone suggested a strong match — illustrating that ALiBi is explicitly trading off “content similarity” against “how far away” the key is.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Edge of the design space:</strong> Using a <em>negative</em> m would flip the sign of the bias and reward distant keys relative to nearby ones — not a choice that tends to help autoregressive language modeling, though it is mathematically possible. The linear template itself is also not sacred; variants with different distance shapes exist, but the simple linear penalty is the standard starting point because it works well with minimal machinery.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>ALiBi Bias Matrix Visualizer</h3>
+      <p>Adjust the slope m to see how the bias matrix affects QK<sup>T</sup>. The bias penalizes distant token pairs.</p>
+
+      <div class="slider-container">
+        <label>Slope m: <span class="slider-value" id="alibiMVal">0.5</span></label>
+        <input type="range" id="alibiSlider" min="0" max="1" value="0.5" step="0.05">
+      </div>
+
+      <div class="alibi-matrices">
+        <div>
+          <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom:8px;">QK<sup>T</sup> (raw) — rows: my, fav, LLM, is, Qwen</p>
+          <div id="alibiQKMatrix" class="matrix-grid"></div>
+        </div>
+        <div style="font-size:1.5rem; color:var(--text-dim); align-self:center;">+</div>
+        <div>
+          <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom:8px;">Bias (m × linear)</p>
+          <div id="alibiBiasMatrix" class="matrix-grid"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;">
+        <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom:8px;">Result (before softmax)</p>
+        <div id="alibiResultMatrix" class="matrix-grid"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 06: RoPE ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>RoPE (Rotary Position Encoding)</h2>
+
+    <p>
+      <strong>Rotary Position Embedding (RoPE)</strong>, introduced in the RoFormer line of work (Microsoft research, circa 2021), is the positional mechanism behind virtually all widely used open LLMs today — Llama, Mistral, Qwen, and many others. Like ALiBi, RoPE bakes distance into the attention computation rather than only into static input vectors — but via <strong>rotation</strong> of query and key vectors instead of a bias matrix on QK<sup>T</sup>.
+    </p>
+
+    <h3 style="margin-top:28px;">Core intuition: rotation in 2D subspaces</h3>
+    <p>
+      Partition each query and key into consecutive dimension pairs. In each pair, rotate the vector by an angle proportional to its absolute position <em>p</em>. In 2D the rotation matrix is:
+    </p>
+
+    <div class="formula">
+      R(p) = [[cos(pθ), −sin(pθ)], [sin(pθ), cos(pθ)]]
+    </div>
+
+    <p>
+      Rotations compose: when you form the dot product between a query at position <em>i</em> and a key at position <em>j</em>, the phase factors combine so the score depends on <strong>(i − j)</strong>, not on <em>i</em> and <em>j</em> separately. Shifting both indices by the same constant leaves the score unchanged — the property relative encodings aim for.
+    </p>
+
+    <div class="formula" style="font-size:0.85rem;">
+      Q(Qwen@5) · K(favorite@2) = standard_Q · R(5−2) · standard_K
+    </div>
+
+    <p>
+      High-dimensional Q/K vectors stack many such 2×2 rotation planes, each with its own frequency (θ ladder). Some subspaces capture fine positional detail, others coarse structure — analogous to multi-frequency sinusoidal encodings. <strong>θ</strong> (or the base generating the frequency ladder) is a hyperparameter; extending to much longer contexts than training sometimes requires revisiting those constants or vendor interpolation schemes.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h4 style="color:var(--accent4); margin-bottom:10px;">ALiBi</h4>
+        <p style="margin-bottom:0; font-size:0.9rem;">Leave Q and K as usual; add a structured distance penalty to the logits before softmax. Extremely simple forward pass change; explicit linear inductive bias toward locality.</p>
+      </div>
+      <div class="card card-alt">
+        <h4 style="color:var(--accent3); margin-bottom:10px;">RoPE</h4>
+        <p style="margin-bottom:0; font-size:0.9rem;">Multiply projected Q and K by position-dependent rotations so relative offset drops out of the dot product cleanly. No large bias matrix stored — the rotation is applied on the fly per head and dimension group.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>RoPE Rotation Visualizer</h3>
+      <p>See how 2D vectors rotate at different positions. The dot product between Q and K depends only on relative distance.</p>
+
+      <div class="slider-container">
+        <label>Query position (p<sub>q</sub>): <span class="slider-value" id="ropeQPos">5</span></label>
+        <input type="range" id="ropeQSlider" min="0" max="8" value="5" step="1">
+      </div>
+      <div class="slider-container">
+        <label>Key position (p<sub>k</sub>): <span class="slider-value" id="ropeKPos">2</span></label>
+        <input type="range" id="ropeKSlider" min="0" max="8" value="2" step="1">
+      </div>
+      <div class="slider-container">
+        <label>θ (rotation freq): <span class="slider-value" id="ropeThetaVal">0.5</span></label>
+        <input type="range" id="ropeThetaSlider" min="0.1" max="1.5" value="0.5" step="0.1">
+      </div>
+
+      <div class="chart-container">
+        <canvas id="ropeCanvas" width="400" height="400"></canvas>
+      </div>
+
+      <div id="ropeDotProduct" style="margin-top:12px; font-family:var(--mono); font-size:0.9rem; color:var(--accent);"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Position Encoding Comparison Table</h3>
+      <p>Side-by-side comparison of the four main position encoding methods.</p>
+
+      <div class="bigram-table-wrapper">
+        <table class="bigram-table">
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Mechanism</th>
+              <th>Extra Params</th>
+              <th>Extrapolation</th>
+              <th>Used In</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-header">Learned Absolute</td>
+              <td>Add P<sub>i</sub> to input</td>
+              <td>Yes (max_len × d)</td>
+              <td style="color:var(--danger);">None</td>
+              <td>BERT, GPT-2</td>
+            </tr>
+            <tr>
+              <td class="row-header">Sinusoidal</td>
+              <td>Add sin/cos to input</td>
+              <td>No</td>
+              <td style="color:var(--accent5);">Some</td>
+              <td>Original Transformer</td>
+            </tr>
+            <tr>
+              <td class="row-header">ALiBi</td>
+              <td>Add bias to QK<sup>T</sup></td>
+              <td>No</td>
+              <td style="color:var(--accent3);">~2×</td>
+              <td>BLOOM, MPT</td>
+            </tr>
+            <tr>
+              <td class="row-header">RoPE</td>
+              <td>Rotate Q and K</td>
+              <td>No</td>
+              <td style="color:var(--accent3);">Good</td>
+              <td>Llama, Mistral, Qwen</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 07: COMPARISON & SUMMARY ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Comparison & Summary</h2>
+
+    <div class="card">
+      <ul style="list-style:none; font-size:0.9rem;">
+        <li style="margin-bottom:12px;"><strong>Learned absolute:</strong> Simple but no extrapolation, extra parameters. Must fix max length at pre-training.</li>
+        <li style="margin-bottom:12px;"><strong>Sinusoidal:</strong> No extra parameters, some extrapolation, rarely used in modern models.</li>
+        <li style="margin-bottom:12px;"><strong>ALiBi:</strong> No extra parameters, additive bias after QK<sup>T</sup>, good extrapolation (~2×), per-head slope m.</li>
+        <li><strong>RoPE:</strong> No extra parameters, rotation of Q and K, elegant math, relative position via rotation properties, used in all modern LLMs.</li>
+      </ul>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h4 style="color:var(--accent); margin-bottom:10px;">Where position enters</h4>
+        <ul style="list-style:disc; padding-left:1.2em; font-size:0.88rem; margin:0; color:var(--text-dim);">
+          <li style="margin-bottom:8px;"><strong>Learned / sinusoidal:</strong> Added to input embeddings before the first block.</li>
+          <li style="margin-bottom:8px;"><strong>ALiBi:</strong> Added to attention logits (after QK<sup>T</sup>, with mask).</li>
+          <li style="margin-bottom:0;"><strong>RoPE:</strong> Applied to Q and K (or equivalently folded into how projections are computed) so dot products encode offset.</li>
+        </ul>
+      </div>
+      <div class="card card-alt">
+        <h4 style="color:var(--accent2); margin-bottom:10px;">Parameters & extrapolation</h4>
+        <ul style="list-style:disc; padding-left:1.2em; font-size:0.88rem; margin:0; color:var(--text-dim);">
+          <li style="margin-bottom:8px;"><strong>Learned table:</strong> O(L·d) trainable offsets; hard stop at L<sub>max</sub>.</li>
+          <li style="margin-bottom:8px;"><strong>Sinusoidal:</strong> zero positional params; extrapolation mixed in practice.</li>
+          <li style="margin-bottom:0;"><strong>ALiBi / RoPE:</strong> no positional embedding matrix; extrapolation behavior depends on architecture and training but avoids “missing row” failures.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Related building block (transformers more broadly):</strong> Residual connections give gradients a shortcut path through each block, mitigating depth-related optimization issues. They are not a substitute for position information — attention remains permutation-symmetric without a positional scheme — but they explain why very deep stacks are trainable at all.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>The trend:</strong> From absolute → relative. From additive embeddings → multiplicative rotations. Modern models prioritize relative position and extrapolation over simplicity.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 08: PLAYGROUND ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Playground</h2>
+    <p>
+      Experiment with position encodings. Visualize how different methods handle sequences at various lengths, and test what happens when you exceed training length.
+    </p>
+
+    <div class="callout">
+      <p><strong>Why length dominates cost:</strong> Standard dense self-attention builds an n×n score matrix (every token attends to every token, subject to masking). That means both time and memory scale <strong>quadratically</strong> in sequence length n — doubling the context roughly quadruples the attention work. Choosing a training context limit is therefore as much a hardware decision as a modeling one; methods that extrapolate beyond that limit still pay the n² bill at inference, but they avoid the separate failure mode of “no embedding row for this index.”</p>
+    </div>
+
+    <div class="interactive-panel" style="margin-top:32px;">
+      <h3>Position Encoding Explorer</h3>
+      <p>See how different encoding methods represent the same sequence at different lengths. Choose a method and sequence length.</p>
+
+      <div class="slider-container">
+        <label>Sequence length: <span class="slider-value" id="explorerLenVal">6</span></label>
+        <input type="range" id="explorerLenSlider" min="3" max="12" value="6" step="1">
+      </div>
+
+      <div class="btn-group" id="explorerBtns">
+        <button class="btn active" onclick="setExplorerMethod('learned')">Learned</button>
+        <button class="btn" onclick="setExplorerMethod('sinusoidal')">Sinusoidal</button>
+        <button class="btn" onclick="setExplorerMethod('alibi')">ALiBi</button>
+        <button class="btn" onclick="setExplorerMethod('rope')">RoPE</button>
+      </div>
+
+      <div id="explorerOutput" style="margin-top:20px;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Extrapolation Tester</h3>
+      <p>Simulate what happens when you go beyond training length. Training length = 8. Test with longer sequences.</p>
+
+      <div class="slider-container">
+        <label>Test sequence length: <span class="slider-value" id="extrapLenVal">10</span></label>
+        <input type="range" id="extrapSlider" min="4" max="16" value="10" step="1">
+      </div>
+
+      <div id="extrapOutput" style="margin-top:20px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p>
+    Position Encodings for Transformers — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+function toggleHint(id) {
+  const el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('open');
+}
+function reveal(id) {
+  const el = document.getElementById(id + '-answer');
+  if (el) el.classList.add('revealed');
+}
+
+// ============================================================
+// UTILITY
+// ============================================================
+
+function softmax(arr) {
+  const max = Math.max(...arr);
+  const exps = arr.map(x => Math.exp(x - max));
+  const sum = exps.reduce((a, b) => a + b, 0);
+  return exps.map(e => e / sum);
+}
+
+// ============================================================
+// SECTION 01: PERMUTATION INVARIANCE DEMO
+// ============================================================
+
+let permOrder = 'original';
+const permWords = ['my', 'favorite', 'LLM', 'is', 'Qwen'];
+const permShuffled = ['Qwen', 'is', 'LLM', 'favorite', 'my'];
+
+function setPermutation(order) {
+  permOrder = order;
+  document.querySelectorAll('#s0 .btn').forEach((b, i) => b.classList.toggle('active', (order === 'original' && i === 0) || (order === 'shuffled' && i === 1)));
+  renderPermDemo();
+}
+
+function renderPermDemo() {
+  const tokens = permOrder === 'original' ? [...permWords] : [...permShuffled];
+  const container = document.getElementById('permTokens');
+  const formula = document.getElementById('permFormula');
+  const expl = document.getElementById('permExplanation');
+
+  container.innerHTML = tokens.map((w, i) =>
+    `<span class="token token-word">${w}<sub>${i + 1}</sub></span>`
+  ).join('');
+
+  formula.textContent = 'Attention(Q, K, V) — same for any permutation of input order';
+  expl.textContent = permOrder === 'original'
+    ? 'With no position encoding, permuting the tokens would give identical Q, K, V (since they come from the same embeddings). The attention scores would be exactly the same.'
+    : 'Even with shuffled order, the attention computation produces the same result. The model cannot distinguish "my favorite LLM is Qwen" from a random reordering.';
+}
+
+renderPermDemo();
+
+// ============================================================
+// SECTION 04: ABSOLUTE VS RELATIVE DEMO
+// ============================================================
+
+const seqA = ['my', 'favorite', 'LLM', 'is', 'Qwen'];
+const seqB = ['I', 'like', 'honestly', 'my', 'favorite', 'LLM', 'is', 'Qwen'];
+
+function renderAbsRelDemo() {
+  const aDiv = document.getElementById('absRelSeqA');
+  const bDiv = document.getElementById('absRelSeqB');
+  const expl = document.getElementById('absRelExplanation');
+
+  aDiv.innerHTML = seqA.map((w, i) => {
+    const cls = (w === 'LLM' || w === 'Qwen') ? 'token token-highlight' : 'token token-word';
+    return `<span class="${cls}">${w}<sub>${i + 1}</sub></span>`;
+  }).join('');
+
+  bDiv.innerHTML = seqB.map((w, i) => {
+    const cls = (w === 'LLM' || w === 'Qwen') ? 'token token-highlight' : 'token token-word';
+    return `<span class="${cls}">${w}<sub>${i + 1}</sub></span>`;
+  }).join('');
+
+  expl.innerHTML = `
+    <strong>Absolute:</strong> In A, LLM is at pos 3, Qwen at 5. In B, LLM at 6, Qwen at 8. Different absolute positions → different embeddings → different attention.<br><br>
+    <strong>Relative:</strong> In both, LLM and Qwen are 2 positions apart. With relative encoding (ALiBi, RoPE), the attention between them is the same.
+  `;
+}
+
+renderAbsRelDemo();
+
+// ============================================================
+// SECTION 05: ALiBi BIAS MATRIX VISUALIZER
+// ============================================================
+
+const n = 5;
+const tokenLabels = ['my', 'fav', 'LLM', 'is', 'Qwen'];
+
+// Simulated QK^T (random-ish but deterministic)
+function getQK() {
+  const qk = [];
+  for (let i = 0; i < n; i++) {
+    qk[i] = [];
+    for (let j = 0; j < n; j++) {
+      qk[i][j] = 0.5 + Math.sin(i * 1.2 + j * 0.8) * 0.8;
+    }
+  }
+  return qk;
+}
+
+const baseQK = getQK();
+
+function renderMatrix(elId, matrix, fmt) {
+  const el = document.getElementById(elId);
+  el.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+  el.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'matrix-cell';
+      cell.style.background = `rgba(108,140,255,${0.1 + Math.max(0, matrix[i][j]) * 0.3})`;
+      cell.style.color = matrix[i][j] < 0 ? 'var(--danger)' : 'var(--text)';
+      cell.textContent = typeof fmt === 'function' ? fmt(matrix[i][j]) : matrix[i][j].toFixed(2);
+      el.appendChild(cell);
+    }
+  }
+}
+
+function updateAlibi() {
+  const m = parseFloat(document.getElementById('alibiSlider').value);
+  document.getElementById('alibiMVal').textContent = m.toFixed(2);
+
+  const bias = [];
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    bias[i] = [];
+    result[i] = [];
+    for (let j = 0; j < n; j++) {
+      const dist = Math.abs(i - j);
+      bias[i][j] = -m * dist;
+      result[i][j] = baseQK[i][j] + bias[i][j];
+    }
+  }
+
+  renderMatrix('alibiQKMatrix', baseQK, v => v.toFixed(2));
+  renderMatrix('alibiBiasMatrix', bias, v => v.toFixed(2));
+  renderMatrix('alibiResultMatrix', result, v => v.toFixed(2));
+}
+
+document.getElementById('alibiSlider').addEventListener('input', updateAlibi);
+updateAlibi();
+
+// ============================================================
+// SECTION 06: RoPE ROTATION VISUALIZER
+// ============================================================
+
+const ropeCanvas = document.getElementById('ropeCanvas');
+const ropeCtx = ropeCanvas.getContext('2d');
+const center = 200;
+const scale = 80;
+
+function ropeRotate(v, angle) {
+  const c = Math.cos(angle), s = Math.sin(angle);
+  return [v[0] * c - v[1] * s, v[0] * s + v[1] * c];
+}
+
+function updateRoPE() {
+  const pq = parseInt(document.getElementById('ropeQSlider').value);
+  const pk = parseInt(document.getElementById('ropeKSlider').value);
+  const theta = parseFloat(document.getElementById('ropeThetaSlider').value);
+
+  document.getElementById('ropeQPos').textContent = pq;
+  document.getElementById('ropeKPos').textContent = pk;
+  document.getElementById('ropeThetaVal').textContent = theta.toFixed(1);
+
+  const baseQ = [1.2, 0.5];
+  const baseK = [0.8, 0.9];
+
+  const qRot = ropeRotate(baseQ, pq * theta);
+  const kRot = ropeRotate(baseK, pk * theta);
+
+  const dotProduct = qRot[0] * kRot[0] + qRot[1] * kRot[1];
+  const relDist = pq - pk;
+  document.getElementById('ropeDotProduct').textContent =
+    `Q·K = ${dotProduct.toFixed(3)}  |  Relative distance (p_q − p_k) = ${relDist}`;
+
+  // Draw
+  ropeCtx.clearRect(0, 0, 400, 400);
+  ropeCtx.strokeStyle = 'var(--border)';
+  ropeCtx.lineWidth = 1;
+  ropeCtx.beginPath();
+  ropeCtx.moveTo(center, 0);
+  ropeCtx.lineTo(center, 400);
+  ropeCtx.moveTo(0, center);
+  ropeCtx.lineTo(400, center);
+  ropeCtx.stroke();
+
+  // Q vector (blue)
+  const qx = center + qRot[0] * scale;
+  const qy = center - qRot[1] * scale;
+  ropeCtx.strokeStyle = '#6c8cff';
+  ropeCtx.lineWidth = 3;
+  ropeCtx.beginPath();
+  ropeCtx.moveTo(center, center);
+  ropeCtx.lineTo(qx, qy);
+  ropeCtx.stroke();
+  ropeCtx.fillStyle = '#6c8cff';
+  ropeCtx.beginPath();
+  ropeCtx.arc(qx, qy, 6, 0, Math.PI * 2);
+  ropeCtx.fill();
+  ropeCtx.fillStyle = '#e0e0e8';
+  ropeCtx.font = '12px sans-serif';
+  ropeCtx.fillText('Q', qx + 10, qy);
+
+  // K vector (green)
+  const kx = center + kRot[0] * scale;
+  const ky = center - kRot[1] * scale;
+  ropeCtx.strokeStyle = '#34d399';
+  ropeCtx.lineWidth = 3;
+  ropeCtx.beginPath();
+  ropeCtx.moveTo(center, center);
+  ropeCtx.lineTo(kx, ky);
+  ropeCtx.stroke();
+  ropeCtx.fillStyle = '#34d399';
+  ropeCtx.beginPath();
+  ropeCtx.arc(kx, ky, 6, 0, Math.PI * 2);
+  ropeCtx.fill();
+  ropeCtx.fillStyle = '#e0e0e8';
+  ropeCtx.fillText('K', kx + 10, ky);
+}
+
+document.getElementById('ropeQSlider').addEventListener('input', updateRoPE);
+document.getElementById('ropeKSlider').addEventListener('input', updateRoPE);
+document.getElementById('ropeThetaSlider').addEventListener('input', updateRoPE);
+updateRoPE();
+
+// ============================================================
+// PLAYGROUND: POSITION ENCODING EXPLORER
+// ============================================================
+
+let explorerMethod = 'learned';
+
+function setExplorerMethod(m) {
+  explorerMethod = m;
+  const btns = document.querySelectorAll('#explorerBtns .btn');
+  ['learned', 'sinusoidal', 'alibi', 'rope'].forEach((method, i) => {
+    btns[i].classList.toggle('active', method === m);
+  });
+  updateExplorer();
+}
+
+function updateExplorer() {
+  const len = parseInt(document.getElementById('explorerLenSlider').value);
+  document.getElementById('explorerLenVal').textContent = len;
+
+  const desc = {
+    learned: `Learned embeddings: ${len} position vectors (P₁...P${len}) added to word embeddings. No extrapolation beyond max training length.`,
+    sinusoidal: `Sinusoidal: Deterministic sin/cos at each position. Some extrapolation. Rarely used today.`,
+    alibi: `ALiBi: No input modification. Bias matrix added to QKᵀ with slope m. Distance −1, −2, −3... Good extrapolation (~2×).`,
+    rope: `RoPE: Q and K rotated by position-dependent angles. Dot product depends only on relative distance. Used in Llama, Mistral.`
+  };
+
+  document.getElementById('explorerOutput').innerHTML = `
+    <div class="card card-alt">
+      <p style="color:var(--text); margin-bottom:0;">${desc[explorerMethod]}</p>
+    </div>
+  `;
+}
+
+document.getElementById('explorerLenSlider').addEventListener('input', updateExplorer);
+updateExplorer();
+
+// ============================================================
+// PLAYGROUND: EXTRAPOLATION TESTER
+// ============================================================
+
+const trainLen = 8;
+
+function updateExtrap() {
+  const len = parseInt(document.getElementById('extrapSlider').value);
+  document.getElementById('extrapLenVal').textContent = len;
+
+  let html = '';
+  if (len <= trainLen) {
+    html = `<div class="card card-alt"><p style="color:var(--accent3);">Within training length. All methods work.</p></div>`;
+  } else {
+    html = `
+      <div class="card card-alt">
+        <p><strong>Learned:</strong> <span style="color:var(--danger);">Error — no embedding for positions ${trainLen + 1}–${len}</span></p>
+        <p><strong>Sinusoidal:</strong> <span style="color:var(--accent5);">May work but quality degrades</span></p>
+        <p><strong>ALiBi:</strong> <span style="color:var(--accent3);">Extrapolates — bias extends naturally</span></p>
+        <p style="margin-bottom:0;"><strong>RoPE:</strong> <span style="color:var(--accent3);">Extrapolates — rotation formula works for any position</span></p>
+      </div>
+    `;
+  }
+  document.getElementById('extrapOutput').innerHTML = html;
+}
+
+document.getElementById('extrapSlider').addEventListener('input', updateExtrap);
+updateExtrap();
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+</body>
+</html>

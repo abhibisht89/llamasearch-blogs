@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reproducing GPT-2 (124M) — Neural Networks: Zero to Hero</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.btn-sm { font-size: 0.75rem; padding: 4px 10px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; max-width: 340px; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.pink { border-left-color: var(--accent4); background: rgba(244,114,182,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin: 24px 0; }
+.qa-box .q { font-weight: 700; color: var(--text); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.65rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 80px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; }
+.ln { display: inline-block; width: 32px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 14px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.08); border-left: 2px solid var(--accent); margin-left: -16px; padding-left: 14px; }
+.line.new { background: rgba(52, 211, 153, 0.08); border-left: 2px solid var(--accent3); margin-left: -16px; padding-left: 14px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.85; text-decoration: underline dotted; }
+.ln.anno:hover { opacity: 1; }
+.code-note { padding: 12px 16px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; display: none; }
+.code-note strong { color: var(--accent); }
+.code-progression { margin: 28px 0; }
+.step-caption { margin-top: 12px; font-size: 0.9rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 16px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 16px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+canvas { border-radius: var(--radius); display: block; max-width: 100%; height: auto; background: var(--bg-card-alt); border: 1px solid var(--border); }
+.arch-diagram { min-height: 220px; padding: 20px; background: var(--bg-card-alt); border-radius: var(--radius); border: 1px solid var(--border); }
+.arch-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin: 12px 0; }
+.arch-box { padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); font-family: var(--mono); font-size: 0.78rem; opacity: 0.25; transform: scale(0.95); transition: all 0.35s ease; }
+.arch-box.visible { opacity: 1; transform: scale(1); }
+.arch-box.emph { border-color: var(--accent); box-shadow: 0 0 16px rgba(108,140,255,0.25); }
+.arch-arrow { color: var(--text-dim); font-size: 1.2rem; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
+.metric-tile { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+.metric-tile .v { font-family: var(--mono); font-size: 1.1rem; color: var(--accent3); }
+.metric-tile .k { font-size: 0.75rem; color: var(--text-dim); }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+table.param-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0; }
+table.param-table th, table.param-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+table.param-table th { background: var(--bg-card-alt); color: var(--accent); font-family: var(--mono); font-weight: 600; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">NN Zero to Hero</a><span class="bc-sep">›</span><span class="bc-current">Reproducing GPT-2 (124M)</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Neural Networks: Zero to Hero</a>
+  <div class="nav-links">
+    <a href="#s0">Goal</a><a href="#s1">HF Weights</a><a href="#s2">Architecture</a><a href="#s3">GPT class</a><a href="#s4">Init</a><a href="#s5">Port weights</a>
+    <a href="#s6">FineWeb</a><a href="#s7">DataLoader</a><a href="#s8">Train loop</a><a href="#s9">bf16</a><a href="#s10">compile</a><a href="#s11">Flash</a><a href="#s12">Vocab</a>
+    <a href="#s13">LR</a><a href="#s14">AdamW</a><a href="#s15">Grad accum</a><a href="#s16">DDP</a><a href="#s17">Clip</a><a href="#s18">Hellaswag</a><a href="#s19">Results</a><a href="#s20">Scaling</a><a href="#s21">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Reproducing GPT-2 (124M)</h1>
+    <p class="subtitle">Train a decoder-only Transformer from scratch in PyTorch, match OpenAI’s public checkpoint, then push past it with modern data and optimization — all in one cohesive build.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">22</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">8</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:760px;margin:0 auto;">
+      You will load <code>GPT2LMHeadModel</code> weights via Hugging Face, implement a compact <code>GPT</code> that mirrors the same tensor names, align initialization (including residual scaling), then scale training with <code>torch.autocast</code>, <code>torch.compile</code>, Flash Attention, padded vocab, cosine+warmup schedules, AdamW + weight decay, gradient accumulation, and DDP — finishing with validation curves, Hellaswag, and sample generations.
+    </p>
+  </div>
+</header>
+
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Goal: reproduce GPT-2 124M</h2>
+    <p><strong>GPT-2</strong> shipped in 2019 as a <em>family</em> of models (124M → 1.5B parameters). This chapter targets the <strong>124M</strong> member: <code>12</code> layers, <code>768</code> channels, <code>12</code> heads, context <code>1024</code>, vocabulary <code>50257</code> (Chapter 8). The objective is twofold: implement a <code>GPT</code> module that can <strong>load OpenAI’s public weights</strong> bit-for-bit (via Hugging Face’s PyTorch port), then <strong>train from random init</strong> until validation metrics meet or exceed that reference.</p>
+    <p>Loading someone else’s checkpoint <strong>calibrates</strong> the implementation: if architecture, tensor layouts, and naming match the reference, you know you are searching in the right model class. Anything you train is a sibling of the released model, not an accidental cousin.</p>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">GPT-2 paper + weights</h3><p>Public <code>state_dict</code>, TensorFlow inference code, relatively sparse training detail.</p></div>
+      <div class="card"><h3 style="color:var(--accent2);">GPT-3 paper</h3><p>No public weights, but <strong>concrete optimization hyperparameters</strong> (Adam <code>β</code>, warmup tokens, cosine decay, weight decay, clipping) that transfer well to GPT-2–sized models.</p></div>
+    </div>
+    <p>The public GPT-2 release is a <strong>miniseries</strong> of four checkpoints (124M through 1.5B parameters) so that scaling curves can be drawn: model size on the horizontal axis, downstream metrics (translation, summarization, QA, and so on) on the vertical axis. The paper’s parameter-count table has a known summation error; authoritative counts are in the <strong>openai/gpt2</strong> GitHub release. Later work on <strong>compute-optimal</strong> scaling (notably Hoffmann et al., <em>Training Compute-Optimal Large Language Models</em> — “Chinchilla”) revisits how much <em>data</em> you should pair with a given parameter count; the recipe below follows historical GPT-2/3 training rather than re-deriving those tradeoffs.</p>
+    <div class="callout warn"><p><strong>Compute snapshot:</strong> What was a heavy industrial run in 2019 is now roughly <strong>~1–2 GPU-hours</strong> on a modern datacenter card for a single epoch over a 10B-token educational subset — on the order of <strong>tens of dollars</strong> of cloud spend, not thousands.</p><p style="margin-top:12px;color:var(--text-dim);">Concrete anchor numbers from end-to-end reproductions: about <strong>one hour</strong> wall time for <strong>10B</strong> tokens on fast 8×A100-class boxes at ~<strong>1.5M tokens/s</strong> aggregate, with single-GPU cloud rental often landing near <strong>~10 USD</strong> for that scale; an overnight <strong>40B-token</strong> run (~four epochs over a 10B pack) is on the order of <strong>~8 hours</strong>.</p></div>
+    <div class="interactive-panel">
+      <h3>Parameter count breakdown (124M class)</h3>
+      <p>Toggle categories. Numbers follow weight tying: token embedding and LM head share one large matrix (~38.6M params), so the naive sum of “embedding + head” double-counts unless you tie.</p>
+      <div class="btn-group" id="paramBreakBtns">
+        <button type="button" class="btn active" data-mode="all">All components</button>
+        <button type="button" class="btn" data-mode="tied">With weight tying</button>
+      </div>
+      <div class="metric-grid" id="paramGrid"></div>
+      <p class="step-caption" id="paramCap"></p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Loading OpenAI’s GPT-2 weights (Hugging Face)</h2>
+    <p>The original OpenAI release is TensorFlow-first. For PyTorch work, <code>transformers</code> provides <code>GPT2LMHeadModel.from_pretrained("gpt2")</code> — where <code>"gpt2"</code> is the <strong>124M</strong> checkpoint (<code>"gpt2-xl"</code> is the 1.5B tier).</p>
+    <p>Inspect <code>state_dict()</code>: keys like <code>transformer.wte.weight</code> (token embeddings, shape <code>[50257, 768]</code>) and <code>transformer.wpe.weight</code> (position embeddings, <code>[1024, 768]</code>). Every other key is a block weight, bias, or LayerNorm parameter inside <code>transformer.h.*</code>.</p>
+    <p>Unlike the original Transformer, which used <strong>fixed sinusoidal</strong> position encodings, GPT-2 learns <code>wpe</code> end-to-end. If you visualize the table, each row is a position <code>0 … 1023</code>; many channels look roughly sinusoidal after training — the network rediscovers frequency-like structure even though nothing enforces it. Jagged or noisy rows can indicate <strong>under-training</strong> (early optimization is pure noise), though smoothness is not strictly required by the mathematics.</p>
+    <p>For generation parity with Hugging Face defaults, <strong>top-<code>k</code> filtering with <code>k = 50</code></strong> is the usual starting point: keep only the 50 largest probabilities, renormalize, then sample. That keeps the model from drifting into ultra-rare tokens. Small mismatches against the <code>Pipeline</code> API can still appear because the pipeline stacks additional heuristics; bitwise-identical logits between your port and <code>GPT2LMHeadModel</code> are the real correctness check.</p>
+    <p>Many modules behave identically in train vs. eval here, but keeping <code>eval()</code> for inference is still good hygiene — PyTorch internals may branch on mode in subtle ways.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Minimal load + shape print</h3>
+        <p>Pull the model, switch to eval for inference, and print tensor shapes. This is the fastest sanity check that you are on the intended checkpoint.</p>
+        <div class="callout"><p><code>wte</code> and <code>wpe</code> are lookup tables; the computation lives in the repeated transformer blocks.</p></div>
+      </div>
+      <div class="code-panel">
+<div class="code-header"><span class="code-filename">notebook_cell.py</span><span class="code-lines">L1–8 / —</span></div>
+<pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">from</span><span class="fn"> </span><span class="str">'transformers'</span><span class="kw"> import</span><span class="fn"> GPT2LMHeadModel</span></code>
+<code><span class="line hl"><span class="ln">2</span><span class="fn">model</span><span class="op"> = </span><span class="fn">GPT2LMHeadModel</span><span class="fn">.from_pretrained</span><span class="op">(</span><span class="str">"gpt2"</span><span class="op">)</span></code>
+<code><span class="line"><span class="ln">3</span><span class="fn">model</span><span class="fn">.eval</span><span class="op">()</span></code>
+<code><span class="line"><span class="ln">4</span><span class="kw">for</span><span class="fn"> k, v </span><span class="kw">in</span><span class="fn"> model</span><span class="fn">.named_parameters</span><span class="op">():</span></code>
+<code><span class="line"><span class="ln">5</span><span class="fn">    print</span><span class="op">(</span><span class="fn">k</span><span class="op">, </span><span class="fn">tuple</span><span class="op">(</span><span class="fn">v</span><span class="fn">.shape</span><span class="op">))</span></code>
+</pre>
+</div>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [1]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="fn">transformer.wte.weight</span> torch.Size([50257, 768])</code>
+<code><span class="line"><span class="ln">2</span><span class="fn">transformer.wpe.weight</span> torch.Size([1024, 768])</code>
+<code><span class="line hl"><span class="ln">3</span><span class="cmt"># ... transformer.h.0.attn.c_attn.weight [2304, 768], etc.</span></code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out</span><pre class="output-text">(truncated — dozens of keys for 12 blocks)</pre></div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Architecture: decoder-only GPT-2</h2>
+    <p>Using the GPT architecture from Chapter 7 — decoder-only Transformer with pre-LayerNorm blocks, causal self-attention, and an MLP per block — this section pins down the GPT-2 124M hyperparameters below.</p>
+    <div class="callout"><p><strong>GELU in GPT-2:</strong> PyTorch exposes both exact GELU and <code>gelu_tanh</code> “approximate” forms. The approximation exists for historical reasons (exact GELU used a slow error function on older TensorFlow stacks). For a faithful GPT-2 reproduction, keep the <strong>approximate</strong> variant the checkpoint expects; for new work, exact GELU is usually fine. GELU avoids the exactly-flat negative tail of ReLU that causes <strong>dead neurons</strong> (zero gradient regions).</p></div>
+    <div class="interactive-panel">
+      <h3>Architecture explorer</h3>
+      <p>Click through: embeddings → twelve identical blocks (pre-norm + attention + MLP) → final norm → tied LM head.</p>
+      <div class="btn-group" id="archBtns">
+        <button type="button" class="btn active" onclick="showArchLayer(0)">1. Embeddings</button>
+        <button type="button" class="btn" onclick="showArchLayer(1)">2. Block ×12</button>
+        <button type="button" class="btn" onclick="showArchLayer(2)">3. Final LN</button>
+        <button type="button" class="btn" onclick="showArchLayer(3)">4. LM head</button>
+      </div>
+      <div class="arch-diagram" id="archDiagram">
+        <div class="arch-row">
+          <div class="arch-box visible emph" id="ab0">token emb <code>wte</code><br>+ pos emb <code>wpe</code></div>
+          <span class="arch-arrow">→</span>
+          <div class="arch-box" id="ab1"><code>×12</code> Transformer blocks<br><code>ln_1 → attn → res</code><br><code>ln_2 → mlp → res</code></div>
+          <span class="arch-arrow">→</span>
+          <div class="arch-box" id="ab2">final LayerNorm <code>ln_f</code></div>
+          <span class="arch-arrow">→</span>
+          <div class="arch-box" id="ab3">LM head (linear)<br><code>768 → vocab</code></div>
+        </div>
+      </div>
+    </div>
+    <table class="param-table">
+      <tr><th>Hyperparameter</th><th>GPT-2 small (124M)</th></tr>
+      <tr><td><code>n_layer</code></td><td>12</td></tr>
+      <tr><td><code>n_head</code></td><td>12</td></tr>
+      <tr><td><code>n_embd</code></td><td>768</td></tr>
+      <tr><td><code>block_size</code> (context)</td><td>1024</td></tr>
+      <tr><td><code>vocab_size</code></td><td>50257 (pad to 50304 for kernels)</td></tr>
+    </table>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Building <code>GPT</code> from scratch in PyTorch</h2>
+    <p>Mirroring Hugging Face’s module tree makes weight porting mechanical: <code>transformer.wte</code>, <code>transformer.wpe</code>, <code>transformer.h</code> as <code>ModuleList</code>, <code>transformer.ln_f</code>, and <code>lm_head</code> without bias (bias <code>False</code>).</p>
+    <p>Inside each block, Hugging Face’s <code>c_attn</code> fuses query/key/value into one linear for kernel efficiency; the same math as a separate multi-head module can be recovered with careful <code>view</code>/<code>transpose</code> gymnastics so tensor names still line up for <code>load_state_dict</code>. A compact reference implementation is on the order of <strong>&lt;100 lines</strong> versus multi-thousand-line framework code — useful when you want the entire training surface area in one screen.</p>
+    <div class="code-progression">
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="showStep(this, 'gptp1')">Skeleton</button>
+        <button type="button" class="btn" onclick="showStep(this, 'gptp2')">+ Block</button>
+        <button type="button" class="btn" onclick="showStep(this, 'gptp3')">+ Forward</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">Progression</span></div>
+        <pre class="code-block" id="gptp1"><code><span class="line"><span class="ln">1</span><span class="kw">class</span> <span class="fn">GPT</span>(<span class="fn">nn.Module</span>):</code>
+<code><span class="line"><span class="ln">2</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">config</span>):</code>
+<code><span class="line hl"><span class="ln">3</span>        self.transformer = <span class="fn">nn.ModuleDict</span>(<span class="fn">dict</span>(</code>
+<code><span class="line"><span class="ln">4</span>            wte=<span class="fn">nn.Embedding</span>(config.vocab_size, config.n_embd),</code>
+<code><span class="line"><span class="ln">5</span>            wpe=<span class="fn">nn.Embedding</span>(config.block_size, config.n_embd),</code>
+<code><span class="line"><span class="ln">6</span>            h=<span class="fn">nn.ModuleList</span>([<span class="fn">Block</span>(config) <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(config.n_layer)]),</code>
+<code><span class="line"><span class="ln">7</span>            ln_f=<span class="fn">nn.LayerNorm</span>(config.n_embd),</code>
+<code><span class="line"><span class="ln">8</span>        ))</code>
+<code><span class="line"><span class="ln">9</span>        self.lm_head = <span class="fn">nn.Linear</span>(config.n_embd, config.vocab_size, bias=<span class="kw">False</span>)</code></pre>
+        <pre class="code-block" id="gptp2" style="display:none"><code><span class="line"><span class="ln">10</span><span class="kw">class</span> <span class="fn">Block</span>(<span class="fn">nn.Module</span>):</code>
+<code><span class="line"><span class="ln">11</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">config</span>):</code>
+<code><span class="line hl"><span class="ln">12</span>        self.ln_1 = <span class="fn">nn.LayerNorm</span>(config.n_embd)</code>
+<code><span class="line"><span class="ln">13</span>        self.attn = <span class="fn">CausalSelfAttention</span>(config)</code>
+<code><span class="line"><span class="ln">14</span>        self.ln_2 = <span class="fn">nn.LayerNorm</span>(config.n_embd)</code>
+<code><span class="line"><span class="ln">15</span>        self.mlp = <span class="fn">MLP</span>(config)</code></pre>
+        <pre class="code-block" id="gptp3" style="display:none"><code><span class="line"><span class="ln">20</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, <span class="arg">idx</span>, <span class="arg">targets</span>=<span class="kw">None</span>):</code>
+<code><span class="line hl"><span class="ln">21</span>        pos = <span class="fn">torch.arange</span>(T, device=idx.device)</code>
+<code><span class="line"><span class="ln">22</span>        x = self.transformer.wte(idx) + self.transformer.wpe(pos)</code>
+<code><span class="line"><span class="ln">23</span>        <span class="kw">for</span> block <span class="kw">in</span> self.transformer.h: x = block(x)</code>
+<code><span class="line"><span class="ln">24</span>        x = self.transformer.ln_f(x)</code>
+<code><span class="line"><span class="ln">25</span>        logits = self.lm_head(x)</code></pre>
+      </div>
+      <p class="step-caption">Start from a <code>ModuleDict</code> that matches checkpoint keys, then fill in <code>Block</code> and the forward path <code>B×T</code> → logits <code>[B,T,vocab]</code>.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Weight initialization &amp; residual scaling</h2>
+    <p>OpenAI’s released code uses <strong>Gaussian init</strong> with <code>std=0.02</code> for most weights, zeros for biases where applicable — close to <strong>Xavier/Glorot</strong> scale for these widths (<code>1/√768 ≈ 0.036</code>, <code>1/√1600 = 0.025</code>, etc.). Their reference also uses <code>0.02</code> for token embeddings and a slightly different scale for positional embeddings in places; mirroring the repository beats guessing from the paper text.</p>
+    <p>The residual-scaling story is quantitative. Imagine a residual stream of dimension <code>768</code> initialized at zero. Add <code>N</code> independent mean-zero updates with unit variance. The post-sum standard deviation grows like <code>√N</code> — e.g. <code>N = 100</code> pushes the scale toward <code>10</code>. GPT-2 therefore scales down the <strong>projections that inject into the residual</strong> by <code>1/√(2·n_layer)</code>: two sublayers per block (attention + MLP) each add to the residual, so the effective count of additive contributors tracks <code>2·n_layer</code>.</p>
+    <p>The GPT-2 paper adds a <strong>depth-aware scaling</strong> for residual branches: multiply projecting layers inside residual paths by <code>1/√(2·n_layer)</code> because each block contributes <em>two</em> residuals (attention + MLP).</p>
+    <div class="formula">std_residual = 0.02 / √(2 · n_layer)</div>
+    <div class="callout pink"><p><strong>Residual scaling:</strong> If you summed <code>N</code> independent zero-mean updates with unit variance, variance grows like <code>N</code>. Scaling each contribution by <code>1/√N</code> keeps activation scale stable through depth.</p></div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>_init_weights</code> hook</h3>
+        <p>Use <code>module.apply(_init_weights)</code>. Linear layers: normal with base <code>0.02</code>, scaled down when <code>isinstance(module, CausalSelfAttention | MLP)</code> projection outputs feed the residual stream.</p>
+      </div>
+      <div class="code-panel">
+<div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L40–52 / —</span></div>
+<pre class="code-block"><code><span class="line"><span class="ln">40</span><span class="kw">def</span><span class="fn"> _init_weights</span><span class="op">(</span><span class="arg">module</span><span class="op">):</span></code>
+<code><span class="line"><span class="ln">41</span><span class="kw">if</span><span class="fn"> isinstance</span><span class="op">(</span><span class="fn">module</span><span class="op">, </span><span class="fn">nn.Linear</span><span class="op">):</span></code>
+<code><span class="line hl"><span class="ln">42</span><span class="fn">    std</span><span class="op"> = </span><span class="num">0.02</span></code>
+<code><span class="line"><span class="ln">43</span><span class="kw">if</span><span class="fn"> hasattr</span><span class="op">(</span><span class="fn">module</span><span class="op">, </span><span class="str">"NANOGPT_SCALE_INIT"</span><span class="op">):</span></code>
+<code><span class="line hl"><span class="ln">44</span><span class="fn">        std</span><span class="op"> *= </span><span class="num">1.0</span><span class="op"> / </span><span class="fn">math.sqrt</span><span class="op">(</span><span class="num">2</span><span class="op"> * </span><span class="fn">config.n_layer</span><span class="op">)</span></code>
+<code><span class="line"><span class="ln">45</span><span class="fn">    torch.nn.init.normal_</span><span class="op">(</span><span class="fn">module.weight</span><span class="op">, </span><span class="fn">mean</span><span class="op">=</span><span class="num">0</span><span class="op">, </span><span class="fn">std</span><span class="op">=</span><span class="fn">std</span><span class="op">)</span></code>
+</pre>
+</div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Porting weights &amp; weight tying</h2>
+    <p>Hugging Face’s tensors sometimes need <strong>transpose</strong> versus naive PyTorch <code>Linear</code> layouts inherited from TensorFlow. Maintain a small allowlist of keys to transpose when copying.</p>
+    <p><strong>Weight tying</strong>: in GPT-2, the token embedding matrix and the LM head matrix are the <em>same storage</em> — check <code>data_ptr()</code> equality. After copying weights, enforce <code>lm_head.weight = transformer.wte.weight</code> so training matches the architecture.</p>
+    <p>The Transformer paper states the design explicitly: <em>“In our model, we share the same weight matrix between the two embedding layers and the pre-softmax linear transformation, similar to [30].”</em> Intuition: if two surface forms are semantically nearby, they should sit close together in <strong>input</strong> embedding space <em>and</em> invite similar <strong>output</strong> logits. Tying enforces that symmetry instead of learning two unrelated linear maps. OpenAI’s TensorFlow reference forwards <code>wte</code> twice — bottom for embeddings, top for logits — so gradients from the classifier and from the embedding pathway <strong>sum into one shared tensor</strong>.</p>
+    <div class="formula">\text{Shared rows} \approx 50257 \times 768 \;\Rightarrow\; \sim 3.86\times 10^{7}\ \text{parameters saved }(\approx 30\text{–}35\%\ \text{of }124\text{M})</div>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">Why tie?</h3><p>Inductive bias that “input token space” and “output logit space” should align; also saves ~<strong>38M</strong> parameters — a large fraction of 124M.</p></div>
+      <div class="card"><h3 style="color:var(--danger);">If you forget</h3><p>You train extra capacity at the classifier, diverge from the reference parameterization, and can hurt sample efficiency.</p></div>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>from_pretrained</code> pattern</h3>
+        <p>Iterate HF keys, skip buffers like attention masks, optionally transpose, assign into your <code>state_dict</code>, then <code>load_state_dict</code>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L101–118 / —</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">101</span><span class="kw">def</span> <span class="fn">from_pretrained</span>(<span class="arg">cls</span>, <span class="arg">model_type</span>):</code>
+<code><span class="line"><span class="ln">102</span>    <span class="kw">from</span> transformers <span class="kw">import</span> GPT2LMHeadModel</code>
+<code><span class="line hl"><span class="ln">103</span>    hf = GPT2LMHeadModel.from_pretrained(model_type)</code>
+<code><span class="line"><span class="ln">104</span>    sd_hf, sd = hf.state_dict(), model.state_dict()</code>
+<code><span class="line"><span class="ln">105</span>    <span class="kw">for</span> k <span class="kw">in</span> sd_hf.keys():</code>
+<code><span class="line"><span class="ln">106</span>        <span class="kw">if</span> <span class="str">'attn.mask'</span> <span class="kw">in</span> k: <span class="kw">continue</span></code>
+<code><span class="line hl"><span class="ln">107</span>        w = sd_hf[k].t() <span class="kw">if</span> k.endswith(<span class="str">'c_proj.weight'</span>) <span class="kw">else</span> sd_hf[k]</code>
+<code><span class="line"><span class="ln">108</span>        sd[k].copy_(w)</code>
+<code><span class="line"><span class="ln">109</span>    model.lm_head.weight = model.transformer.wte.weight</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>FineWeb-Edu instead of WebText</h2>
+    <p>Original GPT-2 trained on <strong>WebText</strong> (Reddit-outbound links) — not redistributable. Modern reproductions use <strong>open mixtures</strong>: Common Crawl derivatives (C4, RefinedWeb), books, GitHub, Wikipedia, etc.</p>
+    <p><strong>FineWeb-Edu</strong> filters massive web crawl toward educational text; a <strong>sample-10BT</strong> shard pack is a practical single-epoch target on one machine. Documents are separated with the GPT-2 <strong>end-of-text</strong> token id <code>50256</code>.</p>
+    <div class="callout"><p><strong>Quality &gt; scale (per token):</strong> Narrower, cleaner English educational prose can match older models trained on noisier, broader data — but comparisons across datasets are never perfectly “fair”; treat downstream evals as sanity checks, not court verdicts.</p></div>
+    <p>GPT-2’s <strong>WebText</strong> was never redistributed; the paper describes scraping outbound Reddit links (roughly <strong>45 million</strong> URLs, on the order of <strong>~40 GB</strong> of text). Community reconstructions such as <strong>OpenWebText</strong> attempt the same recipe. GPT-3’s mixture (Common Crawl–derived mass, books, Wikipedia, etc.) is likewise not a public download — <strong>Common Crawl</strong> alone is extremely noisy (ads, tables, tickers), so modern practice leans on <strong>curated mixtures</strong> (C4, RefinedWeb, RedPajama / SlimPajama-style packs).</p>
+    <p><strong>FineWeb</strong> targets high-quality Common Crawl at huge scale (on the order of <strong>15 trillion</strong> filtered tokens in the full build). <strong>FineWeb-Edu</strong> applies an additional educational filter — Hugging Face documents on the order of <strong>~1.3T</strong> “educational” and <strong>~5.4T</strong> “highly educational” tokens in the full Edu release; the public pipeline uses a large LLM judge (e.g. Llama-3 scale) to score educational value. We use the <strong>sample-10BT</strong> shard pack here: <strong>100</strong> shards × <strong>100M</strong> tokens each, with shard <code>0000</code> reserved for validation. Preprocessing (download + pretokenization) is often <strong>~30 minutes</strong> of wall time on a capable box, depending on bandwidth and CPU parallelism.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>DataLoader: token shards &amp; streaming chunks</h2>
+    <p>Text is pre-tokenized with the GPT-2 BPE tokenizer from Chapter 8 (<code>50257</code> IDs). Pre-tokenize once into <code>uint16</code> numpy shards (~100M tokens each). At runtime, maintain <code>(shard_idx, pos)</code>, fetch windows of length <code>B*T+1</code>, split into <code>inputs</code> and <code>targets</code> shifted by one.</p>
+    <p>For <strong>distributed</strong> training, stride the global pointer by <code>world_size</code> so each rank consumes disjoint token streams; advance by <code>B*T*world_size</code> per global step.</p>
+    <p>Documents are separated with the GPT-2 <strong>end-of-text</strong> token <code>50256</code> (Chapter 8). Shards are commonly stored as <code>uint16</code> numpy arrays because every legal GPT-2 token id fits in 16 bits.</p>
+    <p>On TinyShakespeare, loss can fall toward ~<code>6.6</code> instead of zero because most of the <code>50257</code> vocabulary never appears in a 1M-character slice. The optimizer can crush logits for absent tokens (drive unused columns toward large negative values), harvesting “easy” loss reductions without fully solving next-token prediction on frequent bytes — a useful debugging reminder that <strong>low loss can hide narrow coverage</strong>.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Batch construction</h3>
+        <p>The <code>+1</code> trick supplies the label for the final token in the window without a second read pass.</p>
+        <div class="code-note" style="display:block;border-top:none;background:transparent;padding-left:0;">
+          <strong>Sanity:</strong> initial cross-entropy should sit near <code>ln(50257) ≈ 10.82</code> for a diffuse random classifier.
+        </div>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">dataloader.py</span><span class="code-lines">L22–35 / —</span></div>
+        <pre class="code-block annotated"><code><span class="line" data-note="Load contiguous token buffer; +1 provides next-token targets for the whole window."><span class="ln anno">22</span>buf = torch.tensor(tokens[i:i+B*T+1], dtype=torch.long)</code>
+<code><span class="line hl"><span class="ln">23</span>x = buf[:-1].view(B, T); y = buf[1:].view(B, T)</code></pre>
+        <div class="code-note" id="dlNote" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Training loop infrastructure</h2>
+    <p>A minimal loop: <code>optimizer.zero_grad(set_to_none=True)</code> → forward+loss under <code>autocast</code> → <code>loss.backward()</code> → <code>clip_grad_norm_</code> → <code>optimizer.step()</code>. Log running train loss, periodically evaluate validation loss, sample text, and run benchmarks.</p>
+    <p><code>loss.backward()</code> <strong>accumulates</strong> into <code>.grad</code> fields (<code>+=</code>), so forgetting <code>zero_grad</code> poisons the step. <code>loss.item()</code> moves a scalar from device to host for logging. Device mismatches often come from tensors created on CPU (e.g. token buffers) — reassign <code>buf = buf.to(device)</code> because <code>.to</code> returns a new tensor rather than mutating in place.</p>
+    <p>For timing GPU work, wrap measurements with <code>torch.cuda.synchronize()</code> (when using CUDA) so you do not stop the stopwatch while kernels are still queued.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [12]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>step 0 | loss 10.987 | lr 8.40e-08 | norm 31.2 | dt 1240ms</code>
+<code><span class="line hl"><span class="ln">2</span>step 100 | loss 6.412 | lr 6.00e-05 | norm 0.87 | dt 93ms</code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out</span><pre class="output-text">(illustrative — depends on hardware &amp; flags)</pre></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Mixed precision: <code>bfloat16</code> + <code>torch.autocast</code></h2>
+    <p><strong>TF32</strong> speeds matmuls while tensors still “look like” float32. <strong>bf16 autocast</strong> runs large ops in <code>bfloat16</code> while keeping sensitive reductions (softmax, LayerNorm, loss) in higher precision where PyTorch chooses to.</p>
+    <p>Unlike classic <code>float16</code>, <strong>bf16</strong> shares the fp32 exponent width — often <strong>no gradient scaler</strong> required. Wrap <strong>only</strong> forward + loss in <code>autocast</code>; leave backward and optimizer steps in default precision.</p>
+    <div class="callout warn"><p><strong>Memory bandwidth:</strong> Many Transformer training steps are <em>memory-bound</em>. Halving activation footprint can beat naïve FLOP arithmetic on paper.</p></div>
+    <p>On an <strong>NVIDIA A100</strong>, marketing sheets quote on the order of <strong>~19.5 TFLOPS</strong> of dense FP32 tensor-core throughput versus much larger peak rates for TF32/BF16/FP16 — often quoted <strong>~8×</strong> speedups moving from FP32 matmuls to TF32 internals while <strong>still storing FP32 tensors</strong> in PyTorch. Real training gains are usually <strong>smaller than the peak ratio</strong> (commonly ~<strong>3×</strong> in practice on GPT-2–shaped models) because the system is <strong>memory-bandwidth</strong> limited: tensor cores sit idle waiting on HBM traffic. High-bandwidth memory is on the order of <strong>~2 TB/s</strong> class on modern cards — enormous, yet still the bottleneck for elementwise-heavy schedules.</p>
+    <p>Empirical timing ladder (single-GPU, <code>B=16</code>, <code>T=1024</code>, TinyShakespeare-scale overfit loop — your absolute ms will vary): <strong>~1000 ms</strong> per step naive FP32 → <strong>~300 ms</strong> after enabling TF32 matmuls → <strong>~300 ms</strong> with BF16 <code>autocast</code> (already near bandwidth-bound) → <strong>~129 ms</strong> after <code>torch.compile</code> → <strong>~95–96 ms</strong> after fused attention. Throughput moves from on the order of <strong>~50k tokens/s</strong> in the TF32/BF16 band up to <strong>~125k+ tokens/s</strong> once compile + FlashAttention-class kernels land.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Autocast context</h3>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">L55–58 / —</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">55</span><span class="kw">with</span> torch.autocast(device_type=device_type, dtype=torch.bfloat16):</code>
+<code><span class="line hl"><span class="ln">56</span>    logits, loss = model(X, Y)</code>
+<code><span class="line"><span class="ln">57</span>loss.backward()</code>
+<code><span class="line"><span class="ln">58</span>optimizer.step()</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2><code>torch.compile</code> for throughput</h2>
+    <p><code>model = torch.compile(model)</code> traces the forward graph, removes much Python per-op overhead, and enables <strong>kernel fusion</strong> (fewer HBM round-trips). First iterations pay compile cost; steady-state step time often drops sharply.</p>
+    <div class="callout"><p><strong>Caveat:</strong> compiled graphs can interact badly with some dynamic evaluation paths (sampling, certain custom eval loops). It is reasonable to disable compile selectively while those issues are debugged.</p></div>
+    <p>PyTorch’s own guidance: speedups come primarily from <strong>reducing Python overhead</strong> and <strong>reducing GPU read/write traffic</strong>. A concrete micro-example is GELU: an eager schedule may launch separate kernels for cube, scale, add, tanh — each round-tripping through global memory. A compiled graph can <strong>fuse</strong> those elementwise ops so one chunk of activations stays on-chip through the full nonlinearity, then writes once.</p>
+    <p>At the hardware cartoon level: CPUs talk to DRAM; GPUs add high-bandwidth memory (HBM) and hundreds of streaming multiprocessors (SMs) with on-chip L1/L2/registers. Data streams from HBM → chip for math → back to HBM; <strong>kernel fusion</strong> minimizes those hops.</p>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">+</h3><p>Faster steps, better GPU utilization on A100/H100-class hardware.</p></div>
+      <div class="card"><h3 style="color:var(--danger);">−</h3><p>Longer startup; occasional hard-to-read errors in dynamic control flow.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Flash Attention via <code>scaled_dot_product_attention</code></h2>
+    <p>Vanilla attention materializes a large <code>[B,H,T,T]</code> score matrix in HBM. <strong>FlashAttention</strong> reorders the computation using <em>online softmax</em> tricks so that full matrices need not be stored — often faster <em>despite more FLOPs</em> because memory traffic dominates.</p>
+    <p>In PyTorch 2.x, <code>torch.nn.functional.scaled_dot_product_attention</code> dispatches to fused backends (including flash) when shapes and hardware allow.</p>
+    <div class="callout pink"><p><strong>Why compile isn’t enough:</strong> Flash attention is an <strong>algorithmic rewrite</strong>, not something a generic compiler reliably discovers from four separate kernels (matmul → mask → softmax → matmul).</p></div>
+    <p><strong>FlashAttention</strong> (Dao et al., 2022; FlashAttention-2 refines the scheduling) replaces the naive attention sequence with a fused kernel that never materializes the full <code>[T×T]</code> score matrix in HBM. For <code>T=1024</code>, a single head at batch one still implies on the order of <strong>a million</strong> attention weights per head — prohibitive bandwidth-wise if written literally. The trick builds on an <strong>online softmax</strong> formulation (NVIDIA, 2018) that maintains running statistics so normalization can stream. That earlier work states the hypothesis plainly: <em>“We propose a way to compute the classical softmax with fewer memory accesses and hypothesize that this reduction in memory accesses should improve softmax performance on actual hardware.”</em> FlashAttention can do <em>more FLOPs</em> than the naive decomposed version yet run <strong>several times faster</strong> because it avoids HBM round-trips — the canonical paper reports large speedups (e.g. <strong>~7.6×</strong> in their GPU regime) when memory was the bottleneck.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Replace manual attention</h3>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L88–92 / —</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">88</span>y = torch.nn.functional.scaled_dot_product_attention(</code>
+<code><span class="line hl"><span class="ln">89</span>    q, k, v, attn_mask=None, dropout_p=0.0, is_causal=True)</code>
+<code><span class="line"><span class="ln">90</span><span class="cmt"># equivalent math to QK^T/√d → mask → softmax → ·V</span></code></pre>
+      </div>
+    </div>
+    <div class="code-progression" style="margin-top:28px;">
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="showStep(this, 'opt1')">Baseline fp32</button>
+        <button type="button" class="btn" onclick="showStep(this, 'opt2')">+ TF32 / bf16</button>
+        <button type="button" class="btn" onclick="showStep(this, 'opt3')">+ torch.compile</button>
+        <button type="button" class="btn" onclick="showStep(this, 'opt4')">+ SDPA flash</button>
+        <button type="button" class="btn" onclick="showStep(this, 'opt5')">+ DDP 8×GPU</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">Optimization stages</span></div>
+        <pre class="code-block" id="opt1"><code><span class="line"><span class="ln">1</span><span class="cmt"># Baseline: fp32 matmuls, eager attention</span></code>
+<code><span class="line hl"><span class="ln">2</span>model = GPT(config).to(device)</code>
+<code><span class="line"><span class="ln">3</span>optimizer = torch.optim.AdamW(model.parameters(), lr=max_lr)</code></pre>
+        <pre class="code-block" id="opt2" style="display:none"><code><span class="line new"><span class="ln">4</span>torch.set_float32_matmul_precision(<span class="str">'high'</span>)  <span class="cmt"># TF32 on Ampere+</span></code>
+<code><span class="line new hl"><span class="ln">5</span><span class="kw">with</span> torch.autocast(device_type=<span class="str">'cuda'</span>, dtype=torch.bfloat16):</code>
+<code><span class="line new"><span class="ln">6</span>    logits, loss = model(X, Y)</code></pre>
+        <pre class="code-block" id="opt3" style="display:none"><code><span class="line new"><span class="ln">7</span>model = torch.compile(model)</code>
+<code><span class="line new hl"><span class="ln">8</span><span class="cmt"># first steps pay compile; steady state fuses kernels</span></code></pre>
+        <pre class="code-block" id="opt4" style="display:none"><code><span class="line new"><span class="ln">9</span><span class="cmt"># inside CausalSelfAttention forward:</span></code>
+<code><span class="line new hl"><span class="ln">10</span>y = F.scaled_dot_product_attention(q,k,v,is_causal=True)</code></pre>
+        <pre class="code-block" id="opt5" style="display:none"><code><span class="line new"><span class="ln">11</span>torchrun --nproc_per_node=8 train.py</code>
+<code><span class="line new hl"><span class="ln">12</span>model = DDP(model, device_ids=[local_rank])</code>
+<code><span class="line new"><span class="ln">13</span><span class="cmt"># grad sync only on last micro-step of accumulation</span></code></pre>
+      </div>
+      <p class="step-caption">Each stage preserves the same math (up to numerics); throughput climbs as kernels and parallelism improve.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Vocabulary padding: <code>50257 → 50304</code></h2>
+    <p><code>50257</code> is prime-ish and awkward for GPU tiling. Rounding up to <code>50304</code> (divisible by large powers of two) aligns GEMM shapes with efficient kernels. Extra rows act like <strong>never-used tokens</strong>; optimization drives their logits down like any out-of-distribution symbol.</p>
+    <div class="formula">50304 = 50257 + 47 \quad\text{“dummy” tokens; } 50304 \bmod 64 = 0</div>
+    <div class="callout"><p><strong>Trade-off:</strong> Slightly more FLOPs and memory in the embedding / head — often still a net win when kernels avoid slow tail tiles.</p></div>
+    <p>CUDA kernels tile work into multiples of <strong>16 / 32 / 64</strong>. “Ugly” dimensions force <strong>boundary</strong> micro-kernels that process ragged tails slowly. Padding vocabulary to <code>50304</code> (highly composite — divisible by <code>64</code>, <code>128</code>, etc.) aligns the huge embedding / LM-head GEMMs with fast tiles. Empirically, expect a few percent shaved off step time once everything else is optimized; on some PyTorch stacks the win can be much larger (<strong>~30%</strong> class improvements have been observed when tail tiles were especially painful) — always measure on your build.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Learning rate: linear warmup + cosine decay</h2>
+    <p>Follow GPT-3’s recipe: warm up from a tiny LR to <code>max_lr</code> over a fixed token horizon, then cosine-decay toward <code>min_lr = ratio · max_lr</code>. For a 10B-token run with <code>2^19</code> tokens/step, <code>375e6</code> warmup tokens ⇒ <code>warmup_steps = 375e6 / 2^19</code> (≈715).</p>
+    <p>The GPT-3 paper specifies <strong>linear LR warmup over the first <code>375 million</code> tokens</strong>, then <strong>cosine decay</strong> down to <strong>10%</strong> of the peak LR over the first <strong>260 billion</strong> tokens, holding the <strong>10%</strong> floor while training continues to <strong>300 billion</strong> tokens on the largest runs. The training script sets <strong>total steps</strong> so that <code>warmup_steps = round(375e6 / tokens_per_step)</code> — e.g. <code>tokens_per_step = 2^{19} = 524{,}288</code> ⇒ <strong>715</strong> warmup steps — and trains for <strong>one epoch</strong> over a <strong>10B</strong> token pack: <code>10^{10} / 524{,}288 ≈ 19{,}074</code> optimizer steps (plots may show nearby counts if logging subsamples or if the run uses a slightly different tokens-per-step product). That is <strong>not</strong> a literal 300B-token GPT-3 schedule; it is the <strong>same functional shape</strong> with horizons resized to the dataset.</p>
+    <div class="comparison">
+      <div class="card"><h3>Paper-faithful nuance</h3><p>GPT-3’s cosine horizon is <em>shorter</em> than the full training length — the LR sits at <code>0.1 × peak</code> for the tail. Many small-scale reproductions instead cosine all the way to the final step for simplicity.</p></div>
+      <div class="card"><h3>Practical note</h3><p>Warmup lengths around <strong>715</strong> steps are mild; some practitioners use far fewer warmup steps at 124M scale without catastrophe. Treat the paper numbers as a strong default, not a uniqueness theorem.</p></div>
+    </div>
+    <div class="formula">\mathrm{lr}(t) = \begin{cases} \frac{t+1}{W}\,\eta_{\max} & t < W \\ \eta_{\min} + \tfrac12(\eta_{\max}-\eta_{\min})(1+\cos\pi\frac{t-W}{T-W}) & t \ge W \end{cases}</div>
+    <div class="interactive-panel">
+      <h3>Learning rate schedule visualizer</h3>
+      <p>Drag sliders — same functional form as the training section (normalized time axis).</p>
+      <canvas id="lrCanvasMain" width="700" height="240"></canvas>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;align-items:center;">
+        <label style="color:var(--text-dim);">warmup steps <input type="range" id="lrWarm" min="50" max="900" value="715" style="max-width:220px;"><span class="slider-value" id="lrWarmLab">715</span></label>
+        <label style="color:var(--text-dim);">total steps <input type="range" id="lrTot" min="500" max="4000" value="1973" style="max-width:220px;"><span class="slider-value" id="lrTotLab">1973</span></label>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s14">
+  <div class="container">
+    <span class="section-num">14</span>
+    <h2>Weight decay &amp; fused AdamW</h2>
+    <p>GPT-3 uses <strong>Adam</strong> with <code>β₁=0.9</code>, <code>β₂=0.95</code>, <code>ε=1e-8</code>, plus <strong>weight decay 0.1</strong> applied to “2D” parameters (weights in matmuls / embeddings), not biases or LayerNorm γ/β.</p>
+    <p>In modern PyTorch, <strong>AdamW</strong> (decoupled weight decay) is the standard drop-in: treat it as the variant you want unless you are deliberately reproducing historical L2-on-gradient quirks.</p>
+    <div class="formula">w_{t+1} = w_t - \eta\, \hat m_t / (\sqrt{\hat v_t}+\epsilon) - \lambda \eta\, w_t \quad\text{(decoupled AdamW view)}</div>
+    <p>When available, <code>fused=True</code> in <code>torch.optim.AdamW</code> batches optimizer kernels — another small but free throughput win on CUDA.</p>
+    <p>PyTorch historically defaulted <code>fused=False</code> for compatibility; guard with <code>inspect.signature(torch.optim.AdamW)</code> if you support older installs. A fused kernel can shave a few milliseconds per step once the model is already compile- and attention-optimized — in timed runs, dropping from ~<strong>93 ms</strong> to ~<strong>90 ms</strong> per step has been observed purely from fused AdamW on GPT-2–shaped workloads.</p>
+    <p>Typical parameter accounting: on the order of <strong>~50</strong> tensors receive weight decay (matrices + embeddings) while <strong>~98</strong> small tensors (biases, LayerNorm gains) sit in the no-decay group — only ~<strong>100k</strong> parameters skip decay, the vast majority are regularized.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>configure_optimizers</code> pattern</h3>
+        <p>Split parameters into decay vs no-decay groups. Pass <code>weight_decay</code> only on the decay group; keep <code>betas=(0.9,0.95)</code>, <code>eps=1e-8</code> per GPT-3 table.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L120–135 / —</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">120</span>decay, nodecay = [], []</code>
+<code><span class="line"><span class="ln">121</span><span class="kw">for</span> n, p <span class="kw">in</span> self.named_parameters():</code>
+<code><span class="line hl"><span class="ln">122</span>    <span class="kw">if</span> p.dim() &lt; <span class="num">2</span> <span class="kw">or</span> <span class="str">'bn'</span> <span class="kw">in</span> n: nodecay.append(p)</code>
+<code><span class="line"><span class="ln">123</span>    <span class="kw">else</span>: decay.append(p)</code>
+<code><span class="line"><span class="ln">124</span>groups = [</code>
+<code><span class="line hl"><span class="ln">125</span>    {<span class="str">'params'</span>: decay, <span class="str">'weight_decay'</span>: <span class="num">0.1</span>},</code>
+<code><span class="line"><span class="ln">126</span>    {<span class="str">'params'</span>: nodecay, <span class="str">'weight_decay'</span>: <span class="num">0.0</span>},</code>
+<code><span class="line"><span class="ln">127</span>]</code>
+<code><span class="line"><span class="ln">128</span><span class="kw">return</span> torch.optim.AdamW(groups, lr=lr, betas=(<span class="num">0.9</span>,<span class="num">0.95</span>), eps=<span class="num">1e-8</span>, fused=<span class="kw">True</span>)</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s15">
+  <div class="container">
+    <span class="section-num">15</span>
+    <h2>Gradient accumulation (effective batch size)</h2>
+    <p>GPT-3 reports batch sizes in <strong>tokens</strong> (~0.5M). If a single forward pass only fits <code>B·T</code> tokens per GPU, accumulate <code>k</code> micro-batches before <code>optimizer.step()</code> so effective tokens per step matches the recipe.</p>
+    <p>Because <code>CrossEntropyLoss</code> defaults to <strong>mean</strong> over tokens, divide each micro-batch loss by <code>k</code> before <code>backward</code> so gradients match one large batch.</p>
+    <div class="callout"><p><strong>Toy sanity check (MSE):</strong> Four scalar examples with <code>MSELoss(reduction='mean')</code> produce gradients scaled by <code>1/4</code>. If you instead run four backward passes on single-example means and sum gradients, you have accidentally optimized the <strong>sum</strong> objective — gradients differ by exactly the missing normalizer. Fix: divide each micro-loss by <code>grad_accum_steps</code> (equivalently multiply the summed loss by <code>1/k</code>) so that <code>k</code> serial backwards re-create the <strong>mean</strong> over the large logical batch.</p></div>
+    <div class="formula">\text{Let } L = \frac{1}{BT}\sum_{i=1}^{BT} \ell_i.\quad \text{Micro-step } j \text{ uses } \tilde{L}_j = \frac{1}{k}\cdot \frac{1}{|\text{micro}|}\sum_{i\in \text{micro}_j} \ell_i \;\Rightarrow\; \sum_{j=1}^{k} \tilde{L}_j \text{ matches the full mean gradient.}</div>
+    <p>Concrete token accounting for GPT-3-small-style settings: target <code>2^{19} = 524{,}288</code> tokens per optimizer step. With <code>B=16</code>, <code>T=1024</code>, each micro-forward processes <code>16{,}384</code> tokens, so single-GPU accumulation requires <strong>32</strong> micro-steps before <code>optimizer.step()</code>. At ~<strong>100 ms</strong> per micro-forward on a tuned A100-class GPU, that is ~<strong>3 s</strong> per optimizer step — acceptable because you are simulating an enormous logical batch.</p>
+    <div class="interactive-panel">
+      <h3>Batch / gradient accumulation calculator</h3>
+      <p>Target total tokens per optimizer step (GPT-3 small ≈ <code>2^19 = 524288</code>), sequence length <code>T</code>, per-GPU micro batch <code>B</code>, GPU count.</p>
+      <div class="two-col">
+        <div><label style="color:var(--text-dim);">T (context)</label><br><input type="number" id="gcT" value="1024" min="128" max="2048" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);"></div>
+        <div><label style="color:var(--text-dim);">B per GPU</label><br><input type="number" id="gcB" value="16" min="1" max="128" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);"></div>
+      </div>
+      <div class="two-col" style="margin-top:12px;">
+        <div><label style="color:var(--text-dim);">GPUs</label><br><input type="number" id="gcG" value="8" min="1" max="16" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);"></div>
+        <div><label style="color:var(--text-dim);">Target tokens / step</label><br><input type="number" id="gcTot" value="524288" min="4096" step="1024" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);"></div>
+      </div>
+      <p class="step-caption" id="gcOut" style="margin-top:16px;"></p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s16">
+  <div class="container">
+    <span class="section-num">16</span>
+    <h2>Distributed Data Parallel (DDP)</h2>
+    <p>Launch <code>N</code> processes with <code>torchrun --nproc_per_node=N train.py</code>. Each process binds to one GPU via <code>CUDA_VISIBLE_DEVICES</code> / local rank, runs identical code, consumes different data shards, and averages gradients with <code>all_reduce</code> after the last micro-step of accumulation.</p>
+    <p>Use <code>model = DDP(model, device_ids=[local_rank])</code>; access hyperparameters and optimizer config on <code>model.module</code>. Guard logging so only <strong>global rank 0</strong> prints.</p>
+    <div class="callout warn"><p><strong>Gradient sync timing:</strong> Disable cross-rank synchronization on interior accumulation steps; only sync on the final backward of the accumulation cycle — otherwise you waste bandwidth.</p></div>
+    <p>Launch with <code>torchrun --standalone --nproc_per_node=8 train.py</code> (adjust for your machine). Environment variables <code>RANK</code>, <code>LOCAL_RANK</code>, <code>WORLD_SIZE</code> tell each process which GPU to bind (<code>cuda:LOCAL_RANK</code>). After wrapping with <code>DDP</code>, use <code>model.module</code> when you need the underlying <code>GPT</code> (e.g. <code>configure_optimizers</code>).</p>
+    <p>The sanctioned pattern toggles <code>with model.no_sync():</code> around interior micro-steps; an equivalent implementation sets <code>model.require_backward_grad_sync = (micro_step == grad_accum_steps - 1)</code> so only the final <code>loss.backward()</code> triggers <code>all_reduce</code>. Average the logged train loss across ranks with <code>dist.all_reduce</code> on a tensor holding the running sum.</p>
+    <p>With <strong>8×</strong> GPUs each doing <code>B·T = 16·1024</code>, you inject <code>131{,}072</code> tokens per micro-step across the node, shrinking required accumulation from <strong>32</strong> steps to <strong>4</strong> to hit <code>2^{19}</code> tokens per optimizer step. Call <code>dist.destroy_process_group()</code> on shutdown so processes exit cleanly.</p>
+    <p>8-GPU and 1-GPU runs do not bitwise-match despite identical hyperparameters because DDP changes how shards straddle epoch boundaries when the global token pointer advances by <code>world_size · B · T</code>. For debugging, shrink the logical batch so both setups run the same number of accumulation steps with aligned boundaries, then compare traces.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s17">
+  <div class="container">
+    <span class="section-num">17</span>
+    <h2>Gradient clipping (<code>max_norm=1.0</code>)</h2>
+    <p>After <code>loss.backward()</code>, compute the global L2 norm across all gradients. If it exceeds <code>max_norm</code>, rescale gradients uniformly so the norm equals the cap. This dampens rare explosive minibatches.</p>
+    <div class="formula">\textbf{g} \leftarrow \textbf{g} \cdot \min\left(1,\;\frac{\theta}{\|\textbf{g}\|_2}\right)</div>
+    <p>Early in GPT-2 training from scratch, total gradient norms in the <strong>~30</strong> range are common, then they settle <strong>below 1.0</strong> as the model exits the “everything is wrong” regime. Sporadic spikes usually merit investigation — bad data, too-large LR, or numerical edge cases.</p>
+    <div class="code-panel" style="margin-top:16px;">
+      <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">L72–73 / —</span></div>
+      <pre class="code-block"><code><span class="line hl"><span class="ln">72</span>norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=<span class="num">1.0</span>)</code>
+<code><span class="line"><span class="ln">73</span><span class="fn">print</span>(<span class="str">f"norm {norm:.4f}"</span>)</code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s18">
+  <div class="container">
+    <span class="section-num">18</span>
+    <h2>Hellaswag evaluation</h2>
+    <p><strong>Hellaswag</strong> is a multiple-choice commonsense completion benchmark. For small LMs, score each option as the <strong>average token negative log-likelihood</strong> (or sum) under teacher forcing; pick the lowest-loss continuation. Random guessing ≈ <code>25%</code>.</p>
+    <p>Each example provides a shared story prefix and <strong>four</strong> endings. Distractors are not random sentences — they are <strong>adversarially sourced</strong> (often LM-generated) so that machines find them challenging while humans remain strong. The original paper reports <strong>~95%</strong> human accuracy versus roughly <strong>~48%</strong> for top models of its era; modern LMs now saturate the set (<strong>~96%</strong>), so treat it as a <strong>smooth, early-signal</strong> metric for small models rather than a frontier benchmark.</p>
+    <p><strong>Scoring pipeline (completion-native):</strong> Build a batch of four rows. Row <code>i</code> concatenates the <em>same</em> context tokens with candidate ending <code>i</code>. Lengths differ, so pad to a common <code>T</code> and provide a mask that is <strong>zero</strong> on padded positions and <strong>one</strong> on real continuation tokens. Run a forward pass, compute per-token cross-entropy on the continuation slice only, average over valid tokens, then select the argmin. This is intentionally <em>harder</em> than “multiple-choice with all options visible at once” setups, which let the model compare answers in one context — a luxury 124M-scale models cannot exploit.</p>
+    <p>Open GPT-2 124M lands around <strong>~29–30%</strong> under this completion-style scoring — barely above chance, but a useful <em>early signal</em> curve during training.</p>
+    <div class="callout ok"><p><strong>Reference accuracies (same completion-style harness):</strong> GPT-2 124M ≈ <strong>29.5%</strong> (often reported as <strong>29.55%</strong>); GPT-2 XL reaches roughly <strong>~49%</strong>. Eleuther <strong>LM Harness</strong> numbers can differ if their wrapper uses an easier MC format — always compare <em>protocols</em>, not just headline percentages.</p></div>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">Eval</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>hellaswag acc: 0.295 (GPT-2 124M reference, illustrative)</code>
+<code><span class="line hl"><span class="ln">2</span>trained model acc: 0.31+ after ~10B tokens (runs vary)</code>
+<code><span class="line"><span class="ln">3</span>completion harness detail: ~0.2955 ref; ~40B-token overnight run: ~0.332</code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out</span><pre class="output-text">Numbers depend on eval protocol; use your harness for official comparisons.</pre></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s19">
+  <div class="container">
+    <span class="section-num">19</span>
+    <h2>Training curves, validation, &amp; samples</h2>
+    <p>Log train loss every step (or moving average), validation loss every <code>N</code> steps on a held-out shard, Hellaswag every few hundred steps, and text samples with a <strong>separate RNG</strong> so sampling does not perturb training stochasticity.</p>
+    <p>A practical logging rhythm from full training stacks: evaluate <strong>validation</strong> every <strong>100</strong> steps (including step <code>0</code>) by resetting a dedicated val loader and averaging ~<strong>20</strong> fixed batches; run <strong>Hellaswag</strong> every <strong>250</strong> steps when dynamic compile/sampling bugs are absent; write plain-text logs (<code>train/val/hellaswag</code>) for matplotlib-style postplots.</p>
+    <div class="callout"><p><strong>Interpreting curves:</strong> On FineWeb-Edu, a reproduced model’s <strong>validation</strong> loss can drop <em>below</em> the OpenAI 124M checkpoint evaluated on the <em>same</em> held-out shard even though GPT-2 was trained on WebText — the distributions differ, so this is a <strong>sanity check</strong>, not a claim of strict superiority. On <strong>Hellaswag</strong>, a strong FineWeb-Edu run may cross the GPT-2 124M line after <strong>~10B</strong> tokens while the original model saw on the order of <strong>~100B</strong> tokens — plausible because English-only educational text is information-dense per token, capacity is freed from multilingual/code noise, modern optimizers help, and benchmark contamination cannot be ruled out without a full dedup audit.</p></div>
+    <div class="callout warn"><p><strong>Epoch ripples:</strong> If loss wiggles with the shard index, suspect <strong>insufficient shuffling</strong> between epochs (serial shard order + repeated document adjacency). Remedies: permute shards each epoch, shuffle within shards, or add a strided random access path.</p></div>
+    <p><strong>Checkpointing:</strong> On a cadence of every few thousand steps (e.g. <strong>5,000</strong>), persist <code>model.state_dict()</code> from the raw module (not the DDP wrapper) for inference-only resume. Full training resume also needs <code>optimizer.state_dict()</code>, RNG states, and step counters — Adam’s <code>m</code>/<code>v</code> buffers are not optional if you want bitwise training continuity.</p>
+    <div class="interactive-panel">
+      <h3>Loss curve comparison (schematic)</h3>
+      <p>Blue: training loss (noisy). Orange: validation. Red line: reference GPT-2 124M eval loss on the same held-out shard (not apples-to-apples with original WebText training, but a useful anchor).</p>
+      <canvas id="lossCmp" width="700" height="260"></canvas>
+      <div class="btn-group" style="margin-top:12px;">
+        <button type="button" class="btn active" id="lossBtnIdeal">Idealized smooth</button>
+        <button type="button" class="btn" id="lossBtnRipple">With epoch ripple</button>
+      </div>
+      <p class="step-caption">Real logs sometimes show periodic wiggles if document ordering introduces spurious structure — shuffling shards between epochs mitigates this.</p>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">Sample</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>hello I'm a language model, not a programming language.</code>
+<code><span class="line"><span class="ln">2</span>hello I'm a language model and I try to be as accurate as possible.</code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out</span><pre class="output-text">Longer runs (40B+ tokens) continue to sharpen coherence and topical consistency.</pre></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s20">
+  <div class="container">
+    <span class="section-num">20</span>
+    <h2>GPT-3 scaling table, timing, &amp; compute</h2>
+    <p>GPT-3 documents how <code>max_lr</code> and batch tokens scale with model width/depth. The <strong>124M-scale</strong> row pairs a <em>higher</em> LR (~<code>6e-4</code>) with smaller batches than multi-billion models — always cross-check OOM limits on your hardware.</p>
+    <p>The GPT-3 trainer uses <strong>Adam</strong> with <code>β₁ = 0.9</code>, <code>β₂ = 0.95</code>, <code>ε = 10^{-8}</code>, <strong>global gradient clipping</strong> at <strong>1.0</strong>, and <strong>weight decay 0.1</strong> on matmul/embedding weights (not biases / LN). Data are consumed <strong>without replacement</strong> until an epoch boundary. The paper also describes a <strong>linear batch-size ramp</strong> in tokens; many small reproductions skip the ramp because it complicates bookkeeping — the dominant effect is systems throughput early in training when gradients are highly correlated.</p>
+    <table class="param-table">
+      <tr><th colspan="6">GPT-3 paper — model sizes and optimization hyperparameters (representative)</th></tr>
+      <tr><th>Model</th><th>Parameters</th><th><code>n_layers</code></th><th><code>d_model</code></th><th>Batch size (tokens)</th><th>Learning rate</th></tr>
+      <tr><td>Small</td><td>125M</td><td>12</td><td>768</td><td>0.5M</td><td><code>6.0 × 10⁻⁴</code></td></tr>
+      <tr><td>Medium</td><td>350M</td><td>24</td><td>1024</td><td>0.5M</td><td><code>3.0 × 10⁻⁴</code></td></tr>
+      <tr><td>Large</td><td>760M</td><td>24</td><td>1536</td><td>0.5M</td><td><code>2.5 × 10⁻⁴</code></td></tr>
+      <tr><td>XL</td><td>1.3B</td><td>24</td><td>2048</td><td>1M</td><td><code>2.0 × 10⁻⁴</code></td></tr>
+      <tr><td>2.7B</td><td>2.7B</td><td>32</td><td>2560</td><td>1M</td><td><code>1.6 × 10⁻⁴</code></td></tr>
+      <tr><td>6.7B</td><td>6.7B</td><td>32</td><td>4096</td><td>2M</td><td><code>1.2 × 10⁻⁴</code></td></tr>
+      <tr><td>13B</td><td>13.0B</td><td>40</td><td>5140</td><td>2M</td><td><code>1.0 × 10⁻⁴</code></td></tr>
+      <tr><td>175B (“GPT-3”)</td><td>175.0B</td><td>96</td><td>12288</td><td>3.2M</td><td><code>6.0 × 10⁻⁵</code></td></tr>
+    </table>
+    <div class="callout"><p><strong>Mapping to GPT-2 124M:</strong> Use the <strong>Small</strong> row as the LR / batch-token target. With <code>T = 1024</code>, a <code>0.5M</code> token batch implies a physical micro-batch product <code>B·T ≈ 512</code> in the absence of tensor parallelism — larger than fits most single GPUs, hence <strong>gradient accumulation</strong> (and/or DDP) to reach the same <em>tokens per optimizer step</em>.</p></div>
+    <p>To mimic GPT-3’s doubled context (<code>2048</code>) without changing tokens/step, set <code>T = 2048</code> and halve per-GPU <code>B</code> so <code>B·T</code> stays <code>2^{19}</code> if you want the same stepping arithmetic; the model class is then closer to GPT-3’s shape, not GPT-2’s <code>1024</code> context.</p>
+    <p>See the compute snapshot in Section 00 for wall-time and cost anchors at 10B and 40B token scales.</p>
+    <div class="interactive-panel">
+      <h3>Training throughput calculator (first-order)</h3>
+      <p>Tokens/sec ≈ (tokens per optimizer step) / (seconds per step). Adjust to see scaling trades — measured step time dominates.</p>
+      <label style="color:var(--text-dim);">Tokens per optimizer step</label>
+      <input type="range" id="tpTok" min="16" max="22" value="19" step="0.05" style="max-width:100%;">
+      <span class="slider-value" id="tpTokLab">524288</span>
+      <label style="color:var(--text-dim);display:block;margin-top:12px;">Milliseconds per step</label>
+      <input type="range" id="tpMs" min="20" max="400" value="93" style="max-width:100%;">
+      <span class="slider-value" id="tpMsLab">93</span>
+      <p class="step-caption" id="tpOut" style="margin-top:12px;"></p>
+    </div>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">Our reproduction</h3><p>FineWeb-Edu subset, modern kernels, 10–40B tokens, can match or exceed reference on in-distribution-style evals with caveats.</p></div>
+      <div class="card"><h3 style="color:var(--accent2);">Original GPT-2 124M</h3><p>~100B tokens on WebText; different noise profile and languages. Treat cross-dataset loss comparisons as directional.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s21">
+  <div class="container">
+    <span class="section-num">21</span>
+    <h2>Playground</h2>
+    <p>Explore how hyperparameters interact before you rent GPUs. These widgets are simplified models of the training script — useful for intuition, not exact timings on your hardware.</p>
+    <p><strong>Beyond pre-training:</strong> the <code>GPT</code> built here is a <em>document model</em> — next-token prediction only. Chat-style assistants add a supervised fine-tuning stage on conversational JSONL (user/assistant turns) while keeping the same backbone; RLHF/RLAIF stacks sit on top of that. For raw throughput research, CUDA-first reimplementations such as <strong>llm.c</strong> can match PyTorch numerics while squeezing higher tokens/s on identical steps — a useful cross-check once the PyTorch path is correct.</p>
+
+    <div class="interactive-panel">
+      <h3>Combined explorer</h3>
+      <p>Adjust tokens per step, GPU count, and per-GPU micro-batch. The panel estimates gradient-accumulation steps and effective throughput scaling (idealized).</p>
+      <div class="two-col" style="margin-top:16px;">
+        <div>
+          <label style="color:var(--text-dim);display:block;margin-bottom:8px;">Total tokens / optimizer step</label>
+          <input type="range" id="pgTotalTok" min="17" max="21" value="19" step="1" aria-label="total tokens log2">
+          <span class="slider-value" id="pgTotalTokLab">524288</span>
+        </div>
+        <div>
+          <label style="color:var(--text-dim);display:block;margin-bottom:8px;">GPUs (DDP world size)</label>
+          <input type="range" id="pgGpus" min="1" max="8" value="8" step="1" aria-label="gpus">
+          <span class="slider-value" id="pgGpusLab">8</span>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <label style="color:var(--text-dim);display:block;margin-bottom:8px;">Micro-batch tokens per GPU (B × T)</label>
+        <input type="range" id="pgMicro" min="14" max="18" value="16" step="1" aria-label="micro tokens">
+        <span class="slider-value" id="pgMicroLab">65536</span>
+      </div>
+      <p class="step-caption" id="pgCombinedOut" style="margin-top:16px;"></p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Mini LR + cosine preview</h3>
+      <p>Same schedule family as the training section: linear warmup, cosine decay to <code>min_lr_ratio × max_lr</code>.</p>
+      <canvas id="pgLrCanvas" width="640" height="220"></canvas>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;align-items:center;">
+        <label style="color:var(--text-dim);">warmup_frac <input type="range" id="pgWf" min="5" max="40" value="15" style="max-width:160px;vertical-align:middle;"><span class="slider-value" id="pgWfLab">0.15</span></label>
+        <label style="color:var(--text-dim);">min ratio <input type="range" id="pgMinR" min="5" max="30" value="10" style="max-width:140px;vertical-align:middle;"><span class="slider-value" id="pgMinRLab">0.10</span></label>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Single-file tutorial · Neural Networks: Zero to Hero · Reproducing GPT-2 (124M)</p>
+</footer>
+
+<script>
+function toggleOut(btn) {
+  const cell = btn.closest('.jupyter-cell');
+  const out = cell.querySelector('.cell-output');
+  const on = out.style.display !== 'block';
+  out.style.display = on ? 'block' : 'none';
+  btn.textContent = on ? 'Hide Output ▲' : 'Show Output ▼';
+}
+function showStep(btn, stepId) {
+  const parent = btn.closest('.code-progression');
+  parent.querySelectorAll('.code-block').forEach(el => { el.style.display = 'none'; });
+  const el = parent.querySelector('#' + stepId);
+  if (el) el.style.display = 'block';
+  parent.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function showArchLayer(i) {
+  const boxes = document.querySelectorAll('#archDiagram .arch-box');
+  const btns = document.querySelectorAll('#archBtns .btn');
+  boxes.forEach((b, j) => {
+    b.classList.toggle('visible', j <= i);
+    b.classList.toggle('emph', j === i);
+  });
+  btns.forEach((b, j) => b.classList.toggle('active', j === i));
+}
+document.querySelectorAll('.ln.anno').forEach(ln => {
+  ln.addEventListener('click', () => {
+    const line = ln.closest('.line');
+    const note = line && line.dataset.note;
+    const noteBox = ln.closest('.code-panel') && ln.closest('.code-panel').querySelector('.code-note');
+    if (noteBox && note) {
+      noteBox.innerHTML = '<strong>Line ' + ln.textContent.trim() + ':</strong> ' + note;
+      noteBox.style.display = 'block';
+    }
+  });
+});
+function drawLRSteps(canvas, warmupSteps, totalSteps) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0,0,W,H);
+  const max_lr = 6e-4, min_ratio = 0.1;
+  const min_lr = max_lr * min_ratio;
+  const steps = Math.max(2, totalSteps | 0);
+  const Wm = Math.min(warmupSteps | 0, steps - 1);
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let s = 0; s <= steps; s++) {
+    let lr;
+    if (s < Wm) lr = max_lr * (s + 1) / Math.max(1, Wm);
+    else {
+      const t = (s - Wm) / Math.max(1, steps - Wm);
+      lr = min_lr + 0.5 * (max_lr - min_lr) * (1 + Math.cos(Math.PI * t));
+    }
+    const x = 40 + (s / steps) * (W - 50);
+    const y = H - 20 - (lr / max_lr) * (H - 40);
+    if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+function drawLRSchedule(canvas, warmupFrac, minRatio) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0,0,W,H);
+  const max_lr = 6e-4, steps = 200;
+  const warmupEnd = Math.floor(steps * warmupFrac);
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const y = H - 20 - g * (H - 40) / 4;
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 10, y); ctx.stroke();
+  }
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let s = 0; s <= steps; s++) {
+    let lr;
+    if (s < warmupEnd) lr = max_lr * (s + 1) / Math.max(1, warmupEnd);
+    else {
+      const t = (s - warmupEnd) / Math.max(1, steps - warmupEnd);
+      const min_lr = max_lr * minRatio;
+      lr = min_lr + 0.5 * (max_lr - min_lr) * (1 + Math.cos(Math.PI * t));
+    }
+    const x = 40 + (s / steps) * (W - 50);
+    const y = H - 20 - (lr / max_lr) * (H - 40);
+    if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+function initParamBreakdown() {
+  const grid = document.getElementById('paramGrid');
+  const cap = document.getElementById('paramCap');
+  const btns = document.querySelectorAll('#paramBreakBtns .btn');
+  if (!grid || !btns.length) return;
+  const wte = 50257 * 768, wpe = 1024 * 768;
+  const perBlock = 7087872;
+  const blocks = 12 * perBlock;
+  const lnF = 2 * 768;
+  function render(mode) {
+    grid.innerHTML = '';
+    const rows = [];
+    if (mode === 'tied') {
+      rows.push(['Tied wte + lm_head', wte]);
+      rows.push(['Position wpe', wpe]);
+      rows.push(['12 × Transformer block (~)', blocks]);
+      rows.push(['ln_f', lnF]);
+      cap.textContent = 'Weight tying: token embedding and LM head share one matrix (~38.6M params), counted once.';
+    } else {
+      rows.push(['Token embedding wte', wte]);
+      rows.push(['LM head (untied view)', wte]);
+      rows.push(['Position wpe', wpe]);
+      rows.push(['12 × Transformer block (~)', blocks]);
+      rows.push(['ln_f', lnF]);
+      cap.textContent = 'Naive view double-counts the large vocab projection; the real checkpoint ties wte and lm_head.';
+    }
+    let sum = 0;
+    rows.forEach(([k, v]) => { sum += v; });
+    rows.push(['≈ Sum (check against ~124M)', sum]);
+    rows.forEach(([k, v]) => {
+      const d = document.createElement('div');
+      d.className = 'metric-tile';
+      d.innerHTML = '<div class="k">' + k + '</div><div class="v">' + (v / 1e6).toFixed(2) + 'M</div>';
+      grid.appendChild(d);
+    });
+  }
+  btns.forEach(b => b.addEventListener('click', () => {
+    btns.forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    render(b.dataset.mode);
+  }));
+  render('all');
+}
+function initMainLR() {
+  const c = document.getElementById('lrCanvasMain');
+  const w = document.getElementById('lrWarm');
+  const t = document.getElementById('lrTot');
+  if (!c || !w || !t) return;
+  function go() {
+    document.getElementById('lrWarmLab').textContent = w.value;
+    document.getElementById('lrTotLab').textContent = t.value;
+    drawLRSteps(c, +w.value, +t.value);
+  }
+  w.addEventListener('input', go);
+  t.addEventListener('input', go);
+  go();
+}
+function initGradCalc() {
+  const ids = ['gcT','gcB','gcG','gcTot'];
+  const out = document.getElementById('gcOut');
+  if (!out) return;
+  function go() {
+    const T = +document.getElementById('gcT').value || 1024;
+    const B = +document.getElementById('gcB').value || 1;
+    const G = +document.getElementById('gcG').value || 1;
+    const target = +document.getElementById('gcTot').value || 524288;
+    const micro = B * T * G;
+    const accum = Math.max(1, Math.ceil(target / micro));
+    out.textContent = 'Micro-batch tokens per step (all GPUs): ' + micro.toLocaleString() +
+      '. Target tokens/step: ' + target.toLocaleString() +
+      '. Gradient accumulation steps: ' + accum + '.';
+  }
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', go); });
+  go();
+}
+function drawLossCmp(ripple) {
+  const canvas = document.getElementById('lossCmp');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0,0,W,H);
+  const steps = 200;
+  function trainY(s) {
+    let y = 10.8 - 7.2 * (1 - Math.exp(-s / 55));
+    if (ripple) y += 0.25 * Math.sin(s / 12);
+    return y;
+  }
+  function valY(s) { return trainY(s) + 0.15 + 0.05 * Math.sin(s / 30); }
+  const ref = 3.15;
+  function plot(fn, color) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let s = 0; s <= steps; s++) {
+      const x = 50 + (s / steps) * (W - 70);
+      const y = H - 30 - (fn(s) / 11) * (H - 50);
+      if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  plot(trainY, '#6c8cff');
+  plot(valY, '#fbbf24');
+  ctx.strokeStyle = '#f87171';
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  const y0 = H - 30 - (ref / 11) * (H - 50);
+  ctx.moveTo(50, y0);
+  ctx.lineTo(W - 20, y0);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+  ctx.fillText('train', 58, 22);
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillText('val', 108, 22);
+  ctx.fillStyle = '#f87171';
+  ctx.fillText('GPT-2 124M ref (same val shard)', 148, 22);
+}
+function initLossCmp() {
+  const a = document.getElementById('lossBtnIdeal');
+  const b = document.getElementById('lossBtnRipple');
+  if (!a || !b) return;
+  a.addEventListener('click', () => { a.classList.add('active'); b.classList.remove('active'); drawLossCmp(false); });
+  b.addEventListener('click', () => { b.classList.add('active'); a.classList.remove('active'); drawLossCmp(true); });
+  drawLossCmp(false);
+}
+function initThroughput() {
+  const tok = document.getElementById('tpTok');
+  const ms = document.getElementById('tpMs');
+  const out = document.getElementById('tpOut');
+  if (!tok || !ms || !out) return;
+  function go() {
+    const exp = +tok.value;
+    const tps = Math.pow(2, exp);
+    const mss = +ms.value;
+    const perSec = tps / (mss / 1000);
+    document.getElementById('tpTokLab').textContent = Math.round(tps).toLocaleString();
+    document.getElementById('tpMsLab').textContent = String(mss);
+    out.textContent = 'Approximate throughput: ' + Math.round(perSec).toLocaleString() + ' tokens/s (idealized; ignores eval overhead).';
+  }
+  tok.addEventListener('input', go);
+  ms.addEventListener('input', go);
+  go();
+}
+function initPlayground() {
+  const totalEl = document.getElementById('pgTotalTok');
+  const gpuEl = document.getElementById('pgGpus');
+  const microEl = document.getElementById('pgMicro');
+  const out = document.getElementById('pgCombinedOut');
+  function pow2(n) { return Math.round(Math.pow(2, n)); }
+  function refreshPg() {
+    const total = pow2(+totalEl.value);
+    const gpus = +gpuEl.value;
+    const micro = pow2(+microEl.value);
+    document.getElementById('pgTotalTokLab').textContent = String(total);
+    document.getElementById('pgGpusLab').textContent = String(gpus);
+    document.getElementById('pgMicroLab').textContent = String(micro);
+    const perStepAllGpus = micro * gpus;
+    const accum = Math.max(1, Math.ceil(total / perStepAllGpus));
+    out.textContent = 'Per-step tokens across all GPUs: ' + perStepAllGpus.toLocaleString() +
+      '. Gradient accumulation steps (ceil(total / per_step)): ' + accum +
+      '. Effective optimizer steps per "epoch" of N tokens scales inversely with total tokens per step.';
+  }
+  [totalEl, gpuEl, microEl].forEach(el => el && el.addEventListener('input', refreshPg));
+  refreshPg();
+  const c = document.getElementById('pgLrCanvas');
+  const wf = document.getElementById('pgWf');
+  const mr = document.getElementById('pgMinR');
+  function lrPg() {
+    const warmupFrac = +wf.value / 100;
+    const minRatio = +mr.value / 100;
+    document.getElementById('pgWfLab').textContent = warmupFrac.toFixed(2);
+    document.getElementById('pgMinRLab').textContent = minRatio.toFixed(2);
+    drawLRSchedule(c, warmupFrac, minRatio);
+  }
+  wf.addEventListener('input', lrPg);
+  mr.addEventListener('input', lrPg);
+  lrPg();
+}
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 120);
+}, { passive: true });
+const fades = document.querySelectorAll('.fade-in');
+const obs = new IntersectionObserver((ents) => {
+  ents.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.08 });
+fades.forEach(el => obs.observe(el));
+initParamBreakdown();
+initMainLR();
+initGradCalc();
+initLossCmp();
+initThroughput();
+initPlayground();
+</script>
+</body>
+</html>

@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beyond MLPs: Kolmogorov-Arnold Networks &amp; B-Splines — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 24px; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 12px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  font-size: 0.85rem;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav.visible { transform: translateY(0); }
+.nav-left { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; }
+.nav-title { font-weight: 700; white-space: nowrap; }
+.nav-toggle {
+  display: none;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+}
+.nav-links {
+  display: flex; gap: 16px; overflow-x: auto; flex-wrap: wrap;
+}
+.nav-links a { color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: block; }
+  .nav-links {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; background: rgba(10,10,15,0.98);
+    border-bottom: 1px solid var(--border); padding: 12px 24px; gap: 10px;
+  }
+  .nav-links.open { display: flex; }
+}
+
+.hero {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 80px 24px; position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(167,139,250,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 640px; margin: 0 auto 32px; }
+.stats { display: flex; gap: 32px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap; }
+.stat { text-align: center; }
+.stat-val { display: block; font-size: 2rem; font-weight: 700; color: var(--accent2); font-family: var(--mono); }
+.stat-label { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.85rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; margin: 16px 0;
+}
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 24px; margin: 20px 0;
+  font-family: var(--mono); font-size: 0.95rem; color: var(--accent);
+  text-align: center; overflow-x: auto;
+}
+.callout {
+  background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 20px 0;
+}
+.callout p { margin: 0; }
+.callout.warn {
+  background: rgba(251,191,36,0.08); border-left-color: var(--accent5);
+}
+.callout.ok {
+  background: rgba(52,211,153,0.08); border-left-color: var(--accent3);
+}
+.qa-box {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 22px; margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700; color: var(--text); margin-bottom: 12px;
+  font-size: 1.05rem;
+}
+.qa-box p { margin-bottom: 0; }
+
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; margin: 24px 0;
+}
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.btn {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 16px; color: var(--text-dim);
+  cursor: pointer; font-family: var(--sans); font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+.btn:hover { border-color: var(--accent); color: var(--text); }
+.btn.active { background: rgba(108,140,255,0.15); border-color: var(--accent); color: var(--accent); }
+
+input[type="range"] {
+  -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px;
+  background: var(--border); outline: none; margin: 8px 0;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+}
+
+canvas { border-radius: var(--radius); display: block; max-width: 100%; background: var(--bg-card-alt); }
+svg.diagram { max-width: 100%; height: auto; display: block; margin: 16px auto; }
+
+.fade-in { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+ul.tight { margin: 0 0 1em 1.2em; color: var(--text-dim); }
+ul.tight li { margin-bottom: 0.5em; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Kolmogorov-Arnold Networks</span></nav>
+
+
+<nav class="nav" id="nav">
+  <div class="nav-left">
+    <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Advanced NLP V2</a>
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-label="Toggle section links">Menu</button>
+  </div>
+  <div class="nav-links" id="navLinks">
+    <a href="#s0">Prerequisites</a>
+    <a href="#s1">MLP Review</a>
+    <a href="#s2">Data Fitting</a>
+    <a href="#s3">B-Splines</a>
+    <a href="#s4">UAT</a>
+    <a href="#s5">KART &amp; KAN</a>
+    <a href="#s6">MLP vs KAN</a>
+    <a href="#s7">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Beyond MLPs: Kolmogorov-Arnold Networks &amp; B-Splines</h1>
+    <p class="subtitle">How multilayer perceptrons combine linear maps and fixed nonlinearities; why splines matter for smooth, locally controlled curves; what the Universal Approximation Theorem guarantees; and how Kolmogorov-Arnold Networks replace scalar weights on edges with learnable univariate functions—often implemented as B-splines.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">8</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">7</span><span class="stat-label">Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">File</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Calculus Prerequisites</h2>
+    <p>Understanding Kolmogorov-Arnold Networks (KANs) and spline-based activations rests on a few ideas from calculus and analysis. You do not need a full analysis course, but the following notions should feel familiar.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>Derivative</h3>
+        <p>The derivative <em>f′(x)</em> measures how fast <em>f</em> changes near <em>x</em>. Geometrically, it is the slope of the tangent line. In splines, first-derivative continuity at a knot (<strong>C¹</strong>) means tangents match from left and right—no sharp corner.</p>
+        <div class="formula">f′(x) = lim<sub>h→0</sub> ( f(x+h) − f(x) ) / h</div>
+      </div>
+      <div class="card">
+        <h3>Continuity</h3>
+        <p>A function is <strong>continuous</strong> at a point if small input changes yield small output changes: left and right limits agree with the value at the point. Informally, you can trace the graph without lifting the pen. <strong>C⁰</strong> continuity at a join means the curve does not jump; higher <strong>C<sup>k</sup></strong> means derivatives up to order <em>k</em> also match.</p>
+        <div class="formula">lim<sub>t→t₀⁻</sub> f(t) = f(t₀) = lim<sub>t→t₀⁺</sub> f(t)</div>
+      </div>
+    </div>
+    <div class="callout">
+      <p><strong>Why it matters:</strong> B-spline degree controls smoothness across knots (e.g. cubic B-splines often give <strong>C²</strong> joins). KANs learn shapes of univariate functions; smoothness and local influence of control points are exactly spline properties.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Multilayer Perceptrons (MLP)</h2>
+    <p>A <strong>feedforward</strong> network stacks layers: each layer maps its input vector to an output vector. A <strong>linear (dense) layer</strong> implements an affine map: multiply by a weight matrix, add a bias, then optionally apply a fixed nonlinearity at each <em>node</em> (e.g. ReLU).</p>
+    <div class="formula">y = x W<sup>⊤</sup> + b</div>
+    <p>For a batch of vectors, the same <em>W</em> and <em>b</em> broadcast across rows. Each output coordinate is a dot product of the input with one row of <em>W</em> (one &ldquo;neuron&rdquo;), plus a bias.</p>
+    <p>Concretely, in a framework such as PyTorch, <code style="background:var(--bg-card-alt);padding:2px 8px;border-radius:6px;font-family:var(--mono);font-size:0.9em;">nn.Linear(3, 5, bias=True)</code> implements exactly this: the layer stores a weight matrix whose transpose has shape <strong>3×5</strong> in the usual convention (five output neurons, each holding three incoming weights). Feed a batch of <strong>10</strong> row vectors, each with <strong>three</strong> input features—call them F₁, F₂, F₃ per item—and the linear map returns a <strong>10×5</strong> matrix: ten items, five output features per item.</p>
+    <p>For item 1, the <strong>first</strong> output feature is the dot product of that item&rsquo;s feature vector with the <strong>first neuron&rsquo;s</strong> weight vector, plus the first bias entry B₁. The <strong>second</strong> output feature uses the <strong>second</strong> neuron&rsquo;s weights with the same input features, plus B₂, and so on. After forming all dot products, the bias vector (one scalar per neuron) is broadcast and added to <em>every</em> row of the batch, so item <em>i</em> always picks up B₁ on output dimension 1, B₂ on dimension 2, etc.</p>
+    <div class="formula">z<sub>i,1</sub> = (a<sub>i,1</sub> w<sub>1,1</sub> + a<sub>i,2</sub> w<sub>1,2</sub> + a<sub>i,3</sub> w<sub>1,3</sub>) + b<sub>1</sub></div>
+    <p>In two dimensions, a classifier that only uses linear maps (and no nonlinearities) can only separate classes with a <strong>line</strong>. In three dimensions, separation is by a <strong>plane</strong>; in higher dimensions, by a <strong>hyperplane</strong>. Data that is not linearly separable cannot be modeled exactly by such a stack—hence the need for nonlinearities, and hence the classic XOR versus AND contrast below.</p>
+    <p><strong>Why nonlinearities?</strong> Composing affine maps alone yields another affine map: W<sub>2</sub>(W<sub>1</sub>x + b<sub>1</sub>) + b<sub>2</sub> = W′x + b′. The network cannot bend the input-output relationship. With ReLU, tanh, etc., the model can represent nonlinear decision boundaries.</p>
+    <p>Boolean gates make the geometry obvious. <strong>AND</strong> takes two binary inputs and outputs 1 only when both are 1:</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>AND truth table</h3>
+        <p>(0,0)→0, (0,1)→0, (1,0)→0, <strong>(1,1)→1</strong>. In the unit square with corners at these four points, class 1 sits at a single corner; a straight line can separate the single &ldquo;one&rdquo; corner from the three &ldquo;zero&rdquo; corners.</p>
+      </div>
+      <div class="card">
+        <h3>XOR truth table</h3>
+        <p>(0,0)→0, (0,1)→1, (1,0)→1, <strong>(1,1)→0</strong>. The two positive examples sit on opposite corners; <em>no</em> single line in the plane places all zeros on one side and all ones on the other—whichever line you draw, some zeros and ones remain mixed in at least one half-plane.</p>
+      </div>
+    </div>
+    <div class="interactive-panel">
+      <h3>Demo: AND vs XOR — Linear Separability</h3>
+      <p>AND is linearly separable in the (x₁, x₂) plane; XOR is not. Toggle which task is shown. A single line cannot separate XOR classes; a layered network with nonlinearities can.</p>
+      <div class="btn-group">
+        <button type="button" class="btn active" id="gateAnd">AND</button>
+        <button type="button" class="btn" id="gateXor">XOR</button>
+      </div>
+      <canvas id="xorCanvas" width="720" height="360"></canvas>
+      <p style="font-size:0.85rem;margin-top:8px;">Blue = class 0, coral = class 1. The dashed line is a candidate linear separator (draggable only in spirit—here fixed to illustrate impossibility for XOR).</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Data Fitting: Polynomials and Why Splines Help</h2>
+    <p><strong>Polynomial interpolation</strong> finds a polynomial that passes through given points (x<sub>i</sub>, y<sub>i</sub>). With <em>n</em>+1 points, a unique polynomial of degree at most <em>n</em> exists (in general position).</p>
+    <p>As degree grows (many points), the interpolant can oscillate wildly near the ends of the interval—the <strong>Runge phenomenon</strong>. For animation or modeling, we often want <strong>smooth</strong> curves with <strong>local</strong> control: moving one control point should not warp the entire curve.</p>
+    <p><strong>Bézier curves</strong> use Bernstein weights: B(t) = Σ<sub>i</sub> C(n,i) (1−t)<sup>n−i</sup> t<sup>i</sup> P<sub>i</sub>, where <strong>control points</strong> P<sub>i</sub> steer the shape. The curve passes through the first and last control points; intermediate points typically pull the curve without being interpolated.</p>
+    <p>High-degree Bézier curves on many control points are costly. <strong>B-splines</strong> piece together lower-degree Bézier-like segments at <strong>knots</strong>, sharing continuity (C⁰, C¹, C², …) across joins.</p>
+    <p>In curve design—and in spline activations—the usual goal is a <strong>smooth</strong> path through waypoints instead of kinked straight segments. A single <strong>polynomial</strong> through <em>n</em> points has degree at most <em>n</em>−1; coefficients come from solving a linear system (Gaussian elimination, substitution, or a spreadsheet trend line).</p>
+    <p>That global polynomial scales poorly: hundreds of points imply a huge system, and high-degree fits often oscillate at the ends—the Runge phenomenon. Splines trade a single global polynomial for <strong>local</strong> control: moving one waypoint should not redraw the entire curve.</p>
+    <div class="callout warn">
+      <p>A striking illustration is a <strong>degree-three</strong> polynomial interpolant through <strong>eleven</strong> evenly spaced samples: in the middle of the interval the curve may still look acceptable, but near the boundaries it can swing wildly—unacceptable for motion paths and a warning sign for any &ldquo;one giant polynomial&rdquo; approach to fitting data.</p>
+    </div>
+    <div class="interactive-panel">
+      <h3>Demo: High-Degree Polynomial Wiggle</h3>
+      <p>Sample the Runge function f(x) = 1/(1 + 25x²) on [−1, 1] and fit a polynomial through those samples. Increase the number of points to see boundary oscillation.</p>
+      <label style="font-size:0.9rem;color:var(--text-dim);">Sample count: <span id="rungeNVal" style="color:var(--accent);">9</span></label>
+      <input type="range" id="rungeN" min="5" max="17" step="2" value="9">
+      <canvas id="rungeCanvas" width="720" height="320"></canvas>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>B-Splines: Knots, Degree, Basis Functions</h2>
+    <p>Given control points {P<sub>i</sub>} and a nondecreasing <strong>knot vector</strong> {t<sub>j</sub>}, a B-spline curve is</p>
+    <div class="formula">S(t) = Σ<sub>i</sub> P<sub>i</sub> N<sub>i,k</sub>(t)</div>
+    <p>The <strong>basis functions</strong> N<sub>i,k</sub> of <strong>degree</strong> <em>k</em> (order <em>k</em>+1) are built recursively (<strong>Cox–de Boor</strong>): degree-0 functions are step indicators on knot spans; higher degree blends neighboring lower-degree pieces. The basis functions are piecewise polynomials, nonnegative, sum to 1 on the active interval (<strong>partition of unity</strong>), and have <strong>compact support</strong>—hence <strong>local control</strong>: changing P<sub>i</sub> mainly affects the curve near where N<sub>i,k</sub> is nonzero.</p>
+    <p>With many control points and degree <em>k</em>, the number of B-spline segments relates to how many polynomial pieces stitch at <strong>knots</strong> (join points). Increasing degree tends to increase smoothness at knots (e.g. C<sup>k−1</sup> under uniform simple knots).</p>
+
+    <h3 style="margin-top:32px;">From Bézier intuition to B-splines</h3>
+    <p>A <strong>parametric</strong> curve assigns a position <strong>B</strong>(<em>t</em>) for each parameter <em>t</em> in an interval—think of <em>t</em> as <strong>time</strong> from 0 to 1 along an animation. For two control points <strong>P</strong>₀ and <strong>P</strong>₁, linear interpolation is</p>
+    <div class="formula"><strong>B</strong>(t) = <strong>P</strong>₀ + t (<strong>P</strong>₁ − <strong>P</strong>₀) = (1 − t)<strong>P</strong>₀ + t<strong>P</strong>₁ , &nbsp; t ∈ [0,1]</div>
+    <p>At <em>t</em> = 0 the point is at <strong>P</strong>₀; at <em>t</em> = ½ you have walked halfway along the chord; at <em>t</em> = 1 you arrive at <strong>P</strong>₁. Bold <strong>B</strong> emphasizes that the value can be a 2D or 3D vector—all coordinates depend on <em>t</em>.</p>
+    <p>With <strong>three</strong> control points, <strong>de Casteljau</strong>&rsquo;s construction stacks linear interpolations: first form <strong>Q</strong>₀(<em>t</em>) between <strong>P</strong>₀ and <strong>P</strong>₁, and <strong>Q</strong>₁(<em>t</em>) between <strong>P</strong>₁ and <strong>P</strong>₂; then interpolate between <strong>Q</strong>₀(<em>t</em>) and <strong>Q</strong>₁(<em>t</em>) to obtain the quadratic Bézier point on the red curve. The algebra expands to a single quadratic in <em>t</em> whose coefficients are fixed combinations of <strong>P</strong>₀, <strong>P</strong>₁, <strong>P</strong>₂. With <strong>four</strong> points you repeat the pattern—pairwise linear blends, then blend the blends—until one point remains: a <strong>cubic</strong> Bézier.</p>
+    <p>There is a closed form parallel to the Bernstein weights already cited above. With <em>n</em>+1 control points <strong>P</strong>₀,…,<strong>P</strong><sub>n</sub>,</p>
+    <div class="formula"><strong>B</strong>(t) = Σ<sub>i=0</sub><sup>n</sup> B<sub>n,i</sub>(t) <strong>P</strong><sub>i</sub> , &nbsp; B<sub>n,i</sub>(t) = ( <sup>n</sup>C<sub>i</sub> ) (1−t)<sup>n−i</sup> t<sup>i</sup></div>
+    <p>Here <sup>n</sup>C<sub>i</sub> = n! / (i! (n−i)!) is the <strong>binomial coefficient</strong>—the same integers that appear in the expansion of (a+b)<sup>n</sup>. Each B<sub>n,i</sub>(<em>t</em>) is a nonnegative weight; at any <em>t</em>, the weights sum to 1. Geometrically, each weight tells how strongly control point <strong>P</strong><sub>i</sub> &ldquo;pulls&rdquo; the curve at that time.</p>
+    <p>For a <strong>cubic</strong> (n = 3) with four control points, plot the four Bernstein polynomials against <em>t</em>. At <em>t</em> = 0 only B<sub>3,0</sub> is nonzero, so <strong>B</strong>(0) = <strong>P</strong>₀—the curve starts exactly at the first control point. As <em>t</em> increases, the blue weight (first point) decays while the green weight (second point) grows; near <strong>t ≈ ⅓</strong> the second control point dominates the blend—you are closest to that &ldquo;pull.&rdquo; Near <strong>t ≈ ⅔</strong> the third point takes over; at <strong>t</strong> = 1 only the last Bernstein factor survives and <strong>B</strong>(1) = <strong>P</strong>₃. Between these times <em>several</em> weights are positive at once, so the curve need not pass through intermediate control points: competing pulls shape a smooth arc. That is the same &ldquo;pulling game&rdquo; intuition: no single control point wins in the interior, but the endpoints win at the ends.</p>
+    <div class="callout">
+      <p>If you insist on representing <strong>many</strong> control points with a <em>single</em> Bézier segment, the required degree is <strong>n</strong> for <strong>n</strong>+1 points—e.g. 100 points imply degree 99. That is expensive and numerically delicate. <strong>B-splines</strong> instead chain many <em>low-degree</em> Bézier-like pieces; the joins are the <strong>knots</strong>.</p>
+    </div>
+
+    <h3>Piecewise structure: how many segments?</h3>
+    <p>The following counting exercise matches diagrams you may have seen in spline tutorials (including interactive plots from sources such as <strong>Wolfram</strong> demonstrations). Take <strong>six</strong> control points in order and suppose each underlying Bézier piece has <strong>degree 2</strong> (quadratic), so each quadratic needs <strong>three</strong> consecutive control points. Then one piece uses points 1–2–3, the next uses 2–3–4, then 3–4–5, then 4–5–6: <strong>four</strong> quadratic segments. The parameter values where consecutive polynomial pieces meet are the <strong>knots</strong> (often drawn as red dots along the polygon). In this counting pattern, if you have <strong>n</strong> control points in the relevant index range and each piece has degree <strong>k</strong>, you obtain <strong>n − k</strong> polynomial pieces (this matches the usual &ldquo;sliding window&rdquo; count over consecutive control points).</p>
+    <p>Raising the degree changes the window width: with the <strong>same six</strong> points but <strong>cubic</strong> (degree 3) pieces, each segment needs four consecutive control points, so you get <strong>three</strong> cubic segments and <strong>two</strong> interior knot locations where segments meet—fewer joins, broader polynomial support on each piece.</p>
+
+    <h3>Continuity at knots</h3>
+    <p><strong>Continuity</strong> can be introduced informally: a function is continuous on an interval if you can trace its graph without lifting the pen—no jumps. Formally, left and right limits at each interior point agree with the value at that point. If the graph jumps, limits from left and right hit different heights and the function fails C⁰.</p>
+    <p><strong>C¹</strong> continuity at a knot additionally requires that the <strong>first derivative</strong> (slope of the tangent line) agrees when approached from the left and from the right—no sharp corner. <strong>C²</strong> continuity matches second derivatives as well; geometrically the <strong>concavity</strong> (bending direction) must agree, so you do not see a join where one side bends upward and the other downward.</p>
+    <p>For B-splines with <strong>simple</strong> interior knots, a spline of <strong>degree k</strong> is typically <strong>C<sup>k−1</sup></strong> at those joins—e.g. cubics are commonly C². The degree is the knob that trades off flexibility of each piece against how many derivatives match across knots.</p>
+
+    <h3>Cox–de Boor recursion (step-by-step)</h3>
+    <p>Fix a nondecreasing knot vector ( … , t<sub>i</sub>, t<sub>i+1</sub>, … ). The <strong>degree-0</strong> B-spline basis is piecewise constant: N<sub>i,0</sub>(<em>t</em>) is 1 on the half-open interval [t<sub>i</sub>, t<sub>i+1</sub>) (with the usual right-endpoint convention at the final span) and 0 otherwise. Higher-degree bases mix two neighbors of the previous level:</p>
+    <div class="formula">N<sub>i,k</sub>(t) = ((t − t<sub>i</sub>) / (t<sub>i+k</sub> − t<sub>i</sub>)) N<sub>i,k−1</sub>(t) + ((t<sub>i+k+1</sub> − t) / (t<sub>i+k+1</sub> − t<sub>i+1</sub>)) N<sub>i+1,k−1</sub>(t)</div>
+    <p>When a denominator would be zero, the corresponding fraction is taken to be <strong>0</strong> (convention). Starting from the indicators N<sub>i,0</sub>, you compute N<sub>i,1</sub>, then N<sub>i,2</sub>, and so on up to the target degree <em>k</em>. This is the same structural idea as de Casteljau—<strong>linear interpolation of lower-degree quantities</strong>—but organized on the knot grid instead of on the control polygon alone.</p>
+    <p>The curve value is still the weighted sum <strong>S</strong>(<em>t</em>) = Σ<sub>i</sub> <strong>P</strong><sub>i</sub> N<sub>i,k</sub>(<em>t</em>). The basis functions are nonnegative, sum to one where the spline is defined (<strong>partition of unity</strong>), and each N<sub>i,k</sub> is nonzero only on a <strong>bounded</strong> interval of the <em>t</em>-axis (<strong>compact support</strong>). That support property is exactly <strong>local control</strong>: moving one control point <strong>P</strong><sub>i</sub> perturbs <strong>S</strong> only on the region where N<sub>i,k</sub> is active—near the fifth control point, for example, the deformation is concentrated in the vicinity of the fourth through sixth influence zone, not across the entire spline.</p>
+    <div class="callout ok">
+      <p><strong>KAN connection:</strong> spline-based edge activations inherit this locality. When new data arrives that should reshape the map only in one input range, adjusting local coefficients need not destroy fits elsewhere—an advantage when discussing <strong>continual learning</strong> and catastrophic forgetting in the comparison section below.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Demo: B-Spline Basis Functions</h3>
+      <p>Uniform knots on [0, 1]. Adjust degree <em>k</em> and the number of control points <em>m</em>. Colored curves are N<sub>i,k</sub>(t); their weighted sum (with fixed illustrative weights) appears dashed in white.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <label style="font-size:0.85rem;color:var(--text-dim);">Degree <em>k</em>: <span id="bsDegVal" style="color:var(--accent);">3</span></label>
+          <input type="range" id="bsDeg" min="1" max="4" step="1" value="3">
+        </div>
+        <div>
+          <label style="font-size:0.85rem;color:var(--text-dim);">Control points <em>m</em>: <span id="bsMVal" style="color:var(--accent);">6</span></label>
+          <input type="range" id="bsM" min="4" max="10" step="1" value="6">
+        </div>
+      </div>
+      <canvas id="bsBasisCanvas" width="720" height="360"></canvas>
+    </div>
+    <div class="interactive-panel">
+      <h3>Demo: Local Control of the Spline Sum</h3>
+      <p>Drag horizontally in the plot to move one control-point weight (simulating moving one control point’s vertical value). Only part of the sum changes—illustrating local influence.</p>
+      <canvas id="localCanvas" width="720" height="300" style="cursor:crosshair;"></canvas>
+      <p style="font-size:0.85rem;">Click or drag near the curve. Weights renormalize for display; the point index cycles.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Universal Approximation Theorem (Cybenko-style)</h2>
+    <p>Neural networks are often described as <strong>universal function approximators</strong>. A widely cited formulation (Cybenko, 1989; Hornik et al.) states, roughly: a feedforward network with at least one hidden layer with a nonconstant, bounded continuous activation (e.g. sigmoid) can approximate any continuous function on a compact set arbitrarily well—provided <strong>enough hidden units</strong>.</p>
+    <div class="callout">
+      <p><strong>What it does <em>not</em> say:</strong> It does not give architecture, data, or optimization guarantees. Finite precision, local minima, and sample complexity are separate practical concerns. The theorem is about <em>expressive power</em>, not ease of training.</p>
+    </div>
+    <p>Picture a classification task: images of <strong>cats</strong> and <strong>dogs</strong> with labels. You assume the labeled pairs were produced by some unknown <strong>ideal function</strong>—the &ldquo;true&rdquo; rule that assigns each image to its species. Training minimizes empirical error on samples, but the <em>theoretical</em> question is whether the model class can approximate that ideal mapping on a compact domain to within any prescribed tolerance <strong>ε &gt; 0</strong>. Universal approximation says: with enough width (and a suitable activation), there exist weights making the network&rsquo;s output uniformly close to the target continuous function.</p>
+    <p>That is <em>existence</em> of a good approximation, not a recipe. In practice you may lack compute (one informal image is needing <strong>thousands of GPUs</strong> you do not have), or enough training data, or sufficient numerical precision—weights that theory requires to be astronomically small may be unrepresentable in <strong>float32</strong>, so hardware limits bite. The optimizer may stall in a <strong>local minimum</strong> far from any near-optimal set of weights. So &ldquo;can approximate in principle&rdquo; does not mean &ldquo;will find that approximation with SGD on a laptop.&rdquo; It does mean the MLP family is not ruled out <em>a priori</em> for modeling complicated continuous relationships.</p>
+    <div class="interactive-panel">
+      <h3>Demo: Width and Approximation Error</h3>
+      <p>Target on [0, 1]: sin(2πx). One hidden layer with ReLU: hidden units h<sub>j</sub>(x) = ReLU(w<sub>j</sub>x + b<sub>j</sub>) with random fixed w<sub>j</sub>, b<sub>j</sub>; we train output weights by ridge regression. This is a standard random-feature sketch of universal approximation.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <label style="font-size:0.85rem;color:var(--text-dim);">Hidden units: <span id="uatHVal" style="color:var(--accent);">12</span></label>
+          <input type="range" id="uatH" min="2" max="80" step="1" value="12">
+        </div>
+        <div>
+          <label style="font-size:0.85rem;color:var(--text-dim);">Ridge λ: <span id="uatRidgeVal" style="color:var(--accent);">1e-3</span></label>
+          <input type="range" id="uatRidge" min="-6" max="1" step="0.25" value="-3">
+        </div>
+      </div>
+      <p style="font-family:var(--mono);font-size:0.9rem;color:var(--accent3);">Mean squared error ≈ <span id="uatMse">—</span></p>
+      <canvas id="uatCanvas" width="720" height="320"></canvas>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Kolmogorov-Arnold Representation &amp; KAN Architecture</h2>
+    <p>The <strong>Kolmogorov–Arnold representation theorem</strong> (1957), associated with <strong>Andrey Kolmogorov</strong> and <strong>Vladimir Arnold</strong>, says that any multivariate continuous function on a bounded domain—take f : [0,1]<sup>n</sup> → ℝ—can be expressed with a <strong>finite</strong> outer sum of terms, each term being a <strong>univariate</strong> outer function ψ<sub>q</sub> applied to an <strong>inner sum</strong> of univariate maps φ<sub>q,p</sub>(x<sub>p</sub>) of the individual coordinates. It is the structural cousin of universal approximation for MLPs, but it foregrounds compositions of <strong>one-dimensional</strong> nonlinearities rather than the width of a single affine layer. Schematically, there exist φ<sub>q,p</sub> and ψ<sub>q</sub> such that</p>
+    <div class="formula">f(x₁,…,x<sub>n</sub>) = Σ<sub>q=1</sub><sup>2n+1</sup> ψ<sub>q</sub>( Σ<sub>p=1</sub><sup>n</sup> φ<sub>q,p</sub>(x<sub>p</sub>) )</div>
+    <p>Each outer ψ<sub>q</sub> combines univariate transforms of <em>individual</em> coordinates. This motivates <strong>KANs</strong>: instead of learning only scalar weights on edges, learn a <strong>univariate activation function</strong> on each edge (often a B-spline plus a fixed baseline such as SiLU or sigmoid), so the &ldquo;weight&rdquo; becomes a whole function shape.</p>
+
+    <h3>Worked enumeration for <em>n</em> = 2 inputs</h3>
+    <p>Let the input be (<em>x</em>₁, <em>x</em>₂), so <em>n</em> = 2. Then 2<em>n</em>+1 = <strong>5</strong>, hence <em>q</em> ∈ {1,2,3,4,5} and <em>p</em> ∈ {1,2}. You need <strong>10</strong> inner univariate functions φ<sub>q,p</sub>:</p>
+    <ul class="tight">
+      <li>φ<sub>1,1</sub>, φ<sub>1,2</sub> &nbsp; … &nbsp; φ<sub>5,1</sub>, φ<sub>5,2</sub></li>
+    </ul>
+    <p><strong>Step 1 — inner sums.</strong> For each fixed <em>q</em>, form S<sub>q</sub> = φ<sub>q,1</sub>(<em>x</em>₁) + φ<sub>q,2</sub>(<em>x</em>₂). For example, when <em>q</em> = 1, S₁ = φ<sub>1,1</sub>(<em>x</em>₁) + φ<sub>1,2</sub>(<em>x</em>₂).</p>
+    <p><strong>Step 2 — outer warps.</strong> Apply ψ<sub>q</sub> to each sum: z<sub>q</sub> = ψ<sub>q</sub>(S<sub>q</sub>). You obtain five scalars z₁,…,z₅.</p>
+    <p><strong>Step 3 — final sum.</strong> The representation value is f(<em>x</em>₁,<em>x</em>₂) = z₁ + z₂ + z₃ + z₄ + z₅.</p>
+    <p>Abstract as this looks, it lines up with a <strong>two-stage</strong> computation: first, five different &ldquo;channels&rdquo; each mix two univariate maps of the two inputs by addition; second, each channel is passed through its own outer nonlinearity; third, the channel outputs add.</p>
+
+    <h3>Analogy to an MLP layer</h3>
+    <p>In a standard MLP neuron, incoming features are multiplied by learnable <strong>scalars</strong> and summed: w₁<em>x</em>₁ + w₂<em>x</em>₂ + … before a fixed activation σ. In the Kolmogorov–Arnold view for that same arity, each input is passed through its own <strong>learnable univariate</strong> map φ<sub>·,1</sub>, φ<sub>·,2</sub> and the results are <strong>summed</strong>—no scalar weights on the edges, but entire function shapes. The next stage applies another univariate ψ. Stacking such stages yields a <strong>deep KAN</strong>: width and depth resemble an MLP, but learnable objects on edges are splines (or similar) instead of constants multiplying lines.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>MLP (conceptual)</h3>
+        <p>Edge carries a <strong>weight</strong>; node aggregates Σ w<sub>i</sub> x<sub>i</sub> then applies a <strong>fixed</strong> σ. Theorem anchor: <strong>universal approximation</strong> (Cybenko / Hornik-style).</p>
+      </div>
+      <div class="card">
+        <h3>KAN (conceptual)</h3>
+        <p>Edge carries a <strong>univariate function</strong> φ<sub>i</sub>; node may sum Σ φ<sub>i</sub>(x<sub>i</sub>) then apply another learnable 1D map. Theorem anchor: <strong>Kolmogorov–Arnold representation</strong>.</p>
+      </div>
+    </div>
+
+    <h3>What is actually trained on each edge?</h3>
+    <p>In implementations (e.g. the original KAN formulation), each edge nonlinearity is not a free-floating arbitrary function class; it is often written as a <strong>sum</strong> of a fixed smooth baseline b(<em>x</em>)—such as <strong>SiLU</strong> / <strong>swish</strong>—plus a <strong>B-spline</strong> correction whose coefficients are learned. The <strong>basis functions</strong> N<sub>i,k</sub> are determined once you fix knot layout and degree; only the control-point / coefficient heights are updated during optimization. One edge might learn coefficients that trace a <strong>sine-like</strong> warp; another, with the same basis, might learn an <strong>exponential-looking</strong> warp by placing coefficients monotonically upward—same machinery, different shapes.</p>
+    <p>If the target inner map is closer to sin(<em>Bx</em>+<em>C</em>)+<em>D</em> than to raw sin(<em>x</em>), training also adjusts <strong>scale and translation</strong> parameters so the spline does not have to do all the reparameterization alone. The key point is <strong>interpretability of the 1D factors</strong>: inspecting a learned φ can resemble reading off symbolic structure when the task permits.</p>
+
+    <div class="interactive-panel">
+      <h3>Demo: Activations on Nodes (MLP) vs Edges (KAN)</h3>
+      <p>Left: classic pattern—affine mix then shared nonlinearity at the node. Right: each incoming edge carries its own learnable univariate map φ<sub>ij</sub> before summation.</p>
+      <svg class="diagram" viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg" aria-label="MLP versus KAN activation placement">
+        <defs>
+          <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#8888a0"/></marker>
+        </defs>
+        <text x="120" y="24" fill="#e0e0e8" font-size="14" font-family="Inter,system-ui,sans-serif" text-anchor="middle">MLP node</text>
+        <circle cx="40" cy="110" r="14" fill="#181825" stroke="#6c8cff"/>
+        <circle cx="120" cy="110" r="14" fill="#181825" stroke="#6c8cff"/>
+        <circle cx="200" cy="110" r="22" fill="rgba(108,140,255,0.15)" stroke="#6c8cff"/>
+        <text x="200" y="115" fill="#6c8cff" font-size="11" text-anchor="middle" font-family="ui-monospace,monospace">σ</text>
+        <line x1="54" y1="110" x2="178" y2="110" stroke="#8888a0" marker-end="url(#ar)"/>
+        <text x="115" y="98" fill="#8888a0" font-size="10" font-family="ui-monospace,monospace">w₁x₁+w₂x₂</text>
+        <text x="380" y="24" fill="#e0e0e8" font-size="14" font-family="Inter,system-ui,sans-serif" text-anchor="middle">KAN-style sum</text>
+        <circle cx="320" cy="110" r="14" fill="#181825" stroke="#a78bfa"/>
+        <circle cx="400" cy="110" r="14" fill="#181825" stroke="#a78bfa"/>
+        <rect x="350" y="70" width="36" height="22" rx="4" fill="rgba(167,139,250,0.2)" stroke="#a78bfa"/>
+        <text x="368" y="86" fill="#a78bfa" font-size="9" text-anchor="middle" font-family="ui-monospace,monospace">φ₁</text>
+        <rect x="350" y="128" width="36" height="22" rx="4" fill="rgba(167,139,250,0.2)" stroke="#a78bfa"/>
+        <text x="368" y="144" fill="#a78bfa" font-size="9" text-anchor="middle" font-family="ui-monospace,monospace">φ₂</text>
+        <line x1="334" y1="110" x2="348" y2="81" stroke="#8888a0" marker-end="url(#ar)"/>
+        <line x1="334" y1="110" x2="348" y2="139" stroke="#8888a0" marker-end="url(#ar)"/>
+        <circle cx="500" cy="110" r="18" fill="rgba(52,211,153,0.12)" stroke="#34d399"/>
+        <text x="500" y="115" fill="#34d399" font-size="12" text-anchor="middle" font-family="ui-monospace,monospace">Σ</text>
+        <line x1="386" y1="81" x2="482" y2="105" stroke="#8888a0" marker-end="url(#ar)"/>
+        <line x1="386" y1="139" x2="482" y2="115" stroke="#8888a0" marker-end="url(#ar)"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>MLP vs KAN: Side-by-Side</h2>
+    <p><strong>MLPs</strong> parameterize affine transforms (matrices and biases) and apply <strong>fixed</strong> nonlinearities at nodes. <strong>KANs</strong> parameterize <strong>learnable univariate functions</strong> on edges (splines are a common choice: fixed basis, learnable coefficients / control points).</p>
+    <ul class="tight">
+      <li><strong>Theoretical anchor:</strong> UAT for wide MLPs; Kolmogorov-Arnold representation for sum-of-univariate compositions (KANs align with that structural bias).</li>
+      <li><strong>Parameter scaling:</strong> MLP layer n<sub>in</sub>→n<sub>out</sub> has n<sub>in</sub>n<sub>out</sub> + n<sub>out</sub> affine parameters (plus no extra for fixed activations). A KAN block has comparable <em>count</em> of learnable edge functions but each function carries multiple spline control parameters (grid size, degree).</li>
+      <li><strong>Grid extension:</strong> Refining a spline grid increases expressivity of a single edge map without changing outer tensor dimensions—different from widening a linear layer, which changes the next layer’s input size.</li>
+      <li><strong>Interpretability &amp; locality:</strong> Visualizing a learned φ<sub>ij</sub> can resemble discovering symbolic structure; B-spline locality can mitigate interference when fitting new regions (related to local basis support).</li>
+    </ul>
+
+    <h3>Parameter counts (same width throughout)</h3>
+    <p>Consider an MLP with <strong>L</strong> layers, each connecting <strong>n</strong> inputs to <strong>n</strong> outputs (square blocks), ignoring biases for a first-order comparison. Every layer stores an <strong>n×n</strong> weight matrix, so a rough scalar count is on the order of <strong>n²L</strong> weights.</p>
+    <p>A KAN with the same connectivity pattern has on the order of <strong>n²L</strong> <em>learnable univariate maps</em>—one per directed edge in that block—but each map carries additional degrees of freedom: the spline <strong>control-point heights</strong> (coefficients) tied to the chosen <strong>grid</strong> resolution and polynomial <strong>degree</strong> <em>k</em>. An order-of-magnitude accounting writes the extra cost per edge as scaling like <strong>G + k</strong> trainable scalars, where <strong>G</strong> indexes grid-related resolution (knot structure in the paper&rsquo;s terminology) and <strong>k</strong> is the spline degree; implementations may fold scale/translation parameters into the same count. Bottom line: KANs trade explicit weight matrices for <em>many</em> small coefficient vectors—often <strong>more total parameters</strong> than a minimal MLP, but with a different inductive bias.</p>
+    <div class="formula">MLP (order of magnitude): n² L weights &nbsp;|&nbsp; KAN: n² L edge functions × (G + k)-scale coefficients each</div>
+    <div class="callout">
+      <p>Per-edge spline overhead scales with grid resolution <strong>G</strong> and spline <strong>degree k</strong> through the number of <strong>B-spline control coefficients</strong> tied to the chosen grid and order—consult the implementation for the exact parameterization.</p>
+    </div>
+
+    <h3>Grid extension without rewiring the network</h3>
+    <p>Suppose an edge spline has too few control points to approximate a target inner map (two points can only realize a straight segment—you cannot embed a full sinusoid). <strong>Grid extension</strong> adds knots / grid points on that edge only: the surrounding architecture—how many features leave the layer—stays the same. Contrast widening an MLP hidden layer from five to six units: every downstream weight matrix that consumed five features must be resized.</p>
+    <p>When the grid refines, new coefficients appear. A practical scheme initializes them so that the <strong>new</strong> spline matches the <strong>old</strong> spline on inputs seen so far—e.g. minimize discrepancy between old and new univariate outputs under a norm, so training can continue without a sharp functional reset. That transfer is natural when the adjustable object is a function space with nested grids; it is less straightforward when widening matrices changes tensor shapes.</p>
+
+    <h3>Sparsity, regularization, and pruning</h3>
+    <p>When you suspect the network is larger than necessary, a standard MLP trick is <strong>L1</strong> regularization on <strong>weights</strong>: add λ times the sum of absolute weights to the prediction loss. The optimizer balances fitting the data against driving many weights to <strong>exactly zero</strong>, yielding a sparse linear map.</p>
+    <p>KANs have no scalar edge weights in the same sense; instead, one penalizes the <strong>magnitude of activations</strong> produced by the learnable univariate maps—analogous in spirit, but defined on function outputs. After training, edges whose activations contribute negligibly to the final prediction (contributions below about <strong>1%</strong> of the output magnitude are a common diagnostic threshold) can be <strong>pruned</strong> away. On toy symbolic regression tasks, the surviving edges sometimes recover shapes that mirror the <strong>true generating formula</strong>—one channel sine-like in <em>x</em>, another quadratic-like in <em>y</em>, an outer map exponential-like on the sum—provided enough grid resolution (on the order of <strong>five or six</strong> control points can already hint at a sinusoidal factor when the ground truth permits).</p>
+
+    <h3>Why interpretability might matter</h3>
+    <p>A language-scale model with <strong>billions</strong> of scalar parameters offers no realistic path to auditing each weight. Small networks are easier—but MLPs still entangle features through dense linear mixes, so even modest sizes resist human-readable decompositions. KANs encourage a different viewpoint: if each edge is a <strong>plotted 1D curve</strong>, domain experts can inspect whether a medical-risk model&rsquo;s dependence on dose or age is monotonic, oscillatory, or saturating. In regulated settings (<strong>medicine dosing</strong> is a standard motivating example), &ldquo;the black box said so&rdquo; is weak accountability; <strong>verifiable structure</strong> in the learned univariate factors is a stronger story—when the architecture matches the problem.</p>
+
+    <h3>Continual learning and catastrophic forgetting</h3>
+    <p>Train a language model on <strong>Japanese</strong>, then fine-tune on <strong>English</strong>: performance on English often rises while <strong>Japanese degrades</strong>—<strong>catastrophic forgetting</strong> in deep MLP-style stacks. A toy regression experiment with a sum of <strong>Gaussian bumps</strong> along the input axis illustrates a contrasting behavior: data arrives in <strong>phases</strong> (first only the left bump, then extend rightward). An MLP trained sequentially may fit the latest segment while washing out earlier ones. A spline-based KAN, starting from an initialization that outputs near <strong>zero</strong> everywhere, can fit the first region by moving only the control points whose B-spline basis has support there; when the second training phase arrives, coefficients whose basis is localized farther right adjust <strong>without</strong> destroying the already-fit left region—exactly the <strong>local control</strong> property. In that experiment, after each phase, one evaluates on <em>all</em> past regions; MLP quality on early phases collapses while KAN retains them.</p>
+    <div class="callout warn">
+      <p>Toy demos isolate mechanisms; real continual learning still depends on optimization, task design, and capacity. The point is not that KANs magically solve all forgetting, but that <strong>compact support of B-spline bases</strong> provides a lever MLPs lack when the same scalar weights must simultaneously serve every input region.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Demo: Architecture Comparison (Schematic)</h3>
+      <p>Two-layer bottleneck (2 → 5 → 1): MLP shows weight matrices; KAN shows learnable edge functions φ and ψ.</p>
+      <canvas id="archCanvas" width="720" height="400"></canvas>
+      <div class="btn-group" style="margin-top:12px;">
+        <button type="button" class="btn active" id="viewMlp">Highlight MLP</button>
+        <button type="button" class="btn" id="viewKan">Highlight KAN</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Playground</h2>
+    <p>Experiment with a toy KAN layer: two inputs pass through learnable edge shapes (here: draggable control points for piecewise-linear proxy curves), are summed, then passed through an outer nonlinearity. This is illustrative—not a trained network—but it mirrors the idea that <strong>refining control points</strong> (analogous to <strong>grid extension</strong> on a true B-spline edge) increases how much each φ can bend without changing the number of summed channels.</p>
+    <div class="interactive-panel">
+      <h3>Edge Maps + Sum + Outer Warp</h3>
+      <canvas id="playCanvas" width="720" height="420" style="cursor:grab;"></canvas>
+      <p style="font-size:0.85rem;">Drag the colored handles to reshape φ₁(x₁) and φ₂(x₂). The bottom plot shows y = tanh(φ₁(x₁) + φ₂(x₂)) along slices of the unit square.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+        <div>
+          <label style="font-size:0.85rem;color:var(--text-dim);">Fix x₁ for slice: <span id="sliceX1" style="color:var(--accent);">0.50</span></label>
+          <input type="range" id="playX1" min="0" max="1" step="0.01" value="0.5">
+        </div>
+        <div>
+          <label style="font-size:0.85rem;color:var(--text-dim);">Fix x₂ for slice: <span id="sliceX2" style="color:var(--accent);">0.50</span></label>
+          <input type="range" id="playX2" min="0" max="1" step="0.01" value="0.5">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+'use strict';
+
+const nav = document.getElementById('nav');
+const navToggle = document.getElementById('navToggle');
+const navLinks = document.getElementById('navLinks');
+
+navToggle.addEventListener('click', function () {
+  const open = navLinks.classList.toggle('open');
+  navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+navLinks.querySelectorAll('a').forEach(function (a) {
+  a.addEventListener('click', function () {
+    navLinks.classList.remove('open');
+    navToggle.setAttribute('aria-expanded', 'false');
+  });
+});
+
+window.addEventListener('scroll', function () {
+  const y = window.scrollY;
+  nav.classList.toggle('visible', y > 300);
+  document.querySelectorAll('.fade-in:not(.visible)').forEach(function (el) {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 60) el.classList.add('visible');
+  });
+}, { passive: true });
+window.dispatchEvent(new Event('scroll'));
+
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+
+/* ---- XOR / AND canvas ---- */
+(function xorDemo() {
+  const c = document.getElementById('xorCanvas');
+  const ctx = c.getContext('2d');
+  let mode = 'and';
+
+  function draw() {
+    const w = c.width, h = c.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, w, h);
+    const pad = 50;
+    const sx = (x) => pad + x * (w - 2 * pad);
+    const sy = (y) => h - pad - y * (h - 2 * pad);
+    const pts = mode === 'and'
+      ? [{ x: 0, y: 0, v: 0 }, { x: 0, y: 1, v: 0 }, { x: 1, y: 0, v: 0 }, { x: 1, y: 1, v: 1 }]
+      : [{ x: 0, y: 0, v: 0 }, { x: 0, y: 1, v: 1 }, { x: 1, y: 0, v: 1 }, { x: 1, y: 1, v: 0 }];
+    pts.forEach(function (p) {
+      ctx.beginPath();
+      ctx.arc(sx(p.x), sy(p.y), 18, 0, Math.PI * 2);
+      ctx.fillStyle = p.v ? '#f472b6' : '#6c8cff';
+      ctx.fill();
+      ctx.strokeStyle = '#2a2a3a';
+      ctx.stroke();
+    });
+    ctx.strokeStyle = 'rgba(224,224,232,0.35)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    if (mode === 'and') {
+      ctx.moveTo(sx(0.15), sy(0.85));
+      ctx.lineTo(sx(0.85), sy(0.15));
+    } else {
+      ctx.moveTo(sx(0), sy(0.5));
+      ctx.lineTo(sx(1), sy(0.5));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '14px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText(mode === 'and' ? 'A line can separate 0/1 (AND).' : 'No single line separates XOR.', pad, 28);
+  }
+
+  document.getElementById('gateAnd').addEventListener('click', function () {
+    mode = 'and';
+    document.getElementById('gateAnd').classList.add('active');
+    document.getElementById('gateXor').classList.remove('active');
+    draw();
+  });
+  document.getElementById('gateXor').addEventListener('click', function () {
+    mode = 'xor';
+    document.getElementById('gateXor').classList.add('active');
+    document.getElementById('gateAnd').classList.remove('active');
+    draw();
+  });
+  draw();
+})();
+
+/* ---- Runge polynomial ---- */
+(function runge() {
+  const c = document.getElementById('rungeCanvas');
+  const ctx = c.getContext('2d');
+  const slider = document.getElementById('rungeN');
+
+  function rungeF(x) { return 1 / (1 + 25 * x * x); }
+
+  function vandermondeSolve(xs, ys) {
+    const n = xs.length;
+    const A = [];
+    for (let i = 0; i < n; i++) {
+      const row = [];
+      let p = 1;
+      for (let j = 0; j < n; j++) { row.push(p); p *= xs[i]; }
+      A.push(row);
+    }
+    return gaussianElim(A, ys.slice());
+  }
+
+  function gaussianElim(A, b) {
+    const n = b.length;
+    for (let i = 0; i < n; i++) {
+      let piv = i;
+      for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[piv][i])) piv = r;
+      if (Math.abs(A[piv][i]) < 1e-12) continue;
+      [A[i], A[piv]] = [A[piv], A[i]];
+      const tb = b[i]; b[i] = b[piv]; b[piv] = tb;
+      const div = A[i][i];
+      for (let j = i; j < n; j++) A[i][j] /= div;
+      b[i] /= div;
+      for (let r = 0; r < n; r++) {
+        if (r === i) continue;
+        const f = A[r][i];
+        if (f === 0) continue;
+        for (let j = i; j < n; j++) A[r][j] -= f * A[i][j];
+        b[r] -= f * b[i];
+      }
+    }
+    return b;
+  }
+
+  function evalPoly(coeff, x) {
+    let s = 0, p = 1;
+    for (let i = 0; i < coeff.length; i++) { s += coeff[i] * p; p *= x; }
+    return s;
+  }
+
+  function draw() {
+    const N = parseInt(slider.value, 10);
+    document.getElementById('rungeNVal').textContent = String(N);
+    const xs = [];
+    for (let i = 0; i < N; i++) xs.push(-1 + (2 * i) / (N - 1));
+    const ys = xs.map(rungeF);
+    let coeff;
+    try { coeff = vandermondeSolve(xs, ys); } catch (e) { coeff = [0]; }
+
+    const w = c.width, h = c.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, w, h);
+    const pad = 40;
+    const mapX = (x) => pad + (x + 1) * 0.5 * (w - 2 * pad);
+    const mapY = (y) => h - pad - (y + 0.2) / 1.4 * (h - 2 * pad);
+
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mapX(-1), mapY(0));
+    ctx.lineTo(mapX(1), mapY(0));
+    ctx.stroke();
+
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const x = -1 + (2 * i) / 400;
+      const y = rungeF(x);
+      const px = mapX(x), py = mapY(y);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = '#f472b6';
+    ctx.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const x = -1 + (2 * i) / 400;
+      const y = evalPoly(coeff, x);
+      const px = mapX(x), py = mapY(clamp(y, -2, 2));
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    xs.forEach(function (x, i) {
+      ctx.beginPath();
+      ctx.arc(mapX(x), mapY(ys[i]), 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fill();
+    });
+
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px monospace';
+    ctx.fillText('Green: true Runge  |  Pink: interpolating polynomial', pad, 20);
+  }
+
+  slider.addEventListener('input', draw);
+  draw();
+})();
+
+/* ---- B-spline basis (uniform, open clamped knot construction) ---- */
+function buildKnots(m, k) {
+  if (m < k + 1) m = k + 1;
+  const n = m - 1;
+  const knots = [];
+  let i;
+  for (i = 0; i <= k; i++) knots.push(0);
+  const internal = Math.max(0, n - k);
+  for (i = 1; i <= internal; i++) knots.push(i / (internal + 1));
+  for (i = 0; i <= k; i++) knots.push(1);
+  return knots;
+}
+
+function basisBSpline(i, k, t, knots) {
+  if (k === 0) {
+    return (t >= knots[i] && t < knots[i + 1]) || (t === 1 && knots[i + 1] === 1 && t >= knots[i]) ? 1 : 0;
+  }
+  const left = knots[i + k] - knots[i];
+  const right = knots[i + k + 1] - knots[i + 1];
+  let a = 0, b = 0;
+  if (left > 1e-12) a = ((t - knots[i]) / left) * basisBSpline(i, k - 1, t, knots);
+  if (right > 1e-12) b = ((knots[i + k + 1] - t) / right) * basisBSpline(i + 1, k - 1, t, knots);
+  return a + b;
+}
+
+(function bsDemo() {
+  const c = document.getElementById('bsBasisCanvas');
+  const ctx = c.getContext('2d');
+  const degEl = document.getElementById('bsDeg');
+  const mEl = document.getElementById('bsM');
+  const cols = ['#6c8cff', '#34d399', '#f472b6', '#fbbf24', '#a78bfa', '#f87171', '#e0e0e8', '#8888a0'];
+
+  function draw() {
+    const k = parseInt(degEl.value, 10);
+    let m = parseInt(mEl.value, 10);
+    if (m < k + 1) {
+      m = k + 1;
+      mEl.value = String(m);
+    }
+    document.getElementById('bsDegVal').textContent = String(k);
+    document.getElementById('bsMVal').textContent = String(m);
+    const knots = buildKnots(m, k);
+    const w = c.width, h = c.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, w, h);
+    const pad = 40;
+    const mapT = (t) => pad + t * (w - 2 * pad);
+
+    for (let j = 0; j < knots.length; j++) {
+      const x = mapT(knots[j]);
+      ctx.strokeStyle = 'rgba(136,136,160,0.25)';
+      ctx.beginPath();
+      ctx.moveTo(x, pad);
+      ctx.lineTo(x, h - pad);
+      ctx.stroke();
+    }
+
+    const weights = [];
+    for (let i = 0; i < m; i++) weights.push(0.5 + 0.5 * Math.sin(i * 1.7));
+
+    let maxv = 1e-6;
+    const samples = 500;
+    const curves = [];
+    for (let i = 0; i < m; i++) {
+      const arr = [];
+      for (let s = 0; s <= samples; s++) {
+        const t = s / samples;
+        const v = basisBSpline(i, k, t, knots);
+        arr.push(v);
+        maxv = Math.max(maxv, v);
+      }
+      curves.push(arr);
+    }
+
+    const sumArr = [];
+    for (let s = 0; s <= samples; s++) {
+      let ssum = 0;
+      for (let i = 0; i < m; i++) ssum += weights[i] * curves[i][s];
+      sumArr.push(ssum);
+    }
+
+    const mapY = (v) => h - pad - (v / maxv) * (h - 2 * pad) * 0.55;
+    const baseY = h - pad - (h - 2 * pad) * 0.65;
+
+    for (let i = 0; i < m; i++) {
+      ctx.strokeStyle = cols[i % cols.length];
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let s = 0; s <= samples; s++) {
+        const t = s / samples;
+        const px = mapT(t), py = mapY(curves[i][s]);
+        if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#e0e0e8';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    for (let s = 0; s <= samples; s++) {
+      const t = s / samples;
+      const px = mapT(t);
+      const py = baseY - (sumArr[s] / maxv) * (h - 2 * pad) * 0.25;
+      if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px monospace';
+    ctx.fillText('Solid: each N_{i,k}(t)   Dashed: weighted sum', pad, 22);
+  }
+
+  degEl.addEventListener('input', draw);
+  mEl.addEventListener('input', draw);
+  draw();
+})();
+
+/* ---- Local control demo ---- */
+(function localDemo() {
+  const c = document.getElementById('localCanvas');
+  const ctx = c.getContext('2d');
+  const m = 8, k = 3;
+  const knots = buildKnots(m, k);
+  let weights = [];
+  for (let i = 0; i < m; i++) weights.push(0.4 + 0.25 * Math.sin(i));
+
+  let dragIdx = 2;
+
+  function S(t) {
+    let s = 0, tot = 0;
+    for (let i = 0; i < m; i++) {
+      const b = basisBSpline(i, k, t, knots);
+      s += weights[i] * b; tot += b;
+    }
+    return tot > 1e-9 ? s / tot : 0;
+  }
+
+  function draw() {
+    const w = c.width, h = c.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, w, h);
+    const pad = 36;
+    const mapT = (t) => pad + t * (w - 2 * pad);
+    const mapY = (v) => h - pad - v * (h - 2 * pad);
+    ctx.strokeStyle = '#a78bfa';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let s = 0; s <= 500; s++) {
+      const t = s / 500;
+      const px = mapT(t), py = mapY(S(t));
+      if (s === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px monospace';
+    ctx.fillText('Active control index: ' + dragIdx + ' (click/drag to change weight)', pad, 18);
+  }
+
+  function hitTest(mx, my) {
+    const w = c.width, h = c.height, pad = 36;
+    const t = clamp((mx - pad) / (w - 2 * pad), 0, 1);
+    let best = 0, bd = 1e9;
+    for (let i = 0; i < m; i++) {
+      const ti = i / (m - 1);
+      const d = Math.abs(ti - t);
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+
+  c.addEventListener('mousedown', function (e) {
+    const r = c.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (c.width / r.width);
+    const my = (e.clientY - r.top) * (c.height / r.height);
+    dragIdx = hitTest(mx, my);
+    weights[dragIdx] = clamp(1 - (my - 36) / (c.height - 72), 0, 1);
+    draw();
+  });
+  c.addEventListener('mousemove', function (e) {
+    if (e.buttons !== 1) return;
+    const r = c.getBoundingClientRect();
+    const my = (e.clientY - r.top) * (c.height / r.height);
+    weights[dragIdx] = clamp(1 - (my - 36) / (c.height - 72), 0, 1);
+    draw();
+  });
+  draw();
+})();
+
+/* ---- UAT random ReLU features ---- */
+(function uat() {
+  const c = document.getElementById('uatCanvas');
+  const ctx = c.getContext('2d');
+  const hEl = document.getElementById('uatH');
+  const ridgeEl = document.getElementById('uatRidge');
+  let W = [], B = [];
+
+  function relu(z) { return z > 0 ? z : 0; }
+
+  function resampleHidden(H) {
+    W = []; B = [];
+    for (let j = 0; j < H; j++) {
+      W.push((Math.random() - 0.5) * 8);
+      B.push((Math.random() - 0.5) * 2);
+    }
+  }
+
+  function ridgeRegression(X, y, lam) {
+    const n = X.length, d = X[0].length;
+    const XtX = [];
+    for (let i = 0; i < d; i++) {
+      XtX[i] = new Array(d).fill(0);
+      for (let j = 0; j < d; j++)
+        for (let r = 0; r < n; r++) XtX[i][j] += X[r][i] * X[r][j];
+      XtX[i][i] += lam;
+    }
+    const Xty = new Array(d).fill(0);
+    for (let i = 0; i < d; i++) for (let r = 0; r < n; r++) Xty[i] += X[r][i] * y[r];
+    return gaussianElimMat(XtX, Xty);
+  }
+
+  function gaussianElimMat(A, b) {
+    const n = b.length;
+    for (let i = 0; i < n; i++) {
+      let piv = i;
+      for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[piv][i])) piv = r;
+      if (Math.abs(A[piv][i]) < 1e-14) continue;
+      [A[i], A[piv]] = [A[piv], A[i]];
+      const tb = b[i]; b[i] = b[piv]; b[piv] = tb;
+      const div = A[i][i];
+      for (let j = i; j < n; j++) A[i][j] /= div;
+      b[i] /= div;
+      for (let r = 0; r < n; r++) {
+        if (r === i) continue;
+        const f = A[r][i];
+        if (f === 0) continue;
+        for (let j = i; j < n; j++) A[r][j] -= f * A[i][j];
+        b[r] -= f * b[i];
+      }
+    }
+    return b;
+  }
+
+  function draw() {
+    const H = parseInt(hEl.value, 10);
+    const lam = Math.pow(10, parseFloat(ridgeEl.value));
+    document.getElementById('uatHVal').textContent = String(H);
+    document.getElementById('uatRidgeVal').textContent = lam.toExponential(1);
+
+    if (W.length !== H) resampleHidden(H);
+
+    const n = 120;
+    const xs = [];
+    for (let i = 0; i < n; i++) xs.push(i / (n - 1));
+    const X = [];
+    const y = [];
+    for (let r = 0; r < n; r++) {
+      const x = xs[r];
+      const row = [1];
+      for (let j = 0; j < H; j++) row.push(relu(W[j] * x + B[j]));
+      X.push(row);
+      y.push(Math.sin(2 * Math.PI * x));
+    }
+
+    const beta = ridgeRegression(X, y, lam);
+    function fhat(x) {
+      let s = beta[0];
+      for (let j = 0; j < H; j++) s += beta[j + 1] * relu(W[j] * x + B[j]);
+      return s;
+    }
+
+    let se = 0;
+    for (let r = 0; r < n; r++) {
+      const e = fhat(xs[r]) - y[r];
+      se += e * e;
+    }
+    document.getElementById('uatMse').textContent = (se / n).toExponential(3);
+
+    const w = c.width, h = c.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, w, h);
+    const pad = 36;
+    const mapX = (x) => pad + x * (w - 2 * pad);
+    const mapY = (v) => h - pad - (v * 0.45 + 0.55) * (h - 2 * pad);
+
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const x = i / 400;
+      const px = mapX(x), py = mapY(Math.sin(2 * Math.PI * x));
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = '#6c8cff';
+    ctx.beginPath();
+    for (let i = 0; i <= 400; i++) {
+      const x = i / 400;
+      const px = mapX(x), py = mapY(clamp(fhat(x), -1.5, 1.5));
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px monospace';
+    ctx.fillText('Green: sin(2πx)   Blue: one-hidden-layer ReLU fit', pad, 18);
+  }
+
+  hEl.addEventListener('input', function () {
+    const H = parseInt(hEl.value, 10);
+    resampleHidden(H);
+    draw();
+  });
+  ridgeEl.addEventListener('input', draw);
+  document.getElementById('uatCanvas').addEventListener('dblclick', function () {
+    resampleHidden(parseInt(hEl.value, 10));
+    draw();
+  });
+  draw();
+})();
+
+/* ---- Architecture canvas ---- */
+(function arch() {
+  const c = document.getElementById('archCanvas');
+  const ctx = c.getContext('2d');
+  let mode = 'mlp';
+
+  function draw() {
+    const w = c.width, h = c.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, w, h);
+    const layers = [2, 5, 1];
+    const xs = [100, 360, 620];
+    const ys = [];
+    for (let L = 0; L < 3; L++) {
+      const n = layers[L];
+      const arr = [];
+      const gap = Math.min(48, (h - 100) / Math.max(n - 1, 1));
+      const start = h / 2 - ((n - 1) * gap) / 2;
+      for (let i = 0; i < n; i++) arr.push(start + i * gap);
+      ys.push(arr);
+    }
+    ctx.strokeStyle = 'rgba(136,136,160,0.25)';
+    ctx.lineWidth = mode === 'mlp' ? 2 : 1;
+    for (let L = 0; L < 2; L++) {
+      for (let i = 0; i < ys[L].length; i++) {
+        for (let j = 0; j < ys[L + 1].length; j++) {
+          ctx.beginPath();
+          ctx.moveTo(xs[L], ys[L][i]);
+          ctx.lineTo(xs[L + 1], ys[L + 1][j]);
+          ctx.stroke();
+        }
+      }
+    }
+    for (let L = 0; L < 3; L++) {
+      for (let i = 0; i < ys[L].length; i++) {
+        ctx.beginPath();
+        ctx.arc(xs[L], ys[L][i], 16, 0, Math.PI * 2);
+        ctx.fillStyle = L === 1 && mode === 'kan' ? 'rgba(167,139,250,0.2)' : 'rgba(108,140,255,0.15)';
+        ctx.fill();
+        ctx.strokeStyle = mode === 'mlp' ? '#6c8cff' : '#a78bfa';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = '#e0e0e8';
+    ctx.font = '12px monospace';
+    ctx.fillText(mode === 'mlp' ? 'MLP: learnable affine weights on every edge; σ at nodes.' : 'KAN: learnable φ on edges; Σ at nodes; outer ψ.', 40, 36);
+  }
+
+  document.getElementById('viewMlp').addEventListener('click', function () {
+    mode = 'mlp';
+    document.getElementById('viewMlp').classList.add('active');
+    document.getElementById('viewKan').classList.remove('active');
+    draw();
+  });
+  document.getElementById('viewKan').addEventListener('click', function () {
+    mode = 'kan';
+    document.getElementById('viewKan').classList.add('active');
+    document.getElementById('viewMlp').classList.remove('active');
+    draw();
+  });
+  draw();
+})();
+
+/* ---- Playground: cubic Catmull-Rom style edge maps ---- */
+(function play() {
+  const c = document.getElementById('playCanvas');
+  const ctx = c.getContext('2d');
+  const x1s = document.getElementById('playX1');
+  const x2s = document.getElementById('playX2');
+
+  const pts1 = [{ x: 0, y: 0 }, { x: 0.33, y: 0.4 }, { x: 0.66, y: -0.2 }, { x: 1, y: 0.1 }];
+  const pts2 = [{ x: 0, y: 0.1 }, { x: 0.33, y: -0.3 }, { x: 0.66, y: 0.35 }, { x: 1, y: -0.05 }];
+  let drag = null;
+
+  function interp1(pts, x) {
+    const n = pts.length;
+    if (x <= pts[0].x) return pts[0].y;
+    if (x >= pts[n - 1].x) return pts[n - 1].y;
+    let i = 0;
+    while (i < n - 1 && pts[i + 1].x < x) i++;
+    const a = pts[i], b = pts[i + 1];
+    const t = (x - a.x) / (b.x - a.x);
+    return a.y + t * (b.y - a.y);
+  }
+
+  function draw() {
+    const w = c.width, h = c.height;
+    ctx.fillStyle = '#12121a';
+    ctx.fillRect(0, 0, w, h);
+    const w1 = w / 2;
+    drawPanel(0, 0, w1, h / 2, 'φ₁(x₁)', pts1, '#6c8cff');
+    drawPanel(w1, 0, w1, h / 2, 'φ₂(x₂)', pts2, '#a78bfa');
+    drawSlice(w1 / 2, h / 2, w, h / 2);
+  }
+
+  function drawPanel(x0, y0, ww, hh, title, pts, col) {
+    ctx.save();
+    ctx.translate(x0, y0);
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(8, 8, ww - 16, hh - 24);
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.strokeRect(8, 8, ww - 16, hh - 24);
+    const pad = 28;
+    const mx = (x) => 8 + pad + x * (ww - 16 - 2 * pad);
+    const my = (y) => 8 + (hh - 24) / 2 - y * (hh - 24 - 2 * pad) * 0.4;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const t = i / 100;
+      const px = mx(t), py = my(interp1(pts, t));
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    pts.forEach(function (p, idx) {
+      ctx.beginPath();
+      ctx.arc(mx(p.x), my(p.y), 7, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+      ctx.strokeStyle = '#0a0a0f';
+      ctx.stroke();
+    });
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px monospace';
+    ctx.fillText(title, 16, 22);
+    ctx.restore();
+  }
+
+  function drawSlice(x0, y0, ww, hh) {
+    const pad = 36;
+    ctx.save();
+    ctx.translate(x0, y0);
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(8, 8, ww - 16, hh - 16);
+    const mx = (x) => 8 + pad + x * (ww - 16 - 2 * pad);
+    const my = (y) => 8 + (hh - 16) / 2 - y * (hh - 16 - 2 * pad) * 0.35;
+    const fix1 = parseFloat(x1s.value);
+    const fix2 = parseFloat(x2s.value);
+    document.getElementById('sliceX1').textContent = fix1.toFixed(2);
+    document.getElementById('sliceX2').textContent = fix2.toFixed(2);
+
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200;
+      const s = interp1(pts1, fix1) + interp1(pts2, t);
+      const y = Math.tanh(s);
+      const px = mx(t), py = my(y);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = '#f472b6';
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const t = i / 200;
+      const s = interp1(pts1, t) + interp1(pts2, fix2);
+      const y = Math.tanh(s);
+      const px = mx(t), py = my(y);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px monospace';
+    ctx.fillText('tanh(φ₁(x₁*)+φ₂(x)) green  |  tanh(φ₁(x)+φ₂(x₂*)) pink', 16, 22);
+    ctx.restore();
+  }
+
+  function panelHit(mx, my) {
+    const w = c.width, h = c.height;
+    const w1 = w / 2;
+    if (my < h / 2) {
+      if (mx < w1) return { which: 1, pts: pts1, x0: 0, y0: 0, ww: w1, hh: h / 2 };
+      return { which: 2, pts: pts2, x0: w1, y0: 0, ww: w1, hh: h / 2 };
+    }
+    return null;
+  }
+
+  function toLocal(mx, my, panel) {
+    const x = mx - panel.x0;
+    const y = my - panel.y0;
+    const ww = panel.ww, hh = panel.hh;
+    const pad = 28;
+    const tx = clamp((x - 8 - pad) / (ww - 16 - 2 * pad), 0, 1);
+    const mid = 8 + (hh - 24) / 2;
+    const ty = clamp((mid - y) / ((hh - 24 - 2 * pad) * 0.4), -1.2, 1.2);
+    return { tx, ty };
+  }
+
+  c.addEventListener('mousedown', function (e) {
+    const r = c.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (c.width / r.width);
+    const my = (e.clientY - r.top) * (c.height / r.height);
+    const p = panelHit(mx, my);
+    if (!p) return;
+    const loc = toLocal(mx, my, p);
+    let best = 0, bd = 1e9;
+    for (let i = 0; i < p.pts.length; i++) {
+      const d = Math.abs(p.pts[i].x - loc.tx) + Math.abs(p.pts[i].y - loc.ty) * 0.5;
+      if (d < bd) { bd = d; best = i; }
+    }
+    drag = { panel: p, idx: best };
+    p.pts[best].y = loc.ty;
+    draw();
+  });
+  c.addEventListener('mousemove', function (e) {
+    if (!drag) return;
+    const r = c.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (c.width / r.width);
+    const my = (e.clientY - r.top) * (c.height / r.height);
+    const loc = toLocal(mx, my, drag.panel);
+    drag.panel.pts[drag.idx].y = loc.ty;
+    draw();
+  });
+  c.addEventListener('mouseup', function () { drag = null; });
+  c.addEventListener('mouseleave', function () { drag = null; });
+
+  x1s.addEventListener('input', draw);
+  x2s.addEventListener('input', draw);
+  draw();
+})();
+
+})();
+</script>
+</body>
+</html>

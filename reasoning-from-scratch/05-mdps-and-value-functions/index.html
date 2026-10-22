@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<!-- ================================================================
+     Reasoning from Scratch — Chapter 05
+     MDPs, Returns & Value Functions
+     Merges lecture content on sequential RL formalism + Bellman equations
+     Interactive: 4×4 grid-world value iteration + Bellman backup diagram
+     ================================================================ -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDPs, Returns & Value Functions — Reasoning from Scratch</title>
+<style>
+/* ============================================================
+   Chapter 05 — shared series tokens (match Ch.01–04)
+   Dark theme, Inter + monospace, card-based layout
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 60vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(52,211,153,0.1) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent3), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; line-height: 1.8; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent3); background: rgba(52,211,153,0.15); color: var(--accent3); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+.footer a { margin: 0 12px; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+td { color: var(--text-dim); }
+.flow-diagram { font-family: var(--mono); font-size: 0.82rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 20px; line-height: 1.9; color: var(--text-dim); overflow-x: auto; }
+.flow-diagram .highlight { color: var(--accent3); }
+
+/* ============================================================
+   Ch.05-specific: grid-world + Bellman backup diagram
+   .grid-board — CSS grid of .grid-cell elements colored by V(s)
+   .backup-diagram — radial neighbor layout for Bellman backup viz
+   ============================================================ */
+.grid-controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 20px; font-size: 0.85rem; color: var(--text-dim); }
+.grid-controls label { display: flex; align-items: center; gap: 8px; }
+.grid-controls input[type=range] { width: 120px; accent-color: var(--accent3); }
+.grid-wrap { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; justify-content: center; }
+.grid-board { display: grid; gap: 4px; background: var(--border); padding: 4px; border-radius: 10px; }
+.grid-cell {
+  width: 72px; height: 72px; background: var(--bg-card-alt); border-radius: 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 0.72rem; position: relative; transition: background 0.3s;
+}
+@media (max-width: 500px) { .grid-cell { width: 58px; height: 58px; font-size: 0.65rem; } }
+.grid-cell.wall { background: #1a1a28; color: var(--text-dim); }
+.grid-cell.goal { background: rgba(52,211,153,0.15); border: 1px solid var(--accent3); }
+.grid-cell.trap { background: rgba(248,113,113,0.12); border: 1px solid var(--danger); }
+.grid-cell.start { background: rgba(108,140,255,0.12); border: 1px solid var(--accent); }
+.grid-cell .cell-label { font-size: 0.65rem; color: var(--text-dim); margin-bottom: 2px; }
+.grid-cell .v-val { font-size: 1rem; font-weight: 700; color: var(--accent2); }
+.grid-legend { font-size: 0.8rem; color: var(--text-dim); margin-top: 12px; }
+.grid-legend span { margin-right: 14px; }
+.bellman-viz { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 700px) { .bellman-viz { grid-template-columns: 1fr; } }
+.backup-diagram {
+  position: relative; min-height: 280px; background: var(--bg-card-alt);
+  border: 1px solid var(--border); border-radius: 10px; padding: 20px;
+}
+.backup-center {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--accent2);
+  background: rgba(167,139,250,0.12); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-family: var(--mono); z-index: 2;
+}
+.backup-neighbor {
+  position: absolute; width: 64px; height: 64px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 0.75rem; cursor: pointer; transition: all 0.2s;
+}
+.backup-neighbor:hover, .backup-neighbor.active { border-color: var(--accent3); box-shadow: 0 0 16px rgba(52,211,153,0.2); }
+.backup-neighbor.n-up { top: 12px; left: 50%; transform: translateX(-50%); }
+.backup-neighbor.n-down { bottom: 12px; left: 50%; transform: translateX(-50%); }
+.backup-neighbor.n-left { left: 12px; top: 50%; transform: translateY(-50%); }
+.backup-neighbor.n-right { right: 12px; top: 50%; transform: translateY(-50%); }
+.backup-arrow { position: absolute; font-size: 1.2rem; color: var(--accent3); opacity: 0.6; }
+.backup-arrow.a-up { top: 78px; left: 50%; transform: translateX(-50%); }
+.backup-arrow.a-down { bottom: 78px; left: 50%; transform: translateX(-50%); }
+.backup-arrow.a-left { left: 78px; top: 50%; transform: translateY(-50%); }
+.backup-arrow.a-right { right: 78px; top: 50%; transform: translateY(-50%); }
+.bellman-breakdown { font-family: var(--mono); font-size: 0.82rem; line-height: 1.9; color: var(--text-dim); }
+.bellman-breakdown .term { color: var(--accent5); }
+.bellman-breakdown .result { color: var(--accent3); font-weight: 700; }
+.component-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin: 20px 0; }
+.component-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; background: var(--bg-card-alt); }
+.component-card h4 { font-size: 0.95rem; color: var(--text); margin-bottom: 6px; }
+.component-card p { font-size: 0.82rem; margin: 0; }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<!-- Breadcrumb (series standard — fixed top nav linking back to AskNex & series index) -->
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; background: #111118; border-bottom: 1px solid #23232f; padding: 10px 24px; font-size: 0.82rem; color: #8888a0; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Reasoning from Scratch</a><span class="bc-sep">›</span><span class="bc-current">Ch.05 — MDPs &amp; Value Functions</span></nav>
+
+<!-- Floating in-chapter nav — appears after scroll, anchors to each section id -->
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Reasoning from Scratch</a>
+  <div class="nav-links">
+    <a href="#bridge">Bridge</a>
+    <a href="#mdp">MDP</a>
+    <a href="#markov">Markov</a>
+    <a href="#returns">Returns</a>
+    <a href="#value-fns">Values</a>
+    <a href="#bellman">Bellman</a>
+    <a href="#grid-demo">Grid</a>
+    <a href="#optimal">Optimal</a>
+    <a href="#llms">LLMs</a>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO — chapter thesis + headline stats
+     Stats: 5-tuple (S,A,P,R,γ), V and Q, Bellman as the key equation
+     ============================================================ -->
+<div class="hero">
+  <div class="container">
+    <span class="section-num">CHAPTER 05</span>
+    <h1>MDPs, Returns &amp; Value Functions</h1>
+    <p class="subtitle">Multi-armed bandits have no memory — pull an arm, get a reward, repeat. Real reasoning and control require <em>state</em>: where you are shapes what you should do next. This chapter formalizes sequential decision-making as Markov Decision Processes and introduces the value functions that every RL algorithm ultimately estimates.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">5</span><span class="stat-label">MDP Components</span></div>
+      <div class="stat"><span class="stat-val">2</span><span class="stat-label">Value Functions</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Key Equation</span></div>
+    </div>
+    <p style="font-size:0.85rem;color:var(--text-dim);max-width:560px;margin:0 auto;">Reading path: bandit → MDP → returns → V &amp; Q → Bellman → grid demo → optimality → LLM connection</p>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 1 — Bridge from bandits to sequential RL
+     ============================================================ -->
+<section class="section fade-in" id="bridge">
+  <div class="container">
+    <span class="section-num">01 — FROM BANDITS TO SEQUENTIAL RL</span>
+    <h2>Why Bandits Are Not Enough</h2>
+    <p>Chapter 04 treated the environment as a single static state. The agent chose among arms, received a scalar reward, and never moved. That model captures explore–exploit but misses the core difficulty of reasoning: <strong>actions change what happens next</strong>.</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3 style="color:var(--accent5);font-size:1rem;">Multi-armed bandit</h3>
+        <p style="margin:0;font-size:0.9rem;">One state · many actions · i.i.d. rewards · no transitions</p>
+      </div>
+      <div class="card card-alt">
+        <h3 style="color:var(--accent3);font-size:1rem;">Markov Decision Process</h3>
+        <p style="margin:0;font-size:0.9rem;">Many states · many actions · state transitions · delayed rewards</p>
+      </div>
+    </div>
+
+    <p>Chess, maze escape, bioreactor control, and LLM token generation all share the same structure: observe a state, take an action, receive a reward, land in a new state. Reinforcement learning problems with this structure — where the state signal has the <strong>Markov property</strong> — are called <strong>Markov Decision Processes (MDPs)</strong>.</p>
+
+    <!-- Concrete upgrade from Ch.04 bandit: same agent, richer world -->
+    <h3 style="margin-top:28px;">What changes when we add states?</h3>
+    <p>In a bandit, the agent always sits in the same implicit state — only the action distribution matters. In an MDP, the <em>same</em> action can be good or bad depending on where you are. Moving "forward" in a maze is excellent near the exit and disastrous near a cliff. The policy must become a function of state: π(a|s), not a single fixed distribution over arms.</p>
+
+    <table>
+      <thead><tr><th>Feature</th><th>Multi-armed bandit</th><th>MDP</th></tr></thead>
+      <tbody>
+        <tr><td>States</td><td>1 (implicit)</td><td>Many — possibly infinite</td></tr>
+        <tr><td>Transitions</td><td>None — always same state</td><td>P(s′|s,a) moves the agent</td></tr>
+        <tr><td>Policy</td><td>π(a) — same every step</td><td>π(a|s) — depends on location</td></tr>
+        <tr><td>Reward timing</td><td>Immediate per pull</td><td>Immediate + delayed (path-dependent)</td></tr>
+        <tr><td>Planning</td><td>Not needed</td><td>Essential — consider future consequences</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout ok">
+      <p><strong>Agent–environment interface:</strong> At each timestep <em>t</em>, the agent observes state <code>S<sub>t</sub></code>, selects action <code>A<sub>t</sub></code>, receives reward <code>R<sub>t+1</sub></code>, and transitions to <code>S<sub>t+1</sub></code>. The policy <code>π(a|s)</code> maps each state to action probabilities. The agent's goal is to maximize cumulative reward over time — not just the next immediate reward.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2 — MDP formal definition
+     ============================================================ -->
+<!-- ============================================================
+     SECTION 2 — MDP formal definition (S, A, P, R, γ)
+     Recycling robot example, agent-environment diagram
+     ============================================================ -->
+<section class="section fade-in" id="mdp">
+  <div class="container">
+    <span class="section-num">02 — THE MDP FORMAL DEFINITION</span>
+    <h2>Five Components: (S, A, P, R, γ)</h2>
+    <p>An MDP is a mathematical model of an agent interacting with an environment. When state signals satisfy the Markov property, the entire RL problem reduces to five symbols:</p>
+
+    <div class="component-grid">
+      <div class="component-card"><h4>S — States</h4><p>All configurations the agent can observe: chess board, sensor readings, grid position, prompt + tokens so far.</p></div>
+      <div class="component-card"><h4>A — Actions</h4><p>Decisions available in each state: move direction, target temperature, next token.</p></div>
+      <div class="component-card"><h4>P — Dynamics</h4><p><code>P(s′|s,a)</code> = probability of reaching s′ after taking action a in state s.</p></div>
+      <div class="component-card"><h4>R — Rewards</h4><p>Scalar feedback. Can depend on (s, a, s′). Defines what "good" means.</p></div>
+      <div class="component-card"><h4>γ — Discount</h4><p><code>γ ∈ [0,1)</code>. Weights immediate rewards over distant ones. Essential for continuing tasks.</p></div>
+    </div>
+
+    <p>Reward design matters. In chess, +1 for winning and −1 for losing is clean. Rewarding "capture the queen" as a sub-goal confuses the agent about the true objective. In a maze, −1 per timestep before escape incentivizes speed: escaping in 2 steps yields total reward −2; escaping in 10 steps yields −10.</p>
+
+    <!-- Episodic structure: terminal / absorbing states -->
+    <h3 style="margin-top:28px;">Episodic tasks and terminal states</h3>
+    <p>Many MDPs include <strong>terminal states</strong> where the episode ends. Once entered, no further actions or rewards occur — V<sup>π</sup>(terminal) = 0 by convention (no future return). Chess checkmate, maze exit, and correct LLM answer with EOS token are all terminal. The set of non-terminal states is S<sup>+</sup>; terminal states form S<sup>T</sup>. Episodes are sequences S<sub>0</sub>, A<sub>0</sub>, R<sub>1</sub>, … ending in S<sup>T</sup>.</p>
+
+    <div class="flow-diagram">
+<span class="highlight">S<sub>t</sub></span> ──agent selects──► <span class="highlight">A<sub>t</sub></span> ~ π(·|S<sub>t</sub>)
+&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼
+&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Environment: P(S<sub>t+1</sub>|S<sub>t</sub>,A<sub>t</sub>)
+&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼
+&nbsp;&nbsp;&nbsp;&nbsp;└────────────── receives ──────────► <span class="highlight">R<sub>t+1</sub></span>, <span class="highlight">S<sub>t+1</sub></span>
+    </div>
+
+    <p>Expected immediate reward for a state–action pair is written <code>r(s,a) = E[R | S<sub>t</sub>=s, A<sub>t</sub>=a]</code>. When reward also depends on the landing state, use <code>r(s,a,s′)</code>. Transition dynamics and rewards fully specify the environment; the policy specifies the agent.</p>
+
+    <!-- Recycling robot example from Sutton & Barto — illustrates stochastic P -->
+    <h3 style="margin-top:28px;">Example: the recycling robot</h3>
+    <p>A mobile robot collects empty cans. It can <strong>search</strong> (find cans, drain battery) or <strong>wait</strong> (fewer cans, recharge). State is battery level: high or low. Actions have stochastic outcomes — searching from low battery might fail and leave the robot stuck. This is a continuing MDP: no terminal state, so γ &lt; 1 is required to keep returns finite.</p>
+
+    <table>
+      <thead><tr><th>State</th><th>Action</th><th>Next state (prob)</th><th>Typical reward</th></tr></thead>
+      <tbody>
+        <tr><td>High battery</td><td>Search</td><td>High (0.8), Low (0.2)</td><td>+2 (cans found)</td></tr>
+        <tr><td>High battery</td><td>Wait</td><td>High (1.0)</td><td>+0 (recharge slowly)</td></tr>
+        <tr><td>Low battery</td><td>Search</td><td>High (0.3), Low (0.5), Stuck (0.2)</td><td>+2 or penalty</td></tr>
+        <tr><td>Low battery</td><td>Wait</td><td>High (0.9), Low (0.1)</td><td>+0</td></tr>
+      </tbody>
+    </table>
+    <p>The optimal policy is not "always search" — context matters. From low battery, waiting to recharge may maximize long-run return even though searching yields higher immediate reward. Value functions encode exactly this tradeoff.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3 — Markov property
+     ============================================================ -->
+<!-- ============================================================
+     SECTION 3 — Markov property + grid-world introduction
+     ============================================================ -->
+<section class="section fade-in" id="markov">
+  <div class="container">
+    <span class="section-num">03 — THE MARKOV PROPERTY</span>
+    <h2>Future Depends Only on the Present</h2>
+    <p>A state signal has the <strong>Markov property</strong> if it retains all information from the past that is relevant for choosing future actions. Formally, the probability of the next state depends only on the current state and action — not on the full history:</p>
+
+    <div class="formula">P(S<sub>t+1</sub> = s′ | S<sub>t</sub>, A<sub>t</sub>, S<sub>t−1</sub>, …, S<sub>0</sub>) = P(S<sub>t+1</sub> = s′ | S<sub>t</sub>, A<sub>t</sub>)</div>
+
+    <p>Chess illustrates this cleanly: the current board configuration encodes the entire game history. A cannonball's position and velocity suffice to predict its next position — you do not need the trajectory of every prior timestep. Poker is a counterexample: if your state is only the visible cards and not the betting history, the Markov property fails because past actions inform optimal play.</p>
+
+    <div class="callout warn">
+      <p><strong>State design is critical.</strong> A state must be whatever information enables the agent to act optimally. Too little information breaks Markov; too much makes learning harder. For LLMs, the state is typically the full generated prefix — sufficient for the Markov assumption at the token level.</p>
+    </div>
+
+    <!-- Grid-world as canonical tabular MDP -->
+    <h3 style="margin-top:28px;">Grid worlds: the canonical teaching MDP</h3>
+    <p>Grid worlds place an agent on a 2D lattice. States are cell coordinates. Actions move up/down/left/right (or stay). Walls block movement; terminal cells absorb the agent with a fixed reward. Dynamics may be deterministic (move exactly as commanded) or stochastic (slip to a perpendicular cell with probability ε).</p>
+
+    <div class="flow-diagram">
+4×4 Grid (Section 07 demo):
+
+&nbsp;&nbsp;S&nbsp;&nbsp;·&nbsp;&nbsp;·&nbsp;&nbsp;G(+1)
+&nbsp;&nbsp;·&nbsp;&nbsp;#&nbsp;&nbsp;·&nbsp;&nbsp;·
+&nbsp;&nbsp;·&nbsp;&nbsp;·&nbsp;&nbsp;·&nbsp;&nbsp;·
+&nbsp;&nbsp;·&nbsp;&nbsp;·&nbsp;&nbsp;T(−1)&nbsp;&nbsp;·
+
+S = start (0,0) · G = goal (+1) · T = trap (−1) · # = wall · step cost = −0.04
+    </div>
+    <p>From start, a greedy policy toward G avoids the trap. A random policy diffuses probability mass everywhere, lowering V(s) in most cells. The grid makes Bellman backups visual: each cell's value is a weighted average of neighbor values plus step rewards.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4 — Returns and discounting
+     Covers G_t definition, episodic vs continuing, numeric examples
+     ============================================================ -->
+<section class="section fade-in" id="returns">
+  <div class="container">
+    <span class="section-num">04 — RETURNS &amp; DISCOUNTING</span>
+    <h2>Optimizing for the Long Run</h2>
+    <p>The agent does not maximize the next reward alone. It maximizes the <strong>return</strong> — the cumulative discounted reward from the current timestep onward:</p>
+
+    <div class="formula">G<sub>t</sub> = R<sub>t+1</sub> + γ R<sub>t+2</sub> + γ² R<sub>t+3</sub> + … = Σ<sub>k=0</sub><sup>∞</sup> γ<sup>k</sup> R<sub>t+k+1</sub></div>
+
+    <p>Without discounting, returns in <strong>continuing tasks</strong> (a rover exploring indefinitely, a bioreactor running forever) can diverge to infinity. Discounting assigns higher value to immediate rewards — analogous to inflation making ₹100 today worth more than ₹100 in five years.</p>
+
+    <h3>Episodic vs continuing tasks</h3>
+    <p><strong>Episodic</strong> tasks have a natural terminal state: chess ends at checkmate, a maze ends at the exit. Summing undiscounted rewards is fine when episodes are bounded. <strong>Continuing</strong> tasks have no fixed horizon; γ &lt; 1 keeps returns finite and makes "sooner is better" explicit.</p>
+
+    <h3>Worked example: computing G<sub>t</sub> with γ = 0.9</h3>
+    <p>Suppose an agent is in state <em>s</em> at time <em>t</em> and, following its policy, receives rewards +0, +0, +10 over the next three steps (then the episode ends with zero thereafter):</p>
+
+    <table>
+      <thead><tr><th>Step k</th><th>Reward R<sub>t+k+1</sub></th><th>Discount γ<sup>k</sup></th><th>Contribution γ<sup>k</sup> R<sub>t+k+1</sub></th></tr></thead>
+      <tbody>
+        <tr><td>k = 0</td><td>0</td><td>1.000</td><td>0.000</td></tr>
+        <tr><td>k = 1</td><td>0</td><td>0.900</td><td>0.000</td></tr>
+        <tr><td>k = 2</td><td>+10</td><td>0.810</td><td><strong>8.100</strong></td></tr>
+        <tr><td colspan="3" style="text-align:right;color:var(--text);"><strong>G<sub>t</sub> =</strong></td><td><strong>8.10</strong></td></tr>
+      </tbody>
+    </table>
+
+    <p>For a maze with −1 per step: escaping in 2 steps gives G = −1 + 0.9×(−1) = −1.9. Escaping in 10 steps gives G = −1 − 0.9 − 0.81 − … ≈ −6.51. The agent learns to minimize steps, not just to wander.</p>
+
+    <!-- Second worked example: step-by-step maze escape -->
+    <h3 style="margin-top:28px;">Worked example: maze escape with γ = 0.9</h3>
+    <p>An agent receives −1 at every non-terminal step. It takes 3 steps to reach the exit, where the episode ends (no further reward):</p>
+    <table>
+      <thead><tr><th>Timestep</th><th>Event</th><th>R<sub>t+1</sub></th><th>γ<sup>k</sup> at k = t−t</th><th>Discounted term</th></tr></thead>
+      <tbody>
+        <tr><td>t</td><td>Step 1 in maze</td><td>−1</td><td>γ⁰ = 1.000</td><td>−1.000</td></tr>
+        <tr><td>t+1</td><td>Step 2 in maze</td><td>−1</td><td>γ¹ = 0.900</td><td>−0.900</td></tr>
+        <tr><td>t+2</td><td>Step 3 — reach exit</td><td>−1</td><td>γ² = 0.810</td><td>−0.810</td></tr>
+        <tr><td colspan="4" style="text-align:right;color:var(--text);"><strong>G<sub>t</sub> =</strong></td><td><strong>−2.71</strong></td></tr>
+      </tbody>
+    </table>
+    <p>Compare a 2-step escape: G = −1 + 0.9×(−1) = −1.9. Shorter paths dominate under negative per-step rewards — the return objective naturally encodes "get out fast."</p>
+
+    <h3>Why γ matters numerically</h3>
+    <p>With γ = 0, the agent is purely myopic: G<sub>t</sub> = R<sub>t+1</sub>. With γ → 1, distant rewards weigh almost equally — fine for short episodic tasks, problematic for infinite horizons. Typical choices: γ = 0.9 or 0.99 for continuing control; γ = 1.0 for episodic tasks with guaranteed termination.</p>
+
+    <p><strong>Finite-horizon</strong> tasks fix a maximum episode length T; returns sum only to T and discounting is optional. <strong>Infinite-horizon</strong> continuing tasks require γ &lt; 1 so that Σ γ<sup>k</sup> converges geometrically. The recycling robot and bioreactor examples are infinite-horizon — without γ, even a +1 per-step reward would yield infinite total return.</p>
+
+    <div class="callout">
+      <p><strong>Cricket analogy:</strong> A player's value is not their score in the last two matches but their expected cumulative contribution over the entire tournament. Value functions formalize this long-run perspective.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5 — State and action value functions
+     ============================================================ -->
+<!-- ============================================================
+     SECTION 5 — State and action value functions
+     V^π, Q^π, relationship, worked averaging example
+     ============================================================ -->
+<section class="section fade-in" id="value-fns">
+  <div class="container">
+    <span class="section-num">05 — STATE &amp; ACTION VALUE FUNCTIONS</span>
+    <h2>How Good Is a State (or Action)?</h2>
+    <p>Value functions answer the central question of RL: starting from here, how much total reward can I expect if I follow policy π?</p>
+
+    <h3>State-value function V<sup>π</sup>(s)</h3>
+    <p>The expected return when starting in state <em>s</em> and thereafter following π:</p>
+    <div class="formula">V<sup>π</sup>(s) = E<sub>π</sub>[ G<sub>t</sub> | S<sub>t</sub> = s ] = E<sub>π</sub>[ Σ<sub>k=0</sub><sup>∞</sup> γ<sup>k</sup> R<sub>t+k+1</sub> | S<sub>t</sub> = s ]</div>
+    <p>V<sup>π</sup>(s) is <em>not</em> the immediate reward. It aggregates all future rewards the agent can reach from <em>s</em>, weighted by γ.</p>
+
+    <h3>Action-value function Q<sup>π</sup>(s, a)</h3>
+    <p>The expected return when starting in state <em>s</em>, taking action <em>a</em> first, then following π:</p>
+    <div class="formula">Q<sup>π</sup>(s, a) = E<sub>π</sub>[ G<sub>t</sub> | S<sub>t</sub> = s, A<sub>t</sub> = a ]</div>
+    <p>From the same state, different actions lead to different futures. Q<sup>π</sup> captures the value of each (state, action) pair — essential for deciding which move to make.</p>
+
+    <h3>Relationship between V and Q</h3>
+    <p>The state value is the policy-weighted average of action values:</p>
+    <div class="formula">V<sup>π</sup>(s) = Σ<sub>a∈A</sub> π(a|s) · Q<sup>π</sup>(s, a)</div>
+    <p>Under a deterministic policy that always picks action a* in state s, this collapses to V<sup>π</sup>(s) = Q<sup>π</sup>(s, a*). Q is strictly more informative: it tells you the value of each action, not just the average.</p>
+
+    <!-- Worked Q vs V example on a tiny 2-action state -->
+    <h3 style="margin-top:28px;">Worked example: V from Q at one state</h3>
+    <p>At state <em>s</em>, an agent has two actions. Under a stochastic policy π(right) = 0.6, π(left) = 0.4:</p>
+    <table>
+      <thead><tr><th>Action</th><th>Q<sup>π</sup>(s, a)</th><th>π(a|s)</th><th>Contribution</th></tr></thead>
+      <tbody>
+        <tr><td>Right → toward goal</td><td>8.5</td><td>0.6</td><td>5.10</td></tr>
+        <tr><td>Left → toward trap</td><td>−2.0</td><td>0.4</td><td>−0.80</td></tr>
+        <tr><td colspan="3" style="text-align:right;color:var(--text);"><strong>V<sup>π</sup>(s) =</strong></td><td><strong>4.30</strong></td></tr>
+      </tbody>
+    </table>
+    <p>V<sup>π</sup>(s) is the weighted average — neither 8.5 nor −2.0 alone. To choose the best action, compare Q values directly: argmax<sub>a</sub> Q<sup>π</sup>(s,a) = right.</p>
+
+    <div class="comparison">
+      <div class="card">
+        <span class="tag tag-blue">V<sup>π</sup>(s)</span>
+        <p style="margin-top:12px;font-size:0.9rem;">"How good is it to <em>be</em> here?" — one number per state.</p>
+      </div>
+      <div class="card">
+        <span class="tag tag-green">Q<sup>π</sup>(s,a)</span>
+        <p style="margin-top:12px;font-size:0.9rem;">"How good is it to <em>do this</em> from here?" — one number per (state, action).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6 — Bellman expectation equations
+     ============================================================ -->
+<!-- ============================================================
+     SECTION 6 — Bellman expectation equations
+     Recursive decomposition + interactive backup diagram
+     ============================================================ -->
+<section class="section fade-in" id="bellman">
+  <div class="container">
+    <span class="section-num">06 — BELLMAN EXPECTATION EQUATIONS</span>
+    <h2>Values Decompose into Immediate Reward + Future Value</h2>
+    <p>The Markov property yields a recursive structure: the value of a state equals the expected immediate reward plus the discounted value of wherever you land next. Richard Bellman captured this in the <strong>Bellman expectation equation</strong>.</p>
+
+    <h3>For V<sup>π</sup></h3>
+    <div class="formula">V<sup>π</sup>(s) = Σ<sub>a</sub> π(a|s) Σ<sub>s′</sub> P(s′|s,a) [ R(s,a,s′) + γ V<sup>π</sup>(s′) ]</div>
+
+    <h3>For Q<sup>π</sup></h3>
+    <div class="formula">Q<sup>π</sup>(s,a) = Σ<sub>s′</sub> P(s′|s,a) [ R(s,a,s′) + γ Σ<sub>a′</sub> π(a′|s′) Q<sup>π</sup>(s′,a′) ]</div>
+
+    <p>Read the V-equation as: "take action <em>a</em> with probability π(a|s); transition to s′ with probability P(s′|s,a); collect reward R and discounted future value γV<sup>π</sup>(s′); sum over all actions and next states."</p>
+
+    <p>This is a <strong>backup diagram</strong> idea: V(s) at the root splits into branches for each action, each branch splits into successor states, each leaf contributing R + γV(s′). The Bellman equation is the algebra of that tree.</p>
+
+    <!-- Derivation sketch: one-step lookahead + Markov property -->
+    <h3 style="margin-top:28px;">Where the recursion comes from</h3>
+    <p>Start from the definition and split off the first reward:</p>
+    <div class="formula">G<sub>t</sub> = R<sub>t+1</sub> + γ (R<sub>t+2</sub> + γ R<sub>t+3</sub> + …) = R<sub>t+1</sub> + γ G<sub>t+1</sub></div>
+    <p>Taking expectation under π and using the Markov property (future depends only on S<sub>t+1</sub>):</p>
+    <div class="formula">V<sup>π</sup>(s) = E<sub>π</sub>[R<sub>t+1</sub> + γ V<sup>π</sup>(S<sub>t+1</sub>) | S<sub>t</sub> = s]</div>
+    <p>Expanding the expectation over actions and next states yields the full Bellman expectation equation above. The same logic applied to Q<sup>π</sup>, conditioning on the first action being fixed at <em>a</em>, gives the Q-equation.</p>
+
+    <div class="card card-alt">
+      <h4 style="color:var(--text);font-size:0.95rem;margin-bottom:8px;">Numeric Bellman backup (single state)</h4>
+      <p style="font-size:0.88rem;margin:0;">State <em>s</em> has two actions under π: go right (π = 0.7) lands in s′ with R = 0, V<sup>π</sup>(s′) = 5; go down (π = 0.3) lands in s″ with R = −1, V<sup>π</sup>(s″) = 2. With γ = 0.9:</p>
+      <p style="font-family:var(--mono);font-size:0.85rem;margin:12px 0 0;color:var(--accent3);">V<sup>π</sup>(s) = 0.7×[0 + 0.9×5] + 0.3×[−1 + 0.9×2] = 0.7×4.5 + 0.3×0.8 = 3.15 + 0.24 = <strong>3.39</strong></p>
+    </div>
+
+    <!-- Interactive Bellman backup visualization -->
+    <div class="interactive-panel" id="bellman-panel">
+      <h3>Interactive: Bellman Backup at State S</h3>
+      <p style="font-size:0.9rem;margin-bottom:16px;">Click a neighbor to see how one transition contributes to V(S). The center value equals the weighted sum of all branches.</p>
+      <div class="bellman-viz">
+        <div class="backup-diagram" id="backup-diagram">
+          <div class="backup-center"><span style="font-size:0.7rem;color:var(--text-dim);">state</span><strong>S</strong><span id="center-v" style="color:var(--accent2);font-size:0.85rem;">V=4.0</span></div>
+          <div class="backup-neighbor n-up" data-dir="up" data-r="0" data-sp="0.8" data-v="3.2"><span>↑ s′</span><span class="nv">3.2</span></div>
+          <div class="backup-neighbor n-down" data-dir="down" data-r="-1" data-sp="0.8" data-v="2.5"><span>↓ s′</span><span class="nv">2.5</span></div>
+          <div class="backup-neighbor n-left" data-dir="left" data-r="0" data-sp="0.1" data-v="5.0"><span>← s′</span><span class="nv">5.0</span></div>
+          <div class="backup-neighbor n-right" data-dir="right" data-r="+2" data-sp="0.1" data-v="6.0"><span>→ s′</span><span class="nv">6.0</span></div>
+          <span class="backup-arrow a-up">↓</span><span class="backup-arrow a-down">↑</span>
+          <span class="backup-arrow a-left">→</span><span class="backup-arrow a-right">←</span>
+        </div>
+        <div class="bellman-breakdown" id="bellman-breakdown">
+          <p style="color:var(--text);margin-bottom:8px;">Bellman backup (γ = 0.9, policy π(right)=0.6, π(down)=0.4):</p>
+          <p>V(S) = Σ<sub>a</sub> π(a|S) Σ<sub>s′</sub> P(s′|S,a) [R + γ V(s′)]</p>
+          <p id="bellman-terms">Select a neighbor to inspect one branch…</p>
+          <p class="result" id="bellman-result">V<sup>π</sup>(S) ≈ 4.00</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7 — Grid-world value iteration demo
+     ============================================================ -->
+<!-- ============================================================
+     SECTION 7 — Grid-world value iteration demo
+     4x4 maze, random vs greedy policy, adjustable γ
+     ============================================================ -->
+<section class="section fade-in" id="grid-demo">
+  <div class="container">
+    <span class="section-num">07 — GRID-WORLD VALUE DEMO</span>
+    <h2>Watch V<sup>π</sup>(s) Converge on a Maze</h2>
+    <p>A 4×4 grid with walls, a goal (+1), and a trap (−1). Each non-terminal step costs −0.04. Value iteration computes V<sup>π</sup> for your chosen policy — random (uniform over valid moves) or greedy (always move toward highest Q).</p>
+
+    <!-- Grid demo encodes Bellman expectation with selectable π and γ -->
+    <div class="callout" style="margin-bottom:0;">
+      <p><strong>What the demo computes:</strong> Each click of "Run 1 iteration" applies one sweep of policy evaluation — updating every non-terminal V(s) via the Bellman expectation equation. "Run to convergence" repeats until ΔV &lt; 10<sup>−4</sup>. Switch policies to see how the same environment yields different value landscapes under random vs goal-directed behavior.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <div class="grid-controls">
+        <div class="btn-group" id="policy-btns">
+          <button class="btn active" data-policy="random">Random π</button>
+          <button class="btn" data-policy="greedy">Greedy π</button>
+        </div>
+        <label>γ = <span id="gamma-val">0.9</span>
+          <input type="range" id="gamma-slider" min="0.5" max="0.99" step="0.01" value="0.9">
+        </label>
+        <button class="btn" id="grid-step">Run 1 iteration</button>
+        <button class="btn" id="grid-run">Run to convergence</button>
+        <button class="btn" id="grid-reset">Reset</button>
+      </div>
+      <div class="grid-wrap">
+        <div>
+          <div class="grid-board" id="grid-board" style="grid-template-columns:repeat(4,1fr);"></div>
+          <div class="grid-legend">
+            <span><span class="tag tag-blue">S</span> start</span>
+            <span><span class="tag tag-green">G</span> goal +1</span>
+            <span style="color:var(--danger);">T trap −1</span>
+            <span># wall</span>
+          </div>
+        </div>
+        <div style="max-width:280px;font-size:0.85rem;color:var(--text-dim);">
+          <p><strong id="iter-label">Iteration: 0</strong></p>
+          <p>Each cell shows V<sup>π</sup>(s). Colors intensify as values spread from the goal. Under greedy policy, high values form a gradient pointing toward G; the trap creates a low-value basin.</p>
+          <p style="margin-top:12px;font-family:var(--mono);font-size:0.78rem;background:var(--bg-card-alt);padding:12px;border-radius:8px;" id="grid-formula">
+            V(s) ← Σ<sub>a</sub> π(a|s) Σ<sub>s′</sub> P(s′|s,a)[R + γV(s′)]
+          </p>
+          <p style="margin-top:12px;font-size:0.82rem;">This demo uses deterministic P(s′|s,a) — each action moves exactly one cell. Real robots and slippery grid worlds add stochastic slippage: P might spread 0.8 to intended direction and 0.1 to each perpendicular direction. The Bellman equation handles both; only the inner sum over s′ changes.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8 — Optimal value functions & Bellman optimality
+     ============================================================ -->
+<!-- ============================================================
+     SECTION 8 — Optimal value functions & Bellman optimality
+     V*, Q*, max over actions replaces policy sum
+     ============================================================ -->
+<section class="section fade-in" id="optimal">
+  <div class="container">
+    <span class="section-num">08 — OPTIMAL VALUES &amp; BELLMAN OPTIMALITY</span>
+    <h2>The Best Possible Policy</h2>
+    <p>Policy π is better than π′ if V<sup>π</sup>(s) ≥ V<sup>π′</sup>(s) for <em>every</em> state s — not just some. An <strong>optimal policy</strong> π* achieves the maximum possible value everywhere. Multiple optimal policies may exist, but they share the same optimal value functions V* and Q*.</p>
+
+    <!-- Policy types: deterministic vs stochastic -->
+    <p>A <strong>deterministic policy</strong> maps each state to one action: π(s) = a. A <strong>stochastic policy</strong> outputs a distribution π(a|s) — necessary when multiple actions tie or when exploration is built in. Optimal policies for MDPs can always be chosen deterministic (pick any max-Q action), but learning algorithms often use stochastic policies during training.</p>
+
+    <div class="formula">V*(s) = max<sub>π</sub> V<sup>π</sup>(s) = max<sub>a</sub> Q*(s, a)</div>
+    <div class="formula">Q*(s, a) = max<sub>π</sub> Q<sup>π</sup>(s, a)</div>
+
+    <p>Optimal policies are greedy with respect to Q*: in every state, pick the action that maximizes expected return. The Bellman <em>optimality</em> equation replaces the policy-weighted sum with a max over actions:</p>
+
+    <div class="formula">V*(s) = max<sub>a</sub> Σ<sub>s′</sub> P(s′|s,a) [ R(s,a,s′) + γ V*(s′) ]</div>
+    <div class="formula">Q*(s, a) = Σ<sub>s′</sub> P(s′|s,a) [ R(s,a,s′) + γ max<sub>a′</sub> Q*(s′, a′) ]</div>
+
+    <p>Finding π* means solving these equations — exactly when the MDP is small (dynamic programming, next chapter), approximately when it is large (Monte Carlo, TD, policy gradients for LLMs).</p>
+
+    <!-- Grid-world optimal values intuition -->
+    <h3 style="margin-top:28px;">Optimal values on the demo grid</h3>
+    <p>Under the optimal policy for the Section 07 grid (γ = 0.9, step cost −0.04), V*(G) = 0 and V*(T) = 0 at terminals. Cells closer to G have higher V* — the value gradient points toward the goal. Cells near T have depressed values; the agent learns to route around the trap even though each step only costs −0.04. Greedy policy with respect to V* (move to neighbor with highest R + γV*) recovers the shortest safe path.</p>
+
+    <div class="comparison">
+      <div class="card">
+        <span class="tag tag-blue">Bellman expectation</span>
+        <p style="margin-top:10px;font-size:0.88rem;">Uses fixed π. Computes V<sup>π</sup>, Q<sup>π</sup>. Policy evaluation.</p>
+      </div>
+      <div class="card">
+        <span class="tag tag-green">Bellman optimality</span>
+        <p style="margin-top:10px;font-size:0.88rem;">Uses max<sub>a</sub> instead of π. Computes V*, Q*. Policy improvement.</p>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Summary of equations:</strong> Bellman expectation decomposes V<sup>π</sup> and Q<sup>π</sup> under a fixed policy. Bellman optimality replaces π with max<sub>a</sub> to characterize V* and Q*. Every RL algorithm — from tabular Q-learning to PPO on billion-parameter models — is ultimately trying to approximate these objects.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 9 — Connection to reasoning LLMs
+     ============================================================ -->
+<!-- ============================================================
+     SECTION 9 — MDPs mapped to reasoning LLM training
+     ORM/PRM as reward, tokens as actions, prefix as state
+     ============================================================ -->
+<section class="section fade-in" id="llms">
+  <div class="container">
+    <span class="section-num">09 — MDPs &amp; REASONING LLMs</span>
+    <h2>Why Value Functions Matter for Training Reasoners</h2>
+    <p>RLHF and GRPO frame LLM training as an MDP: state = prompt plus generated tokens, action = next token, reward = verifier score or human preference. DeepSeek-R1-style training estimates whether continuing a reasoning chain will yield high final reward — a value-function question at scale.</p>
+
+    <table>
+      <thead><tr><th>MDP concept</th><th>Reasoning LLM analogue</th></tr></thead>
+      <tbody>
+        <tr><td>State S</td><td>Prompt + chain-of-thought tokens generated so far</td></tr>
+        <tr><td>Action A</td><td>Next token (or next reasoning step)</td></tr>
+        <tr><td>Transition P</td><td>Deterministic given autoregressive sampling</td></tr>
+        <tr><td>Reward R</td><td>ORM/PRM score, correctness check, preference signal</td></tr>
+        <tr><td>V<sup>π</sup>(s)</td><td>Expected final answer quality from this partial trace</td></tr>
+        <tr><td>Q<sup>π</sup>(s,a)</td><td>Expected quality if we emit token <em>a</em> next</td></tr>
+        <tr><td>π*</td><td>Policy that maximizes correct, verifiable reasoning</td></tr>
+      </tbody>
+    </table>
+
+    <p>Chapter 03's verifiers supply R; Chapter 04's explore–exploit dilemma reappears when sampling diverse reasoning paths during training. The Bellman structure explains <em>why</em> credit must propagate backward from a final answer score to intermediate tokens — each token's value depends on the discounted value of the continuation.</p>
+
+    <!-- Process Reward Models as dense Q-like signals -->
+    <h3 style="margin-top:28px;">Process vs outcome rewards</h3>
+    <p>An <strong>outcome reward model (ORM)</strong> scores only the final answer — sparse signal, hard credit assignment. A <strong>process reward model (PRM)</strong> scores intermediate reasoning steps — closer to Q(s,a) at each token. PRMs approximate the Bellman idea: the value of a partial solution depends on whether the continuation can still reach a high final score. Training with PRM feedback is effectively pushing Q-values up on good intermediate actions.</p>
+
+    <div class="callout">
+      <p><strong>Scale challenge:</strong> Tabular V and Q store one number per (state) or (state, action). LLM state spaces have size |V|<sup>L</sup> for vocabulary V and length L — far too large for tables. Function approximation (neural networks) replaces lookup tables; the Bellman structure remains the same. Chapter 07 covers this transition.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 10 — Summary
+     ============================================================ -->
+<section class="section fade-in" id="summary">
+  <div class="container">
+    <span class="section-num">10 — SUMMARY</span>
+    <h2>Key Takeaways</h2>
+    <div class="card">
+      <ul style="color:var(--text-dim);margin:0 0 0 1.2em;line-height:1.9;">
+        <li>MDPs extend bandits with <strong>state transitions</strong>: (S, A, P, R, γ).</li>
+        <li>The <strong>Markov property</strong>: future depends on current state, not full history.</li>
+        <li><strong>Return</strong> G<sub>t</sub> = Σ γ<sup>k</sup> R<sub>t+k+1</sub>; discount γ handles continuing tasks and time preference.</li>
+        <li><strong>V<sup>π</sup>(s)</strong> = expected return from s; <strong>Q<sup>π</sup>(s,a)</strong> = expected return after taking a in s.</li>
+        <li>V<sup>π</sup>(s) = Σ<sub>a</sub> π(a|s) Q<sup>π</sup>(s,a).</li>
+        <li><strong>Bellman expectation</strong> recurses: value = expected [reward + γ × next value].</li>
+        <li><strong>V*, Q*, Bellman optimality</strong>: replace π with max<sub>a</sub> to characterize the best policy.</li>
+        <li>Next: Chapter 06 solves these equations with dynamic programming, Monte Carlo, and TD learning.</li>
+      </ul>
+    </div>
+
+    <!-- Quick reference: all key equations from this chapter -->
+    <h3 style="margin-top:32px;">Equation reference</h3>
+    <div class="card card-alt" style="font-size:0.88rem;">
+      <p style="margin-bottom:12px;color:var(--text-dim);">Every formula introduced in this chapter, in order:</p>
+      <div class="formula" style="text-align:left;font-size:0.82rem;margin:8px 0;">G<sub>t</sub> = Σ<sub>k=0</sub><sup>∞</sup> γ<sup>k</sup> R<sub>t+k+1</sub></div>
+      <div class="formula" style="text-align:left;font-size:0.82rem;margin:8px 0;">V<sup>π</sup>(s) = E<sub>π</sub>[G<sub>t</sub> | S<sub>t</sub> = s]</div>
+      <div class="formula" style="text-align:left;font-size:0.82rem;margin:8px 0;">Q<sup>π</sup>(s,a) = E<sub>π</sub>[G<sub>t</sub> | S<sub>t</sub> = s, A<sub>t</sub> = a]</div>
+      <div class="formula" style="text-align:left;font-size:0.82rem;margin:8px 0;">V<sup>π</sup>(s) = Σ<sub>a</sub> π(a|s) Q<sup>π</sup>(s,a)</div>
+      <div class="formula" style="text-align:left;font-size:0.82rem;margin:8px 0;">V<sup>π</sup>(s) = Σ<sub>a</sub> π(a|s) Σ<sub>s′</sub> P(s′|s,a) [R + γ V<sup>π</sup>(s′)]</div>
+      <div class="formula" style="text-align:left;font-size:0.82rem;margin:8px 0;">Q<sup>π</sup>(s,a) = Σ<sub>s′</sub> P(s′|s,a) [R + γ Σ<sub>a′</sub> π(a′|s′) Q<sup>π</sup>(s′,a′)]</div>
+      <div class="formula" style="text-align:left;font-size:0.82rem;margin:8px 0;">V*(s) = max<sub>a</sub> Σ<sub>s′</sub> P(s′|s,a) [R + γ V*(s′)]</div>
+      <div class="formula" style="text-align:left;font-size:0.82rem;margin:8px 0;">Q*(s,a) = Σ<sub>s′</sub> P(s′|s,a) [R + γ max<sub>a′</sub> Q*(s′,a′)]</div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer navigation — prev Ch.04 RL Foundations, next Ch.06 Solving MDPs -->
+<div class="footer">
+  <p>
+    <a href="../04-rl-foundations/">← Ch.04 — RL Foundations</a>
+    <a href="../06-solving-mdps/">Ch.06 — Solving MDPs →</a>
+  </p>
+  <p style="margin-top:16px;">Reasoning from Scratch · Chapter 05 of 12</p>
+</div>
+
+<script>
+/* ============================================================
+   Chapter 05 interactive logic
+   - Scroll-triggered fade-in + sticky nav
+   - Bellman backup diagram (Section 06)
+   - Grid-world policy evaluation / value iteration (Section 07)
+   ============================================================ */
+
+/* --- Scroll animations + sticky nav --- */
+const nav = document.getElementById('nav');
+const faders = document.querySelectorAll('.fade-in');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+faders.forEach(f => observer.observe(f));
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+
+/* ============================================================
+   Bellman backup visualization — click neighbors to inspect terms
+   ============================================================ */
+(function () {
+  const GAMMA = 0.9;
+  const neighbors = document.querySelectorAll('.backup-neighbor');
+  const termsEl = document.getElementById('bellman-terms');
+  const resultEl = document.getElementById('bellman-result');
+
+  // Fixed demo: π(right)=0.6 from S, π(down)=0.4; deterministic transitions
+  const branches = [
+    { dir: 'right', pi: 0.6, r: 2, v: 6.0 },
+    { dir: 'down',  pi: 0.4, r: -1, v: 2.5 },
+    { dir: 'up',    pi: 0.0, r: 0, v: 3.2 },
+    { dir: 'left',  pi: 0.0, r: 0, v: 5.0 }
+  ];
+  let total = 0;
+  branches.forEach(b => {
+    if (b.pi > 0) total += b.pi * (b.r + GAMMA * b.v);
+  });
+  document.getElementById('center-v').textContent = 'V=' + total.toFixed(2);
+  resultEl.textContent = 'V\u03C0(S) \u2248 ' + total.toFixed(2);
+
+  neighbors.forEach(el => {
+    el.addEventListener('click', () => {
+      neighbors.forEach(n => n.classList.remove('active'));
+      el.classList.add('active');
+      const dir = el.dataset.dir;
+      const b = branches.find(x => x.dir === dir);
+      const r = parseFloat(el.dataset.r);
+      const v = parseFloat(el.dataset.v);
+      const pi = b ? b.pi : 0;
+      const contrib = pi * (r + GAMMA * v);
+      termsEl.innerHTML =
+        'Branch <span class="term">' + dir + '</span>: π(' + dir + '|S) × [R + γ V(s′)]<br>' +
+        '= ' + pi.toFixed(1) + ' × [' + (r >= 0 ? '+' : '') + r + ' + ' + GAMMA + ' × ' + v.toFixed(1) + ']<br>' +
+        '= ' + pi.toFixed(1) + ' × ' + (r + GAMMA * v).toFixed(2) + ' = <span class="term">' + contrib.toFixed(3) + '</span>';
+    });
+  });
+})();
+
+/* ============================================================
+   Grid-world value iteration — 4×4 maze with walls, goal, trap
+   State space: 14 non-wall cells. Actions: ↑↓←→ (blocked by walls).
+   Terminal cells G (+1) and T (−1) have V=0 after absorbing reward.
+   Policy evaluation: V(s) ← E_π[R + γ V(s′)] for all non-terminal s.
+   ============================================================ */
+(function () {
+  const ROWS = 4, COLS = 4;
+  const WALL = -1, START = [0,0], GOAL = [0,3], TRAP = [3,2];
+  const WALLS = new Set(['1,1']);  /* single interior wall at row 1, col 1 */
+  const STEP_COST = -0.04;         /* small penalty encourages shorter paths */
+  const ACTIONS = [[-1,0],[1,0],[0,-1],[0,1]]; /* up down left right */
+  const ACTION_NAMES = ['↑','↓','←','→'];       /* reserved for future arrow overlay */
+
+  let gamma = 0.9;
+  let policy = 'random';
+  let V = {};
+  let iteration = 0;
+  const board = document.getElementById('grid-board');
+  const iterLabel = document.getElementById('iter-label');
+
+  function key(r,c) { return r+','+c; }
+  function isWall(r,c) { return WALLS.has(key(r,c)); }
+  function isTerminal(r,c) {
+    return (r===GOAL[0]&&c===GOAL[1]) || (r===TRAP[0]&&c===TRAP[1]);
+  }
+  function reward(r,c) {
+    if (r===GOAL[0]&&c===GOAL[1]) return 1;
+    if (r===TRAP[0]&&c===TRAP[1]) return -1;
+    return STEP_COST;
+  }
+  function inBounds(r,c) { return r>=0&&r<ROWS&&c>=0&&c<COLS&&!isWall(r,c); }
+  function getValidActions(r,c) {
+    return ACTIONS.map((a,i) => ({a, i, nr: r+a[0], nc: c+a[1]}))
+      .filter(x => inBounds(x.nr, x.nc));
+  }
+  function initV() {
+    V = {};
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+      if (!isWall(r,c)) V[key(r,c)] = 0;
+    }
+  }
+  function getPolicyProbs(r,c) {
+    const valid = getValidActions(r,c);
+    if (valid.length === 0) return [];
+    if (policy === 'random') {
+      const p = 1/valid.length;
+      return valid.map(v => ({...v, p}));
+    }
+    // greedy policy: among actions that reduce Manhattan distance to GOAL,
+    // pick those with highest one-step lookahead Q(s,a) = R + γ V(s′)
+    let best = valid.map(v => {
+      const dist = Math.abs(v.nr-GOAL[0])+Math.abs(v.nc-GOAL[1]);
+      const q = reward(v.nr,v.nc) + gamma * (isTerminal(v.nr,v.nc) ? 0 : V[key(v.nr,v.nc)]);
+      return {...v, dist, q};
+    });
+    const minDist = Math.min(...best.map(b=>b.dist));
+    best = best.filter(b => b.dist === minDist);
+    const maxQ = Math.max(...best.map(b=>b.q));
+    best = best.filter(b => b.q === maxQ);
+    const p = 1/best.length;
+    return best.map(b => ({...b, p}));
+  }
+  function iterate() {
+    const newV = {...V};
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+      if (isWall(r,c) || isTerminal(r,c)) continue;
+      const probs = getPolicyProbs(r,c);
+      let val = 0;
+      probs.forEach(({nr,nc,p}) => {
+        const rward = reward(nr,nc);
+        const nextV = isTerminal(nr,nc) ? 0 : V[key(nr,nc)];
+        val += p * (rward + gamma * nextV);
+      });
+      newV[key(r,c)] = val;
+    }
+    V = newV;
+    iteration++;
+    render();
+  }
+  function runToConvergence(maxIter=200, eps=1e-4) {
+    /* Repeated Bellman backup sweeps until max |V_new - V_old| < eps */
+    for (let i=0;i<maxIter;i++) {
+      const old = {...V};
+      iterate();
+      let diff = 0;
+      Object.keys(V).forEach(k => { diff = Math.max(diff, Math.abs(V[k]-old[k])); });
+      if (diff < eps) break;
+    }
+  }
+  function cellClass(r,c) {
+    if (isWall(r,c)) return 'wall';
+    if (r===GOAL[0]&&c===GOAL[1]) return 'goal';
+    if (r===TRAP[0]&&c===TRAP[1]) return 'trap';
+    if (r===START[0]&&c===START[1]) return 'start';
+    return '';
+  }
+  function cellLabel(r,c) {
+    if (isWall(r,c)) return '#';
+    if (r===GOAL[0]&&c===GOAL[1]) return 'G +1';
+    if (r===TRAP[0]&&c===TRAP[1]) return 'T −1';
+    if (r===START[0]&&c===START[1]) return 'S';
+    return '';
+  }
+  function render() {
+    board.innerHTML = '';
+    iterLabel.textContent = 'Iteration: ' + iteration;
+    let minV = Infinity, maxV = -Infinity;
+    Object.values(V).forEach(v => { minV=Math.min(minV,v); maxV=Math.max(maxV,v); });
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+      const cell = document.createElement('div');
+      cell.className = 'grid-cell ' + cellClass(r,c);
+      const label = document.createElement('span');
+      label.className = 'cell-label';
+      label.textContent = cellLabel(r,c);
+      cell.appendChild(label);
+      if (!isWall(r,c)) {
+        const vEl = document.createElement('span');
+        vEl.className = 'v-val';
+        const v = V[key(r,c)] || 0;
+        vEl.textContent = v.toFixed(2);
+        const t = (v - minV) / (maxV - minV + 1e-9);
+        if (!isTerminal(r,c) && iteration > 0) {
+          cell.style.background = 'rgba(108,140,255,' + (0.05 + t*0.25) + ')';
+        }
+        cell.appendChild(vEl);
+      }
+      board.appendChild(cell);
+    }
+  }
+
+  document.getElementById('policy-btns').addEventListener('click', e => {
+    const btn = e.target.closest('.btn');
+    if (!btn) return;
+    document.querySelectorAll('#policy-btns .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    policy = btn.dataset.policy;
+    initV(); iteration = 0; render();
+  });
+  document.getElementById('gamma-slider').addEventListener('input', e => {
+    gamma = parseFloat(e.target.value);
+    document.getElementById('gamma-val').textContent = gamma.toFixed(2);
+    initV(); iteration = 0; render();
+  });
+  document.getElementById('grid-step').addEventListener('click', () => iterate());
+  document.getElementById('grid-run').addEventListener('click', () => runToConvergence());
+  document.getElementById('grid-reset').addEventListener('click', () => { initV(); iteration = 0; render(); });
+
+  initV();
+  render();
+})();
+</script>
+</body>
+</html>

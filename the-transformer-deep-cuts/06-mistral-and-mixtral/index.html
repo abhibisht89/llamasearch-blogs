@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mistral &amp; Mixtral — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.75;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2rem); margin-bottom: 20px; }
+h3 { font-size: 1.1rem; color: var(--accent); margin: 24px 0 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 20px;
+  font-size: 0.85rem;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav.visible { transform: translateY(0); }
+.nav-title { font-weight: 700; white-space: nowrap; }
+
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 100px 24px 80px; position: relative;
+}
+.hero::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108,140,255,0.18), transparent),
+              radial-gradient(ellipse 60% 40% at 100% 50%, rgba(244,114,182,0.08), transparent);
+  pointer-events: none;
+}
+.hero .container { position: relative; z-index: 1; }
+.hero h1 { margin-bottom: 16px; }
+.subtitle { font-size: 1.1rem; color: var(--text-dim); max-width: 680px; margin: 0 auto 28px; }
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+.pill {
+  font-size: 0.75rem; font-family: var(--mono);
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim);
+}
+
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section.fade-in {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+.section.fade-in.visible { opacity: 1; transform: translateY(0); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 18px 0;
+}
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; margin: 18px 0;
+  font-family: var(--mono); font-size: 0.9rem; color: var(--accent3);
+  text-align: center; overflow-x: auto;
+}
+.callout {
+  background: rgba(108,140,255,0.07); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 20px 0;
+}
+.callout p:last-child { margin-bottom: 0; }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.06); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.06); }
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin: 22px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+.qa-box p { margin-bottom: 0; }
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 22px 0;
+}
+@media (max-width: 700px) {
+  .comparison { grid-template-columns: 1fr; }
+}
+.comparison .card { margin: 0; }
+
+table.scale {
+  width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 16px 0;
+  font-family: var(--mono);
+}
+table.scale th, table.scale td {
+  border: 1px solid var(--border); padding: 10px 8px; text-align: left;
+}
+table.scale th { background: var(--bg-card-alt); color: var(--accent); }
+table.scale td { color: var(--text-dim); }
+table.scale td strong { color: var(--text); }
+
+.demo-wrap {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin: 20px 0;
+}
+.demo-wrap h4 {
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-bottom: 12px;
+  font-family: var(--mono);
+}
+.demo-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+.demo-controls label { font-size: 0.85rem; color: var(--text-dim); }
+.demo-controls input[type="range"] { width: 160px; }
+.demo-controls button {
+  background: var(--accent);
+  color: #0a0a0f;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.demo-controls button:hover { filter: brightness(1.08); }
+
+.grid-attn {
+  display: grid;
+  gap: 3px;
+  width: fit-content;
+  margin: 12px auto;
+}
+.grid-attn span {
+  width: 28px; height: 28px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+}
+.cell-block { background: rgba(248,113,113,0.25); color: var(--danger); }
+.cell-allow { background: rgba(52,211,153,0.25); color: var(--accent3); }
+
+.buffer-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 12px 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+.buffer-slot {
+  width: 48px;
+  height: 40px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  transition: border-color 0.2s, background 0.2s;
+}
+.buffer-slot.head { border-color: var(--accent5); background: rgba(251,191,36,0.12); }
+.buffer-slot.write { border-color: var(--accent3); animation: pulse 0.6s ease; }
+@keyframes pulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 3px rgba(52,211,153,0.35); }
+}
+
+.moe-bars { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.moe-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+.moe-row .bar {
+  flex: 1;
+  height: 22px;
+  background: var(--bg-card);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.moe-row .bar > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  transition: width 0.3s ease;
+}
+.moe-row.top2 .bar > i { background: linear-gradient(90deg, var(--accent3), var(--accent)); }
+
+.pipeline-grid {
+  display: grid;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  margin-top: 12px;
+}
+@media (max-width: 600px) { .pipeline-grid { font-size: 0.55rem; } }
+.pipeline-cell {
+  padding: 6px 4px;
+  text-align: center;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pipeline-cell.active { background: rgba(108,140,255,0.2); color: var(--accent); }
+.pipeline-cell.idle { color: var(--text-dim); opacity: 0.45; }
+
+ul.tight { margin: 0 0 1em 1.2em; color: var(--text-dim); }
+ul.tight li { margin-bottom: 0.4em; }
+
+.playground-intro { color: var(--text-dim); margin-bottom: 24px; }
+
+/* Discussion Notes — Session Q&A */
+.discussion-panel {
+  margin-top: 36px;
+  padding: 24px;
+  background: rgba(18,18,26,0.7);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.discussion-panel-title {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent5);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.discussion-panel-title::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent5);
+}
+.dq {
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+}
+.dq:last-child { margin-bottom: 0; }
+.dq-ai {
+  border-left: 3px solid var(--accent);
+  background: rgba(108,140,255,0.05);
+}
+.dq-user {
+  border-left: 3px solid var(--accent4);
+  background: rgba(244,114,182,0.05);
+}
+.dq-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.dq-ai .dq-label { color: var(--accent); }
+.dq-user .dq-label { color: var(--accent4); }
+.dq .dq-question {
+  color: var(--text);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.dq .dq-answer {
+  color: var(--text-dim);
+  margin-bottom: 0;
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Mistral &amp; Mixtral: SWA &amp; MoE</span></nav>
+
+
+<nav class="nav" id="siteNav" aria-label="Chapter navigation">
+  <a href="../" class="nav-title">Advanced NLP V2</a>
+  <span style="color:var(--text-dim)">/</span>
+  <span style="color:var(--text)">Ch. 06</span>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>Mistral &amp; Mixtral: Sliding Window Attention &amp; MoE</h1>
+    <p class="subtitle">
+      How decoder-only stacks add <strong>local attention</strong>, <strong>bounded KV memory</strong>,
+      <strong>chunked prefill</strong>, and <strong>sparse mixture-of-experts</strong> routing—plus how
+      <strong>pipeline parallelism</strong> and <strong>xFormers block masks</strong> fit into production inference.
+    </p>
+    <div class="pill-row">
+      <span class="pill">Sliding-window + causal</span>
+      <span class="pill">Rolling-buffer KV</span>
+      <span class="pill">Top-2 MoE gating</span>
+      <span class="pill">Block-diagonal masks</span>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00</span>
+  <h2>What this chapter connects</h2>
+  <p>
+    Mistral-style models sit in the same decoder-only family as LLaMA: token embeddings, a repeated transformer block
+    (pre-norm, self-attention, residual, feed-forward, residual), final RMSNorm, and a linear head for next-token
+    logits. The interesting differences are not “another brand name”—they change <em>compute</em>, <em>memory</em>, and
+    <em>how far information travels</em> through depth.
+  </p>
+  <div class="callout">
+    <p><strong>Roadmap.</strong> Self-attention with a causal mask → restrict neighbors (sliding window) → explain long-range effects via depth (receptive field) → standard KV cache → shrink cache to window size (rolling buffer) → fill cache efficiently (prefill &amp; chunking) → widen capacity without running every FFN (sparse MoE, top-<em>K</em> gating) → place layers on many devices (sharding &amp; pipeline parallelism) → batch many prompts safely (xFormers block attention).</p>
+  </div>
+  <p>
+    <strong>Mistral AI</strong> (the company behind these models) released the dense <strong>Mistral 7B</strong> and the sparse <strong>Mixtral 8×7B</strong> family. The organization has been one of the most visible European builders of open-weights language models; keeping that context in mind helps explain why the public artifacts emphasize efficient inference (sliding windows, packed batching) as much as raw parameter counts.
+  </p>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01</span>
+  <h2>Decoder-only stack vs. vanilla Transformer</h2>
+  <p>
+    A decoder-only language model looks like the decoder side of the original Transformer: token embeddings, stacked
+    blocks, then a projection to vocabulary. There is <strong>no cross-attention</strong> to another modality or source
+    sequence—everything is self-attention over the running context. Encoder-only models (for example BERT) omit the
+    final LM head by default; decoder-only models include it because next-token prediction is the core training target.
+  </p>
+  <p>
+    Terminology note: the repeated block is often called a <strong>transformer block</strong>, <strong>decoder block</strong>,
+    or (by analogy to the encoder diagram) an <strong>encoder block</strong> in codebases—same residual structure,
+    different mask inside attention.
+  </p>
+  <div class="callout">
+    <p><strong>Prerequisites.</strong> This chapter assumes comfort with the standard Transformer self-attention equations and autoregressive masking. Companion material in the same series covers <strong>RMSNorm</strong>, <strong>RoPE</strong>, and <strong>grouped-query attention</strong> in depth when you need the LLaMA/Mistral shared building blocks spelled out step by step.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02</span>
+  <h2>Mistral vs. LLaMA at a glance</h2>
+  <p>Architecturally, Mistral is “LLaMA-shaped” with a few high-impact swaps:</p>
+  <div class="card">
+    <ul class="tight">
+      <li><strong>Attention mask:</strong> Mistral adds <strong>sliding-window attention</strong> on top of causality. Each position attends only to prior tokens within a fixed window width <em>W</em> (plus itself), not the entire prefix.</li>
+      <li><strong>KV cache:</strong> With sliding windows, keys and values older than the window cannot affect the current attention output—they are masked out. The cache can be capped at <em>W</em> entries per layer: a <strong>rolling-buffer KV cache</strong>.</li>
+      <li><strong>Activation in the FFN:</strong> The original Transformer decoder often used <strong>ReLU</strong> in the position-wise feed-forward block. LLaMA uses <strong>SwiGLU</strong>-style gating there. Mistral 7B uses <strong>SiLU</strong> (sigmoid linear unit, also known as Swish with β=1) in its two-layer FFN path—the high-level residual diagram matches LLaMA, but the nonlinearities and gating pattern are not identical.</li>
+      <li><strong>Mixtral (8×7B):</strong> Instead of one MLP per block, eight parallel feed-forward “experts” exist; a <strong>router</strong> picks a small subset per token (in Mixtral, <strong>two</strong>), so compute stays sparse even though total parameters grow.</li>
+    </ul>
+  </div>
+  <p>Shared DNA with LLaMA includes RMSNorm, rotary position embeddings (RoPE), grouped-query attention (GQA), and autoregressive training.</p>
+  <div class="comparison">
+    <div class="card"><h3>Vanilla Transformer FFN</h3><p>Often <strong>ReLU</strong> between two linear projections—historically the default in many “encoder/decoder” papers before the LLaMA-era recipe changes.</p></div>
+    <div class="card"><h3>LLaMA vs Mistral 7B</h3><p><strong>LLaMA:</strong> SwiGLU-gated feed-forward. <strong>Mistral 7B:</strong> SiLU in the FFN path. <strong>Mixtral 8×7B:</strong> same attention stack as the family convention, but the dense MLP is replaced by <strong>eight</strong> parallel FFN experts with top-2 routing.</p></div>
+  </div>
+  <p>
+    The repeated block appears <strong>32 times</strong> in the configurations discussed here: each layer’s output feeds the next, and only after the final block do RMSNorm, the vocabulary linear map, and softmax produce next-token logits.
+  </p>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03</span>
+  <h2>Representative hyperparameters (7B vs. Mixtral 8×7B)</h2>
+  <p>Concrete numbers help anchor the diagrams below. Sizes follow published Mistral / Mixtral configurations.</p>
+  <table class="scale">
+    <thead>
+      <tr><th>Quantity</th><th>Mistral 7B</th><th>Mixtral 8×7B</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Embedding dim</strong> (<code>dim</code>)</td><td>4096</td><td>4096</td></tr>
+      <tr><td><strong>Layers</strong></td><td>32</td><td>32</td></tr>
+      <tr><td><strong>Attention heads (Q)</strong></td><td>32</td><td>32</td></tr>
+      <tr><td><strong>GQA heads (K/V)</strong></td><td>8</td><td>8</td></tr>
+      <tr><td><strong>Head dim</strong></td><td>4096 / 32 = 128</td><td>128</td></tr>
+      <tr><td><strong>FFN hidden</strong></td><td>14336 (≈ 3.5× dim)</td><td>14336 per expert</td></tr>
+      <tr><td><strong>Sliding window</strong> <em>W</em></td><td>4096 (typical config; long local context)</td><td>Same family</td></tr>
+      <tr><td><strong>Context length</strong></td><td>8192 (7B class)</td><td>Larger trained context (e.g. 32k class)</td></tr>
+      <tr><td><strong>Vocabulary</strong></td><td>Shared across variants</td><td>Same tokenizer family</td></tr>
+      <tr><td><strong>MoE</strong></td><td>Single MLP</td><td><strong>8 experts</strong>, <strong>top-2</strong> per token</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>GQA recap:</strong> queries use all 32 heads; keys and values share 8 heads so each K/V head is reused by a
+    <em>group</em> of four query heads—between full multi-head attention (many K/V heads) and multi-query attention (one K/V head).
+  </p>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04</span>
+  <h2>Self-attention, scale, and the causal mask</h2>
+  <p>
+    Mistral’s decoder blocks use the same scaled dot-product self-attention and causal mask as any autoregressive LM (Chapter 01 derives <code>QK^T / √d_k</code>, softmax, and the upper-triangular −∞ mask). The score matrix is <code>seqlen × seqlen</code> per head; forbidden future positions get zero mass after softmax.
+  </p>
+  <div class="formula">
+    Attention(Q, K, V) = softmax( (Q K<sup>⊤</sup>) / √d<sub>k</sub> ) V
+  </div>
+  <p>
+    Everything new in Mistral starts in the <strong>next</strong> section: on top of causality, sliding-window attention zeroes interactions when query–key distance exceeds <em>W</em>.
+  </p>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05</span>
+  <h2>Sliding-window attention</h2>
+  <p>
+    Causal full attention lets each token see the entire past. <strong>Sliding-window attention</strong> keeps causality but
+    <em>also</em> zeroes interactions when the distance between query position <em>i</em> and key position <em>j</em> exceeds a
+    window of width <em>W</em> (equivalently: each token attends only within the last <em>W</em>−1 predecessors, plus itself).
+  </p>
+  <div class="callout warn">
+    <p><strong>Tradeoff.</strong> Fewer dot products → faster training and inference, but direct attention links disappear between distant pairs. If <em>W</em> is too small, local context may be insufficient for some tasks—though depth changes the story (next section).</p>
+  </div>
+  <p>
+    <strong>Worked example (window width <em>W</em> = 3 on six tokens).</strong> Index positions from 1 to 6 for
+    <strong>the · cat · is · on · a · chair</strong>. From “chair” (position 6), tokens at graph distance greater than the window along the past direction are dropped: “chair” still sees itself, “a”, and “on”, but it <strong>does not</strong> attend directly to “is” (gap 4) or “the”. Likewise “a” (position 5) must not attend to “the” (position 1) when the same window applies—again gap 4. Causality is unchanged: no token attends forward in time.
+  </p>
+  <p>
+    <strong>Book analogy (full).</strong> When you read a long book, you usually do not need to relate a word in <em>chapter five</em> to every word in <em>chapter one</em>—those chapters may introduce unrelated material, and forcing dense long-range edges would spend parameters and compute on links that rarely matter. What you <em>do</em> need is strong coherence <em>inside</em> the local passage: words in the same section should exchange information freely. Sliding-window attention bakes in that bias: each position builds context from a finite neighborhood, which reduces the number of dot products per layer and speeds training and inference.
+  </p>
+  <p>
+    The tradeoff is real: if the window is too small for the task, quality can suffer because direct edges between distant siblings disappear. The next section explains why depth still rescues many long-range dependencies indirectly.
+  </p>
+  <div class="demo-wrap">
+    <h4>Demo — Causal + sliding mask</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px;">Rows = query position, columns = key position. Green = allowed; red = masked.</p>
+    <div class="demo-controls">
+      <label>Seq length <input type="range" id="dwN" min="5" max="12" value="8"></label>
+      <label>Window <em>W</em> <input type="range" id="dwW" min="2" max="8" value="4"></label>
+    </div>
+    <div id="dwGrid" class="grid-attn" aria-live="polite"></div>
+    <p id="dwCaption" style="text-align:center;font-size:0.8rem;color:var(--text-dim);margin:0;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06</span>
+  <h2>Receptive field across layers</h2>
+  <p>
+    Even when “chair” cannot attend directly to “the” in <strong>layer 1</strong> because they sit outside the window, stacked
+    layers compound information much like stacked convolutions: deeper representations mix <em>already-mixed</em> neighbors.
+    After one layer, a hidden state at position <em>i</em> is a blend of tokens inside its window; after another layer, that
+    blend itself aggregates slightly farther prefixes—so <strong>effective context grows with depth</strong>.
+  </p>
+  <p>
+    This is the transformer analogue of <strong>receptive field</strong> in CNNs: two 3×3 layers do not mean only 3 pixels of
+    influence—features at stage two depend indirectly on a wider region. Here, windowed attention + depth yields <strong>indirect long-range dependencies</strong> without every layer using full attention.
+  </p>
+  <p>
+    <strong>CNN receptive field (expanded).</strong> Picture a 2D image convolved with a <strong>3×3</strong> kernel. The activation at one output location looks at a 3×3 patch of the input. Slide the kernel one step: the next activation sees a shifted 3×3 patch—so neighboring output cells share some inputs but not all. Stack <em>another</em> 3×3 convolution on those features. A cell in the second feature map may appear, at first glance, unrelated to a pixel several steps away in the original image—yet that second-layer cell depends on a 3×3 neighborhood of <em>first-layer</em> features, and each of those depended on 3×3 patches below. Chaining dependencies means <strong>indirect</strong> connectivity reaches farther than a single kernel width suggests. That is the classical receptive-field argument, and it transfers to transformers: a token in layer ℓ+1 mixes vectors that already mixed their own neighbors in layer ℓ.
+  </p>
+  <p>
+    <strong>After softmax, multiply by V.</strong> Continue the six-token example with a causal <em>and</em> sliding mask. The attention weight matrix multiplies <strong>V</strong> (same token sequence as queries/keys in self-attention). Row <em>i</em> of the weight matrix picks a convex combination of rows of <strong>V</strong>. Zeros from masked positions mean entire rows of <strong>V</strong> are irrelevant for that output position—for the sixth token, only the last three rows of <strong>V</strong> can receive non-zero weight. So the sixth output vector is built strictly from the embeddings (or projected values) of <strong>on, a, chair</strong> at that layer—even though deeper layers will remix those summaries again.
+  </p>
+  <p>
+    <strong>Second layer expands the union of influences.</strong> Feed the layer-1 outputs back through another identical masked attention block. The queries/keys/values at layer 2 are no longer “raw” token embeddings; each position already encodes a <em>blend</em> of prior neighbors allowed by the mask. When the fourth position in layer 2 forms its new vector, it may combine layer-1 representations that themselves already contained information from earlier words. A concrete chain: layer-1 position 2 might aggregate “the” and “cat”; layer-1 position 3 might aggregate “cat” and “is”; by the time layer 2 fuses what it can see within the window, the representation at position 4 can inherit pieces that trace back to <strong>the</strong> even though “chair” and “the” were never directly connected in one hop. With window width 3, a useful rule of thumb used in pedagogy is that each additional layer can extend how far information has traveled by roughly <strong>two more tokens</strong> along the past direction (until the sequence length caps the effect). After enough layers—Mistral uses <strong>32</strong>—even a local window can support global reasoning, which matches the empirical plots in the <strong>Mistral technical report</strong> showing how deeper layers widen effective context under sliding attention.
+  </p>
+  <p>
+    Sliding windows limit direct edges per layer, but depth stacks local mixes so representations progressively aggregate information from farther away—analogous to deepening a CNN to grow the receptive field. The window controls per-layer sparsity; the stack controls how far information compounds.
+  </p>
+  <div class="demo-wrap">
+    <h4>Demo — Effective reach vs. depth</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px;">Rough model: each layer extends reach by at most (<em>W</em>−1) tokens along the past direction (illustrative lower bound; real networks are richer).</p>
+    <div class="demo-controls">
+      <label>Window <em>W</em> <input type="range" id="rfW" min="2" max="8" value="4"></label>
+      <label>Layers <input type="range" id="rfL" min="1" max="32" value="8"></label>
+    </div>
+    <p id="rfOut" style="font-family:var(--mono);font-size:0.9rem;color:var(--accent3);text-align:center;margin:0;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07</span>
+  <h2>KV cache for autoregressive decoding</h2>
+  <p>
+    Naively regenerating the full prefix every step repeats work: earlier keys and values do not change when only the newest
+    token is appended. A <strong>KV cache</strong> stores past <strong>K</strong> and <strong>V</strong> projections; each step supplies a fresh query for the
+    latest token only, appends new keys/values, and computes a single new output row. That removes redundant dot products and
+    yields one next-token representation per step—what you need for sampling.
+  </p>
+  <div class="callout">
+    <p><strong>Throughput caveat.</strong> When compute drops, <strong>memory bandwidth</strong> (reading/writing large tensors) can dominate. Pure multi-query attention (many query heads, a single K/V head) aggressively cuts cache traffic and can improve latency by an order of magnitude in reported benchmarks, with only a small quality hit; <strong>grouped query attention</strong> splits the difference by using more than one K/V head but still fewer than Q heads—Mistral’s 32/8 split is a common compromise.</p>
+  </div>
+  <p>
+    <strong>Training vs inference.</strong> During <em>training</em> with teacher forcing, you often present an entire labeled sequence at once (for example a line of poetry with a start-of-sequence token prepended and an end-of-sequence token appended), run one forward pass, and compute cross-entropy at every position in parallel. A line like <em>“Love that can quickly seize the gentle heart”</em> (plus special tokens) might yield nine supervised positions in one go: the model learns to emit “Love” after SOS, “that” after SOS+Love, and so on, all within a single graph.
+  </p>
+  <p>
+    At <em>inference</em> time you typically generate one token at a time: step 1 feeds only SOS and reads off the distribution for the first word; step 2 feeds SOS plus the sampled first word; step 3 feeds those two plus the new sample; continuing until EOS. You only <em>need</em> the final position’s logits to choose the next token, but every token in the prompt conditions that choice—you cannot predict “gentle” from the article “the” alone; you need the full preceding clause.
+  </p>
+  <div class="comparison">
+    <div class="card"><h3>Naive autoregressive forward</h3><p>Recompute attention over the entire growing prefix each step. Many dot products repeat work you already did at the previous time step, and under a causal mask large regions of the score matrix are unused for the final column anyway.</p></div>
+    <div class="card"><h3>With KV cache</h3><p>Append new keys and values for the token you just finished, but use <strong>only the latest hidden state as the query</strong> for the next projection—do not rebuild a full-sequence query tensor each time. You therefore materialize just the <strong>last output row</strong> of attention per step, which is exactly what you need before the final linear layer and softmax for next-token prediction.</p></div>
+  </div>
+  <div class="callout ok">
+    <p>Equivalently: without a cache you might append the new representation to <strong>Q, K, and V</strong> together; with a KV cache you append only to <strong>K</strong> and <strong>V</strong> while replacing the query side with the single new token’s query vector. That is the implementation pattern that removes redundant matmuls while preserving semantics.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s08">
+  <span class="section-num">08</span>
+  <h2>Rolling-buffer KV cache</h2>
+  <p>
+    If attention never looks farther than <em>W</em>−1 steps back, storing more than <em>W</em> keys and values per layer cannot change outputs—those entries multiply masked (zero) attention weights. A <strong>rolling buffer</strong> caps storage at <em>W</em> slots:
+    append until full, then <strong>overwrite the oldest</strong> slot circularly. Logical token order may no longer match physical array order, so implementations <strong>un-rotate</strong> using a head pointer: take entries from pointer→end, then 0→pointer.
+  </p>
+  <p>
+    The same masking argument shows early rows of <strong>V</strong> may be irrelevant for the current query row when their weights are
+    zero—another way to see why trimming the cache is safe <em>given</em> the sliding mask.
+  </p>
+  <p>
+    <strong>Quantitative intuition.</strong> Suppose the sliding window covers <strong>W = 10</strong> tokens. Even if the conversation history contains <strong>1,000</strong> prior tokens, attention with that mask never reads more than the last ten positions. Storing all 1,000 key/value pairs per layer therefore wastes memory and bandwidth: older slots never receive non-zero attention mass from the current query. The rolling buffer simply aligns storage with what the mask can ever use.
+  </p>
+  <p>
+    <strong>Illustration at inference step with eight cached tokens and <em>W</em> = 4.</strong> The newest query attends backward at most three steps. Dot products against keys older than that are masked to −∞, so after softmax those columns are zero. In the weighted sum with <strong>V</strong>, the <strong>first four rows</strong> of <strong>V</strong> (the ones that would correspond to the oldest keys) are multiplied by zeros for the current query row—they contribute nothing to the output. There is no reason to keep recomputing or storing those stale entries once they fall outside the window.
+  </p>
+  <p>
+    <strong>Circular buffer with <em>W</em> = 4 on the sentence “the cat is on a chair.”</strong> Fill slots with the first four tokens: <code>the, cat, is, on</code>. When token <strong>a</strong> arrives, overwrite the <strong>oldest</strong> physical slot (the position tracked by a head pointer) so the array may read <code>a, cat, is, on</code> in memory even though chronologically you mean <code>cat, is, on, a</code>. Implementations therefore <strong>un-rotate</strong> (the Mistral codebase names this idea in functions such as <code>un_rotate</code>): read from the head index to the end of the buffer, then wrap from the start up to the head, reconstructing true time order before attention or when debugging tensor layouts.
+  </p>
+  <div class="demo-wrap">
+    <h4>Demo — Circular KV buffer (length <em>W</em> = 4)</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px;">Tokens stream in; oldest slot is replaced. Highlight shows last physical write; gold border marks next write index.</p>
+    <div class="buffer-row" id="bufSlots"></div>
+    <p id="bufLogical" style="text-align:center;font-family:var(--mono);font-size:0.8rem;color:var(--accent2);margin:8px 0 0;"></p>
+    <div class="demo-controls" style="justify-content:center;margin-top:14px;">
+      <button type="button" id="bufStep">Append next token</button>
+      <button type="button" id="bufReset">Reset</button>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s09">
+  <span class="section-num">09</span>
+  <h2>Prefill and chunked prefill</h2>
+  <p>
+    Before decoding, the model must <strong>prefill</strong> the KV cache with the prompt. The prompt is known up front, so all its
+    tokens can be processed in parallel in principle—but implementations often <strong>chunk</strong> long prompts for memory or kernel efficiency.
+  </p>
+  <p>
+    For chunk <em>k</em> &gt; 1, attention is set up so <strong>queries</strong> come from the <em>current</em> chunk while <strong>keys and values</strong> include
+    <strong>the previous chunk’s cache plus the current chunk</strong>. That way tokens at the start of a new chunk can still attend to
+    tokens at the end of the prior chunk; using only the current chunk as K/V would sever cross-chunk dependencies.
+    After prefill, decoding returns to the familiar one-token-at-a-time pattern with KV growth (or rolling) as usual.
+  </p>
+  <div class="callout warn">
+    <p><strong>Why chunk size tracks <em>W</em>.</strong> In systems that tie chunking to the sliding window, a common choice is to set the prefill chunk length to the window width <em>W</em> (or a compatible divisor) so that each chunk’s attention kernel stays aligned with the local mask while still allowing cross-chunk context when keys and values include the prior cache. Very long prompts—retrieval-augmented setups with <strong>5,000–6,000+</strong> tokens are the usual motivating example—would require thousands of serial forward passes if you insisted on one token per prefill step, which under-utilizes the GPU; feeding the whole prompt at once may exceed device memory (often a few thousand tokens of working set depending on width, batch, and <em>W</em>). Chunked prefill is the middle path.</p>
+  </div>
+  <p>
+    <strong>Concrete prompt chunking.</strong> Take <em>W</em> = 4 and the question
+    <strong>“can you tell me who is the richest man in history”</strong>. Chunk 1 might be <code>can · you · tell · me</code>. Chunk 2 is <code>who · is · the · richest</code>. When prefilling chunk 2, queries come only from that chunk’s tokens, but keys and values must include <strong>the rolling cache after chunk 1 plus chunk 2’s tokens</strong>. Otherwise <strong>who</strong> could not attend to <strong>me</strong> or <strong>tell</strong> even when the sliding window says it should—there would be no keys present for those positions. The final chunk <code>man · in · history</code> repeats the pattern: queries from the current chunk, keys/values from everything cached from <code>who is the richest</code> plus the new tokens. After prefill completes, generation reverts to the single-query KV-cache stepping described earlier.
+  </p>
+  <p>
+    <strong>Implementation sketch.</strong> The first prefill chunk often builds an attention mask whose logical shape depends only on the fresh tokens (empty cache). Every later chunk uses mask dimensions derived from <code>cached_length + current_chunk_length</code> so prior tokens remain addressable. Token generation after prefill matches standard autoregressive caching: one new query, append K/V, softmax on the active window.
+  </p>
+  <div class="demo-wrap">
+    <h4>Demo — Chunked prefill wiring</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px;">Select a chunk; arrows show Q vs K/V sources for that step.</p>
+    <div class="demo-controls">
+      <label>Chunk index <input type="range" id="chIdx" min="0" max="2" value="0"></label>
+    </div>
+    <svg id="chunkSvg" viewBox="0 0 420 140" width="100%" style="max-width:420px;display:block;margin:0 auto;" aria-label="chunk diagram"></svg>
+    <p id="chunkCap" style="text-align:center;font-size:0.82rem;color:var(--text-dim);margin-top:10px;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <span class="section-num">10</span>
+  <h2>Sparse mixture of experts (MoE)</h2>
+  <p>
+    Classical <strong>mixture of experts</strong> combines several “expert” sub-networks; <strong>sparse</strong> MoE activates only a few per input.
+    In Mixtral each transformer block still runs self-attention once, but the dense MLP is replaced by <strong>eight parallel FFN experts</strong>.
+  </p>
+  <p>
+    A <strong>router</strong> (typically a linear map from the hidden vector to eight logits) scores expert affinity for <em>each token</em>.
+    The implementation keeps the <strong>top two</strong> logits, runs the token through those two experts, and forms a <strong>convex combination</strong>
+    of their outputs. Weights come from <strong>softmax over just those two logits</strong>—not all eight—so expert masses always sum to one
+    for the active pair, keeping output scale comparable across training runs and ablations (different expert counts, etc.).
+  </p>
+  <p>
+    <strong>Why sparse helps:</strong> eight full matmul chains per token would be eight times the FFN work; top-2 routing executes two,
+    while total parameters rise because unused experts still exist in memory. Attention stays shared, so per-token compute is roughly one attention block plus two expert FFNs (~12–13B effective FLOPs in the usual Mixtral accounting, not a full 14B). Empirically, experts often <strong>specialize</strong> (syntax, language, lexical classes)—not guaranteed, but a useful mental model.
+  </p>
+  <p>
+    <strong>Numeric gate example.</strong> Suppose the router emits eight logits; the largest two might be <strong>3.4</strong> and <strong>1.5</strong> for experts <em>A</em> and <em>B</em>. Mixtral runs the token through experts <em>A</em> and <em>B</em> only, then forms weights by applying <strong>softmax solely to that pair</strong>—not to all eight logits. With only two arguments, softmax enforces <strong>w<sub>A</sub> + w<sub>B</sub> = 1</strong>, which stabilizes the scale of the mixture compared to taking softmax over all eight and then zeroing six experts (the discarded mass would otherwise change the magnitude of the combination).
+  </p>
+  <div class="formula">y = w<sub>A</sub> · FFN<sub>A</sub>(x) + w<sub>B</sub> · FFN<sub>B</sub>(x), w = softmax([ℓ<sub>A</sub>, ℓ<sub>B</sub>])</div>
+  <div class="callout">
+    <p><strong>Why softmax-after-top-<em>k</em> matters for research iterations.</strong> Teams routinely train variants with different expert counts (say 2, 3, 4, or 8). If the combination weights always summed to one <em>per active expert subset</em>, the residual stream’s scale stays comparable across ablations. If instead you softmaxed all experts and then masked, the surviving weights might no longer form a simplex subset with predictable norm, making it harder to swap configurations without retuning surrounding layers.</p>
+  </div>
+  <p>
+    <strong>Specialization stories.</strong> After large-scale training, some experts pick up loose semantic or syntactic roles—one might see more multilingual tokens, another more verb-heavy spans, another noun-heavy spans. These patterns are emergent rather than guaranteed, but they explain why sparse routing can feel like delegating examples to different “sub-FFNs” without running all of them.
+  </p>
+  <div class="demo-wrap">
+    <h4>Demo — Top-2 gating &amp; weights</h4>
+    <div class="demo-controls">
+      <button type="button" id="moeRand">Random logits</button>
+    </div>
+    <div id="moeBars" class="moe-bars"></div>
+    <p id="moeText" style="margin-top:12px;font-family:var(--mono);font-size:0.82rem;color:var(--text-dim);"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <span class="section-num">11</span>
+  <h2>Model sharding and pipeline parallelism</h2>
+  <p>
+    When a model does not fit one GPU, one option is <strong>layer sharding</strong>: place contiguous layer groups on separate devices,
+    stream activations GPU-by-GPU for each forward pass. That works, but a simple pipeline leaves most devices idle most of the time—only one stage is active at a given instant during a single large batch.
+  </p>
+  <p>
+    <strong>Pipeline parallelism</strong> (as in GPipe-style schedules) splits a logical batch into <strong>micro-batches</strong> and staggers them:
+    while stage 2 processes micro-batch 1, stage 1 can start micro-batch 2. Gradients can be <strong>accumulated</strong> across micro-batches before an optimizer step. Inference can drop the backward half but keep the <strong>micro-batch overlap idea</strong> to raise utilization.
+  </p>
+  <p>
+    Schedules still exhibit <strong>bubbles</strong>—idle intervals at the start/end of the pipeline; larger batch depth reduces bubble overhead.
+  </p>
+  <p>
+    <strong>Layer sharding on four devices.</strong> Map Mistral’s <strong>32</strong> transformer blocks into four groups of <strong>eight</strong> consecutive layers. Device 1 runs layers 1–8 and hands activations to device 2, which runs 9–16, and so on until device 4 finishes 25–32; only then do the final RMSNorm and vocabulary projection run. This works but is sequential: at any instant a naive schedule keeps three GPUs idle while one executes.
+  </p>
+  <p>
+    <strong>Pipeline parallelism (GPipe-style).</strong> Split a logical minibatch into <strong>micro-batches</strong> and stagger them across stages so multiple GPUs stay busy. Bubble slots at the start and end of a wave are roughly fixed at <code>stages − 1</code>; deeper fill amortizes them (e.g. four micro-batches waste on the order of ~43% of stage-slots, eight ~27%, sixteen ~16%). Training accumulates gradients across micro-batches before an optimizer step; inference keeps only the forward overlap.
+  </p>
+  <div class="callout warn">
+    <p>Even optimized pipelines retain <strong>bubble</strong> time steps at the start and end of a wave—moments when some stages have no work. Increasing the number of micro-batches (deeper pipeline fill) amortizes those bubbles; this is the same throughput–memory trade-off that appears in every production serving stack.</p>
+  </div>
+  <div class="demo-wrap">
+    <h4>Demo — Micro-batch pipeline (4 stages, simplified clock)</h4>
+    <div class="demo-controls">
+      <button type="button" id="pipePlay">Step clock</button>
+      <button type="button" id="pipeReset">Reset</button>
+      <span id="pipeT" style="font-family:var(--mono);color:var(--accent5);"></span>
+    </div>
+    <div id="pipeGrid" class="pipeline-grid"></div>
+    <p style="font-size:0.78rem;color:var(--text-dim);margin-top:10px;text-align:center;">Columns = GPU stages; highlighted cells show which stage is busy for the current clock tick (schematic).</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <span class="section-num">12</span>
+  <h2>xFormers and block-diagonal causal masks</h2>
+  <p>
+    Serving many requests batches prompts together for throughput. Padding variable-length prompts wastes work: attention runs dot products involving pad positions you never read. A better pattern <strong>concatenates</strong> all tokens into one long sequence and stores per-prompt lengths.
+  </p>
+  <p>
+    The <strong>xFormers</strong> stack provides helpers for complex masks and memory-efficient attention kernels. Mistral inference code
+    uses a <strong>block-diagonal causal mask</strong>: tokens attend causally <em>within</em> their prompt block but are forbidden from attending
+    across prompts—equivalent to independent causal LMs packed into one tensor parallel kernel.
+  </p>
+  <p>
+    When sliding windows apply, the library composes <strong>window limits</strong> with those blocks. Separate mask builders cover
+    <strong>first-chunk prefill</strong> (empty cache) versus <strong>later chunks</strong> (non-empty per-sequence caches of different sizes), so attention
+    respects both <em>which</em> tokens exist in cache and <em>which</em> cross-prompt interactions must stay blocked.
+  </p>
+  <p>
+    <strong>Padding batching vs packed batching.</strong> Suppose three customer prompts (treating words as tokens for intuition) are <strong>“write a poem”</strong> (3 tokens), <strong>“write a historical novel”</strong> (4 tokens), and <strong>“tell me a funny joke”</strong> (5 tokens). Padding every row to length 5 produces a rectangular tensor but forces attention kernels to compute scores involving pad positions that never influence the real next-token loss—wasted FLOPs and memory traffic. Worse, when you read off hidden states to predict the next token, you must index the <strong>last non-padding</strong> position per row (position 3 for the first prompt, 4 for the second, 5 for the third), not the final column of the tensor.
+  </p>
+  <p>
+    The alternative is to <strong>concatenate</strong> all real tokens into one sequence of length <strong>3 + 4 + 5 = 12</strong>, store the boundaries <code>[3, 4, 5]</code> (or prefix sums) in a side array, and build a <strong>block-diagonal causal mask</strong>: causality holds inside each prompt block, and entries that would let “novel” attend to “poem” are set to −∞. After one forward pass you still have twelve rows of hidden states, but the positions that matter for decoding are exactly the last real token of each block (indices 3, 7, and 12 in 1-based counting)—you gather those rows for the final linear map and softmax.
+  </p>
+  <p>
+    xFormers pairs structured masks with <strong>memory-efficient attention</strong> kernels so fused code respects causality and block structure without materializing dense N×N tensors for every batched request. Production paths must also track <strong>heterogeneous KV cache lengths</strong> when one user’s context is ~10 tokens and another’s is ~5,000.
+  </p>
+  <p>
+    <strong>Three mask families (as used in the reference implementation narrative).</strong> (1) <em>First prefill chunk</em>—cache starts empty, so the mask dimensions follow only the new tokens. (2) <em>Later prefill chunks</em>—cache is non-empty and differs per sequence; the mask must let current queries read prior cached keys/values while still enforcing block boundaries and sliding limits. (3) <em>Block-diagonal causal with offset / padded keys</em>—physical tensors allocate a fixed rolling width <em>W</em>, but only a prefix of slots is valid for a short prompt; the mask encodes how many slots actually contain live keys so padded slack is not attended as if it were real text.
+  </p>
+  <p>
+    As an illustration, three packed prompts of lengths <strong>7, 5, and 6</strong> with a sliding window of <strong>3</strong> tokens (two steps of history plus self) yield a sparse pattern where each token sees at most two predecessors within its own block—composed on top of the block-diagonal separation between customers. The exact index ranges depend on how you flatten batches, but the invariant is always <strong>no cross-customer attention</strong> and <strong>no backward window beyond <em>W</em></strong>.
+  </p>
+  <div class="demo-wrap">
+    <h4>Demo — Packed prompts (block boundaries)</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px;">Three prompts concatenated (lengths 3+4+5); gold cell marks the focused query index.</p>
+    <div class="demo-controls">
+      <label>Focus token index <input type="range" id="bdIdx" min="0" max="11" value="5"></label>
+    </div>
+    <div id="bdGrid" class="grid-attn"></div>
+    <p id="bdCap" style="text-align:center;font-size:0.8rem;color:var(--text-dim);margin-top:8px;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <span class="section-num">13</span>
+  <h2>Playground</h2>
+  <p class="playground-intro">
+    Combine causal masking, sliding windows, and packed blocks in one grid. Align <em>N</em> and <em>W</em> with the receptive-field slider in section 06 to reason about how much history can propagate through depth.
+  </p>
+  <p>
+    <strong>Set-based mental model.</strong> You can treat each position after a layer as carrying the <em>set</em> (or multiset) of source tokens it has already mixed—sliding attention forms unions of those sets within the window, and depth iterates that construction. Toy notebooks that visualize “which original tokens influence position <em>i</em> after ℓ layers” are a faithful companion to the algebra above.
+  </p>
+  <div class="card">
+    <h3 style="margin-top:0;">Combined attention explorer</h3>
+    <p style="font-size:0.9rem;">Single grid: causal + sliding + optional two-prompt packing (first half vs second half of the sequence).</p>
+    <div class="demo-controls">
+      <label>N <input type="range" id="pgN" min="6" max="14" value="10"></label>
+      <label>W <input type="range" id="pgW" min="2" max="10" value="3"></label>
+      <label><input type="checkbox" id="pgPack"> Simulate 2 packed prompts (5+5)</label>
+    </div>
+    <div id="pgGrid" class="grid-attn"></div>
+    <p id="pgCap" style="text-align:center;font-size:0.8rem;color:var(--text-dim);margin-top:10px;"></p>
+  </div>
+</section>
+
+</main>
+
+<footer style="padding:48px 24px;text-align:center;border-top:1px solid var(--border);color:var(--text-dim);font-size:0.85rem;">
+  <div class="container">Advanced NLP V2 · Chapter 06 · Mistral &amp; Mixtral</div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var nav = document.getElementById('siteNav');
+  var ticking = false;
+  function updateNav() {
+    var y = window.scrollY || document.documentElement.scrollTop;
+    if (y > 120) nav.classList.add('visible');
+    else nav.classList.remove('visible');
+    ticking = false;
+  }
+  window.addEventListener('scroll', function () {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(updateNav);
+    }
+  }, { passive: true });
+  updateNav();
+
+  var sections = document.querySelectorAll('.section.fade-in');
+  if ('IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          obs.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+    sections.forEach(function (s) { obs.observe(s); });
+  } else {
+    sections.forEach(function (s) { s.classList.add('visible'); });
+  }
+
+  function softmaxPair(a, b) {
+    var m = Math.max(a, b);
+    var ea = Math.exp(a - m);
+    var eb = Math.exp(b - m);
+    var s = ea + eb;
+    return [ea / s, eb / s];
+  }
+
+  function buildMaskGrid(n, W, el, captionEl) {
+    el.innerHTML = '';
+    el.style.gridTemplateColumns = 'repeat(' + n + ', 28px)';
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        var span = document.createElement('span');
+        var causal = j <= i;
+        var local = i - j < W;
+        span.className = causal && local ? 'cell-allow' : 'cell-block';
+        el.appendChild(span);
+      }
+    }
+    if (captionEl) {
+      captionEl.textContent = 'Window W=' + W + ': row i allows keys j where j ≤ i and i−j < ' + W + ' (up to W−1 steps into the past).';
+    }
+  }
+  var dwN = document.getElementById('dwN');
+  var dwW = document.getElementById('dwW');
+  var dwGrid = document.getElementById('dwGrid');
+  var dwCaption = document.getElementById('dwCaption');
+  function refreshDw() {
+    buildMaskGrid(+dwN.value, +dwW.value, dwGrid, dwCaption);
+  }
+  dwN.addEventListener('input', refreshDw);
+  dwW.addEventListener('input', refreshDw);
+  refreshDw();
+
+  var rfW = document.getElementById('rfW');
+  var rfL = document.getElementById('rfL');
+  var rfOut = document.getElementById('rfOut');
+  function refreshRf() {
+    var W = +rfW.value;
+    var L = +rfL.value;
+    var reach = 1 + L * (W - 1);
+    rfOut.textContent = 'Illustrative past reach ≤ 1 + L×(W−1) = 1 + ' + L + '×' + (W - 1) + ' = ' + reach + ' tokens (lower-bound story; real mixing depends on weights).';
+  }
+  rfW.addEventListener('input', refreshRf);
+  rfL.addEventListener('input', refreshRf);
+  refreshRf();
+
+  var bufSlots = document.getElementById('bufSlots');
+  var bufLogical = document.getElementById('bufLogical');
+  var Wbuf = 4;
+  var buf = new Array(Wbuf).fill(null);
+  var head = 0;
+  var size = 0;
+  var tokens = ['the','cat','is','on','a','chair','and','sleeps','.','tok9','tok10','tok11','tok12'];
+  var stepN = 0;
+  function logicalOrder() {
+    if (size === 0) return [];
+    if (size < Wbuf) return buf.slice(0, size);
+    var out = [];
+    for (var k = 0; k < Wbuf; k++) out.push(buf[(head + k) % Wbuf]);
+    return out;
+  }
+  function renderBuf(highlightIdx) {
+    bufSlots.innerHTML = '';
+    for (var i = 0; i < Wbuf; i++) {
+      var d = document.createElement('div');
+      d.className = 'buffer-slot';
+      d.textContent = buf[i] != null ? buf[i] : '·';
+      if (i === head) d.classList.add('head');
+      if (i === highlightIdx) d.classList.add('write');
+      bufSlots.appendChild(d);
+    }
+    var ord = logicalOrder();
+    bufLogical.textContent = 'Physical slots 0…' + (Wbuf - 1) + ' · next write @' + head + ' · logical oldest→newest: [ ' + ord.join(', ') + ' ]';
+  }
+  document.getElementById('bufStep').addEventListener('click', function () {
+    var t = tokens[stepN % tokens.length];
+    stepN++;
+    var writeIdx = head;
+    buf[writeIdx] = t;
+    head = (head + 1) % Wbuf;
+    if (size < Wbuf) size++;
+    renderBuf(writeIdx);
+  });
+  document.getElementById('bufReset').addEventListener('click', function () {
+    buf = new Array(Wbuf).fill(null);
+    head = 0;
+    size = 0;
+    stepN = 0;
+    renderBuf(-1);
+  });
+  renderBuf(-1);
+
+  var chIdx = document.getElementById('chIdx');
+  var chunkSvg = document.getElementById('chunkSvg');
+  var chunkCap = document.getElementById('chunkCap');
+  function drawChunk() {
+    var idx = +chIdx.value;
+    var ns = 'http://www.w3.org/2000/svg';
+    chunkSvg.innerHTML = '';
+    function rect(x, y, w, h, fill, stroke) {
+      var r = document.createElementNS(ns, 'rect');
+      r.setAttribute('x', x); r.setAttribute('y', y);
+      r.setAttribute('width', w); r.setAttribute('height', h);
+      r.setAttribute('rx', 6);
+      r.setAttribute('fill', fill);
+      r.setAttribute('stroke', stroke || 'none');
+      return r;
+    }
+    function text(x, y, s, fs) {
+      var t = document.createElementNS(ns, 'text');
+      t.setAttribute('x', x); t.setAttribute('y', y);
+      t.setAttribute('fill', '#e0e0e8');
+      t.setAttribute('font-size', fs || 11);
+      t.setAttribute('font-family', 'monospace');
+      t.textContent = s;
+      return t;
+    }
+    function arrow(x1, y1, x2, y2) {
+      var p = document.createElementNS(ns, 'path');
+      p.setAttribute('d', 'M' + x1 + ',' + y1 + ' L' + x2 + ',' + y2);
+      p.setAttribute('stroke', '#6c8cff');
+      p.setAttribute('stroke-width', 2);
+      p.setAttribute('fill', 'none');
+      p.setAttribute('marker-end', 'url(#arr)');
+      return p;
+    }
+    var defs = document.createElementNS(ns, 'defs');
+    defs.innerHTML = '<marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#6c8cff"/></marker>';
+    chunkSvg.appendChild(defs);
+    chunkSvg.appendChild(rect(20, 20, 100, 36, 'rgba(52,211,153,0.15)', '#34d399'));
+    chunkSvg.appendChild(rect(140, 20, 100, 36, 'rgba(167,139,250,0.12)', '#a78bfa'));
+    chunkSvg.appendChild(rect(260, 20, 100, 36, 'rgba(244,114,182,0.12)', '#f472b6'));
+    chunkSvg.appendChild(text(45, 42, 'Chunk 0', 12));
+    chunkSvg.appendChild(text(165, 42, 'Chunk 1', 12));
+    chunkSvg.appendChild(text(285, 42, 'Chunk 2', 12));
+    chunkSvg.appendChild(text(20, 78, 'KV cache grows', 10));
+    chunkSvg.appendChild(rect(20, 88, 340, 28, '#12121a', '#2a2a3a'));
+    if (idx === 0) {
+      chunkSvg.appendChild(text(30, 106, 'Q = chunk0 ; K,V = chunk0', 11));
+      chunkCap.textContent = 'First chunk: build K/V from scratch for tokens in chunk 0 only.';
+      chunkSvg.appendChild(arrow(70, 70, 70, 56));
+    } else if (idx === 1) {
+      chunkSvg.appendChild(text(30, 106, 'Q = chunk1 ; K,V = cache(chunk0)+chunk1', 11));
+      chunkCap.textContent = 'Later chunk: queries from current chunk; keys/values include prior cache so boundaries stay connected.';
+      chunkSvg.appendChild(arrow(190, 70, 120, 56));
+    } else {
+      chunkSvg.appendChild(text(30, 106, 'Q = chunk2 ; K,V = cache(0+1)+chunk2', 11));
+      chunkCap.textContent = 'Pattern continues: each new chunk attends into all cached prior tokens (subject to causal + window masks).';
+      chunkSvg.appendChild(arrow(310, 70, 220, 56));
+    }
+  }
+  chIdx.addEventListener('input', drawChunk);
+  drawChunk();
+
+  var moeBars = document.getElementById('moeBars');
+  var moeText = document.getElementById('moeText');
+  var logits = [0.2, -0.5, 1.1, -0.2, 0.8, 0.1, -0.9, 0.4];
+  function renderMoe() {
+    moeBars.innerHTML = '';
+    var indexed = logits.map(function (v, i) { return { v: v, i: i }; });
+    indexed.sort(function (a, b) { return b.v - a.v; });
+    var eHi = indexed[0].i;
+    var eLo = indexed[1].i;
+    var wPair = softmaxPair(logits[eHi], logits[eLo]);
+    var wHi = wPair[0];
+    var wLo = wPair[1];
+    var maxL = Math.max.apply(null, logits.map(Math.abs)) || 1;
+    for (var e = 0; e < 8; e++) {
+      var row = document.createElement('div');
+      row.className = 'moe-row' + (e === eHi || e === eLo ? ' top2' : '');
+      var lab = document.createElement('span');
+      lab.style.width = '72px';
+      lab.textContent = 'E' + e;
+      var bar = document.createElement('div');
+      bar.className = 'bar';
+      var inner = document.createElement('i');
+      inner.style.width = (Math.abs(logits[e]) / maxL * 100) + '%';
+      bar.appendChild(inner);
+      var val = document.createElement('span');
+      val.style.width = '52px';
+      val.textContent = logits[e].toFixed(2);
+      row.appendChild(lab);
+      row.appendChild(bar);
+      row.appendChild(val);
+      moeBars.appendChild(row);
+    }
+    moeText.textContent = 'Top-2: E' + eHi + ' (w≈' + wHi.toFixed(3) + '), E' + eLo + ' (w≈' + wLo.toFixed(3) + ') — softmax on this pair only, weights sum to 1. y = w_hi·FFN_' + eHi + '(x) + w_lo·FFN_' + eLo + '(x).';
+  }
+  document.getElementById('moeRand').addEventListener('click', function () {
+    logits = logits.map(function () { return Math.random() * 4 - 2; });
+    renderMoe();
+  });
+  renderMoe();
+
+  var pipeT = 0;
+  var pipeGrid = document.getElementById('pipeGrid');
+  var pipeTEl = document.getElementById('pipeT');
+  var stages = 4;
+  var micro = 4;
+  function pipeBusy(t, stage) {
+    var wave = t - stage;
+    return wave >= 0 && wave < micro;
+  }
+  function renderPipe() {
+    pipeGrid.innerHTML = '';
+    pipeGrid.style.gridTemplateColumns = 'repeat(' + (stages + 1) + ', 1fr)';
+    var hdr = document.createElement('div');
+    hdr.className = 'pipeline-cell';
+    hdr.textContent = 't=' + pipeT;
+    pipeGrid.appendChild(hdr);
+    for (var s = 0; s < stages; s++) {
+      var c = document.createElement('div');
+      c.className = 'pipeline-cell ' + (pipeBusy(pipeT, s) ? 'active' : 'idle');
+      c.textContent = 'GPU' + (s + 1);
+      pipeGrid.appendChild(c);
+    }
+    pipeTEl.textContent = 'clock ' + pipeT;
+  }
+  document.getElementById('pipePlay').addEventListener('click', function () {
+    pipeT++;
+    if (pipeT > 12) pipeT = 0;
+    renderPipe();
+  });
+  document.getElementById('pipeReset').addEventListener('click', function () {
+    pipeT = 0;
+    renderPipe();
+  });
+  renderPipe();
+
+  var bdIdx = document.getElementById('bdIdx');
+  var bdGrid = document.getElementById('bdGrid');
+  var bdCap = document.getElementById('bdCap');
+  var total = 12;
+  function refreshBd() {
+    var focus = +bdIdx.value;
+    bdGrid.innerHTML = '';
+    bdGrid.style.gridTemplateColumns = 'repeat(' + total + ', 28px)';
+    function blockOf(j) {
+      if (j < 3) return 0;
+      if (j < 7) return 1;
+      return 2;
+    }
+    for (var i = 0; i < total; i++) {
+      for (var j = 0; j < total; j++) {
+        var span = document.createElement('span');
+        var same = blockOf(i) === blockOf(j);
+        var causal = j <= i;
+        var ok = same && causal;
+        span.className = ok ? 'cell-allow' : 'cell-block';
+        if (i === focus && j === focus) span.style.boxShadow = '0 0 0 2px #fbbf24';
+        bdGrid.appendChild(span);
+      }
+    }
+    bdCap.textContent = 'Token ' + focus + ' in block ' + blockOf(focus) + ' may attend causally within its block only; cross-block cells are forbidden.';
+  }
+  bdIdx.addEventListener('input', refreshBd);
+  refreshBd();
+
+  var pgN = document.getElementById('pgN');
+  var pgW = document.getElementById('pgW');
+  var pgPack = document.getElementById('pgPack');
+  var pgGrid = document.getElementById('pgGrid');
+  var pgCap = document.getElementById('pgCap');
+  function refreshPg() {
+    var n = +pgN.value;
+    var W = +pgW.value;
+    var pack = pgPack.checked;
+    pgGrid.innerHTML = '';
+    pgGrid.style.gridTemplateColumns = 'repeat(' + n + ', 28px)';
+    function blk(j) {
+      if (!pack) return 0;
+      return j < 5 ? 0 : 1;
+    }
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        var span = document.createElement('span');
+        var causal = j <= i;
+        var local = i - j < W;
+        var same = !pack || blk(i) === blk(j);
+        span.className = causal && local && same ? 'cell-allow' : 'cell-block';
+        pgGrid.appendChild(span);
+      }
+    }
+    pgCap.textContent = (pack ? 'Packed: two blocks (0–4 and 5–end). ' : 'Single sequence. ') + 'Causal + sliding W=' + W + '.';
+  }
+  pgN.addEventListener('input', refreshPg);
+  pgW.addEventListener('input', refreshPg);
+  pgPack.addEventListener('change', refreshPg);
+  refreshPg();
+})();
+</script>
+</body>
+</html>

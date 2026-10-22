@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verifiers, Self-Consistency & Beam Search — Reasoning from Scratch</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 60vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-yellow { background: rgba(251,191,36,0.15); color: var(--accent5); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+.footer a { margin: 0 12px; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+td { color: var(--text-dim); }
+.flow-diagram { font-family: var(--mono); font-size: 0.82rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 20px; line-height: 1.9; color: var(--text-dim); overflow-x: auto; }
+.flow-diagram .highlight { color: var(--accent3); }
+.flow-diagram .dim { color: var(--text-dim); opacity: 0.7; }
+.prompt-block { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; font-family: var(--mono); font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap; color: var(--text-dim); }
+.path-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin: 10px 0; font-size: 0.88rem; transition: all 0.3s; }
+.path-card.winner { border-color: var(--accent3); background: rgba(52,211,153,0.1); box-shadow: 0 0 20px rgba(52,211,153,0.15); }
+.path-card .path-label { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); margin-bottom: 6px; }
+.path-card .path-answer { font-weight: 700; color: var(--text); font-size: 1rem; }
+.path-card .path-reason { color: var(--text-dim); font-size: 0.82rem; margin-top: 6px; }
+.vote-bar { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+.vote-chip { padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border); font-family: var(--mono); font-weight: 600; transition: all 0.3s; }
+.vote-chip.majority { border-color: var(--accent3); background: rgba(52,211,153,0.2); color: var(--accent3); transform: scale(1.05); }
+.rm-card { position: relative; overflow: hidden; }
+.rm-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.rm-card.orm::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.rm-card.prm::before { background: linear-gradient(90deg, var(--accent3), var(--accent5)); }
+.step-score { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; font-family: var(--mono); font-size: 0.78rem; margin: 4px 4px 4px 0; }
+.step-score.high { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); }
+.step-score.low { background: rgba(248,113,113,0.12); color: var(--danger); border: 1px solid rgba(248,113,113,0.3); }
+.beam-tree { display: flex; flex-direction: column; gap: 24px; margin: 24px 0; }
+.beam-layer { display: flex; flex-direction: column; gap: 8px; }
+.beam-layer-label { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+.beam-nodes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.beam-node { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-alt); font-size: 0.8rem; min-width: 120px; text-align: center; transition: all 0.3s; cursor: default; }
+.beam-node.selected { border-color: var(--accent3); background: rgba(52,211,153,0.12); }
+.beam-node.pruned { opacity: 0.35; text-decoration: line-through; }
+.beam-node .score { display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--accent5); margin-top: 4px; }
+.beam-connector { text-align: center; color: var(--text-dim); font-size: 1.2rem; }
+.slider-row { margin: 16px 0; }
+.slider-row label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 8px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.slider-val { font-family: var(--mono); color: var(--accent); font-size: 0.9rem; }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<!-- Breadcrumb: series navigation -->
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; background: #111118; border-bottom: 1px solid #23232f; padding: 10px 24px; font-size: 0.82rem; color: #8888a0; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Reasoning from Scratch</a><span class="bc-sep">›</span><span class="bc-current">Ch.03 — Verifiers & Search</span></nav>
+
+<!-- Floating in-chapter nav -->
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Reasoning from Scratch</a>
+  <div class="nav-links">
+    <a href="#intro">Intro</a>
+    <a href="#verification">Verification</a>
+    <a href="#reward-models">ORM / PRM</a>
+    <a href="#self-consistency">Self-Consistency</a>
+    <a href="#best-of-n">Best-of-N</a>
+    <a href="#beam-search">Beam Search</a>
+    <a href="#compute">Compute Scaling</a>
+    <a href="#tree">Tree Search</a>
+    <a href="#summary">Summary</a>
+  </div>
+</nav>
+
+<!-- Hero: chapter thesis + headline stats -->
+<div class="hero">
+  <div class="container">
+    <span class="section-num">CHAPTER 03</span>
+    <h1>Verifiers, Self-Consistency &amp; Beam Search</h1>
+    <p class="subtitle">Chapter 02 taught models <em>how</em> to think via prompting. This chapter spends more compute at inference time by generating many candidate answers and using verifiers — reward models, majority votes, or structured search — to pick the best one.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">3</span><span class="stat-label">Verification Methods</span></div>
+      <div class="stat"><span class="stat-val">2</span><span class="stat-label">Reward Model Types</span></div>
+      <div class="stat"><span class="stat-val">N×</span><span class="stat-label">Inference Compute</span></div>
+      <div class="stat"><span class="stat-val">1976</span><span class="stat-label">Beam Search Origin</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 01: From prompting to search -->
+<section class="section fade-in" id="intro">
+  <div class="container">
+    <span class="section-num">01 — BEYOND PROMPTING</span>
+    <h2>Search Against Verifiers</h2>
+    <p>Inference-time compute scaling has two families. Chapter 02 covered the first: <strong>modifying the proposal distribution</strong> — few-shot chain-of-thought, zero-shot CoT ("Let's think step by step"), and related prompting tricks that nudge the model toward longer reasoning traces without changing weights.</p>
+    <p>This chapter covers the second family: <strong>search against verifiers</strong>. Instead of trusting the first chain the model emits, you sample multiple answers (or multiple reasoning paths), score them with a verification layer, and return the best. The base LLM stays frozen; you pay extra compute at test time for higher accuracy.</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-blue">Proposal Distribution</span></h3>
+        <p>Change <em>what</em> the model is likely to generate — via prompts, temperature, or decoding tweaks.</p>
+        <p style="margin-bottom:0;font-size:0.9rem;">Examples: CoT, zero-shot CoT, Tree-of-Thought (next chapter).</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-green">Verifiers</span></h3>
+        <p>Keep generation as-is but add a layer that <em>grades</em> candidates and selects the winner.</p>
+        <p style="margin-bottom:0;font-size:0.9rem;">Examples: self-consistency, best-of-N, beam search + PRM.</p>
+      </div>
+    </div>
+
+    <div class="flow-diagram">
+Question ──► Reasoning LLM ──► <span class="highlight">A₁, A₂, A₃, A₄</span> (multiple samples)
+                                    │
+                                    ▼
+                         <span class="highlight">Verification Layer</span> (human or reward model)
+                                    │
+                                    ▼
+                              Best Answer
+    </div>
+
+    <div class="callout">
+      <p><strong>Crop-field analogy:</strong> Finding the best crop in a huge field. You could stop at the first good one — or pluck five or six samples and pick the best among them. Sampling more candidates raises the probability of finding the true optimum. Verifiers do the same for LLM outputs.</p>
+    </div>
+
+    <p>The verification layer increases wall-clock inference time and token count. That is exactly why these techniques fall under <strong>inference-time compute scaling</strong>: pre-training and fine-tuning stay fixed; the inference phase grows because you generate and evaluate multiple candidates before showing the user a single answer.</p>
+
+    <!-- Lifecycle diagram: where verification sits in the ML pipeline -->
+    <h3 style="margin-top:32px;">The ML Lifecycle with Verification</h3>
+    <div class="flow-diagram">
+<span class="dim">PRE-TRAINING</span>  ──►  billions of tokens, base capabilities
+<span class="dim">FINE-TUNING</span>   ──►  instruction following, optional SFT on CoT
+<span class="highlight">INFERENCE</span>     ──►  question in → <span class="highlight">×N samples + verifier</span> → answer out
+    </div>
+    <p>Without verification, inference is a single forward pass. With verification, inference expands horizontally: the same frozen weights run N times (or branch into a search tree), and a separate verifier model may run N additional forward passes. Total test-time FLOPs can exceed training-time FLOPs for a single query — that is intentional.</p>
+
+    <!-- Three verifier methods preview table -->
+    <table>
+      <thead><tr><th>Method</th><th>Needs reward model?</th><th>Search structure</th></tr></thead>
+      <tbody>
+        <tr><td>Self-consistency</td><td>No — majority vote only</td><td>Flat bag of N samples</td></tr>
+        <tr><td>Best-of-N</td><td>Yes — ORM or PRM</td><td>Flat bag, scored post-hoc</td></tr>
+        <tr><td>Beam search</td><td>Yes — typically PRM per step</td><td>Layered tree, pruned each step</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION 02: Verification layer mechanics -->
+<section class="section fade-in" id="verification">
+  <div class="container">
+    <span class="section-num">02 — THE VERIFICATION PIPELINE</span>
+    <h2>How Verification Works</h2>
+    <p>Verification means: generate different answers, then select the best among them. The verifier can be a <strong>human</strong> (expensive, accurate) or a <strong>model</strong> trained to mimic human judgment — a <strong>reward model</strong>.</p>
+
+    <p>A canonical example on Hugging Face is <code>OpenAssistant/reward-model-deberta-v3-large-v2</code>. It is trained to predict which generated answer a human would prefer, given a question. Uses include RLHF reward scoring, model evaluation, and ranking toxic responses. The training data consists of human preference labels; the model learns to assign a scalar score so that better answers receive higher rewards.</p>
+
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Role</th><th>When it runs</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Reasoning LLM</td><td>Generates CoT + final answer(s)</td><td>Every sample</td></tr>
+        <tr><td>Verifier / reward model</td><td>Scores each candidate</td><td>After each sample (ORM or PRM)</td></tr>
+        <tr><td>Selection rule</td><td>Majority vote, argmax score, or beam prune</td><td>Once all candidates scored</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout ok">
+      <p><strong>Production insight:</strong> Systems like OpenAI o1 and DeepSeek-R1 likely attach a verification layer before surfacing an answer — often a process reward model that evaluates reasoning steps and returns the path with the strongest chain, not merely the first fluent completion.</p>
+    </div>
+
+    <p>The key advantage of verifier-based methods: you do <strong>not</strong> need to fine-tune or retrain the base reasoning LLM. You wrap it with search and scoring. That makes verifiers the fastest path from a generic model to better reasoning on hard benchmarks.</p>
+  </div>
+</section>
+
+<!-- SECTION 03: ORM vs PRM -->
+<section class="section fade-in" id="reward-models">
+  <div class="container">
+    <span class="section-num">03 — REWARD MODELS</span>
+    <h2>Outcome vs Process Reward Models</h2>
+    <p>Reward models that power verifiers come in two flavors. The names describe exactly what each one scores.</p>
+
+    <!-- Interactive comparison cards: ORM vs PRM -->
+    <div class="comparison">
+      <div class="card rm-card orm">
+        <h3><span class="tag tag-blue">ORM</span> Outcome Reward Model</h3>
+        <p>Scores <strong>only the final answer</strong>. The chain-of-thought is ignored — the model does not care how the model arrived there.</p>
+        <div class="formula" style="font-size:0.85rem;margin:12px 0;">score = ORM(question, final_answer)</div>
+        <p><strong>Example:</strong> Question → reasoning trace → answer "42" → ORM returns 0.85.</p>
+        <p style="margin-bottom:0;font-size:0.88rem;color:var(--text-dim);">Best for tasks where only correctness of the endpoint matters (e.g., multiple-choice extraction, numeric answers).</p>
+      </div>
+      <div class="card rm-card prm">
+        <h3><span class="tag tag-green">PRM</span> Process Reward Model</h3>
+        <p>Scores <strong>each reasoning step</strong> individually. The final answer may not be scored directly — correct steps imply a correct conclusion.</p>
+        <div class="formula" style="font-size:0.85rem;margin:12px 0;">score = mean(PRM(q, step₁), …, PRM(q, stepₙ))</div>
+        <p><strong>Assumption:</strong> If every step is sound, the final answer will be sound.</p>
+        <p style="margin-bottom:0;font-size:0.88rem;color:var(--text-dim);">Preferred for math and logic where a wrong intermediate step dooms the solution even if the final number looks plausible.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:32px;">PRM in Action: Roger&apos;s Tennis Balls</h3>
+    <p>Consider the GSM8K-style problem: <em>Roger has 5 tennis balls. He buys 2 cans of 3 tennis balls each. How many does he have now?</em></p>
+
+    <div class="card card-alt">
+      <p><span class="step-score high">Step 1 ✓ 0.92</span> Roger started with 5 balls.</p>
+      <p><span class="step-score low">Step 2 ✗ 0.31</span> Two cans of three tennis balls each is <strong>five</strong> tennis balls. <em>(Wrong — should be 6.)</em></p>
+      <p><span class="step-score high">Step 3 ✓ 0.88</span> Total is 5 + 6 = 11.</p>
+      <p style="margin-bottom:0;font-size:0.9rem;">A PRM penalizes Step 2 even though Step 3 reaches the correct answer 11 via lucky arithmetic. An ORM might score the final "11" highly and miss the flawed reasoning.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Let&apos;s Verify Step by Step (Lightman et al., 2023)</h3>
+    <p>The landmark paper <strong>"Let's Verify Step by Step"</strong> (Lightman et al., 2023) introduced <strong>PRM800K</strong> — 800,000 step-level human labels on MATH problem solutions. The authors showed that process supervision (PRMs) substantially outperforms outcome supervision (ORMs) on challenging math benchmarks, because ORMs cannot distinguish lucky guesses from valid derivations.</p>
+
+    <p>PRM800K labels each intermediate step as positive, negative, or neutral. A PRM trained on this data learns fine-grained supervision: wrong reasoning gets a lower reward even when the final boxed answer matches. Modern inference stacks — including best-of-N and beam search over reasoning steps — frequently employ PRMs built on this line of work.</p>
+
+    <div class="callout">
+      <p><strong>Paper tie-in:</strong> Snell et al. (2024), <em>Scaling LLM Test-Time Compute Optimally can be More Effective than Scaling Model Parameters</em>, organizes test-time methods into verifiers (this chapter) vs. proposal-distribution modifiers (Chapter 02). The lecture recommends reading it after these three chapters — the theory formalizes when extra inference compute beats training a larger model.</p>
+    </div>
+
+    <!-- Interactive ORM vs PRM side-by-side step scoring -->
+    <div class="interactive-panel" id="orm-prm-demo">
+      <h3>Interactive: ORM vs PRM on the Same Chain</h3>
+      <p>Same flawed reasoning chain. Toggle verifier type to see what each one evaluates.</p>
+      <div class="btn-group">
+        <button class="btn active" id="btn-orm-view">Show ORM view</button>
+        <button class="btn" id="btn-prm-view">Show PRM view</button>
+      </div>
+      <div class="card card-alt" style="margin-top:16px;">
+        <p><strong>Chain:</strong></p>
+        <p id="chain-step1">Step 1: Roger started with 5 balls.</p>
+        <p id="chain-step2">Step 2: Two cans × 3 = <strong>5</strong> new balls. <span class="tag tag-pink" style="margin-left:8px;">error</span></p>
+        <p id="chain-step3">Step 3: Total = 5 + 6 = <strong>11</strong>.</p>
+      </div>
+      <div id="orm-output">
+        <p style="color:var(--text);margin-bottom:8px;"><strong>ORM scores final answer only:</strong></p>
+        <div class="formula" style="text-align:left;font-size:0.85rem;">ORM(q, "11") → 0.82  <span style="color:var(--accent5);">/* high — correct number */</span></div>
+        <p style="margin-bottom:0;font-size:0.88rem;">ORM never sees Step 2&apos;s arithmetic mistake. A best-of-N picker might choose this chain over a slower-but-correct derivation.</p>
+      </div>
+      <div id="prm-output" style="display:none;">
+        <p style="color:var(--text);margin-bottom:8px;"><strong>PRM scores each step:</strong></p>
+        <p><span class="step-score high">Step 1: 0.91</span> <span class="step-score low">Step 2: 0.28</span> <span class="step-score high">Step 3: 0.87</span></p>
+        <div class="formula" style="text-align:left;font-size:0.85rem;">mean(PRM) = (0.91 + 0.28 + 0.87) / 3 = <strong>0.687</strong></div>
+        <p style="margin-bottom:0;font-size:0.88rem;">A fully correct chain (Step 2 = 6) would score ~0.90+. PRM ranks the flawed chain lower despite the right final answer.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 04: Self-consistency -->
+<section class="section fade-in" id="self-consistency">
+  <div class="container">
+    <span class="section-num">04 — MAJORITY VOTING</span>
+    <h2>Self-Consistency Decoding</h2>
+    <p><strong>Self-consistency</strong> (Wang et al., 2022/2023) is the simplest verifier: sample the LLM many times with stochastic decoding, extract each final answer, and take a <strong>majority vote</strong>. No separate reward model is required — the verifier is the vote count itself.</p>
+
+    <div class="formula">â = argmax<sub>a</sub> |{ i : extract_answer(y<sup>(i)</sup>) = a }|</div>
+
+    <p>Intuition: diverse reasoning paths that independently reach the same conclusion are more likely correct than a single greedy decode. Temperature &gt; 0 is essential — without diversity in samples, every path may return the same (possibly wrong) answer.</p>
+
+    <!-- Interactive self-consistency demo -->
+    <div class="interactive-panel" id="sc-demo">
+      <h3>Interactive: Self-Consistency Majority Vote</h3>
+      <p><strong>Question:</strong> Are the number of prime numbers finite?</p>
+      <p style="font-size:0.88rem;margin-bottom:16px;">Six independent reasoning paths (final answers only). Click <em>Run Majority Vote</em> to highlight the winner.</p>
+
+      <div id="sc-paths">
+        <div class="path-card" data-answer="No">
+          <div class="path-label">Path 1</div>
+          <div class="path-answer">Final answer: <strong>No</strong></div>
+          <div class="path-reason">Euclid&apos;s proof: assume finitely many primes p₁…pₙ; construct N = p₁×…×pₙ + 1…</div>
+        </div>
+        <div class="path-card" data-answer="Yes">
+          <div class="path-label">Path 2</div>
+          <div class="path-answer">Final answer: <strong>Yes</strong></div>
+          <div class="path-reason">There are only finitely many numbers below any bound, so primes must be finite.</div>
+        </div>
+        <div class="path-card" data-answer="No">
+          <div class="path-label">Path 3</div>
+          <div class="path-answer">Final answer: <strong>No</strong></div>
+          <div class="path-reason">Infinitely many primes — classic number theory result.</div>
+        </div>
+        <div class="path-card" data-answer="No">
+          <div class="path-label">Path 4</div>
+          <div class="path-answer">Final answer: <strong>No</strong></div>
+          <div class="path-reason">For any finite list, a new prime can be constructed (Euclid).</div>
+        </div>
+        <div class="path-card" data-answer="Yes">
+          <div class="path-label">Path 5</div>
+          <div class="path-answer">Final answer: <strong>Yes</strong></div>
+          <div class="path-reason">Primes thin out quickly; eventually you run out.</div>
+        </div>
+        <div class="path-card" data-answer="No">
+          <div class="path-label">Path 6</div>
+          <div class="path-answer">Final answer: <strong>No</strong></div>
+          <div class="path-reason">Proof by contradiction shows infinitely many primes exist.</div>
+        </div>
+      </div>
+
+      <button class="btn" id="sc-vote-btn" style="margin-top:16px;">Run Majority Vote</button>
+      <div id="sc-result" style="margin-top:16px;display:none;">
+        <div class="vote-bar">
+          <span class="vote-chip" id="vote-no">No: 4</span>
+          <span class="vote-chip" id="vote-yes">Yes: 2</span>
+        </div>
+        <p style="margin-top:12px;margin-bottom:0;color:var(--accent3);"><strong>Selected answer: No</strong> (4/6 votes) — correct. Infinitely many primes exist.</p>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Limitation:</strong> Self-consistency has no ground-truth check. If the model systematically biases toward a wrong answer, majority vote amplifies that error. The next method — best-of-N with a trained verifier — addresses this by scoring quality, not just frequency.</p>
+    </div>
+
+    <p>Wang et al. report large gains on arithmetic and commonsense reasoning when combining CoT prompting with self-consistency over greedy decoding — often matching or beating much larger models, purely by spending more samples at inference time.</p>
+
+    <!-- Algorithm pseudocode block for self-consistency -->
+    <h3 style="margin-top:28px;">Self-Consistency Algorithm</h3>
+    <div class="prompt-block"><span class="label" style="color:var(--accent);">Pseudocode</span>
+# Input: question q, LLM, sample count N, temperature T &gt; 0
+answers = []
+for i in 1..N:
+    chain = LLM.sample(q, temperature=T)   # diverse CoT paths
+    answers.append(extract_final(chain))
+return mode(answers)   # majority vote
+    </div>
+
+    <p>The critical hyperparameters are <strong>N</strong> (how many samples) and <strong>temperature</strong> (how diverse they are). Too few samples or temperature ≈ 0 collapses self-consistency to ordinary greedy decoding — all paths identical, vote meaningless.</p>
+
+    <!-- Prime numbers lecture example spelled out -->
+    <div class="card card-alt">
+      <h3>Lecture Example: Prime Numbers (Vote Breakdown)</h3>
+      <p>Six CoT paths on <em>"Are the number of prime numbers finite?"</em> — only final answers counted:</p>
+      <p><span class="tag tag-green">No × 4</span> &nbsp; <span class="tag tag-pink">Yes × 2</span></p>
+      <p style="margin-bottom:0;">Majority selects <strong>No</strong> — mathematically correct (Euclid&apos;s theorem). If the model were biased toward "Yes" on 4/6 paths, self-consistency would confidently return the wrong answer with no way to detect the error.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 05: Best-of-N -->
+<section class="section fade-in" id="best-of-n">
+  <div class="container">
+    <span class="section-num">05 — BEST-OF-N SAMPLING</span>
+    <h2>Scoring N Candidates with a Verifier</h2>
+    <p>Best-of-N keeps the multi-sample idea but replaces voting with a <strong>learned verifier</strong>. Sample N complete solutions from the LLM, score each with an ORM or PRM, and return the highest-scoring candidate.</p>
+
+    <div class="formula">â = argmax<sub>i ∈ {1…N}</sub> R(x, y<sup>(i)</sup>)</div>
+
+    <p>Where <code>R</code> is either an outcome reward (final answer only) or an aggregate of per-step process rewards.</p>
+
+    <h3 style="margin-top:28px;">Best-of-N with an ORM</h3>
+    <p><strong>Question:</strong> How many moons does Jupiter have?</p>
+    <p>The reasoning model produces six chains. An ORM ignores the chains and scores only extracted final answers:</p>
+
+    <table>
+      <thead><tr><th>Sample</th><th>Final answer</th><th>ORM score</th></tr></thead>
+      <tbody>
+        <tr><td>T₁</td><td>91</td><td>0.629</td></tr>
+        <tr><td>T₂</td><td>95</td><td><strong>0.735</strong></td></tr>
+        <tr><td>T₃</td><td>82</td><td>0.512</td></tr>
+        <tr><td>T₄</td><td>76</td><td>0.441</td></tr>
+        <tr><td>T₅</td><td>95</td><td>0.701</td></tr>
+        <tr><td>T₆</td><td>14</td><td>0.089</td></tr>
+      </tbody>
+    </table>
+    <p>Best-of-N with ORM selects <strong>95</strong> (highest verifier score). Note: two samples agree on 95, but ORM picks by score, not vote count.</p>
+
+    <h3 style="margin-top:28px;">Best-of-N with a PRM</h3>
+    <p>Three full reasoning chains are scored step-by-step; chain-level score is the <strong>mean of step scores</strong>:</p>
+
+    <table>
+      <thead><tr><th>Chain</th><th>Step scores</th><th>Mean</th></tr></thead>
+      <tbody>
+        <tr><td>T₁</td><td>0.91, 0.88, 0.85</td><td>0.880</td></tr>
+        <tr><td>T₂</td><td>0.72, 0.15, 0.81</td><td>0.560</td></tr>
+        <tr><td>T₃</td><td>0.89, 0.92, 0.84</td><td><strong>0.883</strong></td></tr>
+      </tbody>
+    </table>
+    <p>PRM selects chain T₃ — best average step quality — even if another chain&apos;s final numeric answer looked plausible. Process supervision catches the weak Step 2 in T₂ (score 0.15) that an ORM might overlook if the final answer were correct.</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3>Self-Consistency</h3>
+        <p>Verifier = vote count. Free, no extra model. Fails when wrong answers dominate.</p>
+      </div>
+      <div class="card card-alt">
+        <h3>Best-of-N</h3>
+        <p>Verifier = ORM or PRM. Costs N forward passes + N verifier calls. Catches quality, not just consensus.</p>
+      </div>
+    </div>
+
+    <!-- Interactive best-of-N ORM table from Jupiter moons lecture example -->
+    <div class="interactive-panel" id="bon-demo">
+      <h3>Interactive: Best-of-N with ORM (Jupiter Moons)</h3>
+      <p>Six sampled final answers from the lecture. Click a row to inspect its ORM score; best-of-N picks the highest.</p>
+      <table id="bon-table" style="cursor:pointer;">
+        <thead><tr><th>Sample</th><th>Answer</th><th>ORM score</th></tr></thead>
+        <tbody>
+          <tr data-score="0.629"><td>T₁</td><td>91 moons</td><td>0.629</td></tr>
+          <tr data-score="0.735"><td>T₂</td><td>95 moons</td><td><strong>0.735 ★</strong></td></tr>
+          <tr data-score="0.512"><td>T₃</td><td>82 moons</td><td>0.512</td></tr>
+          <tr data-score="0.441"><td>T₄</td><td>76 moons</td><td>0.441</td></tr>
+          <tr data-score="0.701"><td>T₅</td><td>95 moons</td><td>0.701</td></tr>
+          <tr data-score="0.089"><td>T₆</td><td>14 moons</td><td>0.089</td></tr>
+        </tbody>
+      </table>
+      <p id="bon-result" style="margin-top:12px;margin-bottom:0;color:var(--text-dim);font-size:0.9rem;">Best-of-N selects <strong style="color:var(--accent3);">T₂ → 95 moons</strong> (highest ORM score 0.735).</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 06: Beam search -->
+<section class="section fade-in" id="beam-search">
+  <div class="container">
+    <span class="section-num">06 — STRUCTURED SEARCH</span>
+    <h2>Beam Search Over Reasoning Steps</h2>
+    <p>Beam search is the third verifier strategy — and the most structured. Instead of scoring full chains after the fact, you grow a <strong>tree of partial reasoning steps</strong>, pruning weak branches at each layer using a PRM. The algorithm dates to speech recognition (HARPY system, 1976): search strategy described as keeping "a few best paths in parallel."</p>
+
+    <p>Classic NLP used beam search for translation: at each step, keep the top-<em>k</em> continuations by model probability. For reasoning LLMs, beam width <em>m</em> becomes how many partial chains survive each PRM scoring step; number of beams <em>n</em> is how many new thoughts the LLM generates per active branch per layer.</p>
+
+    <h3 style="margin-top:28px;">Parameters</h3>
+    <table>
+      <thead><tr><th>Symbol</th><th>Name</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>n</code></td><td>Number of beams</td><td>Candidate thoughts generated at each layer (e.g., 4)</td></tr>
+        <tr><td><code>m</code></td><td>Beam width</td><td>How many top-scoring paths survive pruning (e.g., 2)</td></tr>
+        <tr><td><code>L</code></td><td>Max steps / layers</td><td>Depth of reasoning tree before final answer</td></tr>
+      </tbody>
+    </table>
+
+    <div class="formula">At layer ℓ: keep top-<strong>m</strong> of <strong>n</strong> (or n×m) scored partial chains → expand each into n children at layer ℓ+1</div>
+
+    <!-- Interactive beam search visualization -->
+    <div class="interactive-panel" id="beam-demo">
+      <h3>Interactive: Beam Search Tree (Roger&apos;s Tennis Balls)</h3>
+      <p>PRM scores each partial reasoning step. With <code>n=4</code> beams and <code>m=2</code> width, only two paths survive each layer. Adjust sliders to see pruning behavior.</p>
+
+      <div class="slider-row">
+        <label>Beam width (m): <span class="slider-val" id="beam-m-val">2</span></label>
+        <input type="range" id="beam-m" min="1" max="3" value="2">
+      </div>
+      <div class="slider-row">
+        <label>Beams per layer (n): <span class="slider-val" id="beam-n-val">4</span></label>
+        <input type="range" id="beam-n" min="2" max="4" value="4">
+      </div>
+
+      <div class="beam-tree" id="beam-tree">
+        <div class="beam-layer">
+          <div class="beam-layer-label">Layer 1 — initial thoughts</div>
+          <div class="beam-nodes">
+            <div class="beam-node" data-score="0.15">Roger has 5 balls<span class="score">PRM: 0.15</span></div>
+            <div class="beam-node selected" data-score="0.80">Roger started with 5<span class="score">PRM: 0.80</span></div>
+            <div class="beam-node" data-score="0.30">5 tennis balls initially<span class="score">PRM: 0.30</span></div>
+            <div class="beam-node selected" data-score="0.70">Start: 5 balls<span class="score">PRM: 0.70</span></div>
+          </div>
+        </div>
+        <div class="beam-connector">↓ keep top m</div>
+        <div class="beam-layer">
+          <div class="beam-layer-label">Layer 2 — extend survivors</div>
+          <div class="beam-nodes">
+            <div class="beam-node selected" data-score="0.90">… + 2×3 = 6 new<span class="score">PRM: 0.90</span></div>
+            <div class="beam-node" data-score="0.10">… + 2×3 = 5 new<span class="score">PRM: 0.10</span></div>
+            <div class="beam-node selected" data-score="0.85">… buys 6 more<span class="score">PRM: 0.85</span></div>
+            <div class="beam-node" data-score="0.20">… adds 5 more<span class="score">PRM: 0.20</span></div>
+          </div>
+        </div>
+        <div class="beam-connector">↓ keep top m</div>
+        <div class="beam-layer">
+          <div class="beam-layer-label">Layer 3 — final step</div>
+          <div class="beam-nodes">
+            <div class="beam-node selected" data-score="0.95">5 + 6 = 11<span class="score">PRM: 0.95</span></div>
+            <div class="beam-node" data-score="0.40">5 + 5 = 10<span class="score">PRM: 0.40</span></div>
+          </div>
+        </div>
+      </div>
+      <p id="beam-final" style="margin-bottom:0;color:var(--accent3);"><strong>Final answer:</strong> 11 tennis balls (highest-scoring complete path)</p>
+    </div>
+
+    <p>Unlike best-of-N — which scores entire chains independently — beam search <strong>commits early</strong> to promising prefixes and abandons dead ends. That makes it more compute-efficient on long reasoning problems when a good PRM is available, but wrong early pruning can be irreversible.</p>
+
+    <div class="callout">
+      <p><strong>Implementation note:</strong> Reference Colab notebooks use notation <code>n</code> = total beams, <code>m</code> = beam width, and <code>max_steps</code> = number of layers. Raising temperature (e.g., 0.9) increases answer diversity across beams — critical when the base model otherwise collapses to identical chains.</p>
+    </div>
+
+    <!-- Classic beam search: Hindi→English translation walkthrough from lecture -->
+    <h3 style="margin-top:32px;">Classic Beam Search: Translation Intuition</h3>
+    <p>Before applying beam search to reasoning, the lecture walks through word-by-word translation. A Hindi sentence meaning <em>"I am going to Delhi"</em> is decoded into English one word at a time from a fixed vocabulary (~50,000 words).</p>
+
+    <div class="card card-alt">
+      <p><strong>Step 0:</strong> Vocabulary = 50,000 English words. Model scores each as the first translated word.</p>
+      <p><strong>Step 1:</strong> Top-3 first words by probability: <code>I</code>, <code>Delhi</code>, <code>zoo</code> (beam width = 3).</p>
+      <p><strong>Step 2:</strong> For each surviving prefix, score all 50,000 next words → 150,000 pairs → keep top-3 two-word phrases: <code>I am</code>, <code>I love</code>, <code>zoo …</code>.</p>
+      <p><strong>Step 3+:</strong> Repeat until EOS. Paths like <code>zoo …</code> eventually score poorly and get pruned; <code>I am going to Delhi</code> wins.</p>
+      <p style="margin-bottom:0;">The name <strong>beam search</strong> evokes shining a flashlight (beam) into a vast library — illuminating only a few books (candidates) at each shelf (layer) instead of reading everything.</p>
+    </div>
+
+    <p>For reasoning LLMs, "words" become <strong>reasoning steps</strong> or token spans, and probabilities become <strong>PRM scores</strong>. The search topology is identical; only the scoring function changes from log-probability to learned step quality.</p>
+
+    <!-- Beam search layer expansion math from lecture -->
+    <h3 style="margin-top:28px;">Layer Expansion with n=4, m=2</h3>
+    <div class="flow-diagram">
+Layer 1: LLM generates <span class="highlight">4 thoughts</span> → PRM scores → keep top <span class="highlight">2</span>
+Layer 2: Each survivor branches into 2 children → <span class="highlight">4 thoughts</span> → keep top <span class="highlight">2</span>
+Layer 3: repeat …
+Layer L: single complete solution (filled node = final answer)
+    </div>
+    <p>Intermediate nodes are hollow (partial chains); the complete solution node is filled. Unlike best-of-N averaging over full chains, beam search <strong>discards</strong> low-scoring prefixes permanently — no second chance for a path that starts poorly.</p>
+
+    <!-- Reference pseudocode for beam + PRM -->
+    <div class="prompt-block"><span class="label" style="color:var(--accent);">Beam + PRM pseudocode</span>
+beams = [empty_chain]
+for step in 1..max_steps:
+    candidates = []
+    for b in beams:
+        for i in 1..n:
+            thought = LLM.continue(b, temperature=T)
+            score = PRM(question, thought)
+            candidates.append((b + thought, score))
+    beams = top_m(candidates, key=score)   # beam width m
+return best_complete(beams)
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 07: Compute-optimal inference -->
+<section class="section fade-in" id="compute">
+  <div class="container">
+    <span class="section-num">07 — COMPUTE-OPTIMAL INFERENCE</span>
+    <h2>Spending Compute at Test Time</h2>
+    <p>Every technique in this chapter trades <strong>more inference compute</strong> for <strong>better accuracy</strong>. The compute budget can be spent on:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;">
+      <li><strong>N samples</strong> — linear cost in N for self-consistency or best-of-N</li>
+      <li><strong>Verifier forward passes</strong> — one ORM call per sample, or one PRM call per step per sample</li>
+      <li><strong>Beam width × depth</strong> — structured search cost grows with n, m, and layers L</li>
+    </ul>
+
+    <p>Snell et al. (2024) ask: given a fixed FLOP budget at test time, should you sample more chains, use a stronger verifier, or widen the beam? Their analysis shows that <strong>optimally allocating test-time compute</strong> can outperform simply training a larger model — echoing the lecture&apos;s pre-training → fine-tuning → inference diagram where the inference bar grows when verification is enabled.</p>
+
+    <div class="flow-diagram">
+<span class="dim">Without verification</span>
+  Question ──► LLM ──► Answer   <span class="dim">(1× inference)</span>
+
+<span class="highlight">With verification</span>
+  Question ──► LLM × N samples ──► Verifier ──► Best Answer   <span class="highlight">(N×+ inference)</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Verifier type</th><th>Compute scaling</th><th>When to use</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Self-consistency</td><td>Majority vote</td><td>O(N) generations</td><td>Quick win, verifiable extractable answers</td></tr>
+        <tr><td>Best-of-N + ORM</td><td>Outcome RM</td><td>O(N) gen + O(N) ORM</td><td>Final-answer tasks, cheap verifier</td></tr>
+        <tr><td>Best-of-N + PRM</td><td>Process RM</td><td>O(N×L) PRM calls</td><td>Math, logic — step errors matter</td></tr>
+        <tr><td>Beam search + PRM</td><td>Process RM</td><td>O(L×n×m) structured</td><td>Long chains, early pruning helps</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout ok">
+      <p><strong>Practical takeaway:</strong> Verifiers let you improve a frozen model without gradient updates. The right method depends on your verifier quality, answer format, and latency budget. Production reasoning systems often combine high temperature sampling with PRM-guided beam search — the pattern likely used in o1-class models before answers are shown to users.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 08: Tree search preview -->
+<section class="section fade-in" id="tree">
+  <div class="container">
+    <span class="section-num">08 — BEYOND BEAM SEARCH</span>
+    <h2>Tree Search Strategies for Reasoning</h2>
+    <p>Beam search keeps a fixed-width frontier — greedy at the tree level. Richer <strong>tree search</strong> strategies explore reasoning more flexibly:</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-purple">Tree-of-Thought</span></h3>
+        <p>Deliberately branch on high-level "thoughts," backtrack when a branch looks unpromising, and use LLM self-evaluation or external verifiers to guide expansion. Modifies proposal distribution <em>and</em> uses search.</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-yellow">MCTS</span></h3>
+        <p>Monte Carlo Tree Search balances exploration and exploitation — simulate rollouts from partial reasoning states, update value estimates, select promising nodes. Used when the search space is too large for fixed beams.</p>
+      </div>
+    </div>
+
+    <p>The lecture previews Tree-of-Thought and MCTS briefly before pivoting to reinforcement learning in Chapter 04. Beam search with PRMs sits between simple best-of-N and full game-tree search: structured enough to prune bad prefixes, lightweight enough to run at LLM inference latencies.</p>
+
+    <h3 style="margin-top:28px;">Arc 1 Recap: Two Pillars of Inference-Time Reasoning</h3>
+    <div class="flow-diagram">
+<span class="dim">PILLAR 1 — Proposal distribution (Ch.02)</span>
+  CoT · Zero-shot CoT · prompt engineering
+
+<span class="highlight">PILLAR 2 — Verifiers (Ch.03)</span>
+  Self-consistency · Best-of-N · Beam search + ORM/PRM
+
+<span class="dim">NEXT — Tree search &amp; RL (Ch.04+)</span>
+  Tree-of-Thought · MCTS · policy optimization
+    </div>
+
+    <div class="callout">
+      <p><strong>What comes next:</strong> Chapter 04 begins Arc 2 — reinforcement learning foundations. The verifier intuition (reward models scoring steps) connects directly to RLHF and, later, GRPO training for models like DeepSeek-R1. Inference-time verifiers are the bridge between prompting and learned reasoning.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 09: Key papers summary -->
+<section class="section fade-in" id="papers">
+  <div class="container">
+    <span class="section-num">09 — KEY REFERENCES</span>
+    <h2>Papers Worth Reading</h2>
+    <table>
+      <thead><tr><th>Paper</th><th>Contribution</th></tr></thead>
+      <tbody>
+        <tr><td>Wang et al. — Self-Consistency Improves Chain of Thought Reasoning</td><td>Majority vote over diverse CoT paths; no verifier model needed</td></tr>
+        <tr><td>Lightman et al. — Let&apos;s Verify Step by Step (2023)</td><td>PRM800K dataset; process supervision beats outcome supervision</td></tr>
+        <tr><td>Snell et al. — Scaling LLM Test-Time Compute Optimally (2024)</td><td>Framework: verifiers vs proposal modifiers; compute allocation theory</td></tr>
+        <tr><td>Lowerre &amp; Reddy — HARPY Speech System (1976)</td><td>Early beam search — "few best paths in parallel"</td></tr>
+        <tr><td>OpenAssistant reward-model-deberta-v3-large-v2</td><td>Practical ORM for ranking answers; RLHF and evaluation use cases</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION 10: Hands-on Colab notes and temperature -->
+<section class="section fade-in" id="hands-on">
+  <div class="container">
+    <span class="section-num">10 — PRACTICAL NOTES</span>
+    <h2>Temperature, Diversity, and Colab Experiments</h2>
+    <p>The lecture&apos;s beam-search Colab scores Roger&apos;s tennis-ball steps with a PRM and plots a search tree. When every beam returns answer <strong>11</strong>, the demo shows insufficient diversity — search cannot help if all paths are identical.</p>
+
+    <div class="callout warn">
+      <p><strong>Increase temperature</strong> (e.g., T=0.9) to diversify samples. The test-time compute paper recommends temperature tuning so best-of-N and beam search actually explore distinct reasoning trajectories. Small models at T≈0 may collapse all beams to one chain.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Parameters to Sweep in the Notebook</h3>
+    <table>
+      <thead><tr><th>Parameter</th><th>Symbol</th><th>Effect when increased</th></tr></thead>
+      <tbody>
+        <tr><td>Number of beams</td><td><code>n</code></td><td>More candidates per layer; wider tree; higher compute</td></tr>
+        <tr><td>Beam width</td><td><code>m</code></td><td>More survivors per layer; less aggressive pruning</td></tr>
+        <tr><td>Max steps</td><td><code>max_steps</code></td><td>Deeper reasoning chains before stopping</td></tr>
+        <tr><td>Temperature</td><td><code>T</code></td><td>More diverse partial thoughts; risk of incoherence if too high</td></tr>
+      </tbody>
+    </table>
+
+    <p>The reference implementation defines <code>plot_trace_graph_tree_clean()</code> to visualize which nodes survive each PRM scoring round — filled nodes mark complete solutions; hollow nodes are pruned intermediate prefixes.</p>
+  </div>
+</section>
+
+<!-- SECTION 11: Chapter summary checklist -->
+<section class="section fade-in" id="summary">
+  <div class="container">
+    <span class="section-num">11 — SUMMARY</span>
+    <h2>What You Should Know After This Chapter</h2>
+    <div class="card card-alt">
+      <p>✓ <strong>Verification</strong> samples many answers and picks the best — human or reward model</p>
+      <p>✓ <strong>ORM</strong> scores final answers only; <strong>PRM</strong> scores each step (PRM800K, Lightman et al. 2023)</p>
+      <p>✓ <strong>Self-consistency</strong> (Wang et al.) = majority vote; no verifier model; needs T &gt; 0</p>
+      <p>✓ <strong>Best-of-N</strong> = argmax ORM/PRM score over N full chains</p>
+      <p>✓ <strong>Beam search</strong> = PRM-guided layer-wise pruning (n beams, width m; HARPY 1976)</p>
+      <p>✓ <strong>Test-time compute</strong> scales with N and search params — often beats bigger models (Snell et al. 2024)</p>
+      <p style="margin-bottom:0;">✓ Next: Tree-of-Thought, MCTS preview, then RL foundations in Chapter 04</p>
+    </div>
+  </div>
+</section>
+
+<!-- Footer navigation: prev Ch.02, next Ch.04 -->
+<div class="footer">
+  <p>
+    <a href="../02-chain-of-thought/">← Ch.02 — Chain of Thought</a>
+    <a href="../04-rl-foundations/">Ch.04 — RL Foundations →</a>
+  </p>
+  <p style="margin-top:16px;">Reasoning from Scratch · Chapter 03 of 12</p>
+</div>
+
+<script>
+/* Scroll animations + sticky nav */
+const nav = document.getElementById('nav');
+const faders = document.querySelectorAll('.fade-in');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+faders.forEach(f => observer.observe(f));
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+
+/* Self-consistency demo: highlight majority paths */
+document.getElementById('sc-vote-btn').addEventListener('click', () => {
+  document.getElementById('sc-result').style.display = 'block';
+  document.getElementById('vote-no').classList.add('majority');
+  document.querySelectorAll('#sc-paths .path-card').forEach(card => {
+    if (card.dataset.answer === 'No') card.classList.add('winner');
+  });
+});
+
+/* Beam search demo: prune nodes by top-m scores per layer */
+function updateBeamTree() {
+  const m = parseInt(document.getElementById('beam-m').value, 10);
+  document.getElementById('beam-m-val').textContent = m;
+  document.getElementById('beam-n-val').textContent = document.getElementById('beam-n').value;
+
+  document.querySelectorAll('.beam-layer').forEach(layer => {
+    const nodes = Array.from(layer.querySelectorAll('.beam-node'));
+    nodes.sort((a, b) => parseFloat(b.dataset.score) - parseFloat(a.dataset.score));
+    nodes.forEach((node, i) => {
+      node.classList.remove('selected', 'pruned');
+      if (i < m) node.classList.add('selected');
+      else node.classList.add('pruned');
+    });
+  });
+}
+document.getElementById('beam-m').addEventListener('input', updateBeamTree);
+document.getElementById('beam-n').addEventListener('input', updateBeamTree);
+updateBeamTree();
+
+/* ORM vs PRM toggle demo */
+document.getElementById('btn-orm-view').addEventListener('click', function() {
+  this.classList.add('active');
+  document.getElementById('btn-prm-view').classList.remove('active');
+  document.getElementById('orm-output').style.display = 'block';
+  document.getElementById('prm-output').style.display = 'none';
+});
+document.getElementById('btn-prm-view').addEventListener('click', function() {
+  this.classList.add('active');
+  document.getElementById('btn-orm-view').classList.remove('active');
+  document.getElementById('orm-output').style.display = 'none';
+  document.getElementById('prm-output').style.display = 'block';
+});
+
+/* Best-of-N table row highlight on click */
+document.querySelectorAll('#bon-table tbody tr').forEach(row => {
+  row.addEventListener('click', () => {
+    document.querySelectorAll('#bon-table tbody tr').forEach(r => r.style.background = '');
+    row.style.background = 'rgba(108,140,255,0.12)';
+    const score = row.dataset.score;
+    document.getElementById('bon-result').innerHTML =
+      `You selected ${row.cells[0].textContent} → ${row.cells[1].textContent} (ORM: ${score}). ` +
+      (parseFloat(score) >= 0.735
+        ? '<strong style="color:var(--accent3);">This is the best-of-N winner.</strong>'
+        : 'Best-of-N would still pick T₂ (score 0.735).');
+  });
+});
+</script>
+</body>
+</html>

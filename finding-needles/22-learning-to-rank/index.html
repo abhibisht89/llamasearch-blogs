@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Learning to Rank — From Features to Models | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 96px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover, .main-nav a.active { color: var(--accent); }
+    .nav-toggle {
+      display: none;
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    @media (max-width: 640px) {
+      .nav-toggle { display: block; }
+      .main-nav.collapsed { display: none; }
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(52, 211, 153, 0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(34, 211, 238, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(167, 139, 250, 0.1), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.5rem, 4vw, 2.55rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent3);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent2);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .demo-box {
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin: 20px 0;
+    }
+    .demo-box h4 { margin: 0 0 12px; font-size: 0.95rem; color: var(--accent3); }
+    table.data { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 16px 0; }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    table.data th { background: var(--bg-card-alt); color: var(--text-dim); font-weight: 600; }
+    table.data td { font-family: var(--mono); color: var(--text-dim); }
+    .code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+    .code-section .prose-col { min-width: 0; }
+    .code-panel {
+      position: sticky;
+      top: 100px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: var(--bg-card-alt);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+    }
+    .code-filename { color: var(--accent); }
+    .code-block {
+      padding: 16px;
+      margin: 0;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+      color: var(--text);
+      background: transparent;
+    }
+    .code-block .line { display: block; padding: 1px 0; }
+    .code-block .kw { color: var(--accent4); }
+    .code-block .fn { color: var(--accent); }
+    .code-block .arg { color: var(--accent3); }
+    .code-block .str { color: var(--accent5); }
+    .code-block .num { color: var(--accent3); }
+    .code-block .cmt { color: var(--text-dim); font-style: italic; }
+    .code-block .op { color: var(--accent2); }
+    .jupyter-cell {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin: 16px 0;
+      overflow: hidden;
+    }
+    .cell-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-card-alt);
+      border-bottom: 1px solid var(--border);
+    }
+    .cell-label { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); }
+    .cell-run {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--accent3);
+      cursor: pointer;
+    }
+    .cell-run:hover { border-color: var(--accent3); }
+    .cell-input { padding: 12px 16px; font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); white-space: pre-wrap; border-bottom: 1px solid var(--border); }
+    .cell-output { padding: 12px 16px; background: rgba(52, 211, 153, 0.04); border-top: 1px solid var(--border); }
+    .output-text { font-family: var(--mono); font-size: 0.82rem; color: var(--accent3); margin: 0; white-space: pre-wrap; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 0.78rem; }
+    .bar-row span.name { width: 110px; color: var(--text-dim); flex-shrink: 0; }
+    .bar-track { flex: 1; height: 10px; background: var(--bg-card-alt); border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+    .bar-fill { height: 100%; border-radius: 5px; transition: width 0.25s ease; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+    .grade-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .grade-btns button {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .grade-btns button.on { background: rgba(34, 211, 238, 0.15); border-color: var(--accent); color: var(--accent); }
+    .serp-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      background: var(--bg-card-alt);
+      cursor: grab;
+    }
+    .serp-item.dragging { opacity: 0.55; cursor: grabbing; }
+    .serp-item .title { font-weight: 600; color: var(--text); font-size: 0.9rem; margin-bottom: 4px; }
+    .serp-item .url { font-size: 0.72rem; color: var(--accent); font-family: var(--mono); }
+    .pipeline-steps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .pipeline-steps button {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .pipeline-steps button.active { border-color: var(--accent3); color: var(--accent3); background: rgba(52, 211, 153, 0.08); }
+    .lambda-table { font-size: 0.75rem; width: 100%; border-collapse: collapse; }
+    .lambda-table th, .lambda-table td { border: 1px solid var(--border); padding: 6px 8px; text-align: center; font-family: var(--mono); }
+    .lambda-table th { background: var(--bg-card-alt); color: var(--text-dim); }
+    .lambda-pos { color: var(--accent5); }
+    .lambda-neg { color: var(--danger); }
+    .pg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+    .pg-doc {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--bg-card-alt);
+    }
+    .pg-doc label { display: block; font-size: 0.7rem; color: var(--text-dim); margin-top: 6px; }
+    .pg-doc input[type="number"] {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 4px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+    }
+    .pg-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0; }
+    .pg-controls select {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+    }
+    .stat-pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--accent3);
+      margin-right: 8px;
+      margin-top: 8px;
+    }
+    .footer-note { text-align: center; padding: 48px 24px 80px; color: var(--text-dim); font-size: 0.85rem; }
+    @media (max-width: 900px) {
+      .code-section { grid-template-columns: 1fr; }
+      .code-panel { position: static; }
+    }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Learning to Rank</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="true" aria-controls="mainNav">Nav</button>
+  <nav class="main-nav" id="mainNav" aria-label="On this page">
+    <a href="#s0">What is LTR?</a>
+    <a href="#s1">Judgment lists</a>
+    <a href="#s2">Features</a>
+    <a href="#s3">Pointwise</a>
+    <a href="#s4">Pairwise</a>
+    <a href="#s5">LambdaMART</a>
+    <a href="#s6">Pipeline</a>
+    <a href="#s7">Playground</a>
+  </nav>
+
+  <header class="hero">
+    <span class="chapter-badge">Search Zero to Hero · 22 / 26</span>
+    <h1>Learning to Rank — From Features to Models</h1>
+    <p class="subtitle">
+      Learn how production search stacks turn dozens of <code>relevance signals</code> into a single <code>ranking score</code>:
+      judgment lists, feature engineering, <code>pointwise</code>, <code>pairwise</code>, and <code>listwise</code> objectives, plus
+      <code>LambdaMART</code> as the workhorse reranker at web scale.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">8</div><div class="lbl">Sections</div></div>
+      <div class="hero-stat"><div class="val">6+</div><div class="lbl">Interactives</div></div>
+      <div class="hero-stat"><div class="val">LTR</div><div class="lbl">Reranker mindset</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>00 · What is Learning to Rank?</h2>
+    <p>
+      <strong>Learning to rank</strong> (<code>LTR</code>) is the application of supervised machine learning to the ranking problem:
+      you learn a <code>scoring function</code> <code>f(q, d)</code> (or <code>f(x)</code> when <code>x</code> is a feature vector for a query–document pair)
+      from labeled examples so that documents with higher human-assessed relevance receive higher scores.
+    </p>
+    <p>
+      The central idea is <strong>signal fusion</strong>: a retrieval stack may expose lexical scores (<code>BM25</code>, <code>TF-IDF</code>—Chapters 2–3), dense retrieval similarity (Chapters 6–7),
+      click-through rate, freshness, authority, and dozens of other measurements.
+      An LTR model learns how to <em>weight and combine</em> those signals for your traffic, domain, and product goals—far beyond hand-tuned linear blends.
+    </p>
+    <div class="callout">
+      Production search stacks have long used LTR-style reranking: first-stage retrieval stays fast and broad; a second stage applies a learned function to a short candidate list.
+    </div>
+    <h3>Three families of objectives</h3>
+    <ul class="fancy">
+      <li><strong>Pointwise</strong> — predict an absolute relevance grade or probability for each <code>(query, document)</code> pair in isolation.</li>
+      <li><strong>Pairwise</strong> — learn from <em>relative</em> preferences: for the same query, should document <code>A</code> appear above <code>B</code>?</li>
+      <li><strong>Listwise</strong> — optimize a metric defined on the <em>entire ranked list</em> (for example <code>nDCG</code>), often via clever gradients.</li>
+    </ul>
+    <div class="code-section">
+      <div class="prose-col">
+        <p>
+          In code and in search engines, the scoring function is usually a real-valued score; sorting by descending score yields the ranking.
+          Neural rerankers are a modern variant: <code>f</code> may be a deep network over query and document text, but the same training-data story
+          (judgments, features, list metrics) still applies.
+        </p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">ranking_api.py</span></div>
+        <pre class="code-block"><span class="line"><span class="kw">def</span> <span class="fn">rank_documents</span><span class="op">(</span><span class="arg">query</span><span class="op">,</span> <span class="arg">candidates</span><span class="op">,</span> <span class="arg">model</span><span class="op">):</span></span>
+<span class="line">    <span class="cmt"># x_i = feature_vector(query, doc_i) logged at query time</span></span>
+<span class="line">    <span class="arg">scores</span> <span class="op">=</span> <span class="op">[</span><span class="fn">model.predict</span><span class="op">(</span><span class="fn">features</span><span class="op">(</span><span class="arg">query</span><span class="op">,</span> <span class="arg">d</span><span class="op">))</span> <span class="kw">for</span> <span class="arg">d</span> <span class="kw">in</span> <span class="arg">candidates</span><span class="op">]</span></span>
+<span class="line">    <span class="kw">return</span> <span class="fn">sorted</span><span class="op">(</span><span class="arg">candidates</span><span class="op">,</span> <span class="arg">key</span><span class="op">=</span><span class="kw">lambda</span> <span class="arg">d</span><span class="op">:</span> <span class="arg">scores</span><span class="op">[</span><span class="arg">d</span><span class="op">],</span> <span class="arg">reverse</span><span class="op">=</span><span class="kw">True</span><span class="op">)</span></span></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>01 · Judgment Lists — The Training Data</h2>
+    <p>
+      Supervised LTR needs <strong>labels</strong>. A <code>judgment list</code> (or <code>relevance judgments</code>) stores triples
+      <code>(query, document, grade)</code> produced by people or derived from behavioral signals. The grade encodes how useful the document is
+      for that information need on an agreed scale.
+    </p>
+    <h3>Grading scales</h3>
+    <ul class="fancy">
+      <li><strong>Binary</strong> — <code>0</code> (not relevant) / <code>1</code> (relevant). Common when the task is coarse filtering.</li>
+      <li><strong>4-point (0–3)</strong> — typical web search: not relevant, relevant, highly relevant, perfect (exact definitions live in your guidelines).</li>
+      <li><strong>5-point (0–4)</strong> — finer granularity for difficult domains (medical, legal) where calibration matters.</li>
+    </ul>
+    <p>
+      A machine-readable row often expands into <code>query_id</code>, <code>document_id</code>, a dense <code>features[]</code> vector (after feature logging),
+      and <code>grade</code>. That row is what training code consumes—whether you use <code>libsvm</code> format, Parquet, or an internal pipeline.
+    </p>
+    <div class="code-section">
+      <div class="prose-col">
+        <h3>Collecting judgments</h3>
+        <p>
+          <strong>Crowdsourcing</strong> scales volume but needs tight templates and quality checks.
+          <strong>Expert annotators</strong> cost more but anchor difficult domains.
+          <strong>Click and engagement signals</strong> (implicit feedback) can augment or proxy labels when carefully debiased—often covered as a dedicated topic next to explicit judgments.
+        </p>
+        <p>
+          <strong>Quality control</strong> includes <code>inter-annotator agreement</code> (for example Cohen’s kappa), adjudication of disagreements,
+          and crystal-clear <code>annotation guidelines</code> with worked examples. Without that, models learn noise.
+        </p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">judgments.jsonl</span></div>
+        <pre class="code-block"><span class="line"><span class="op">{</span><span class="str">"qid"</span><span class="op">:</span> <span class="str">"q_1042"</span><span class="op">,</span> <span class="str">"doc"</span><span class="op">:</span> <span class="str">"d_88"</span><span class="op">,</span></span>
+<span class="line"> <span class="str">"features"</span><span class="op">:</span> <span class="op">[</span><span class="num">12.4</span><span class="op">,</span> <span class="num">8.1</span><span class="op">,</span> <span class="num">0.73</span><span class="op">,</span> <span class="num">0.02</span><span class="op">],</span> <span class="str">"grade"</span><span class="op">:</span> <span class="num">2</span><span class="op">}</span></span>
+<span class="line"><span class="op">{</span><span class="str">"qid"</span><span class="op">:</span> <span class="str">"q_1042"</span><span class="op">,</span> <span class="str">"doc"</span><span class="op">:</span> <span class="str">"d_91"</span><span class="op">,</span></span>
+<span class="line"> <span class="str">"features"</span><span class="op">:</span> <span class="op">[</span><span class="num">4.0</span><span class="op">,</span> <span class="num">15.2</span><span class="op">,</span> <span class="num">0.41</span><span class="op">,</span> <span class="num">0.11</span><span class="op">],</span> <span class="str">"grade"</span><span class="op">:</span> <span class="num">0</span><span class="op">}</span></span></pre>
+      </div>
+    </div>
+    <div class="demo-box">
+      <h4>Interactive · Build a mini judgment list</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-bottom:12px;">
+        Query: <strong style="color:var(--text)">“best budget mirrorless camera 2024”</strong>. Assign a 0–3 grade to each synthetic result; the table below is your judgment list export.
+      </p>
+      <div id="judgmentDemo"></div>
+      <div style="margin-top:14px;font-family:var(--mono);font-size:0.75rem;color:var(--text-dim);" id="judgmentExport"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>02 · Feature Engineering</h2>
+    <p>
+      Features are the interface between your search stack and the learner. Good LTR is less about exotic algorithms and more about
+      <strong>faithful, leak-free features</strong> computed the same way in training logs and at serving time.
+    </p>
+    <h3>Lexical and dense signals</h3>
+    <ul class="fancy">
+      <li><strong>Lexical scores</strong> (<code>BM25</code>, <code>TF-IDF</code>—Chapters 2–3) per field: title, body, URL, anchors, structured metadata.</li>
+      <li><strong>Dense and late-interaction scores</strong> (Chapters 6–7, 11): embedding cosine, ColBERT-style <code>MaxSim</code>, cross-encoder logits.</li>
+    </ul>
+    <h3>Document quality and query–document interaction</h3>
+    <ul class="fancy">
+      <li>Static quality: <code>PageRank</code>-style link features, site authority, spam scores.</li>
+      <li><strong>Freshness</strong>: age of content, recency of last crawl, half-life decay.</li>
+      <li><strong>Interaction features</strong>: token overlap counts, longest common subsequence, character <code>edit distance</code>, bigram matches.</li>
+    </ul>
+    <h3>Behavioral and structural signals</h3>
+    <ul class="fancy">
+      <li>Clicks: <code>CTR</code>, position-aware models, dwell time, bounce proxies (use with care—position and presentation bias dominate).</li>
+      <li>Structure: document length, heading count, number of images, reading level estimates.</li>
+    </ul>
+    <p>
+      <strong>Normalization</strong> (per-query <code>z-score</code>, <code>min-max</code>, <code>quantile</code> binning) stabilizes tree ensembles and linear models when scales differ wildly.
+      <strong>Feature logging</strong> means persisting the exact feature vector seen online for each judged pair so offline training matches production.
+    </p>
+    <div class="code-section">
+      <div class="prose-col">
+        <p>
+          Below is a toy feature-extraction sketch. Production systems add caching, field-specific analyzers, and alignment with the first-stage retriever.
+        </p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">features.py</span></div>
+        <pre class="code-block"><span class="line"><span class="kw">def</span> <span class="fn">vectorize</span><span class="op">(</span><span class="arg">q</span><span class="op">,</span> <span class="arg">doc</span><span class="op">):</span></span>
+<span class="line">    <span class="kw">return</span> <span class="op">[</span></span>
+<span class="line">        <span class="fn">bm25</span><span class="op">(</span><span class="arg">q</span><span class="op">,</span> <span class="arg">doc</span><span class="op">.</span><span class="arg">title</span><span class="op">),</span></span>
+<span class="line">        <span class="fn">bm25</span><span class="op">(</span><span class="arg">q</span><span class="op">,</span> <span class="arg">doc</span><span class="op">.</span><span class="arg">body</span><span class="op">),</span></span>
+<span class="line">        <span class="fn">cosine</span><span class="op">(</span><span class="fn">embed</span><span class="op">(</span><span class="arg">q</span><span class="op">),</span> <span class="fn">embed</span><span class="op">(</span><span class="arg">doc</span><span class="op">)),</span></span>
+<span class="line">        <span class="fn">log1p</span><span class="op">(</span><span class="arg">doc</span><span class="op">.</span><span class="arg">pagerank</span><span class="op">),</span></span>
+<span class="line">        <span class="fn">freshness_score</span><span class="op">(</span><span class="arg">doc</span><span class="op">.</span><span class="arg">modified</span><span class="op">),</span></span>
+<span class="line">        <span class="fn">ctr_smoothed</span><span class="op">(</span><span class="arg">q</span><span class="op">.</span><span class="arg">id</span><span class="op">,</span> <span class="arg">doc</span><span class="op">.</span><span class="arg">id</span><span class="op">),</span></span>
+<span class="line">    <span class="op">]</span></span></pre>
+      </div>
+    </div>
+    <div class="jupyter-cell" id="cellNorm">
+      <div class="cell-header">
+        <span class="cell-label">In [1]: per-query z-score (toy)</span>
+        <button type="button" class="cell-run" data-run="norm">Run</button>
+      </div>
+      <div class="cell-input">raw = [12.4, 4.0, 8.1, 15.2, 0.73, 0.41]
+# imagine these are two docs' BM25_title under same query
+# z = (x - mean) / std</div>
+      <div class="cell-output"><pre class="output-text cell-output-pre"></pre></div>
+    </div>
+    <div class="demo-box">
+      <h4>Interactive · Feature importance visualizer</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-bottom:12px;">
+        Adjust hypothetical raw feature values. Bars show a linear model’s <em>contribution</em> (weight × value) for a toy scorer trained to mimic “expert” weights.
+      </p>
+      <div id="featureViz"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>03 · Pointwise Approach</h2>
+    <p>
+      The <strong>pointwise</strong> recipe treats each labeled example as an independent supervised learning problem: predict the numeric grade
+      (regression) or the label distribution (classification). The loss might be <code>MSE</code>, <code>MAE</code>, or <code>cross-entropy</code> for ordinal buckets.
+    </p>
+    <p>
+      Simplicity is the win: any off-the-shelf learner works. The downside is conceptual: a ranking is a <em>structured</em> object—order matters—while
+      pointwise loss only indirectly encourages good ordering. It often works reasonably for binary relevance; with fine-grained grades, mispredictions
+      on mid-range labels can scramble ordering among top results.
+    </p>
+    <div class="code-section">
+      <div class="prose-col">
+        <p>
+          Training builds design matrix <code>X</code> of shape <code>(N, F)</code> and target vector <code>y</code> of grades.
+          At inference, you sort by predicted score. Calibration of probabilities (if you use them) is a separate concern from rank quality.
+        </p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">pointwise_train.py</span></div>
+        <pre class="code-block"><span class="line"><span class="kw">import</span> numpy <span class="kw">as</span> np</span>
+<span class="line"><span class="kw">from</span> sklearn.linear_model <span class="kw">import</span> Ridge</span>
+<span class="line"></span>
+<span class="line"><span class="arg">model</span> <span class="op">=</span> <span class="fn">Ridge</span><span class="op">(</span><span class="arg">alpha</span><span class="op">=</span><span class="num">1.0</span><span class="op">)</span></span>
+<span class="line"><span class="arg">model</span><span class="op">.</span><span class="fn">fit</span><span class="op">(</span><span class="arg">X_train</span><span class="op">,</span> <span class="arg">y_train</span><span class="op">)</span>  <span class="cmt"># y = relevance grades</span></span>
+<span class="line"><span class="arg">scores</span> <span class="op">=</span> <span class="arg">model</span><span class="op">.</span><span class="fn">predict</span><span class="op">(</span><span class="arg">X_candidates</span><span class="op">)</span></span></pre>
+      </div>
+    </div>
+    <div class="demo-box">
+      <h4>Interactive · Pointwise MSE on four documents</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-bottom:12px;">
+        One shared query; grades are fixed. A linear model <code>ŷ = w·x</code> is fit by closed-form least squares. Compare predictions to grades and watch <code>MSE</code>.
+      </p>
+      <div id="pointwiseDemo"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>04 · Pairwise Approach</h2>
+    <p>
+      <strong>Pairwise</strong> methods learn from ordered pairs under the same query. For documents <code>A</code> and <code>B</code> with grades <code>g_A</code> and <code>g_B</code>,
+      if <code>g_A &gt; g_B</code> then the desired ranking places <code>A</code> above <code>B</code>. Many algorithms reduce this to classification on the <em>difference vector</em>
+      <code>x_A - x_B</code>: positive label means “A should beat B.”
+    </p>
+    <div class="callout">
+      <strong>RankSVM</strong> (Joachims) is the classic pairwise formulation: a large-margin classifier on difference vectors with a hinge-like loss,
+      optionally weighted for higher-grade gaps. Modern tree boosting still exploits the same preference structure inside more flexible split rules.
+    </div>
+    <div class="code-section">
+      <div class="prose-col">
+        <p>
+          Pairwise transforms can explode the number of training rows (all comparable pairs per query). Subsampling hard negatives or pairs near decision boundaries
+          keeps training tractable without sacrificing much accuracy.
+        </p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">pairwise_transform.py</span></div>
+        <pre class="code-block"><span class="line"><span class="kw">def</span> <span class="fn">pairwise_rows</span><span class="op">(</span><span class="arg">X</span><span class="op">,</span> <span class="arg">y</span><span class="op">):</span></span>
+<span class="line">    <span class="cmt"># X: (n_docs, F), y: grades for one query</span></span>
+<span class="line">    <span class="arg">rows</span><span class="op">,</span> <span class="arg">labels</span> <span class="op">=</span> <span class="op">[],</span> <span class="op">[]</span></span>
+<span class="line">    <span class="kw">for</span> <span class="arg">i</span> <span class="kw">in</span> <span class="fn">range</span><span class="op">(</span><span class="fn">len</span><span class="op">(</span><span class="arg">y</span><span class="op">)):</span></span>
+<span class="line">        <span class="kw">for</span> <span class="arg">j</span> <span class="kw">in</span> <span class="fn">range</span><span class="op">(</span><span class="fn">len</span><span class="op">(</span><span class="arg">y</span><span class="op">)):</span></span>
+<span class="line">            <span class="kw">if</span> <span class="arg">y</span><span class="op">[</span><span class="arg">i</span><span class="op">]</span> <span class="op">==</span> <span class="arg">y</span><span class="op">[</span><span class="arg">j</span><span class="op">]:</span> <span class="kw">continue</span></span>
+<span class="line">            <span class="arg">rows</span><span class="op">.</span><span class="fn">append</span><span class="op">(</span><span class="arg">X</span><span class="op">[</span><span class="arg">i</span><span class="op">]</span> <span class="op">-</span> <span class="arg">X</span><span class="op">[</span><span class="arg">j</span><span class="op">])</span></span>
+<span class="line">            <span class="arg">labels</span><span class="op">.</span><span class="fn">append</span><span class="op">(</span><span class="num">1</span> <span class="kw">if</span> <span class="arg">y</span><span class="op">[</span><span class="arg">i</span><span class="op">]</span> <span class="op">&gt;</span> <span class="arg">y</span><span class="op">[</span><span class="arg">j</span><span class="op">]</span> <span class="kw">else</span> <span class="num">0</span><span class="op">)</span></span>
+<span class="line">    <span class="kw">return</span> <span class="arg">rows</span><span class="op">,</span> <span class="arg">labels</span></span></pre>
+      </div>
+    </div>
+    <div class="demo-box">
+      <h4>Interactive · Drag to rank (pairwise sanity check)</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-bottom:12px;">
+        Reorder documents for the same query. We compare your order to the total order implied by integer grades (ties broken by doc id).
+        “Pairwise errors” counts inverted pairs—what pairwise training tries to eliminate.
+      </p>
+      <div id="pairwiseDrag"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>05 · Listwise — LambdaMART</h2>
+    <p>
+      <strong>Listwise</strong> methods reason about the entire permutation or set of scores for a query at once. The metric of interest—often
+      <code>nDCG</code>, <code>MAP</code>, or a business-weighted variant—is usually non-smooth in the scores, which complicates direct gradient descent.
+    </p>
+    <p>
+      <strong>LambdaMART</strong> combines <code>gradient boosted trees</code> with <strong>lambda gradients</strong>: for each document, assemble a pseudo-response that approximates
+      how much the list metric would improve if that document’s score nudged up or down relative to others, then fit a regression tree to those lambdas.
+      The trick sidesteps differentiating <code>nDCG</code> directly while still optimizing list quality in practice.
+    </p>
+    <h3>Why LambdaMART dominates production reranking</h3>
+    <ul class="fancy">
+      <li>Handles heterogeneous features and feature interactions via tree splits.</li>
+      <li>Trains quickly at moderate data sizes with <code>XGBoost</code>, <code>LightGBM</code>, or <code>CatBoost</code> LTR modes.</li>
+      <li>Interpretable via feature importance and partial dependence—valuable for debugging search.</li>
+    </ul>
+    <div class="code-section">
+      <div class="prose-col">
+        <p>
+          Training alternates: compute lambdas from the current scores and the metric’s sensitivities, fit a tree to predict those lambdas,
+          update scores with a learning rate (boosting shrinkage), repeat until validation <code>nDCG@k</code> plateaus.
+        </p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">lambdamart_loop.txt</span></div>
+        <pre class="code-block"><span class="line"><span class="cmt"># conceptual loop</span></span>
+<span class="line"><span class="kw">for</span> <span class="arg">round</span> <span class="kw">in</span> <span class="fn">range</span><span class="op">(</span><span class="arg">num_trees</span><span class="op">):</span></span>
+<span class="line">    <span class="arg">λ</span> <span class="op">=</span> <span class="fn">lambda_gradients</span><span class="op">(</span><span class="arg">scores</span><span class="op">,</span> <span class="arg">grades</span><span class="op">,</span> <span class="arg">metric</span><span class="op">=</span><span class="str">'ndcg'</span><span class="op">)</span></span>
+<span class="line">    <span class="arg">tree</span> <span class="op">=</span> <span class="fn">fit_regression_tree</span><span class="op">(</span><span class="arg">X</span><span class="op">,</span> <span class="arg">λ</span><span class="op">)</span></span>
+<span class="line">    <span class="arg">scores</span> <span class="op">+=</span> <span class="arg">learning_rate</span> <span class="op">*</span> <span class="arg">tree</span><span class="op">.</span><span class="fn">predict</span><span class="op">(</span><span class="arg">X</span><span class="op">)</span></span></pre>
+      </div>
+    </div>
+    <div class="demo-box">
+      <h4>Interactive · Swap deltas and λ-style priorities</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-bottom:12px;">
+        For each position, we show the <em>exact</em> change in <code>nDCG@10</code> from swapping that item with the one below (if any).
+        Large positive deltas indicate pairs where promoting the upper document strongly helps the metric—similar to where lambda gradients concentrate.
+      </p>
+      <div id="lambdaDemo"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>06 · End-to-End LTR Pipeline</h2>
+    <p>
+      Shipping LTR is a systems story as much as a modeling story. The steps below mirror what teams run from first prototype to continuous improvement.
+    </p>
+    <ol class="fancy" style="padding-left:1.2rem;">
+      <li><strong>Collect judgments</strong> (explicit labels or carefully debiased behavioral proxies).</li>
+      <li><strong>Log features</strong> for every judged <code>(query, document)</code> using the same code path as live traffic.</li>
+      <li><strong>Transform or pack data</strong> — pairwise differences for <code>RankSVM</code>, or raw matrices grouped by <code>qid</code> for boosting.</li>
+      <li><strong>Train with query-level splits</strong>: hold out entire queries for validation and test so the model generalizes to new intents, not new documents for memorized queries.</li>
+      <li><strong>Evaluate offline</strong> with <code>nDCG@k</code>, <code>MAP</code>, precision at one for navigational sets, and segment-specific slices.</li>
+      <li><strong>Upload the model</strong> to your search serving layer (<code>Solr</code> LTR plugin, <code>Elasticsearch</code> learning to rank, OpenSearch plugins, custom rankers).</li>
+      <li><strong>Deploy as a reranker</strong>: stage-one lexical or dense retrieval recalls hundreds of candidates; stage-two LTR rescores the top <code>K</code>.</li>
+    </ol>
+    <p>
+      The <strong>continuous loop</strong>: monitor ranking quality and engagement, refresh judgments, retrain, shadow-test, promote, repeat.
+      Drift in queries or corpus without retraining slowly erodes gains.
+    </p>
+    <div class="jupyter-cell" id="cellSplit">
+      <div class="cell-header">
+        <span class="cell-label">In [2]: query-level split sanity check</span>
+        <button type="button" class="cell-run" data-run="split">Run</button>
+      </div>
+      <div class="cell-input">queries = ["q1","q2","q3","q4","q5"]
+# random 60/20/20 split BY QUERY — never split rows within same qid</div>
+      <div class="cell-output"><pre class="output-text cell-output-pre"></pre></div>
+    </div>
+    <div class="demo-box">
+      <h4>Interactive · Step through the pipeline</h4>
+      <div id="pipelineDemo"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>07 · Playground — LTR Training Simulator</h2>
+    <p>
+      Four documents share a single query. Edit raw grades (0–3) and three positive features (BM25-like, dense similarity, CTR prior).
+      Pick a training objective. The page fits a tiny linear scorer and shows predicted ranking versus grade-sorted ideal, with <code>nDCG@4</code>.
+      In the listwise mode we take a few coordinate-ascent steps on weights to increase <code>nDCG</code> (finite-difference hill climb)—a didactic stand-in for lambda-based boosting.
+    </p>
+    <div class="demo-box" style="border-style:solid;border-color:var(--accent2);">
+      <h4>Playground</h4>
+      <div class="pg-controls">
+        <label style="color:var(--text-dim);font-size:0.85rem;">Approach</label>
+        <select id="pgApproach">
+          <option value="pointwise">Pointwise (MSE least squares)</option>
+          <option value="pairwise">Pairwise (perceptron on differences)</option>
+          <option value="listwise">Listwise (hill-climb nDCG)</option>
+        </select>
+        <button type="button" class="cell-run" id="pgTrain">Train / refresh</button>
+      </div>
+      <div id="pgPlayground"></div>
+      <div id="pgResults" style="margin-top:16px;"></div>
+    </div>
+    <div class="card" style="margin-top:32px;">
+      <h3 style="margin-top:0;color:var(--accent3);">Quick reference · Metrics</h3>
+      <p style="font-size:0.9rem;">
+        <code>DCG@k</code> discounts cumulative gain using position; <code>nDCG@k</code> divides by the ideal DCG so scores stay in <code>[0,1]</code>.
+        <code>MAP</code> averages precision across relevant documents for each query, then averages queries—strong for binary relevance.
+      </p>
+    </div>
+  </section>
+
+  <p class="footer-note">Single-file tutorial · vanilla JS · dark theme</p>
+
+  <script>
+  (function () {
+    'use strict';
+
+    var navToggle = document.getElementById('navToggle');
+    var mainNav = document.getElementById('mainNav');
+    if (navToggle && mainNav) {
+      navToggle.addEventListener('click', function () {
+        var c = mainNav.classList.toggle('collapsed');
+        navToggle.setAttribute('aria-expanded', !c);
+      });
+    }
+
+    document.querySelectorAll('section.fade-in').forEach(function (sec) {
+      new IntersectionObserver(function (ents) {
+        ents.forEach(function (e) {
+          if (e.isIntersecting) e.target.classList.add('visible');
+        });
+      }, { threshold: 0.08, rootMargin: '0px 0px -8% 0px' }).observe(sec);
+    });
+
+    var navLinks = document.querySelectorAll('.main-nav a[href^="#"]');
+    var sections = Array.prototype.map.call(navLinks, function (a) {
+      return document.querySelector(a.getAttribute('href'));
+    }).filter(Boolean);
+
+    function onScrollNav() {
+      var y = window.scrollY + 130;
+      var id = '';
+      for (var i = 0; i < sections.length; i++) {
+        var s = sections[i];
+        if (s.offsetTop <= y) id = s.id;
+      }
+      navLinks.forEach(function (l) {
+        l.classList.toggle('active', l.getAttribute('href') === '#' + id);
+      });
+    }
+    window.addEventListener('scroll', onScrollNav, { passive: true });
+    onScrollNav();
+
+    function dcg(rels, k) {
+      var sum = 0;
+      var n = Math.min(k, rels.length);
+      for (var i = 0; i < n; i++) {
+        sum += (Math.pow(2, rels[i]) - 1) / Math.log2(i + 2);
+      }
+      return sum;
+    }
+
+    function ndcgFromOrder(order, grades, k) {
+      var rels = order.map(function (idx) { return grades[idx]; });
+      var ideal = grades.slice().sort(function (a, b) { return b - a; });
+      var id = dcg(ideal, k);
+      if (id <= 1e-12) return 0;
+      return dcg(rels, k) / id;
+    }
+
+    function ndcgForPermutation(perm, grades) {
+      return ndcgFromOrder(perm, grades, grades.length);
+    }
+
+    function swapDeltaNdcg(order, grades, i) {
+      if (i >= order.length - 1) return 0;
+      var copy = order.slice();
+      var t = copy[i]; copy[i] = copy[i + 1]; copy[i + 1] = t;
+      return ndcgForPermutation(copy, grades) - ndcgForPermutation(order, grades);
+    }
+
+    /* --- Judgment demo --- */
+    var jItems = [
+      { id: 'd1', title: 'Mirrorless Buying Guide — Sensor Sizes Explained', url: 'https://example.com/guide/sensors' },
+      { id: 'd2', title: 'Top 10 Cameras (sponsored roundup)', url: 'https://ads.example.com/top10' },
+      { id: 'd3', title: 'Official Z-mount lens compatibility PDF', url: 'https://vendor.example.com/support/z-lenses.pdf' },
+      { id: 'd4', title: 'Budget APS-C bodies compared (2024)', url: 'https://reviews.example.com/budget-aps-c' }
+    ];
+    var jGrades = { d1: 2, d2: 0, d3: 1, d4: 3 };
+    var jRoot = document.getElementById('judgmentDemo');
+    var jExport = document.getElementById('judgmentExport');
+
+    function renderJudgments() {
+      jRoot.innerHTML = '';
+      jItems.forEach(function (it) {
+        var card = document.createElement('div');
+        card.className = 'serp-item';
+        card.style.cursor = 'default';
+        card.innerHTML = '<div class="title">' + it.title + '</div><div class="url">' + it.url + '</div>';
+        var btns = document.createElement('div');
+        btns.className = 'grade-btns';
+        for (var g = 0; g <= 3; g++) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = String(g);
+          if (jGrades[it.id] === g) b.classList.add('on');
+          b.addEventListener('click', function (id, gg) {
+            return function () {
+              jGrades[id] = gg;
+              renderJudgments();
+            };
+          }(it.id, g));
+          btns.appendChild(b);
+        }
+        card.appendChild(btns);
+        jRoot.appendChild(card);
+      });
+      var lines = jItems.map(function (it) {
+        return JSON.stringify({ qid: 'q_camera_budget', doc: it.id, grade: jGrades[it.id] });
+      });
+      jExport.textContent = lines.join('\n');
+    }
+    renderJudgments();
+
+    /* --- Jupyter-style cells --- */
+    document.querySelectorAll('.cell-run[data-run]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var cell = btn.closest('.jupyter-cell');
+        var pre = cell.querySelector('.cell-output-pre');
+        if (btn.getAttribute('data-run') === 'norm') {
+          var raw = [12.4, 4.0, 8.1, 15.2, 0.73, 0.41];
+          var m = raw.reduce(function (a, b) { return a + b; }, 0) / raw.length;
+          var v = raw.reduce(function (a, b) { return a + Math.pow(b - m, 2); }, 0) / raw.length;
+          var s = Math.sqrt(v) || 1;
+          var z = raw.map(function (x) { return ((x - m) / s).toFixed(3); });
+          pre.textContent = 'mean=' + m.toFixed(3) + ' std=' + s.toFixed(3) + '\nz = ' + JSON.stringify(z);
+        }
+        if (btn.getAttribute('data-run') === 'split') {
+          var queries = ['q1', 'q2', 'q3', 'q4', 'q5'];
+          var sh = queries.slice().sort(function () { return Math.random() - 0.5; });
+          var n = sh.length;
+          var tr = sh.slice(0, Math.ceil(n * 0.6));
+          var va = sh.slice(Math.ceil(n * 0.6), Math.ceil(n * 0.8));
+          var te = sh.slice(Math.ceil(n * 0.8));
+          pre.textContent = 'train: ' + tr.join(', ') + '\nvalid: ' + va.join(', ') + '\ntest : ' + te.join(', ');
+        }
+      });
+    });
+
+    /* --- Feature visualizer --- */
+    var featNames = ['bm25_title', 'bm25_body', 'dense_sim', 'pagerank_ln', 'freshness', 'ctr_smoothed'];
+    var featWeights = [0.35, 0.22, 1.8, 0.5, 0.9, 1.2];
+    var featVals = [12, 9, 0.62, 2.1, 0.4, 0.07];
+    var fvRoot = document.getElementById('featureViz');
+
+    function renderFeatureViz() {
+      fvRoot.innerHTML = '';
+      var total = 0;
+      var contribs = featNames.map(function (name, i) {
+        var c = featWeights[i] * featVals[i];
+        total += c;
+        return { name: name, c: c };
+      });
+      var maxC = Math.max.apply(null, contribs.map(function (x) { return Math.abs(x.c); }).concat([1]));
+      featNames.forEach(function (name, i) {
+        var row = document.createElement('div');
+        row.className = 'bar-row';
+        var nm = document.createElement('span');
+        nm.className = 'name';
+        nm.textContent = name;
+        var track = document.createElement('div');
+        track.className = 'bar-track';
+        var fill = document.createElement('div');
+        fill.className = 'bar-fill';
+        var pct = (Math.abs(contribs[i].c) / maxC) * 100;
+        fill.style.width = pct.toFixed(1) + '%';
+        if (contribs[i].c < 0) fill.style.background = 'linear-gradient(90deg,#f87171,#fb7185)';
+        track.appendChild(fill);
+        var slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '100';
+        slider.value = String(Math.min(100, featVals[i] * (name.indexOf('dense') >= 0 ? 100 : name.indexOf('ctr') >= 0 ? 1000 : 8)));
+        slider.style.width = '120px';
+        slider.addEventListener('input', function (idx) {
+          return function () {
+            var v = Number(slider.value);
+            if (featNames[idx].indexOf('dense') >= 0) featVals[idx] = v / 100;
+            else if (featNames[idx].indexOf('ctr') >= 0) featVals[idx] = v / 1000;
+            else featVals[idx] = v / 8;
+            renderFeatureViz();
+          };
+        }(i));
+        row.appendChild(nm);
+        row.appendChild(track);
+        row.appendChild(slider);
+        fvRoot.appendChild(row);
+      });
+      var score = document.createElement('div');
+      score.className = 'stat-pill';
+      score.textContent = 'linear score Σ wᵢxᵢ = ' + total.toFixed(3);
+      fvRoot.appendChild(score);
+    }
+    renderFeatureViz();
+
+    /* --- Pointwise demo --- */
+    var pwDocs = [
+      { name: 'A', x: [1.0, 0.2, 0.1], g: 2 },
+      { name: 'B', x: [0.4, 0.9, 0.05], g: 1 },
+      { name: 'C', x: [0.2, 0.3, 0.8], g: 3 },
+      { name: 'D', x: [0.8, 0.1, 0.2], g: 0 }
+    ];
+    var pwRoot = document.getElementById('pointwiseDemo');
+
+    function matVec(w, x) {
+      var s = 0;
+      for (var i = 0; i < w.length; i++) s += w[i] * x[i];
+      return s;
+    }
+
+    function fitLeastSquares(X, y) {
+      var d = X[0].length;
+      var XtX = [];
+      var Xty = [];
+      for (var i = 0; i < d; i++) {
+        XtX[i] = [];
+        for (var j = 0; j < d; j++) {
+          var sum = 0;
+          for (var r = 0; r < X.length; r++) sum += X[r][i] * X[r][j];
+          XtX[i][j] = sum;
+        }
+        var t = 0;
+        for (var r2 = 0; r2 < X.length; r2++) t += X[r2][i] * y[r2];
+        Xty[i] = t;
+      }
+      return solveLinear(XtX, Xty);
+    }
+
+    function solveLinear(A, b) {
+      var n = b.length;
+      var M = A.map(function (row, i) {
+        return row.slice().concat([b[i]]);
+      });
+      for (var col = 0; col < n; col++) {
+        var piv = col;
+        for (var r = col + 1; r < n; r++) {
+          if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+        }
+        var tmp = M[col]; M[col] = M[piv]; M[piv] = tmp;
+        var div = M[col][col] || 1e-12;
+        for (var c = col; c <= n; c++) M[col][c] /= div;
+        for (var r3 = 0; r3 < n; r3++) {
+          if (r3 === col) continue;
+          var f = M[r3][col];
+          for (var c2 = col; c2 <= n; c2++) M[r3][c2] -= f * M[col][c2];
+        }
+      }
+      return M.map(function (row) { return row[n]; });
+    }
+
+    function renderPointwise() {
+      var X = pwDocs.map(function (d) { return d.x; });
+      var y = pwDocs.map(function (d) { return d.g; });
+      var w = fitLeastSquares(X, y);
+      var preds = pwDocs.map(function (d) { return matVec(w, d.x); });
+      var mse = 0;
+      for (var i = 0; i < pwDocs.length; i++) {
+        mse += Math.pow(preds[i] - pwDocs[i].g, 2);
+      }
+      mse /= pwDocs.length;
+      var html = '<table class="data"><thead><tr><th>Doc</th><th>x</th><th>grade</th><th>ŷ</th></tr></thead><tbody>';
+      pwDocs.forEach(function (d, i) {
+        html += '<tr><td>' + d.name + '</td><td>[' + d.x.map(function (v) { return v.toFixed(1); }).join(', ') + ']</td><td>' + d.g + '</td><td>' + preds[i].toFixed(3) + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      html += '<div style="margin-top:12px;"><span class="stat-pill">w = [' + w.map(function (x) { return x.toFixed(3); }).join(', ') + ']</span>';
+      html += '<span class="stat-pill">MSE = ' + mse.toFixed(4) + '</span></div>';
+      html += '<p style="font-size:0.85rem;color:var(--text-dim);margin-top:12px;">Predicted ranking by ŷ: <strong style="color:var(--text);">' +
+        pwDocs.map(function (_, i) { return i; }).sort(function (a, b) { return preds[b] - preds[a]; }).map(function (i) { return pwDocs[i].name; }).join(' > ') +
+        '</strong></p>';
+      pwRoot.innerHTML = html;
+    }
+    renderPointwise();
+
+    /* --- Pairwise drag --- */
+    var pdOrder = [0, 1, 2, 3];
+    var pdGrades = [2, 1, 3, 0];
+    var pdNames = ['Doc A', 'Doc B', 'Doc C', 'Doc D'];
+    var pdRoot = document.getElementById('pairwiseDrag');
+    var dragIdx = null;
+
+    function countInversions(order, grades) {
+      var err = 0;
+      for (var i = 0; i < order.length; i++) {
+        for (var j = i + 1; j < order.length; j++) {
+          var gi = grades[order[i]];
+          var gj = grades[order[j]];
+          if (gi > gj) err++;
+          else if (gi === gj && order[i] > order[j]) err++;
+        }
+      }
+      return err;
+    }
+
+    function renderPairwiseDrag() {
+      pdRoot.innerHTML = '';
+      var hint = document.createElement('p');
+      hint.style.fontSize = '0.82rem';
+      hint.style.color = 'var(--text-dim)';
+      hint.innerHTML = 'Grades (fixed): A=2, B=1, C=3, D=0. Drag items to reorder.';
+      pdRoot.appendChild(hint);
+      pdOrder.forEach(function (docIdx, pos) {
+        var el = document.createElement('div');
+        el.className = 'serp-item';
+        el.draggable = true;
+        el.dataset.pos = String(pos);
+        el.innerHTML = '<div class="title">' + pdNames[docIdx] + '</div><div class="url">grade=' + pdGrades[docIdx] + '</div>';
+        el.addEventListener('dragstart', function (e) {
+          dragIdx = pos;
+          el.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', function () {
+          el.classList.remove('dragging');
+          dragIdx = null;
+        });
+        el.addEventListener('dragover', function (e) {
+          e.preventDefault();
+        });
+        el.addEventListener('drop', function (e) {
+          e.preventDefault();
+          var from = dragIdx;
+          var to = pos;
+          if (from === null || from === to) return;
+          var item = pdOrder.splice(from, 1)[0];
+          pdOrder.splice(to, 0, item);
+          renderPairwiseDrag();
+        });
+        pdRoot.appendChild(el);
+      });
+      var inv = countInversions(pdOrder, pdGrades);
+      var stat = document.createElement('div');
+      stat.style.marginTop = '12px';
+      stat.innerHTML = '<span class="stat-pill">Pairwise errors vs true grade order: ' + inv + '</span>';
+      pdRoot.appendChild(stat);
+    }
+    renderPairwiseDrag();
+
+    /* --- Lambda / swap demo --- */
+    var lamGrades = [3, 2, 2, 0, 1];
+    var lamOrder = [0, 1, 2, 3, 4];
+    var lamRoot = document.getElementById('lambdaDemo');
+
+    function renderLambda() {
+      var order = lamOrder.slice();
+      var tbl = '<table class="lambda-table"><thead><tr><th>Pos</th><th>Doc</th><th>Grade</th><th>ΔnDCG swap with below</th></tr></thead><tbody>';
+      for (var i = 0; i < order.length; i++) {
+        var d = order[i];
+        var delta = i < order.length - 1 ? swapDeltaNdcg(order, lamGrades, i) : 0;
+        var cls = delta > 1e-9 ? 'lambda-pos' : (delta < -1e-9 ? 'lambda-neg' : '');
+        tbl += '<tr><td>' + (i + 1) + '</td><td>' + String.fromCharCode(65 + d) + '</td><td>' + lamGrades[d] + '</td><td class="' + cls + '">' +
+          (i < order.length - 1 ? delta.toFixed(4) : '—') + '</td></tr>';
+      }
+      tbl += '</tbody></table>';
+      tbl += '<p style="font-size:0.82rem;color:var(--text-dim);margin-top:10px;">Current nDCG@5 = ' + ndcgForPermutation(order, lamGrades).toFixed(4) +
+        ' · ideal = 1.000</p>';
+      lamRoot.innerHTML = tbl;
+    }
+    renderLambda();
+
+    /* --- Pipeline --- */
+    var pipeSteps = [
+      { t: 'Judgments', d: 'Collect (query, document, grade) via annotators or debiased clicks. Freeze guideline version IDs in the dataset manifest.' },
+      { t: 'Feature logs', d: 'For each labeled pair, persist the exact feature vector your ranker saw. Timestamp code revisions to replay old traffic safely.' },
+      { t: 'Transform', d: 'Expand to pairwise differences for linear RankSVM, or group rows by qid for LambdaMART / LightGBM query bundles.' },
+      { t: 'Train / split', d: 'Split by query_id: 60/20/20 train/valid/test. Tune depth, leaves, min_data_in_leaf, and learning rate on validation nDCG.' },
+      { t: 'Evaluate', d: 'Report nDCG@5/10, MAP, and slices (head vs tail queries, locales). Compare to BM25-only and previous production model.' },
+      { t: 'Package model', d: 'Export trees or weights in the format your search server expects (Solr JSON, ES LTR model blob, ONNX, etc.).' },
+      { t: 'Deploy rerank', d: 'Retrieve top N with BM25 or ANN, rescore with LTR, merge with business rules. Shadow traffic before full rollout.' },
+      { t: 'Monitor loop', d: 'Track ranking metrics, failure rates, latency. Feed new judgments and retrain on a cadence; watch for corpus drift.' }
+    ];
+    var pipeRoot = document.getElementById('pipelineDemo');
+    var pipeIdx = 0;
+
+    function renderPipeline() {
+      var tabs = document.createElement('div');
+      tabs.className = 'pipeline-steps';
+      pipeSteps.forEach(function (s, i) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = (i + 1) + '. ' + s.t;
+        if (i === pipeIdx) b.classList.add('active');
+        b.addEventListener('click', function () {
+          pipeIdx = i;
+          renderPipeline();
+        });
+        tabs.appendChild(b);
+      });
+      var body = document.createElement('div');
+      body.className = 'card';
+      body.style.marginTop = '0';
+      body.innerHTML = '<p style="margin:0;color:var(--text-dim);">' + pipeSteps[pipeIdx].d + '</p>';
+      pipeRoot.innerHTML = '';
+      pipeRoot.appendChild(tabs);
+      pipeRoot.appendChild(body);
+    }
+    renderPipeline();
+
+    /* --- Playground --- */
+    var pgDocs = [
+      { id: 'D1', f: [12, 0.55, 0.08], g: 2 },
+      { id: 'D2', f: [6, 0.72, 0.03], g: 1 },
+      { id: 'D3', f: [9, 0.61, 0.12], g: 3 },
+      { id: 'D4', f: [15, 0.40, 0.02], g: 0 }
+    ];
+    var pgRoot = document.getElementById('pgPlayground');
+    var pgRes = document.getElementById('pgResults');
+
+    function renderPgForm() {
+      pgRoot.innerHTML = '';
+      var grid = document.createElement('div');
+      grid.className = 'pg-grid';
+      pgDocs.forEach(function (d, di) {
+        var card = document.createElement('div');
+        card.className = 'pg-doc';
+        card.innerHTML = '<strong style="color:var(--text);">' + d.id + '</strong>';
+        ['feat₁ BM25', 'feat₂ dense', 'feat₃ CTR'].forEach(function (lbl, fi) {
+          var lab = document.createElement('label');
+          lab.textContent = lbl;
+          var inp = document.createElement('input');
+          inp.type = 'number';
+          inp.step = 'any';
+          inp.value = String(d.f[fi]);
+          inp.addEventListener('change', function () {
+            pgDocs[di].f[fi] = Number(inp.value) || 0;
+          });
+          var gl = document.createElement('label');
+          gl.textContent = 'grade 0–3';
+          var gin = document.createElement('input');
+          gin.type = 'number';
+          gin.min = '0';
+          gin.max = '3';
+          gin.step = '1';
+          gin.value = String(d.g);
+          gin.addEventListener('change', function () {
+            pgDocs[di].g = Math.max(0, Math.min(3, parseInt(gin.value, 10) || 0));
+          });
+          card.appendChild(lab);
+          card.appendChild(inp);
+          if (fi === 2) {
+            card.appendChild(gl);
+            card.appendChild(gin);
+          }
+        });
+        grid.appendChild(card);
+      });
+      pgRoot.appendChild(grid);
+    }
+    renderPgForm();
+
+    function softmax(arr) {
+      var m = Math.max.apply(null, arr);
+      var ex = arr.map(function (x) { return Math.exp(x - m); });
+      var s = ex.reduce(function (a, b) { return a + b; }, 0);
+      return ex.map(function (x) { return x / s; });
+    }
+
+    function trainPlayground() {
+      var mode = document.getElementById('pgApproach').value;
+      var X = pgDocs.map(function (d) { return d.f; });
+      var g = pgDocs.map(function (d) { return d.g; });
+      var w;
+      if (mode === 'pointwise') {
+        w = fitLeastSquares(X, g);
+      } else if (mode === 'pairwise') {
+        w = [0.1, 0.1, 0.1];
+        for (var ep = 0; ep < 80; ep++) {
+          for (var i = 0; i < pgDocs.length; i++) {
+            for (var j = 0; j < pgDocs.length; j++) {
+              if (g[i] === g[j]) continue;
+              var sign = g[i] > g[j] ? 1 : -1;
+              var diff = X[i].map(function (v, k) { return v - X[j][k]; });
+              var s = sign * matVec(w, diff);
+              if (s < 1) {
+                for (var k = 0; k < w.length; k++) {
+                  w[k] += 0.03 * sign * diff[k];
+                }
+              }
+            }
+          }
+        }
+      } else {
+        w = [0.2, 0.5, 0.3];
+        var step = 0.04;
+        for (var it = 0; it < 120; it++) {
+          var base = ndcgForPermutation(pgDocs.map(function (_, i) { return i; }).sort(function (a, b) {
+            return matVec(w, X[b]) - matVec(w, X[a]);
+          }), g);
+          var gw = [0, 0, 0];
+          for (var dim = 0; dim < 3; dim++) {
+            var wp = w.slice();
+            wp[dim] += 1e-3;
+            var sp = ndcgForPermutation(pgDocs.map(function (_, i) { return i; }).sort(function (a, b) {
+              return matVec(wp, X[b]) - matVec(wp, X[a]);
+            }), g);
+            gw[dim] = ((sp - base) / 1e-3) * step;
+          }
+          for (var d = 0; d < 3; d++) w[d] += gw[d];
+        }
+      }
+
+      var scored = pgDocs.map(function (d, i) {
+        return { i: i, id: d.id, s: matVec(w, d.f), g: d.g };
+      });
+      var predOrder = scored.slice().sort(function (a, b) { return b.s - a.s; }).map(function (x) { return x.i; });
+      var idealOrder = pgDocs.map(function (_, i) { return i; }).sort(function (a, b) { return g[b] - g[a]; });
+      var n1 = ndcgForPermutation(predOrder, g);
+
+      var html = '<div><span class="stat-pill">w ≈ [' + w.map(function (x) { return x.toFixed(3); }).join(', ') + ']</span>';
+      html += '<span class="stat-pill">nDCG@4 (predicted) = ' + n1.toFixed(4) + '</span></div>';
+      html += '<p style="font-size:0.88rem;color:var(--text-dim);margin-top:12px;">Predicted order: <strong style="color:var(--text);">' +
+        predOrder.map(function (i) { return pgDocs[i].id + ' (' + scored.find(function (z) { return z.i === i; }).s.toFixed(2) + ')'; }).join(' → ') +
+        '</strong></p>';
+      html += '<p style="font-size:0.88rem;color:var(--text-dim);">Ideal by grade: <strong style="color:var(--text);">' +
+        idealOrder.map(function (i) { return pgDocs[i].id; }).join(' → ') + '</strong></p>';
+      pgRes.innerHTML = html;
+    }
+
+    document.getElementById('pgTrain').addEventListener('click', trainPlayground);
+    trainPlayground();
+  })();
+  </script>
+</body>
+</html>
+

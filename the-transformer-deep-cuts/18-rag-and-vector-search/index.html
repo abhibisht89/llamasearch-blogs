@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG: Dense Retrieval, Sentence-BERT &amp; HNSW — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #5eead4;
+  --accent2: #818cf8;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); margin-bottom: 20px; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+.nav-wrap {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav-wrap.visible { transform: translateY(0); }
+.nav-inner {
+  max-width: 920px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.nav-back { font-weight: 700; color: var(--accent2); white-space: nowrap; font-size: 0.85rem; }
+.nav-toggle {
+  margin-left: auto; display: none;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.75rem; cursor: pointer; font-family: inherit;
+}
+.nav-toggle:hover { border-color: var(--accent); }
+.nav-links {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  font-size: 0.78rem;
+}
+.nav-links a { color: var(--text-dim); }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: block; }
+  .nav-links {
+    display: none; width: 100%; flex-direction: column; align-items: flex-start;
+    padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px;
+  }
+  .nav-wrap.open .nav-links { display: flex; }
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 88px 24px 64px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(94,234,212,0.12) 0%, transparent 68%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 14px; position: relative; z-index: 1; }
+.subtitle {
+  font-size: 1.12rem; color: var(--text-dim);
+  max-width: 680px; margin: 0 auto 28px; position: relative; z-index: 1;
+}
+.stats {
+  display: flex; gap: 28px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 28px; position: relative; z-index: 1;
+}
+.stat { text-align: center; }
+.stat-val {
+  display: block; font-size: 1.85rem; font-weight: 700;
+  color: var(--accent); font-family: var(--mono);
+}
+.stat-label {
+  font-size: 0.72rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 18px 0;
+}
+.comparison {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;
+}
+@media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; margin: 18px 0;
+  font-family: var(--mono); font-size: 0.95rem; color: var(--accent3);
+  text-align: center; overflow-x: auto;
+}
+
+.callout {
+  background: rgba(129,140,248,0.07); border-left: 3px solid var(--accent2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 20px; margin: 20px 0;
+}
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.06); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.callout.danger { border-left-color: var(--danger); background: rgba(248,113,113,0.06); }
+.callout p:last-child { margin-bottom: 0; }
+
+.qa-box {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 22px; margin: 22px 0;
+}
+.qa-box .q {
+  font-weight: 600; color: var(--text); margin-bottom: 10px;
+  font-size: 1.02rem;
+}
+.qa-box p:last-child { margin-bottom: 0; }
+
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 22px 0;
+}
+.interactive-panel h4 {
+  font-size: 0.95rem; color: var(--text); margin-bottom: 14px; font-weight: 600;
+}
+
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.88rem; cursor: pointer; margin: 4px 6px 4px 0;
+  font-family: inherit;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: rgba(94,234,212,0.15); border-color: var(--accent); color: var(--accent); }
+
+.flow-steps {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0;
+}
+.flow-box {
+  padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-card-alt); font-family: var(--mono); font-size: 0.78rem;
+  opacity: 0.35; transition: opacity 0.35s ease, border-color 0.35s;
+  max-width: 100%;
+}
+.flow-box.active { opacity: 1; border-color: var(--accent3); }
+
+input[type="range"] { width: 100%; max-width: 320px; }
+label.lbl { font-size: 0.8rem; color: var(--text-dim); display: block; margin-top: 8px; }
+
+ul.clean { margin: 12px 0 12px 1.2em; color: var(--text-dim); }
+ul.clean li { margin-bottom: 0.5em; }
+
+.fade-in { opacity: 0; transform: translateY(28px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent4); }
+
+.dem-canvas-wrap {
+  position: relative; width: 100%; max-width: 480px; margin: 16px auto;
+  aspect-ratio: 1; background: var(--bg-card-alt);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.dem-canvas-wrap canvas { display: block; width: 100%; height: 100%; border-radius: var(--radius); }
+
+.tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tag {
+  padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim);
+  font-family: var(--mono);
+}
+.tag.sel { border-color: var(--accent); color: var(--accent); background: rgba(94,234,212,0.08); }
+
+.bar-row { display: flex; align-items: flex-end; gap: 8px; height: 100px; margin: 12px 0; }
+.bar-row .bar {
+  flex: 1; border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--accent2), var(--accent));
+  min-height: 4px; transition: height 0.4s ease;
+}
+
+.hnsw-layer {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0; transition: opacity 0.3s;
+}
+.hnsw-layer.show { opacity: 1; }
+
+kbd {
+  font-family: var(--mono); font-size: 0.8em;
+  padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+}
+
+/* Discussion Notes — Session Q&A */
+.discussion-panel {
+  margin-top: 36px;
+  padding: 24px;
+  background: rgba(18,18,26,0.7);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.discussion-panel-title {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent5);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.discussion-panel-title::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent5);
+}
+.dq {
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+}
+.dq:last-child { margin-bottom: 0; }
+.dq-ai {
+  border-left: 3px solid var(--accent);
+  background: rgba(108,140,255,0.05);
+}
+.dq-user {
+  border-left: 3px solid var(--accent4);
+  background: rgba(244,114,182,0.05);
+}
+.dq-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.dq-ai .dq-label { color: var(--accent); }
+.dq-user .dq-label { color: var(--accent4); }
+.dq .dq-question {
+  color: var(--text);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.dq .dq-answer {
+  color: var(--text-dim);
+  margin-bottom: 0;
+}
+
+/* Deep Dive — Bonus Q&A */
+.dq-bonus {
+  border-left: 3px solid var(--accent3);
+  background: rgba(52,211,153,0.05);
+}
+.dq-bonus .dq-label { color: var(--accent3); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">RAG &amp; Vector Search</span></nav>
+
+
+<div class="nav-wrap" id="navWrap">
+  <div class="nav-inner">
+    <a class="nav-back" href="../">Advanced NLP V2</a>
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#s00">00 Limits</a>
+      <a href="#s01">01 Embeddings</a>
+      <a href="#s02">02 Sentence vec</a>
+      <a href="#s03">03 Sentence-BERT</a>
+      <a href="#s04">04 Bi vs cross</a>
+      <a href="#s05">05 Vector DB</a>
+      <a href="#s06">06 HNSW</a>
+      <a href="#s07">07 RAG</a>
+      <a href="#s08">08 vs fine-tune</a>
+      <a href="#play">Playground</a>
+    </div>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="container">
+    <h1>RAG: Dense Retrieval, Sentence-BERT &amp; HNSW</h1>
+    <p class="subtitle">
+      Grounding generation with <strong>retrieved context</strong>: dense embeddings, bi-encoder retrievers,
+      approximate nearest neighbors in vector indexes, and the full <strong>retrieve → augment → generate</strong> loop—
+      including tradeoffs against cross-encoders and full model fine-tuning.
+      Comfortable familiarity with <strong>Transformer self-attention</strong> and <strong>BERT-style masked language
+      modeling</strong> makes the embedding sections easier to follow.
+    </p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">cos θ</span><span class="stat-label">Similarity</span></div>
+      <div class="stat"><span class="stat-val">O(n·d)</span><span class="stat-label">Naive kNN</span></div>
+      <div class="stat"><span class="stat-val">HNSW</span><span class="stat-label">ANN graph</span></div>
+      <div class="stat"><span class="stat-val">top-k</span><span class="stat-label">Retrieval</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00</span>
+  <h2>Why LLMs need retrieval</h2>
+  <p>
+    A neural language model assigns high probability to plausible token sequences learned from its training mixture.
+    At inference, you build a <strong>prompt</strong> and the model continues token by token so that the completion
+    reads coherently with the prefix. That coherence is <em>not</em> a guarantee of factual alignment with the world.
+    If weights were frozen years ago, questions about events that unfolded afterward may be answered poorly or not at all
+    unless you supply fresh evidence in context or update the model. A model whose pretraining snapshot ends in
+    <strong>2018</strong>, for example, should not be trusted to know the detailed timeline of the
+    <strong>COVID-19</strong> pandemic unless you retrieve contemporaneous text or otherwise ground it.
+  </p>
+  <div class="callout danger">
+    <p>
+      <strong>Knowledge cutoff and static weights.</strong> Whatever was absent or rare in pretraining may be missing
+      or wrong at query time. A model cannot “look up” new facts unless you give it text in the context window or
+      change the weights (fine-tuning, continued pretraining, adapters).
+    </p>
+  </div>
+  <p>
+    <strong>Hallucination</strong> here means confident text that is not justified by reliable evidence. Without
+    grounding—retrieved passages, tool outputs, or curated context—the model may invent plausible-sounding details.
+    Supplying <strong>explicit context</strong> in the prompt (question answering with a provided paragraph) is one fix;
+    <strong>Retrieval-Augmented Generation (RAG)</strong> automates finding that paragraph from a large corpus.
+  </p>
+  <p>
+    Prompt-only QA scales poorly when the answer might live anywhere in a large document set: stuffing everything into
+    the window is slow, expensive, and may exceed context limits. RAG <em>selects</em> a small set of chunks likely to
+    contain the answer, then asks the generator to read those chunks.
+  </p>
+  <p>
+    Concretely, a <strong>language model</strong> is a probabilistic model that assigns probabilities to sequences of
+    tokens. In practice it lets you answer questions such as: what is the probability that the word <em>China</em> follows
+    the prefix <em>“Shanghai is a city in”</em>? We usually train a neural network to predict those next-token
+    distributions. A network trained on a very large text corpus is what people call a <strong>large language model</strong>.
+  </p>
+  <p>
+    Training corpora are often huge <strong>collections of documents</strong>: all of Wikipedia, millions of web pages,
+    thousands of books—because we want the model to internalize as much distributional knowledge as possible. If a model
+    saw only English at scale, you should not expect it to fluently generate Japanese or French; new languages and new
+    facts generally require <strong>fine-tuning</strong> or <strong>context injection</strong>.
+  </p>
+  <div class="callout">
+    <p>
+      <strong>Decoder-only vs encoder-only (typical naming).</strong> Many open “LLaMA-style” stacks are
+      <strong>decoder-only</strong> Transformers: roughly the decoder stack of the original Transformer (without
+      cross-attention to another encoder), plus a linear layer and softmax for next-token prediction. BERT-style models are
+      <strong>encoder-only</strong>: they use the encoder stack and task-specific heads (often a linear layer on top)
+      for classification, span prediction, or similar. For retrieval-augmented <em>generation</em>, a decoder (or an
+      instruction-tuned decoder) usually produces the final answer; encoders or bi-encoders often score or embed evidence.
+    </p>
+  </div>
+  <p>
+    At inference you build a <strong>prompt</strong> and the model extends it token by token so that each continuation
+    stays coherent with the prefix—much like finishing a joke after <em>“You are what you eat…”</em> so the punchline
+    reads naturally with what came before. That coherence is about plausibility under the training distribution, not a
+    guarantee that every fact is current.
+  </p>
+  <div class="callout warn">
+    <p>
+      <strong>Parameter count and fine-tuning limits.</strong> Model families are released at multiple sizes for a reason:
+      a <strong>7B</strong> checkpoint can hold useful knowledge, but a <strong>70B</strong> checkpoint can represent
+      substantially more. Capacity is not infinite; you cannot assume “any” document collection fits in the weights.
+      Fine-tuning is also <strong>not strictly additive</strong>: if you start from an English-heavy model and heavily
+      adapt it to another language or domain, you may see <strong>forgetting</strong> of behaviors or facts from the
+      original distribution unless you mitigate it (regularization, replay, careful mixing, adapters, etc.).
+    </p>
+  </div>
+  <p>
+    <strong>Retrieval-augmented generation</strong> has been used in production settings where freshness matters—for
+    example, systems that ground answers in large, continually updated text streams (social posts, news, tickets) instead
+    of relying solely on weights frozen at training time.
+  </p>
+  <p>
+    You can sometimes elicit a new formatting rule with <strong>instructions plus in-context examples</strong> (few-shot prompting). The same pattern supports <strong>question answering with a provided passage</strong>: prepend an instruction (“answer using only the context”), paste the evidence, then ask the question. If the fact never appeared in pretraining but appears in the context, the model can still answer—provided the span is actually present and the prompt is followed.
+  </p>
+  <p>
+    Prompting is powerful, but large pasted contexts cost <strong>tokens</strong> every query and still hit window limits. Fine-tuning can bake domain knowledge into weights so a short question alone often suffices; many deployments combine both—a little fine-tuning for style or tool use, plus a <strong>vector index</strong> for facts that change often.
+  </p>
+  <div class="callout ok">
+    <p>
+      <strong>Worked QA-with-context example (parameter count).</strong> Suppose the context contains the sentence:
+      “After announcing X, we prototyped and trained the prototype LLM with <strong>33 billion</strong> parameters.”
+      Question: “How many parameters does Grok-0 have?” A model that was never updated with that product name in weights can
+      still answer <strong>33 billion</strong> by conditioning on the supplied passage—exactly the behavior RAG automates
+      at scale by retrieving the right passage for you.
+    </p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01</span>
+  <h2>Embeddings and semantic similarity</h2>
+  <p>
+    An <strong>embedding</strong> maps a discrete object (token, sentence, image patch, product) to a fixed-length
+    real vector. The hope—especially for text—is that <strong>semantic nearness in meaning</strong> becomes geometric
+    nearness in vector space: related concepts point in similar directions; unrelated concepts form wider angles.
+    Pure keyword matching misses that: “parameters” and “weights” share no characters yet mean the same thing—dense
+    retrieval matches <strong>intent</strong>, not surface strings.
+  </p>
+  <p>
+    The <strong>distributional hypothesis</strong> motivates this: words that share contexts tend to share meaning
+    (“teacher” and “professor” co-occur with school-like words); conversely, words that keep showing up in the same kinds of
+    surroundings—<strong>school, university, exam, lecture, course</strong>, and so on—tend to be close in meaning. Shared
+    meaning predicts contextual overlap.
+    Transformer <strong>self-attention</strong> uses token embeddings plus position information so each position’s
+    representation mixes information from the whole span—contextualized token vectors, not static type IDs alone.
+  </p>
+  <p>
+    To build intuition in two dimensions, take the words <strong>cherry</strong>, <strong>digital</strong>, and
+    <strong>information</strong>. In the original Transformer, token vectors often live in a much higher dimensionality
+    (commonly on the order of <strong>512</strong> in the “vanilla” encoder/decoder stacks); BERT-Base uses
+    <strong>768</strong> for each token vector. If you <em>project mentally</em> down to a plane, you hope that
+    <strong>digital</strong> and <strong>information</strong> point in nearly the same direction—a <strong>small angle</strong>
+    between them—while <strong>cherry</strong> points somewhere else, giving a <strong>larger angle</strong> to
+    <strong>digital</strong>. Add <strong>tomato</strong>: you might draw it nearly collinear with <strong>cherry</strong>
+    (a “vertical” family of directions in the sketch) so that cherry–tomato is a small angle again. Cosine similarity is
+    the standard way to turn those directions into a single score: a <strong>smaller angle</strong> yields a
+    <strong>higher</strong> cosine; a <strong>larger angle</strong> yields a <strong>lower</strong> cosine.
+  </p>
+  <p>
+    Self-attention scores each position against every other position in the same sequence, using both the token embedding
+    (lexical meaning) and the positional encoding (where the token sits). Nearby tokens are not forced to behave like distant
+    ones: distance in the sequence is part of the representation. The mechanism <strong>rewrites</strong> each token’s
+    vector so that it reflects not only the word type but also the sentence-wide context it participates in.
+  </p>
+  <div class="formula">
+    Cosine similarity:&nbsp;
+    cos(θ) = <span style="color:var(--accent4);">(a · b)</span> / <span style="color:var(--accent5);">(||a|| ||b||)</span>
+    &nbsp;∈ [−1, 1]
+  </div>
+  <p>
+    Cosine similarity measures the angle between vectors (length-normalized dot product). For normalized embeddings,
+    higher cosine means smaller angle—often used as a proxy for semantic similarity in retrieval. Raw dot product depends on
+    magnitude; cosine cancels length so you measure direction only—vectors (1,1) and (100,100) both score 1.0.
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Demo: 2-D embedding directions (illustrative)</h4>
+    <p style="margin-bottom:12px;font-size:0.9rem;">
+      Four toy unit vectors in the plane. Select two labels to see cosine similarity (same idea as in high dimensions).
+    </p>
+    <div class="dem-canvas-wrap"><canvas id="embCanvas" width="480" height="480" aria-label="Embedding vectors in 2D"></canvas></div>
+    <div class="tag-row" id="embTags"></div>
+    <p id="embCosReadout" style="font-family:var(--mono);color:var(--accent3);margin-top:12px;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02</span>
+  <h2>From BERT token outputs to a sentence vector</h2>
+  <p>
+    BERT-style encoders output one contextual vector per input token—a <em>T × d</em> matrix for sentence length <em>T</em>
+    (see <a href="../03-bert-encoder-models/">Chapter 03</a> for the encoder stack, MLM objective, and token-level shapes).
+    For retrieval you collapse that matrix to one <strong>sentence embedding</strong>, typically by <strong>mean pooling</strong>
+    across tokens (alternatives include max pooling or the <code class="inline">[CLS]</code> vector).
+  </p>
+  <div class="callout warn">
+    <p>
+      <strong>Why naive pooling is weak for retrieval.</strong> Off-the-shelf BERT was trained for masked-token prediction,
+      not to make pooled vectors comparable under cosine distance. Similar sentences can sit farther apart than you want unless
+      the encoder is <em>adapted</em> for semantic similarity—exactly what <strong>Sentence-BERT</strong>-style fine-tuning
+      addresses in the next section.
+    </p>
+  </div>
+  <p>
+    For retrieval, you compare a <strong>query sentence</strong> to a <strong>candidate sentence</strong> that paraphrases
+    it—e.g. asking “how many parameters are in Grok-0?” versus a passage that spells the name slightly differently. The
+    encoder must be <strong>aligned</strong> to your similarity metric. Chunks longer than the encoder limit (typically
+    512 tokens) must be split or windowed before embedding.
+  </p>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03</span>
+  <h2>Sentence-BERT: Siamese bi-encoders</h2>
+  <p>
+    The line of work is published under the title <strong>Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks</strong>.
+    The core idea: start from pretrained BERT, attach a pooling step, and <strong>fine-tune</strong> so that the resulting
+    sentence vectors behave well under a similarity function you care about—most often <strong>cosine similarity</strong>,
+    though the same framework can target other metrics (including distances related to Euclidean geometry in embedding space).
+  </p>
+  <p>
+    <strong>Sentence-BERT</strong> (sentence embeddings from Siamese BERT networks) fine-tunes a shared BERT trunk so that
+    pooled sentence vectors align with a chosen similarity—typically <strong>cosine similarity</strong>—on pairs or triplets
+    of sentences with known semantic relationships.
+  </p>
+  <p>
+    Architecturally, diagrams show <strong>two branches</strong>; in code there is <strong>one set of weights</strong>.
+    Sentence A and sentence B are encoded sequentially (or batched) through the same network; each side is pooled
+    (mean, max, or <code class="inline">[CLS]</code>) to a vector; cosine (or another metric) scores the pair; loss
+    (e.g. regression to a target similarity, contrastive loss, triplet loss) backpropagates through the shared encoder.
+  </p>
+  <div class="comparison">
+    <div class="card">
+      <h3>Sentence A</h3>
+      <p style="margin-bottom:0">“My father plays with me at the park.”</p>
+    </div>
+    <div class="card">
+      <h3>Sentence B</h3>
+      <p style="margin-bottom:0">“I play with my dad at the park.”</p>
+    </div>
+  </div>
+  <p>
+    Encode A and B separately. Suppose A becomes 10 tokens and B becomes 8 after WordPiece-style splitting; BERT still
+    returns one contextual vector per token. Apply pooling (typically <strong>mean pooling</strong>) on each side to obtain
+    two vectors <strong>u</strong> and <strong>v</strong> in ℝ<sup>768</sup> for BERT-Base. Compute cosine similarity
+    between <strong>u</strong> and <strong>v</strong>. Because you are <em>training</em> for retrieval, you also choose a
+    <strong>target similarity</strong>: for a near-duplicate paraphrase pair like the example above, you may supervise toward
+    a cosine close to <strong>1</strong> (small angle). The loss compares predicted similarity to the target; gradients
+    update the <strong>shared</strong> encoder weights so that paraphrases move together in vector space.
+  </p>
+  <div class="card">
+    <h3>Pooling choices</h3>
+    <p style="margin-bottom:0">
+      The Sentence-BERT paper compared <strong>mean pooling</strong>, <strong>max pooling</strong>, and the
+      <strong><code class="inline">[CLS]</code></strong> vector. In their experiments, mean pooling was strong and is widely
+      used in production pipelines; <code class="inline">[CLS]</code> did not consistently beat mean pooling for sentence
+      embeddings in that setting.
+    </p>
+  </div>
+  <p>
+    Optional <strong>projection</strong> layers can map 768-dimensional BERT vectors down to 512 (or lower) for storage
+    and faster distance computations, trading a bit of expressivity for index size and throughput.
+  </p>
+  <div class="callout">
+    <p>
+      <strong>What “Siamese” means.</strong> Diagrams draw <strong>two branches</strong> with identical architecture. In a
+      correct implementation there is still only <strong>one</strong> encoder: you run sentence A through it, then sentence B
+      through it (or batch both), compute the similarity on the two pooled outputs, and backpropagate once. The two branches
+      are the same network with <strong>shared weights</strong>, not two independent copies that could drift apart.
+    </p>
+  </div>
+  <p>
+    The <strong>[CLS]</strong> token is the first input token in BERT and has a final-layer representation that, because of
+    self-attention, can aggregate information from the entire sequence. Sentence-BERT’s authors nevertheless report that
+    <strong>mean pooling</strong> outperformed both <strong>max pooling</strong> and relying on <strong>[CLS]</strong> for
+    sentence embeddings in their experiments—so mean pooling is the usual default in production pipelines, with optional
+    projection afterward (e.g. <strong>768 → 512</strong>).
+  </p>
+
+  <div class="discussion-panel" style="margin-top: 18px;">
+    <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+
+    <div class="dq dq-bonus">
+      <div class="dq-label">Bonus Question</div>
+      <p class="dq-question">Sentence-BERT is trained on sentence pairs — but where do those labeled pairs come from? What kind of training data does it need?</p>
+      <p class="dq-answer">Common sources include <strong>NLI datasets</strong> (Natural Language Inference) like SNLI and MultiNLI, where sentence pairs are labeled as entailment, contradiction, or neutral. Paraphrase datasets (like QQP — Quora Question Pairs) also work. The key is having pairs with <strong>known semantic relationships</strong>. Training can use <strong>contrastive loss</strong> (push similar pairs close, dissimilar apart) or <strong>regression loss</strong> (predict a continuous similarity score). Data quality directly determines embedding quality.</p>
+    </div>
+
+    <div class="dq dq-bonus">
+      <div class="dq-label">Bonus Question</div>
+      <p class="dq-question">Can you use a decoder-only model (like LLaMA) as a bi-encoder instead of BERT?</p>
+      <p class="dq-answer">Yes, but it requires care. Decoder-only models use <strong>causal attention</strong> (each token only sees previous tokens), so the last token's hidden state is typically used as the sentence embedding (since it has seen the entire input). Some recent work fine-tunes decoder models for embedding tasks and achieves competitive results. However, BERT-style <strong>bidirectional</strong> encoders are still preferred for embeddings because every token attends to every other token, giving richer sentence representations.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04</span>
+  <h2>Bi-encoder vs cross-encoder</h2>
+  <p>
+    A <strong>bi-encoder</strong> (dual encoder) embeds query and document <em>independently</em>, then scores with a cheap
+    vector operation—dot product or cosine. Encoding each document once and reusing its vector makes large-corpus search
+    feasible with an index (hash tables, trees, or graphs like HNSW).
+  </p>
+  <p>
+    A <strong>cross-encoder</strong> concatenates query and candidate text into a single transformer forward pass (e.g.
+    <code class="inline">[CLS] query [SEP] passage</code>) and uses a classification head for relevance. Every query–document
+    pair needs its own pass—accurate but too slow for million-document search. Production stacks use a <strong>bi-encoder for
+    recall</strong> (embed documents once offline; at query time one encoder pass plus cheap dot products) and a
+    <strong>cross-encoder to rerank top-<em>k</em></strong>. If the bi-encoder misses a relevant document in stage 1, the
+    cross-encoder never sees it—the <strong>recall ceiling</strong> problem—so stage 1 often retrieves a generous top-<em>k</em>.
+    Adding a new document requires encoding only that document and inserting its vector into the index.
+  </p>
+  <p>
+    At query time against a million indexed vectors, each comparison is a cheap <strong>dot product</strong>—no neural
+    network per candidate. At billion scale even that becomes heavy; <strong>approximate nearest neighbor</strong> indexes
+    such as HNSW (next sections) trade a little recall for large speedups.
+  </p>
+  <div class="comparison">
+    <div class="card">
+      <h3>Bi-encoder</h3>
+      <ul class="clean">
+        <li>Encode docs once; query encoding + index lookup at search time</li>
+        <li>Great for first-stage <strong>recall</strong> over large corpora</li>
+        <li>Weaker if shallow pooling misses subtle query–passage interactions</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Cross-encoder</h3>
+      <ul class="clean">
+        <li>Joint attention between query and passage</li>
+        <li>Strong <strong>precision</strong> on a short candidate list</li>
+        <li>Impractical as exhaustive first-stage scorer over huge sets</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: relative cost vs quality (schematic)</h4>
+    <p style="margin-bottom:10px;font-size:0.9rem;">
+      Adjust corpus size <em>N</em> and candidate list size <em>k</em> for reranking. Bars are normalized illustrative
+      compute units, not wall-clock timings.
+    </p>
+    <label class="lbl">Documents in index N = <span id="biCrossN">10000</span></label>
+    <input type="range" id="biCrossNslide" min="3" max="6" step="0.05" value="4" aria-label="Corpus size exponent">
+    <label class="lbl" style="margin-top:16px;">Rerank top-k with cross-encoder, k = <span id="biCrossK">20</span></label>
+    <input type="range" id="biCrossKslide" min="5" max="200" step="5" value="20" aria-label="Top k for reranking">
+    <div class="bar-row" id="biCrossBars" style="margin-top:20px;height:120px;"></div>
+    <p id="biCrossNote" style="font-size:0.88rem;color:var(--text-dim);margin-bottom:0;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05</span>
+  <h2>Vector databases and k nearest neighbors</h2>
+  <p>
+    A <strong>vector database</strong> stores embedding vectors of fixed dimension <em>d</em> and answers similarity queries:
+    return the vectors closest to a query embedding under cosine distance, Euclidean distance, or inner product (depending
+    on index and normalization). Internally, many systems implement this as a variant of <strong>k nearest neighbors
+    (kNN)</strong>—exact or approximate—specialized for high-dimensional dense vectors. Besides RAG, the same pattern powers
+    duplicate detection, music or image similarity, and product recommendations.
+  </p>
+  <p>
+    Exact <strong>kNN</strong> compares the query to <em>every</em> stored vector: complexity on the order of
+    <strong>O(N · d)</strong> per query for <em>N</em> vectors—simple and precise, but slow at web scale when
+    <em>N</em> reaches millions or billions.
+  </p>
+  <p>
+    Picture a query like “how many parameters are in Grok-0?” against an index of <strong>N = 1,000,000</strong> sentence
+    embeddings. A naïve pipeline computes a similarity score between the query vector and <em>each</em> of the million
+    candidates—imagine scores such as <strong>0.3</strong>, <strong>0.1</strong>, <strong>0.2</strong>, and so on—then
+    <strong>sorts</strong> by descending similarity (or ascending distance, depending on the metric), and keeps the
+    <strong>top-<em>k</em></strong> rows. With BERT-Base–sized vectors, <strong>d = 768</strong>, the dominant cost is
+    proportional to <strong>N × d</strong>. A million vectors is already heavy; live text corpora (web-scale pages, large
+    social streams) can sit in the <strong>billions</strong> of vectors, which makes exact linear scans prohibitive without
+    enormous hardware.
+  </p>
+  <p>
+    Beyond RAG, the same vector-search pattern appears whenever you need “items like this one”: <strong>music similarity</strong>
+    (embed songs, then retrieve nearest neighbors), <strong>image similarity</strong> (embed images, retrieve visually or
+    semantically related results—the same geometric story as text), and <strong>product recommendations</strong> (embed
+    catalog entries or sessions). The database abstraction hides whether the backend is exact kNN or an approximate index.
+  </p>
+  <div class="callout">
+    <p>
+      <strong>Recall (retrieval sense).</strong> Suppose the true set of relevant neighbors for your query is
+      <em>R</em> and the algorithm returns set <em>S</em>. A common metric is
+      <span style="font-family:var(--mono);color:var(--accent3);">|R ∩ S| / |R|</span>—what fraction of the true
+      relevant items you actually retrieved. Approximate methods trade a little recall for large speedups.
+    </p>
+  </div>
+  <div class="callout warn">
+    <p>
+      <strong>Concrete recall sketch (top-3).</strong> Suppose the three genuinely best matches for your query are unique
+      items {a, b, c}. If an approximate search returns only {a, b}, you recovered <strong>2</strong> of
+      <strong>3</strong> true positives, so recall is <strong>2⁄3 ≈ 66.7%</strong>. In production you monitor this kind of
+      metric (often alongside latency and MRR/nDCG) when you dial up the “approximation aggressiveness” of an ANN index.
+    </p>
+  </div>
+  <div class="callout ok">
+    <p>
+      <strong>Precision vs speed trade.</strong> Exact kNN is slow because it compares the query to <em>every</em> vector, but
+      it is <strong>fully precise</strong> under the chosen distance: no candidate is skipped. Approximate nearest-neighbor
+      (ANN) methods deliberately <strong>skip many comparisons</strong> to answer fast; the risk is missing some of the true
+      top-<em>k</em> neighbors unless you add redundancy (wider beams, multiple entry points, larger candidate lists, etc.).
+    </p>
+  </div>
+  <div class="comparison">
+    <div class="card">
+      <h3>Naïve exhaustive kNN</h3>
+      <p style="margin-bottom:0">
+        Score the query against <strong>all N</strong> vectors (cost ~<strong>N · d</strong>), sort, take top-<em>k</em>.
+        Always finds the true top-<em>k</em> under the metric—maximum precision for the ranking rule, minimum speed at large
+        <em>N</em>.
+      </p>
+    </div>
+    <div class="card">
+      <h3>ANN (e.g. graph indexes)</h3>
+      <p style="margin-bottom:0">
+        Navigate a sparse graph of neighbors; visit only a <strong>subset</strong> of nodes per query. Much faster at
+        billion-scale <em>N</em>, but recall can fall below 100% unless you tune entry points, degree, and candidate list sizes.
+      </p>
+    </div>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: exact vs approximate mindset</h4>
+    <p style="font-size:0.9rem;margin-bottom:10px;">
+      Slide “approximation aggressiveness” (conceptual). Higher speedup implies fewer distance comparisons—and higher risk
+      of missing some true top-k neighbors.
+    </p>
+    <label class="lbl">Index speedup factor (illustrative): <span id="recallSp">32</span>×</label>
+    <input type="range" id="recallSlide" min="1" max="256" step="1" value="32" aria-label="Speedup factor">
+    <p style="font-family:var(--mono);margin-top:14px;color:var(--accent3);" id="recallReadout"></p>
+  </div>
+
+  <div class="discussion-panel" style="margin-top: 18px;">
+    <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+
+    <div class="dq dq-bonus">
+      <div class="dq-label">Bonus Question</div>
+      <p class="dq-question">If approximate search can miss the true top-k, how do you know if your ANN index is good enough for production?</p>
+      <p class="dq-answer">You benchmark against <strong>exact kNN</strong> on a held-out query set. Run exact search to find the true top-k, then run your ANN index on the same queries and measure <strong>recall@k</strong> (what fraction of the true top-k did the ANN find?). Production systems typically target <strong>95–99% recall</strong>. You also monitor <strong>latency</strong> and <strong>MRR</strong> (Mean Reciprocal Rank) to balance speed vs. accuracy.</p>
+    </div>
+
+    <div class="dq dq-bonus">
+      <div class="dq-label">Bonus Question</div>
+      <p class="dq-question">Besides HNSW, what are other common ANN algorithms, and when would you use them instead?</p>
+      <p class="dq-answer"><strong>IVF (Inverted File Index)</strong> partitions vectors into clusters and only searches nearby clusters — good for very large datasets with GPU acceleration. <strong>Product Quantization (PQ)</strong> compresses vectors to reduce memory, useful when you have billions of vectors but limited RAM. <strong>LSH (Locality-Sensitive Hashing)</strong> uses hash functions to bucket similar vectors. HNSW tends to win on <strong>recall vs. latency</strong> tradeoff but uses more memory than quantization-based methods.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06</span>
+  <h2>HNSW: hierarchical navigable small world graphs</h2>
+  <p>
+    <strong>HNSW</strong>—<strong>hierarchical navigable small world</strong>—is a widely deployed
+    <strong>approximate nearest neighbor (ANN)</strong> index. Public documentation for several engines (for example
+    <strong>Qdrant</strong>, an open-source vector database) describes <strong>HNSW</strong> as the vector index in use;
+    reported engineering discussions around large social text systems have pointed to such stacks for real-time retrieval over
+    huge posting volumes. The naming is deliberate: the algorithm merges a <strong>navigable small-world graph</strong> idea
+    with a <strong>hierarchy</strong> reminiscent of a <strong>skip list</strong>.
+  </p>
+  <p>
+    The small-world intuition is older than modern embeddings. In the 1960s, Stanley Milgram’s
+    <strong>small-world experiment</strong> asked people in Nebraska and Kansas to forward a letter toward a specific target
+    in Boston without mailing it directly: participants had to pass it to someone they knew personally, chosen to move the
+    letter closer to the unknown recipient. Many chains completed in about <strong>five or six</strong> steps, motivating
+    the popular phrase <strong>“six degrees of separation.”</strong> Later, Facebook reported (circa <strong>2016</strong>) that
+    among roughly <strong>1.59 billion</strong> active users the average distance was about <strong>3.5</strong> hops—again
+    illustrating how sparse local links can still yield short paths through a giant graph. HNSW exploits the same structural
+    idea in <strong>embedding space</strong>: each vector is a node, and each node keeps a <strong>small</strong> set of
+    neighbors so total edge count stays manageable, yet greedy routing still finds near points quickly.
+  </p>
+  <p>
+    Algorithmically, HNSW builds a <strong>multi-layer graph</strong>: sparse upper layers for long-range jumps, denser lower
+    layers for local refinement—directly analogous to the level structure of a skip list, but with edges defined by proximity
+    in vector space rather than sorted keys.
+  </p>
+  <p>
+    <strong>Navigable Small World (NSW)</strong>—an earlier approximate-nearest-neighbor graph method—search starts from an
+    entry node, greedily moves to the neighbor most similar to the query until no neighbor improves the score—a local optimum.
+    <strong>Hierarchical NSW (HNSW)</strong> layers multiple NSW-like graphs of increasing density so search can “zoom” from
+    coarse to fine. Repeating from several random entry points and merging candidate lists improves recall.
+    <strong>Insertion</strong> links a new point to its approximate top neighbors found by the same search procedure.
+  </p>
+  <div class="card">
+    <h3>NSW-style walkthrough (toy graph)</h3>
+    <p>
+      Imagine only <strong>15</strong> nodes, each the embedding of a sentence: some discuss the Transformer, others discuss
+      diagnosing cancer with AI, and so on. Edges connect “close” vectors; think of a cap such as <strong>up to six</strong>
+      neighbors per node as a mnemonic echo of the six-degrees story—real implementations pick degrees from parameters, but
+      the principle is <strong>bounded degree</strong>.
+    </p>
+    <p>
+      Query: “How many encoder layers are in the Transformer model?” Pick a <strong>random entry node</strong> (say node
+      <strong>5</strong>). Measure similarity between the query and node 5, then compare to the similarities for node 5’s
+      neighbors—perhaps nodes <strong>7</strong> and <strong>2</strong>. If node <strong>2</strong> beats node 5, move to
+      node 2. Repeat: compare the current node against <em>its</em> friends—perhaps node <strong>3</strong> now looks best,
+      so you move again. Stop when <strong>no neighbor</strong> of the current node beats the current node itself: e.g. node
+      <strong>4</strong> might be locally best among its connections to nodes <strong>0</strong>, <strong>8</strong>, and
+      <strong>6</strong> even if the <em>global</em> best lies elsewhere. You then rank all visited nodes by similarity and
+      keep <strong>top-<em>k</em></strong>. Run the whole procedure again from <strong>different random starts</strong>, merge
+      candidates, sort again, and keep the best <em>k</em> overall—boosting recall compared with a single greedy path.
+    </p>
+    <p style="margin-bottom:0">
+      <strong>Insertion:</strong> to add a new vector, treat it like a query, run the same greedy multi-start search, take the
+      approximate nearest neighbors you encounter, and <strong>link</strong> the new node to those neighbors (subject to
+      degree limits and heuristics in the concrete library).
+    </p>
+  </div>
+  <div class="card">
+    <h3>Skip lists: logarithmic search before the hierarchy</h3>
+    <p>
+      A <strong>skip list</strong> maintains a sorted sequence using multiple linked levels. The bottom level contains
+      <em>all</em> elements; higher levels contain <em>fewer</em> elements, so the top level is sparse. Average search and
+      insertion are <strong>O(log N)</strong> in well-tuned implementations.
+    </p>
+    <p>
+      <strong>Find 9.</strong> Start at the head of the top level. If the next pointer would overshoot (e.g. you see
+      <strong>5</strong> then end-of-level), drop down a level. Compare forward until you would pass the target (seeing
+      <strong>17</strong> when searching for <strong>9</strong> means go down again). Continue until you can step directly
+      onto <strong>9</strong>.
+    </p>
+    <p style="margin-bottom:0">
+      <strong>Find 12.</strong> Repeat from the top: walk forward while keys stay ≤ 12, drop when the next key would be too
+      large, until you reach <strong>12</strong> on the bottom chain. HNSW reuses this “start coarse, then refine” feeling:
+      upper graph layers are <strong>sparse</strong> (long jumps across the space), lower layers are <strong>dense</strong>
+      (local refinement).
+    </p>
+  </div>
+  <p>
+    HNSW combines that graph idea with the <strong>hierarchy</strong>: search begins at the top sparse layer, descends layer
+    by layer, performing greedy improvement within each level before dropping down—balancing global navigation and fine
+    local search. Implementations expose parameters (e.g. maximum degree, construction/search depth) that trade memory,
+    build time, latency, and recall.
+  </p>
+  <div class="callout">
+    <p>
+      <strong>Hierarchical search pattern.</strong> Choose a random entry point on the <strong>top</strong> layer. Greedily
+      walk to the neighbor most aligned with the query; when nothing improves, move <strong>down</strong> one layer and
+      repeat the greedy improvement. After reaching the bottom layer, you settle at a <strong>local optimum</strong> (no
+      friend of the current node beats it). As with plain NSW, you typically rerun from multiple entry points, pool the
+      visited candidates, sort by your similarity or distance, and return <strong>top-<em>k</em></strong>.
+    </p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: greedy graph walk to a local best</h4>
+    <p style="font-size:0.9rem;margin-bottom:10px;">
+      Nodes are synthetic 2-D points; edges connect each node to its <em>m</em> nearest neighbors. The query is the green
+      marker. The animation greedily walks from a random start along improving neighbors (NSW-style intuition).
+    </p>
+    <div class="dem-canvas-wrap" style="max-width:520px;"><canvas id="hnswCanvas" width="520" height="520" aria-label="HNSW-style graph walk"></canvas></div>
+    <button type="button" class="btn primary" id="hnswReplay">Replay search</button>
+    <p id="hnswLog" style="font-family:var(--mono);font-size:0.82rem;color:var(--text-dim);margin-top:12px;margin-bottom:0;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07</span>
+  <h2>The RAG pipeline: retrieve, augment, generate</h2>
+  <p>
+    Retrieval-augmented generation is still <strong>prompt engineering</strong> at the generator: you are not necessarily
+    changing the base LM’s weights for every document update. Instead you add a <strong>retrieval stage</strong> that maps
+    a natural-language <strong>query</strong> to a small set of text <strong>chunks</strong> pulled from PDFs, HTML pages,
+    tickets, wikis, or other stores. Those chunks become the <strong>context</strong> block inside a fixed template
+    (“You are an assistant; answer using the following context…”), followed by the user question. The LM answers by reading
+    the retrieved text—much like the manual copy-paste QA pattern, but automated.
+  </p>
+  <p>
+    A concrete mental checklist: start from the query (e.g. “How many parameters are in Grok-0?”). Split your knowledge
+    sources into <strong>sentences</strong> or other small passages. Embed each passage with the <strong>same</strong>
+    sentence encoder you will use at query time—e.g. a Sentence-BERT-style model that outputs a fixed-size vector such as
+    <strong>768</strong> floats per sentence. Store those vectors in a <strong>vector database</strong> together with
+    pointers back to the original strings. Embed the query, run a similarity search (cosine if vectors are compared by
+    angle; <strong>Euclidean</strong> distance on normalized vectors is monotonically related to cosine in many setups; some
+    stacks use inner product on deliberately scaled embeddings). Take <strong>top-<em>k</em></strong> hits, map them back to
+    text, paste into the prompt, and generate. Libraries such as <strong>LlamaIndex</strong> and <strong>LangChain</strong>
+    orchestrate these steps—chunking policies, embedding providers, index types, and rerankers—even though the underlying
+    geometry is unchanged.
+  </p>
+  <p>
+    End-to-end RAG for question answering typically runs as follows:
+  </p>
+  <ol class="clean" style="margin-left:1.2em;">
+    <li><strong>Ingest &amp; chunk:</strong> Split documents (PDFs, HTML, tickets, code) into passages—sentences, paragraphs,
+      or fixed token windows with optional overlap.</li>
+    <li><strong>Embed:</strong> Map each chunk to a vector with a sentence encoder (e.g. Sentence-BERT family).</li>
+    <li><strong>Index:</strong> Store vectors in a vector database with an ANN index (often HNSW or other graph/quantization methods).</li>
+    <li><strong>Query:</strong> Embed the user question with the same model; retrieve <strong>top-k</strong> chunks by similarity.</li>
+    <li><strong>Augment:</strong> Fill a prompt template: system instruction + retrieved passages + user question.</li>
+    <li><strong>Generate:</strong> A decoder-only or instruction-tuned LM produces the answer conditioned on that prompt.</li>
+  </ol>
+
+  <div class="interactive-panel">
+    <h4>Demo: pipeline pulse</h4>
+    <div class="flow-steps" id="ragFlow"></div>
+    <button type="button" class="btn primary" id="ragReplay">Run pipeline animation</button>
+  </div>
+
+  <div class="card">
+    <h3>Chunking strategies</h3>
+    <ul class="clean">
+      <li><strong>Sentence-level:</strong> Simple, aligns with sentence encoders; may fragment tables or lists.</li>
+      <li><strong>Paragraph / section:</strong> Preserves local discourse; variable length may exceed encoder limits.</li>
+      <li><strong>Fixed token windows:</strong> Stable memory usage; use stride/overlap to avoid cutting answers at boundaries.</li>
+      <li><strong>Structure-aware:</strong> Split on headings, code blocks, or records when the source has explicit structure.</li>
+    </ul>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: how chunk size changes boundaries</h4>
+    <p style="font-size:0.9rem;margin-bottom:8px;">Sample text split by sentences vs. fixed character windows.</p>
+    <select id="chunkMode" style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card-alt);color:var(--text);font-family:inherit;">
+      <option value="sentence">One sentence per chunk</option>
+      <option value="para">Paragraph chunks</option>
+      <option value="fixed">Fixed 90-character windows (stride 45)</option>
+    </select>
+    <pre id="chunkOut" style="margin-top:14px;padding:14px;background:var(--bg-card-alt);border-radius:8px;font-family:var(--mono);font-size:0.78rem;white-space:pre-wrap;color:var(--text-dim);border:1px solid var(--border);"></pre>
+  </div>
+
+  <p>
+    Query and document chunks must use the <strong>same encoder</strong>—different models place vectors in incomparable spaces.
+    When retrieved passages conflict, the generator may defer to parametric knowledge unless the prompt explicitly requires
+    faithfulness to context.
+  </p>
+</section>
+
+<section class="section fade-in" id="s08">
+  <span class="section-num">08</span>
+  <h2>RAG versus fine-tuning</h2>
+  <p>
+    <strong>Fine-tuning</strong> bakes knowledge and style into weights. It can yield very high quality on a narrow domain
+    when data is clean and you can afford training. Downsides include compute cost, need for labeled or curated data,
+    and <strong>catastrophic forgetting</strong> risk: aggressive adaptation to a new locale or language may erode
+    behavior on the original distribution—knowledge updates are not automatically <em>additive</em>.
+  </p>
+  <p>
+    <strong>RAG</strong> leaves the base model frozen (or lightly adapted) and injects facts via context. Updating the
+    knowledge base is often as simple as re-embedding new documents—no full retrain. The cost shifts to retrieval quality,
+    chunking, and prompt design. Large retrieved context increases tokens per query; hybrid stacks use RAG plus a small
+    amount of fine-tuning for tone or tool use.
+  </p>
+  <div class="callout ok">
+    <p>
+      <strong>Hybrid deployments.</strong> You are not forced to pick exactly one strategy. A common pattern is to
+      <strong>fine-tune for a few epochs</strong> on domain instructions or style, then attach a <strong>vector database</strong>
+      that continuously ingests new web or enterprise documents so factual answers can track sources that change daily. The
+      fine-tuned head improves formatting and tool use; the index carries volatile knowledge.
+    </p>
+  </div>
+  <div class="comparison">
+    <div class="card">
+      <h3>When fine-tuning shines</h3>
+      <ul class="clean">
+        <li>Stable domain vocabulary and answer patterns</li>
+        <li>Short prompts at inference (facts “in weights”)</li>
+        <li>Ample task-specific supervision</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>When RAG shines</h3>
+      <ul class="clean">
+        <li>Frequently changing corpora (policies, tickets, news)</li>
+        <li>Need citations or traceability to source passages</li>
+        <li>Avoiding full retrains for each content update</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="play">
+  <span class="section-num">Playground</span>
+  <h2>Playground: cosine from components</h2>
+  <p>
+    For vectors <em>a = (a₁, a₂)</em> and <em>b = (b₁, b₂)</em>, cosine similarity is
+    <span style="font-family:var(--mono);color:var(--accent3);">(a₁b₁ + a₂b₂) / (√(a₁²+a₂²) · √(b₁²+b₂²))</span>.
+    Adjust sliders—watch the angle and value update.
+  </p>
+  <div class="interactive-panel">
+    <h4>Vector a</h4>
+    <label class="lbl">a₁ = <span id="pa1v">1</span></label>
+    <input type="range" id="pa1" min="-2" max="2" step="0.05" value="1" aria-label="a1">
+    <label class="lbl">a₂ = <span id="pa2v">0.2</span></label>
+    <input type="range" id="pa2" min="-2" max="2" step="0.05" value="0.2" aria-label="a2">
+    <h4 style="margin-top:18px;">Vector b</h4>
+    <label class="lbl">b₁ = <span id="pb1v">0.8</span></label>
+    <input type="range" id="pb1" min="-2" max="2" step="0.05" value="0.8" aria-label="b1">
+    <label class="lbl">b₂ = <span id="pb2v">0.9</span></label>
+    <input type="range" id="pb2" min="-2" max="2" step="0.05" value="0.9" aria-label="b2">
+    <div class="dem-canvas-wrap" style="margin-top:18px;max-width:400px;"><canvas id="playCanvas" width="400" height="400" aria-label="Cosine visualization"></canvas></div>
+    <p id="playReadout" style="font-family:var(--mono);color:var(--accent3);margin-top:12px;margin-bottom:0;"></p>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // --- Embedding 2D demo ---
+  const embWords = [
+    { id: 'digital', label: 'digital', ang: 0.35 },
+    { id: 'information', label: 'information', ang: 0.42 },
+    { id: 'cherry', label: 'cherry', ang: 1.72 },
+    { id: 'tomato', label: 'tomato', ang: 1.78 }
+  ];
+  let embSel = ['digital', 'information'];
+  const embCanvas = document.getElementById('embCanvas');
+  const embCtx = embCanvas.getContext('2d');
+  const embTags = document.getElementById('embTags');
+  const embCosReadout = document.getElementById('embCosReadout');
+
+  function embVec(w) {
+    return { x: Math.cos(w.ang), y: Math.sin(w.ang) };
+  }
+  function cosSim2(u, v) {
+    const d = Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y);
+    if (d === 0) return 0;
+    return (u.x * v.x + u.y * v.y) / d;
+  }
+  function drawEmb() {
+    const w = embCanvas.width, h = embCanvas.height;
+    const cx = w / 2, cy = h / 2, scale = Math.min(w, h) * 0.38;
+    embCtx.clearRect(0, 0, w, h);
+    embCtx.strokeStyle = '#2a2a3a';
+    embCtx.lineWidth = 1;
+    embCtx.beginPath();
+    embCtx.moveTo(0, cy); embCtx.lineTo(w, cy);
+    embCtx.moveTo(cx, 0); embCtx.lineTo(cx, h);
+    embCtx.stroke();
+    embCtx.strokeStyle = '#3d3d52';
+    embCtx.beginPath();
+    embCtx.arc(cx, cy, scale, 0, Math.PI * 2);
+    embCtx.stroke();
+
+    embWords.forEach((word, i) => {
+      const v = embVec(word);
+      const x = cx + v.x * scale, y = cy - v.y * scale;
+      const sel = embSel.includes(word.id);
+      embCtx.strokeStyle = sel ? '#5eead4' : '#8888a0';
+      embCtx.lineWidth = sel ? 3 : 1.5;
+      embCtx.beginPath();
+      embCtx.moveTo(cx, cy);
+      embCtx.lineTo(x, y);
+      embCtx.stroke();
+      embCtx.fillStyle = sel ? '#5eead4' : '#818cf8';
+      embCtx.beginPath();
+      embCtx.arc(x, y, sel ? 8 : 6, 0, Math.PI * 2);
+      embCtx.fill();
+      embCtx.fillStyle = '#e0e0e8';
+      embCtx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+      embCtx.fillText(word.label, x + 10, y - 6 + i * 2);
+    });
+
+    const a = embWords.find(w => w.id === embSel[0]);
+    const b = embWords.find(w => w.id === embSel[1]);
+    if (a && b) {
+      const c = cosSim2(embVec(a), embVec(b));
+      embCosReadout.textContent = 'cos(' + a.label + ', ' + b.label + ') = ' + c.toFixed(4);
+    }
+  }
+  embTags.innerHTML = embWords.map(w =>
+    '<button type="button" class="tag' + (embSel.includes(w.id) ? ' sel' : '') + '" data-id="' + w.id + '">' + w.label + '</button>'
+  ).join('');
+  embTags.querySelectorAll('.tag').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const id = this.getAttribute('data-id');
+      if (embSel.includes(id)) {
+        if (embSel.length > 1) embSel = embSel.filter(x => x !== id);
+      } else if (embSel.length < 2) {
+        embSel.push(id);
+      } else {
+        embSel = [embSel[1], id];
+      }
+      embTags.querySelectorAll('.tag').forEach(t => {
+        t.classList.toggle('sel', embSel.includes(t.getAttribute('data-id')));
+      });
+      drawEmb();
+    });
+  });
+  drawEmb();
+
+  // --- Bi vs cross ---
+  const biCrossNslide = document.getElementById('biCrossNslide');
+  const biCrossKslide = document.getElementById('biCrossKslide');
+  const biCrossN = document.getElementById('biCrossN');
+  const biCrossK = document.getElementById('biCrossK');
+  const biCrossBars = document.getElementById('biCrossBars');
+  const biCrossNote = document.getElementById('biCrossNote');
+  function updateBiCross() {
+    const exp = parseFloat(biCrossNslide.value);
+    const N = Math.round(Math.pow(10, exp));
+    const k = parseInt(biCrossKslide.value, 10);
+    biCrossN.textContent = N.toLocaleString();
+    biCrossK.textContent = String(k);
+    const biEncode = N + 1;
+    const biScore = N;
+    const crossRerank = k;
+    const maxv = Math.max(biEncode + biScore, crossRerank * 40, 100);
+    const hBiEnc = (biEncode / maxv) * 100;
+    const hBiSc = (biScore / maxv) * 100;
+    const hCross = Math.min(100, (crossRerank * 40 / maxv) * 100);
+    biCrossBars.innerHTML =
+      '<div style="flex:1;text-align:center;"><div class="bar" style="height:' + hBiEnc + '%"></div><div style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;">Bi: encode all</div></div>' +
+      '<div style="flex:1;text-align:center;"><div class="bar" style="height:' + hBiSc + '%;background:linear-gradient(180deg,#34d399,#5eead4)"></div><div style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;">Bi: dot/cos vs query</div></div>' +
+      '<div style="flex:1;text-align:center;"><div class="bar" style="height:' + hCross + '%;background:linear-gradient(180deg,#f472b6,#818cf8)"></div><div style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;">Cross: k full forwards</div></div>';
+    biCrossNote.textContent =
+      'Typical production pattern: bi-encoder retrieval over N passages, then cross-encoder reranking on top-' + k +
+      ' for better precision without N joint attentions.';
+  }
+  biCrossNslide.addEventListener('input', updateBiCross);
+  biCrossKslide.addEventListener('input', updateBiCross);
+  updateBiCross();
+
+  // --- Recall demo ---
+  const recallSlide = document.getElementById('recallSlide');
+  const recallSp = document.getElementById('recallSp');
+  const recallReadout = document.getElementById('recallReadout');
+  function updateRecall() {
+    const sp = parseInt(recallSlide.value, 10);
+    recallSp.textContent = String(sp);
+    const est = Math.max(0.55, 1 - 0.12 * Math.log2(sp));
+    recallReadout.textContent = 'Illustrative estimated recall: ' + (est * 100).toFixed(1) +
+      '% — verify with your own benchmarks; real curves depend on data and index parameters.';
+  }
+  recallSlide.addEventListener('input', updateRecall);
+  updateRecall();
+
+  // --- HNSW-style graph ---
+  const hnswCanvas = document.getElementById('hnswCanvas');
+  const hctx = hnswCanvas.getContext('2d');
+  const hnswReplay = document.getElementById('hnswReplay');
+  const hnswLog = document.getElementById('hnswLog');
+  let hnswAnim = null;
+
+  function randPoint(rng) {
+    return { x: 0.12 + rng() * 0.76, y: 0.12 + rng() * 0.76 };
+  }
+  function buildGraph(nodes, m) {
+    const n = nodes.length;
+    const edges = Array.from({ length: n }, () => []);
+    for (let i = 0; i < n; i++) {
+      const dists = nodes.map((p, j) => ({ j, d: Math.hypot(p.x - nodes[i].x, p.y - nodes[i].y) }));
+      dists.sort((a, b) => a.d - b.d);
+      for (let k = 1; k <= m && k < n; k++) {
+        const j = dists[k].j;
+        if (!edges[i].includes(j)) edges[i].push(j);
+        if (!edges[j].includes(i)) edges[j].push(i);
+      }
+    }
+    return edges;
+  }
+  function sim(a, b) {
+    return 1 / (1 + Math.hypot(a.x - b.x, a.y - b.y));
+  }
+  function runHnswDemo() {
+    if (hnswAnim) cancelAnimationFrame(hnswAnim);
+    const rng = (function (s) { return function () { s = (s * 9301 + 49297) % 233280; return s / 233280; }; })(Date.now() % 100000);
+    const nodes = [];
+    for (let i = 0; i < 42; i++) nodes.push(randPoint(rng));
+    const query = { x: 0.35 + rng() * 0.3, y: 0.35 + rng() * 0.3, q: true };
+    const m = 4;
+    const edges = buildGraph(nodes, m);
+    let start = Math.floor(rng() * nodes.length);
+    const path = [start];
+    let cur = start;
+    for (let step = 0; step < 25; step++) {
+      let best = cur;
+      let bestS = sim(query, nodes[cur]);
+      edges[cur].forEach(j => {
+        const s = sim(query, nodes[j]);
+        if (s > bestS) { bestS = s; best = j; }
+      });
+      if (best === cur) break;
+      cur = best;
+      path.push(cur);
+    }
+    const w = hnswCanvas.width, h = hnswCanvas.height;
+    let frame = 0;
+    function drawStep(phase) {
+      hctx.clearRect(0, 0, w, h);
+      hctx.fillStyle = '#181825';
+      hctx.fillRect(0, 0, w, h);
+      hctx.strokeStyle = '#2a2a3a';
+      edges.forEach((nei, i) => {
+        nei.forEach(j => {
+          if (j > i) {
+            hctx.beginPath();
+            hctx.moveTo(nodes[i].x * w, h - nodes[i].y * h);
+            hctx.lineTo(nodes[j].x * w, h - nodes[j].y * h);
+            hctx.stroke();
+          }
+        });
+      });
+      nodes.forEach((p, i) => {
+        hctx.fillStyle = i === path[path.length - 1] ? '#34d399' : '#3d3d52';
+        hctx.beginPath();
+        hctx.arc(p.x * w, h - p.y * h, 5, 0, Math.PI * 2);
+        hctx.fill();
+      });
+      hctx.fillStyle = '#5eead4';
+      hctx.beginPath();
+      hctx.arc(query.x * w, h - query.y * h, 9, 0, Math.PI * 2);
+      hctx.fill();
+      const upto = Math.min(path.length, Math.floor(phase) + 1);
+      hctx.strokeStyle = '#fbbf24';
+      hctx.lineWidth = 2;
+      for (let i = 1; i < upto; i++) {
+        const a = nodes[path[i - 1]], b = nodes[path[i]];
+        hctx.beginPath();
+        hctx.moveTo(a.x * w, h - a.y * h);
+        hctx.lineTo(b.x * w, h - b.y * h);
+        hctx.stroke();
+      }
+    }
+    function tick() {
+      frame += 0.18;
+      drawStep(frame);
+      if (frame < path.length + 8) hnswAnim = requestAnimationFrame(tick);
+    }
+    hnswLog.textContent = 'Start node ' + start + ' → ' + (path.length - 1) + ' greedy hops to local best (similarity to query). HNSW adds layers + multi-entry for global recall.';
+    drawStep(0);
+    hnswAnim = requestAnimationFrame(tick);
+  }
+  hnswReplay.addEventListener('click', runHnswDemo);
+  runHnswDemo();
+
+  // --- RAG flow ---
+  const ragFlow = document.getElementById('ragFlow');
+  const ragSteps = [
+    'Chunk corpus',
+    'Embed chunks',
+    'Index (ANN)',
+    'Embed query',
+    'Retrieve top-k',
+    'Fill prompt',
+    'LLM generate'
+  ];
+  function buildRagFlow() {
+    ragFlow.innerHTML = ragSteps.map((s, i) =>
+      '<div class="flow-box" data-step="' + i + '">' + s + '</div>'
+    ).join('<span style="color:var(--text-dim);">→</span>');
+  }
+  let ragTimer = null;
+  document.getElementById('ragReplay').addEventListener('click', function () {
+    if (ragTimer) clearInterval(ragTimer);
+    buildRagFlow();
+    const boxes = ragFlow.querySelectorAll('.flow-box');
+    let i = 0;
+    boxes.forEach(b => b.classList.remove('active'));
+    ragTimer = setInterval(function () {
+      boxes.forEach(b => b.classList.remove('active'));
+      if (i < boxes.length) boxes[i].classList.add('active');
+      i++;
+      if (i > boxes.length) { clearInterval(ragTimer); ragTimer = null; }
+    }, 550);
+  });
+  buildRagFlow();
+
+  // --- Chunking demo ---
+  const sampleText = 'Retrieval selects evidence. The generator must cite it faithfully. ' +
+    'Chunk boundaries affect recall. Overlapping windows reduce the chance that an answer is split across two chunks. ' +
+    'Sentence splits are simple but may break tables.';
+  const chunkMode = document.getElementById('chunkMode');
+  const chunkOut = document.getElementById('chunkOut');
+  function renderChunks() {
+    const mode = chunkMode.value;
+    let parts = [];
+    if (mode === 'sentence') {
+      parts = sampleText.split(/(?<=[.!?])\s+/).filter(Boolean);
+    } else if (mode === 'para') {
+      const sents = sampleText.split(/(?<=[.!?])\s+/).filter(Boolean);
+      parts = [];
+      for (let i = 0; i < sents.length; i += 2) {
+        parts.push(sents.slice(i, i + 2).join(' '));
+      }
+    } else {
+      const win = 90, stride = 45;
+      for (let i = 0; i < sampleText.length; i += stride) {
+        parts.push(sampleText.slice(i, i + win));
+        if (i + win >= sampleText.length) break;
+      }
+    }
+    chunkOut.textContent = parts.map((p, i) => '[' + i + '] ' + p).join('\n\n');
+  }
+  chunkMode.addEventListener('change', renderChunks);
+  renderChunks();
+
+  // --- Playground cosine ---
+  const playCanvas = document.getElementById('playCanvas');
+  const pctx = playCanvas.getContext('2d');
+  const pa1 = document.getElementById('pa1');
+  const pa2 = document.getElementById('pa2');
+  const pb1 = document.getElementById('pb1');
+  const pb2 = document.getElementById('pb2');
+  const pa1v = document.getElementById('pa1v');
+  const pa2v = document.getElementById('pa2v');
+  const pb1v = document.getElementById('pb1v');
+  const pb2v = document.getElementById('pb2v');
+  const playReadout = document.getElementById('playReadout');
+  function drawPlay() {
+    const a1 = parseFloat(pa1.value), a2 = parseFloat(pa2.value);
+    const b1 = parseFloat(pb1.value), b2 = parseFloat(pb2.value);
+    pa1v.textContent = a1.toFixed(2);
+    pa2v.textContent = a2.toFixed(2);
+    pb1v.textContent = b1.toFixed(2);
+    pb2v.textContent = b2.toFixed(2);
+    const na = Math.hypot(a1, a2), nb = Math.hypot(b1, b2);
+    const cos = na && nb ? (a1 * b1 + a2 * b2) / (na * nb) : 0;
+    const W = playCanvas.width, H = playCanvas.height, cx = W / 2, cy = H / 2, sc = 55;
+    pctx.clearRect(0, 0, W, H);
+    pctx.fillStyle = '#181825';
+    pctx.fillRect(0, 0, W, H);
+    pctx.strokeStyle = '#2a2a3a';
+    pctx.beginPath();
+    pctx.moveTo(0, cy); pctx.lineTo(W, cy);
+    pctx.moveTo(cx, 0); pctx.lineTo(cx, H);
+    pctx.stroke();
+    function arrow(x1, y1, x2, y2, col) {
+      pctx.strokeStyle = col;
+      pctx.lineWidth = 2;
+      pctx.beginPath();
+      pctx.moveTo(x1, y1);
+      pctx.lineTo(x2, y2);
+      pctx.stroke();
+    }
+    const ax2 = cx + a1 * sc, ay2 = cy - a2 * sc;
+    const bx2 = cx + b1 * sc, by2 = cy - b2 * sc;
+    arrow(cx, cy, ax2, ay2, '#5eead4');
+    arrow(cx, cy, bx2, by2, '#f472b6');
+    const angA = Math.atan2(a2, a1);
+    const angB = Math.atan2(b2, b1);
+    let delta = Math.abs(angB - angA);
+    if (delta > Math.PI) delta = 2 * Math.PI - delta;
+    const deg = (delta * 180 / Math.PI).toFixed(1);
+    playReadout.textContent = 'cos θ = ' + cos.toFixed(4) + '   |Δθ| ≈ ' + deg + '°';
+  }
+  ['pa1', 'pa2', 'pb1', 'pb2'].forEach(id => document.getElementById(id).addEventListener('input', drawPlay));
+  drawPlay();
+
+  // --- Nav + fade-in + menu toggle ---
+  const navWrap = document.getElementById('navWrap');
+  const navToggle = document.getElementById('navToggle');
+  const navLinks = document.getElementById('navLinks');
+
+  navToggle.addEventListener('click', function () {
+    const open = navWrap.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.querySelectorAll('#navLinks a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      navWrap.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  window.addEventListener('scroll', function () {
+    const y = window.scrollY;
+    navWrap.classList.toggle('visible', y > 220);
+    document.querySelectorAll('.fade-in:not(.visible)').forEach(function (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 50) el.classList.add('visible');
+    });
+  }, { passive: true });
+  window.dispatchEvent(new Event('scroll'));
+})();
+</script>
+</body>
+</html>

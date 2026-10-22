@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Latent Attention Unlocked — Multi-Head Latent Attention from Theory to Code</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 640px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3, .interactive-panel h4 { margin-bottom: 16px; }
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar { width: 100%; border-radius: 6px 6px 0 0; transition: height 0.5s ease, background 0.3s ease; min-height: 4px; }
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value { font-size: 0.7rem; font-family: var(--mono); color: var(--text); text-align: center; margin-bottom: 4px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 8px; font-family: var(--mono); font-size: 0.9rem; font-weight: 600; transition: all 0.3s; }
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); }
+.token-cached { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+canvas { border-radius: var(--radius); display: block; max-width: 100%; }
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); display: inline-block; margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { background: rgba(251, 191, 36, 0.08); border-left-color: var(--accent5); }
+.callout.ok { background: rgba(52, 211, 153, 0.08); border-left-color: var(--accent3); }
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin: 24px 0; }
+.qa-box .q { font-weight: 700; color: var(--accent); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 14px 24px; text-align: center; font-size: 0.9rem; width: 100%; max-width: 500px; transition: all 0.3s; }
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow { font-size: 1.2rem; color: var(--text-dim); padding: 4px 0; }
+.dim-table, .data-table { border-collapse: collapse; font-family: var(--mono); font-size: 0.82rem; width: 100%; margin: 16px 0; }
+.dim-table th, .dim-table td, .data-table th, .data-table td { padding: 10px 12px; border: 1px solid var(--border); text-align: center; }
+.dim-table th, .data-table th { background: var(--bg-card-alt); color: var(--accent); font-weight: 600; }
+.dim-table td, .data-table td { background: var(--bg-card); color: var(--text-dim); }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.num-input { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--mono); font-size: 0.9rem; width: 100%; outline: none; }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+.code-block { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin: 20px 0; font-family: var(--mono); font-size: 0.82rem; line-height: 1.6; overflow-x: auto; color: var(--text-dim); }
+.code-block .kw { color: var(--accent2); } .code-block .fn { color: var(--accent); } .code-block .str { color: var(--accent3); }
+.code-block .num { color: var(--accent5); } .code-block .cmt { color: #666; font-style: italic; } .code-block .cls { color: var(--accent4); }
+.output-readout { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 16px; font-family: var(--mono); font-size: 0.85rem; color: var(--text); }
+.step-indicator { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.step-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-family: var(--mono); color: var(--text-dim); cursor: pointer; transition: all 0.2s; }
+.step-dot.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.step-dot.done { border-color: var(--accent3); color: var(--accent3); }
+.matrix-grid { display: grid; gap: 2px; font-family: var(--mono); font-size: 0.75rem; margin: 12px auto; }
+.matrix-cell { background: var(--bg-card-alt); border: 1px solid var(--border); padding: 6px 4px; text-align: center; min-width: 36px; transition: background 0.3s; }
+.matrix-cell.highlight { background: rgba(108,140,255,0.25); color: var(--accent); font-weight: 700; }
+.matrix-cell.latent { background: rgba(52,211,153,0.2); color: var(--accent3); }
+.head-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; margin: 16px 0; }
+.head-cell { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.7rem; font-weight: 700; border: 1px solid var(--border); transition: transform 0.2s; }
+.head-cell:hover { transform: scale(1.08); }
+.progress-bar-wrap { background: var(--bg-card-alt); border-radius: 8px; height: 28px; overflow: hidden; margin: 8px 0; border: 1px solid var(--border); }
+.progress-bar { height: 100%; border-radius: 8px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 0.7rem; font-family: var(--mono); color: var(--bg); font-weight: 700; }
+.evolution-track { display: flex; align-items: center; gap: 0; margin: 24px 0; flex-wrap: wrap; justify-content: center; }
+.evolution-node { background: var(--bg-card-alt); border: 2px solid var(--border); border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 120px; transition: all 0.3s; cursor: pointer; }
+.evolution-node.active { border-color: var(--accent); background: rgba(108,140,255,0.12); }
+.evolution-arrow { font-size: 1.5rem; color: var(--text-dim); padding: 0 8px; }
+.ctrl { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 8px; }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .bar-chart { height: 150px; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } .nav-links { gap: 10px; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: rgba(10, 10, 15, 0.92); backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid #2a2a3a; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span><span class="bc-current">Latent Attention Unlocked</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Latent Attention Unlocked</a>
+  <div class="nav-links">
+    <a href="#s0">Introduction</a><a href="#s1">KV Recap</a><a href="#s2">MQA &amp; GQA</a>
+    <a href="#s3">Best of Both</a><a href="#s4">Latent Space</a><a href="#s5">Absorption</a>
+    <a href="#s6">Inference</a><a href="#s7">Memory</a><a href="#s8">Code</a>
+    <a href="#s9">Dimensions</a>    <a href="#s10">Playground</a><a href="#s-deep">Deep Dive</a><a href="#s-recap">Recap</a>
+<a href="#s-appendix">Appendix</a><a href="#s-summary">Summary</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 05</p>
+    <h1>Latent Attention Unlocked</h1>
+    <p class="subtitle">Multi-Head Latent Attention from Theory to Code — DeepSeek's core innovation that compresses the KV cache through low-rank latent projections while preserving multi-head diversity.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">14</span><span class="stat-label">Core Sections</span></div>
+      <div class="stat"><span class="stat-val">8</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">57×</span><span class="stat-label">Cache Reduction</span></div>
+      <div class="stat"><span class="stat-val">400→6</span><span class="stat-label">GB at Scale</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:720px;margin:0 auto;">
+      DeepSeek did not merely tune hyperparameters — they rewrote the attention mechanism itself.
+      <strong>Multi-Head Latent Attention (MLA)</strong> projects keys and values into a compressed latent space,
+      caches a single low-dimensional matrix instead of separate K and V caches per head,
+      and uses the <strong>absorption trick</strong> to recover full attention quality at inference time.
+      This chapter walks from the 400 GB KV cache problem through the mathematics to a complete PyTorch implementation.
+    </p>
+
+    <h3 style="margin-top:28px;">What You Will Learn</h3>
+    <ol style="color:var(--text-dim);margin:0 auto 1em;text-align:left;max-width:640px;line-height:2;">
+      <li>Why the KV cache exists and why it costs 400 GB at DeepSeek scale</li>
+      <li>Why MQA and GQA trade quality for memory — and why that trade-off is unacceptable at the frontier</li>
+      <li>How latent space compression via W<sub>DKV</sub> reduces per-token storage from 2×N×H to d<sub>L</sub></li>
+      <li>The absorption trick: folding W<sub>UK</sub> into W<sub>Q</sub> so keys never need caching</li>
+      <li>The exact inference steps when a new token arrives — matrix by matrix</li>
+      <li>A complete PyTorch RolessMLA implementation with dimension traces</li>
+      <li>How to verify head diversity is preserved unlike MQA</li>
+    </ol>
+
+    <p style="color:var(--text-dim);font-size:0.85rem;max-width:640px;margin:0 auto;">Multi-Head Latent Attention was introduced in the <strong>DeepSeek-V2</strong> technical report (June 2024). This chapter implements <em>low-rank key-value joined compression</em> — the simplest MLA variant before decoupled RoPE.</p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>The Innovation That Changed Attention</h2>
+    <p>Among all the architectural choices in DeepSeek-V2 (introduced June 2024), one stands above the rest: <strong>Multi-Head Latent Attention</strong>. It is the primary reason DeepSeek achieved dramatically lower inference costs while maintaining frontier-level language model performance. The standard transformer attention block — multi-head attention with separate key and value caches — was the bottleneck. MLA replaced it.</p>
+
+    <p>Think of a transformer as three regions: an <strong>input block</strong> (embeddings and positional encoding), a <strong>processor block</strong> (stacked transformer layers with attention and feed-forward networks), and an <strong>output block</strong> (final projection to vocabulary logits). MLA transforms specifically the <strong>multi-head attention</strong> component inside every processor layer. Everything else — feed-forward networks, layer normalization, residual connections — remains familiar. But attention itself is fundamentally different.</p>
+
+    <div class="callout"><p><strong>DeepSeek-V2 paper:</strong> The schematic in the DeepSeek-V2 technical report shows four attention variants side by side: standard MHA, Grouped Query Attention, Multi-Query Attention, and finally Multi-Head Latent Attention. This chapter focuses on the simplest MLA variant: <em>low-rank key-value joined compression</em>. A later chapter covers decoupled rotary position embeddings (RoPE) applied to MLA.</p></div>
+
+    
+    <h3 style="margin-top:28px;">The Long Journey to Latent Attention</h3>
+    <p>Understanding MLA requires understanding the path that led to it. The journey has clear milestones:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;line-height:2;">
+      <li><strong>Standard inference is wasteful</strong> — every token recomputes attention over the full prefix</li>
+      <li><strong>KV cache fixes compute</strong> — store keys and values, compute only new token's q, k, v</li>
+      <li><strong>KV cache creates memory crisis</strong> — 400 GB at DeepSeek scale with 100K context</li>
+      <li><strong>MQA sacrifices quality</strong> — share K/V across all heads for N× memory savings</li>
+      <li><strong>GQA partially compromises</strong> — share K/V within groups for N/G× savings</li>
+      <li><strong>MLA breaks the trade-off</strong> — compress via latent space, preserve diversity via up-projections</li>
+    </ol>
+
+    <p>Each step solved the previous problem while introducing a new constraint. MLA is the first approach that simultaneously achieves low cache footprint and full multi-head representational capacity — not by sharing content across heads, but by sharing a compressed latent representation that each head decodes differently.</p>
+
+    <div class="evolution-track">
+      <div class="evolution-node" id="evoMHA">MHA<br><span style="font-size:0.75rem;color:var(--text-dim);">Best quality</span></div>
+      <span class="evolution-arrow">→</span>
+      <div class="evolution-node" id="evoMQA">MQA<br><span style="font-size:0.75rem;color:var(--text-dim);">Smallest cache</span></div>
+      <span class="evolution-arrow">→</span>
+      <div class="evolution-node" id="evoGQA">GQA<br><span style="font-size:0.75rem;color:var(--text-dim);">Middle ground</span></div>
+      <span class="evolution-arrow">→</span>
+      <div class="evolution-node active" id="evoMLA">MLA<br><span style="font-size:0.75rem;color:var(--text-dim);">Best of both</span></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Attention Mechanism Evolution</h4>
+      <p style="font-size:0.9rem;margin-bottom:12px;">Click each node to see its KV cache footprint and performance trade-off relative to DeepSeek-scale settings (128 heads, head dim 128, context 100K).</p>
+      <div class="output-readout" id="evoReadout">MLA: ~6 GB cache, high performance — compresses via latent dimension d<sub>L</sub>=576 instead of 2×128×128 per token.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>The KV Cache Story — From Repetition to Storage</h2>
+    <p>Chapter 4 derived the KV cache in full. The essentials: during inference, each new token triggers a full forward pass, but only the last token's output matters — and most intermediate attention work repeats unchanged.</p>
+
+    
+    <h3 style="margin-top:28px;">Inside Multi-Head Attention — The Four-Token Example</h3>
+    <p>Take the prompt <em>"The next day is"</em> — four tokens. Each token is converted to an input embedding vector. Stacking these gives an input embedding matrix X of shape <strong>(4 × d<sub>model</sub>)</strong>. Using a 4×4 matrix example, d<sub>model</sub> = 4 for simplicity.</p>
+
+    <p>Three trainable weight matrices transform X:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li><strong>Q = X · W<sub>Q</sub></strong> → query matrix, shape (4 × 4)</li>
+      <li><strong>K = X · W<sub>K</sub></strong> → key matrix, shape (4 × 4)</li>
+      <li><strong>V = X · W<sub>V</sub></strong> → value matrix, shape (4 × 4)</li>
+    </ul>
+
+    <p>Attention scores are computed as <strong>Q · K<sup>T</sup></strong>, producing a (4 × 4) matrix where entry (i, j) measures how much token i attends to token j. We scale by √d<sub>k</sub>, apply softmax along each row, and apply the causal mask so future tokens receive zero weight. The resulting attention weights multiply V to produce the context matrix — also (4 × 4), where row i is the context vector for token i.</p>
+
+    <table class="dim-table">
+      <tr><th>Matrix</th><th>Shape</th><th>Row i Represents</th></tr>
+      <tr><td>Input embeddings X</td><td>(4 × d)</td><td>Embedding for token i</td></tr>
+      <tr><td>Queries Q</td><td>(4 × d)</td><td>Query vector for token i</td></tr>
+      <tr><td>Keys K</td><td>(4 × d)</td><td>Key vector for token i</td></tr>
+      <tr><td>Values V</td><td>(4 × d)</td><td>Value vector for token i</td></tr>
+      <tr><td>Attention scores</td><td>(4 × 4)</td><td>Token i's raw scores over all tokens</td></tr>
+      <tr><td>Context</td><td>(4 × d)</td><td>Enriched representation for token i</td></tr>
+    </table>
+
+    <h3 style="margin-top:28px;">Predicting "bright" — Then Repeating Everything</h3>
+    <p>The context matrix passes through the rest of the transformer layers. At the output, we get a logits matrix — one row per token, one column per vocabulary entry. We examine only the logits row for <strong>"is"</strong> (the last token), find the maximum probability, and decode token ID → <strong>"bright"</strong>.</p>
+
+    <p>Now the input becomes five tokens: <em>"The next day is bright"</em>. The entire pipeline runs again. We recompute Q, K, V for all five tokens. The attention score matrix is now (5 × 5). The context matrix is (5 × d). But rows 0–3 of Q, K, V, attention scores, attention weights, and context are <strong>bit-for-bit identical</strong> to what we computed in the previous step. Only row 4 is genuinely new.</p>
+
+    <div class="callout warn"><p><strong>The waste quantified:</strong> At step t with t tokens, we recompute (t−1)² attention entries that were already computed. Summing over all generation steps gives O(T²) total attention work for a sequence of length T — even though only O(T) of that work produces new information.</p></div>
+
+    <p>Tracing backward from next-token prediction for <strong>"bright"</strong>:</p>
+    <div class="flow">
+      <div class="flow-step">Need: logits row for "bright"</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Need: context vector for "bright" only</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Need: attention weights row for "bright" × full V matrix</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Need: q<sub>bright</sub> × K<sup>T</sup> for scores, plus full K and V caches</div>
+    </div>
+
+    <p>For the new token, compute q<sub>new</sub>, k<sub>new</sub>, v<sub>new</sub>. Append k<sub>new</sub> to the K cache and v<sub>new</sub> to the V cache. Multiply q<sub>new</sub> by the full cached K<sup>T</sup> to get scores. Apply softmax. Multiply weights by the full cached V. Done — one context vector, one logits row, one predicted token.</p>
+
+    <p>Queries for prior tokens? Never needed. Keys and values for prior tokens? Already computed — just store them. This is the KV cache.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Repeated Computation Explorer</h4>
+      <div class="token-row" id="repTokens"></div>
+      <div class="btn-group">
+        <button class="btn" id="repStepBtn">Append Token &amp; Recompute</button>
+        <button class="btn" id="repResetBtn">Reset</button>
+      </div>
+      <canvas id="repCanvas" width="560" height="220" style="width:100%;background:var(--bg-card-alt);margin-top:12px;"></canvas>
+      <div class="output-readout" id="repReadout">Step 0: 4 tokens. All Q, K, V computed fresh.</div>
+    </div>
+
+    <p><strong>Conclusion:</strong> Cache the keys and values matrices during inference. This is the <strong>KV cache</strong>. It eliminates recomputation of all prior keys and values, reducing per-step compute from quadratic growth to linear growth in context length.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>The Dark Side — and the MQA/GQA Response</h2>
+
+    <h3 style="margin-top:28px;">KV Cache Memory Formula</h3>
+    <p>The KV cache is not free. Every cached key and value parameter occupies memory. For each transformer layer, the cache size is:</p>
+    <div class="formula">KV cache size = L × B × N × H × S × 2 × 2 bytes</div>
+    <p>Where:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li><strong>L</strong> — number of transformer blocks (layers)</li>
+      <li><strong>B</strong> — batch size</li>
+      <li><strong>N</strong> — number of attention heads</li>
+      <li><strong>H</strong> — head dimension (d<sub>model</sub> / N)</li>
+      <li><strong>S</strong> — context length (number of tokens cached)</li>
+      <li>First <strong>2</strong> — separate caches for keys and values</li>
+      <li>Second <strong>2</strong> — bytes per FP16 parameter (16-bit floating point)</li>
+    </ul>
+
+    <p>For DeepSeek-R1 or DeepSeek-V3 at scale: <strong>L = 61</strong> layers, <strong>B = 1</strong>, <strong>N = 128</strong> heads, <strong>H = 128</strong> head dimension, <strong>S = 100,000</strong> context window. Plugging into the formula:</p>
+    <div class="formula">61 × 1 × 128 × 128 × 100,000 × 2 × 2 ≈ 400 GB</div>
+    <p>Four hundred gigabytes — just for the KV cache. DeepSeek's actual inference costs are far lower than this naive calculation would suggest, which is direct evidence they are not using a standard MHA KV cache. They are doing something fundamentally different — and that something is MLA.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · KV Cache Size Calculator</h4>
+      <div class="two-col">
+        <div class="slider-container"><label>Layers (L): <span class="slider-value" id="kvL">61</span></label><input type="range" id="kvLSlider" min="1" max="96" value="61"></div>
+        <div class="slider-container"><label>Heads (N): <span class="slider-value" id="kvN">128</span></label><input type="range" id="kvNSlider" min="1" max="128" value="128"></div>
+        <div class="slider-container"><label>Head dim (H): <span class="slider-value" id="kvH">128</span></label><input type="range" id="kvHSlider" min="32" max="256" step="32" value="128"></div>
+        <div class="slider-container"><label>Context (S): <span class="slider-value" id="kvS">100000</span></label><input type="range" id="kvSSlider" min="1000" max="128000" step="1000" value="100000"></div>
+      </div>
+      <div class="output-readout" id="kvReadout"></div>
+      <canvas id="kvGrowthCanvas" width="560" height="180" style="width:100%;background:var(--bg-card-alt);margin-top:12px;"></canvas>
+    </div>
+
+    <p>Chapter 4 showed how MQA and GQA reduce KV cache memory by sharing key-value heads. Both approaches trade model quality for memory savings. MLA eliminates this trade-off.</p>
+
+    <table class="data-table">
+      <tr><th>Mechanism</th><th>KV Cache Size</th><th>Head Diversity</th><th>Performance</th></tr>
+      <tr><td>MHA</td><td>Largest (4.5 GB ref.)</td><td>Full — all heads unique</td><td>Best</td></tr>
+      <tr><td>GQA (8 groups)</td><td>~384 MB</td><td>Partial — 8 distinct K/V groups</td><td>Medium</td></tr>
+      <tr><td>MQA</td><td>Smallest (~47 MB ref.)</td><td>None — single shared K/V</td><td>Worst</td></tr>
+      <tr><td>MLA</td><td>~6 GB at DeepSeek scale</td><td>Full — via per-head W<sub>UK</sub>, W<sub>UV</sub></td><td>Best</td></tr>
+    </table>
+
+    <div class="interactive-panel">
+      <h4>Interactive · MHA vs MQA vs GQA Memory Comparison</h4>
+      <div class="two-col">
+        <div class="slider-container"><label>Attention heads (N): <span class="slider-value" id="memN">128</span></label><input type="range" id="memNSlider" min="4" max="128" step="4" value="128"></div>
+        <div class="slider-container"><label>GQA groups (G): <span class="slider-value" id="memG">16</span></label><input type="range" id="memGSlider" min="1" max="128" value="16"></div>
+      </div>
+      <div class="bar-chart" id="memBarChart"></div>
+      <div class="output-readout" id="memReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>The Best of Both Worlds Problem</h2>
+    <p>Two goals must be satisfied simultaneously:</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3>Goal 1: Low Cache Size</h3>
+        <p>In the KV cache formula, the terms <strong>N × H</strong> (number of heads × head dimension) dominate the per-token storage cost. For DeepSeek, N × H = 128 × 128 = 16,384 dimensions per token per cache (keys and values separately). We cannot easily change L (layers), B (batch), or S (context) — but we <em>can</em> attack N × H.</p>
+      </div>
+      <div class="card card-alt">
+        <h3>Goal 2: High Performance</h3>
+        <p>Every attention head should have <strong>different</strong> K and V values. We want K<sub>1</sub> ≠ K<sub>2</sub> ≠ K<sub>3</sub> ≠ K<sub>4</sub> and V<sub>1</sub> ≠ V<sub>2</sub> ≠ V<sub>3</sub> ≠ V<sub>4</sub>. This requires W<sub>K1</sub> ≠ W<sub>K2</sub> and W<sub>V1</sub> ≠ W<sub>V2</sub> — distinct trainable weights per head.</p>
+      </div>
+    </div>
+
+    <p>These goals appear contradictory. MQA reduced cache size by making all heads share content — directly violating Goal 2. How can we shrink N × H while keeping heads diverse?</p>
+
+    <h3 style="margin-top:28px;">DeepSeek's Reframing</h3>
+    <p>DeepSeek asked a different question: <strong>what if we don't cache keys and values separately at all?</strong></p>
+    <p>Currently we cache two matrices (K and V), each with N × H columns per token. That gives a factor of 2 × N × H in the cache size. DeepSeek proposed:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li>Cache <strong>only one matrix</strong> instead of two (eliminate the factor of 2)</li>
+      <li>Make that matrix's column dimension <strong>d<sub>L</sub></strong> much smaller than N × H</li>
+    </ol>
+
+    <p>This sounds like a magic bullet. How do you cache one small matrix and still compute full multi-head attention with diverse keys and values per head? The answer is the <strong>latent space</strong>.</p>
+
+    <div class="qa-box">
+      <div class="q">A common question is: why not just use GQA with more groups?</div>
+      <p>GQA still forces heads within a group to share identical K/V — a hard constraint on representational diversity. MLA compresses via a learned latent bottleneck that is shared, but reconstructs head-specific K and V through separate up-projection matrices W<sub>UK</sub> and W<sub>UV</sub> that differ per head. The compression is soft, not hard.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Latent Space Compression — The Down-Projection</h2>
+    <p>The idea of latent spaces has existed in machine learning for decades — autoencoders, variational models, and recommendation systems all project high-dimensional inputs into lower-dimensional representations. DeepSeek brought this concept to language model attention for the first time at scale.</p>
+
+    
+    <h3 style="margin-top:28px;">The Latent Matrix C<sub>KV</sub> — What DeepSeek Caches</h3>
+    <p>DeepSeek's insight: instead of caching K and V separately (each S × N × H), cache a single matrix C<sub>KV</sub> = X · W<sub>DKV</sub> with shape <strong>S × d<sub>L</sub></strong>. The down-projection matrix W<sub>DKV</sub> maps from d<sub>model</sub>-dimensional embedding space to d<sub>L</sub>-dimensional latent space.</p>
+
+    <p>Using a 4×4 matrix example: input embeddings are (4 × 8). W<sub>DKV</sub> is (8 × 4). The latent matrix C<sub>KV</sub> is (4 × 4). Per-token storage drops from 8 columns to 4 — before accounting for the K/V factor.</p>
+
+    <p>DeepSeek-V2 uses d<sub>L</sub> = 576 with d<sub>model</sub> corresponding to N × H = 128 × 128 = 16,384 total key/value dimensions per cache. The compression within the latent space alone is 16,384 / 576 ≈ 28×. Combined with storing one cache instead of two, the total reduction reaches ~57×.</p>
+
+    <h3 style="margin-top:28px;">The Full MLA Pipeline (Simplest Variant)</h3>
+    <div class="flow">
+      <div class="flow-step"><strong>Queries:</strong> Q = X · W<sub>Q</sub> <span class="tag tag-blue">unchanged from MHA</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Latent:</strong> C<sub>KV</sub> = X · W<sub>DKV</sub> <span class="tag tag-green">CACHED</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Keys:</strong> K = C<sub>KV</sub> · W<sub>UK</sub> <span class="tag tag-purple">per-head up-projection</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Values:</strong> V = C<sub>KV</sub> · W<sub>UV</sub> <span class="tag tag-purple">per-head up-projection</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Attention:</strong> softmax(Q · K<sup>T</sup> / √d) · V → Context</div>
+    </div>
+
+    <p>Later MLA variants also project queries into a latent space and apply decoupled RoPE (Rotary Positional Embeddings). This chapter covers the simplest variant where queries use standard W<sub>Q</sub> projection — sufficient to understand the core compression and absorption mechanisms.</p>
+
+    <h3 style="margin-top:28px;">Why "Absorption Trick"?</h3>
+    <p>DeepSeek calls the matrix rearrangement an <strong>absorption trick</strong> because W<sub>UK</sub> — which traditionally lives in the key computation path — gets absorbed into the query computation path at inference time. Instead of computing full keys and caching them, we fold W<sub>UK</sub><sup>T</sup> into W<sub>Q</sub> and query the latent cache directly. The keys are never materialized during inference — they are implicitly represented through the absorbed query against C<sub>KV</sub>.</p>
+
+    <h3 style="margin-top:28px;">The Core Workflow</h3>
+    <p>Start with an input embedding matrix X of shape (S × d<sub>model</sub>). In a toy example, four tokens each with 8-dimensional embeddings give X of shape (4 × 8).</p>
+
+    <p><strong>Step 1 — Queries (unchanged):</strong> X is multiplied by W<sub>Q</sub> to produce the queries matrix Q. In the simplest MLA variant, queries work exactly as in standard attention.</p>
+
+    <p><strong>Step 2 — Down-projection to latent space:</strong> Instead of computing K = X · W<sub>K</sub> and V = X · W<sub>V</sub> directly, we first multiply X by W<sub>DKV</sub> — the <strong>down-projection KV matrix</strong>. The "D" means down, "KV" means this projection serves both keys and values jointly.</p>
+
+    <div class="formula">C<sub>KV</sub> = X · W<sub>DKV</sub>&nbsp;&nbsp;&nbsp;(shape: S × d<sub>L</sub>)</div>
+
+    <p>W<sub>DKV</sub> has shape (d<sub>model</sub> × d<sub>L</sub>). If d<sub>model</sub> = 8 and d<sub>L</sub> = 4, then a (4 × 8) input produces a (4 × 4) latent matrix C<sub>KV</sub>. We went from 8 dimensions to 4 — a 2× compression per token before even considering the K/V factor.</p>
+
+    <p><strong>Step 3 — Up-projection to keys and values:</strong> The latent matrix is multiplied by separate up-projection matrices:</p>
+    <div class="formula">K = C<sub>KV</sub> · W<sub>UK</sub>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;V = C<sub>KV</sub> · W<sub>UV</sub></div>
+    <p>W<sub>UK</sub> and W<sub>UV</sub> each have shape (d<sub>L</sub> × d<sub>model</sub>). The "U" means up-projection. Critically, these matrices are <strong>different per attention head</strong> — so reconstructed K and V differ across heads even though they share the same latent cache C<sub>KV</sub>.</p>
+
+    <p><strong>Step 4 — Standard attention:</strong> Q · K<sup>T</sup> → attention scores → softmax → attention weights · V → context matrix. Everything after obtaining K and V is identical to standard multi-head attention.</p>
+
+    <div class="flow">
+      <div class="flow-step">X · W<sub>Q</sub> → Q</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">X · W<sub>DKV</sub> → C<sub>KV</sub> <span class="tag tag-green">CACHED</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">C<sub>KV</sub> · W<sub>UK</sub> → K &nbsp;|&nbsp; C<sub>KV</sub> · W<sub>UV</sub> → V</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">softmax(Q · K<sup>T</sup> / √d) · V → Context</div>
+    </div>
+
+    <div class="callout"><p><strong>At first glance this seems worse:</strong> We added an extra matrix multiplication (the down-projection) and two up-projections. How does adding computation reduce cache size? The answer lies in what we store during inference — and the absorption trick that follows.</p></div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Latent Compression Visualizer</h4>
+      <p style="font-size:0.9rem;margin-bottom:12px;">Watch an input embedding compress through W<sub>DKV</sub> into the latent space, then expand back via W<sub>UK</sub> and W<sub>UV</sub>.</p>
+      <div class="two-col">
+        <div class="slider-container"><label>d<sub>model</sub>: <span class="slider-value" id="latDmodel">8</span></label><input type="range" id="latDmodelSlider" min="4" max="32" step="4" value="8"></div>
+        <div class="slider-container"><label>d<sub>L</sub> (latent): <span class="slider-value" id="latDL">4</span></label><input type="range" id="latDLSlider" min="2" max="16" step="2" value="4"></div>
+      </div>
+      <canvas id="latentCanvas" width="560" height="260" style="width:100%;background:var(--bg-card-alt);"></canvas>
+      <div class="output-readout" id="latentReadout">Compression ratio per token: d<sub>model</sub>/d<sub>L</sub> = 8/4 = 2×. With joint K/V cache: 2×2 = 4× vs standard MHA.</div>
+    </div>
+
+    <h3 style="margin-top:28px;">What Gets Cached</h3>
+    <p>During inference, we cache <strong>C<sub>KV</sub> = X · W<sub>DKV</sub></strong> — the latent KV matrix. Not keys separately. Not values separately. Just this one matrix with d<sub>L</sub> columns per token instead of N × H columns per cache.</p>
+
+    <table class="dim-table">
+      <tr><th>Component</th><th>Standard MHA Cache</th><th>MLA Latent Cache</th></tr>
+      <tr><td>Keys</td><td>S × (N × H) — cached</td><td>Not cached separately</td></tr>
+      <tr><td>Values</td><td>S × (N × H) — cached</td><td>Not cached separately</td></tr>
+      <tr><td>Latent C<sub>KV</sub></td><td>Does not exist</td><td><strong>S × d<sub>L</sub> — cached</strong></td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>The Absorption Trick — Mathematics That Makes It Work</h2>
+    <p>Adding a latent matrix only helps if we can still compute attention scores and context vectors using just the cached C<sub>KV</sub>. The <strong>absorption trick</strong> is the mathematical rearrangement that makes this possible.</p>
+
+    <h3 style="margin-top:28px;">Deriving the Absorbed Query</h3>
+    <p>We know:</p>
+    <div class="formula">Q = X · W<sub>Q</sub>&nbsp;&nbsp;|&nbsp;&nbsp;C<sub>KV</sub> = X · W<sub>DKV</sub>&nbsp;&nbsp;|&nbsp;&nbsp;K = C<sub>KV</sub> · W<sub>UK</sub> = X · W<sub>DKV</sub> · W<sub>UK</sub></div>
+
+    <p>Attention scores are Q · K<sup>T</sup>:</p>
+    <div class="formula">Scores = (X · W<sub>Q</sub>) · (X · W<sub>DKV</sub> · W<sub>UK</sub>)<sup>T</sup></div>
+    <div class="formula">Scores = X · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> · W<sub>DKV</sub><sup>T</sup> · X<sup>T</sup></div>
+
+    <p>Now the crucial step. W<sub>Q</sub> and W<sub>UK</sub><sup>T</sup> are both fixed after pre-training. They never change during inference. So we can pre-multiply them into a single absorbed matrix:</p>
+    <div class="formula">W<sub>absorbed</sub> = W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup>&nbsp;&nbsp;(computed once, never cached)</div>
+
+    <p>For a new token x (a single row of X), the attention scores against the cached latent vectors become:</p>
+    <div class="formula">scores = (x · W<sub>absorbed</sub>) · C<sub>KV</sub><sup>T</sup></div>
+
+    <p>The <strong>absorbed query</strong> is q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup>. Compare this to standard attention where q = x · W<sub>Q</sub>. We have absorbed W<sub>UK</sub><sup>T</sup> into the query computation. No key cache needed — we multiply the absorbed query directly against the latent cache C<sub>KV</sub>.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Absorption Trick Step-by-Step</h4>
+      <div class="step-indicator" id="absSteps">
+        <div class="step-dot active" data-step="0">1</div>
+        <div class="step-dot" data-step="1">2</div>
+        <div class="step-dot" data-step="2">3</div>
+        <div class="step-dot" data-step="3">4</div>
+        <div class="step-dot" data-step="4">5</div>
+      </div>
+      <canvas id="absCanvas" width="560" height="240" style="width:100%;background:var(--bg-card-alt);"></canvas>
+      <div class="btn-group">
+        <button class="btn" id="absPrevBtn">← Previous</button>
+        <button class="btn" id="absNextBtn">Next →</button>
+      </div>
+      <div class="output-readout" id="absReadout">Step 1: Q = X · W<sub>Q</sub> and K = X · W<sub>DKV</sub> · W<sub>UK</sub></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Absorbing Values into the Output Projection</h3>
+    <p>The same logic applies to the context vector. The values matrix is V = X · W<sub>DKV</sub> · W<sub>UV</sub> = C<sub>KV</sub> · W<sub>UV</sub>. The context vector is attention_weights · V, and eventually we multiply by the output projection W<sub>O</sub> to get logits.</p>
+    <div class="formula">Context = AttnWeights · C<sub>KV</sub> · W<sub>UV</sub>&nbsp;&nbsp;→&nbsp;&nbsp;Logits = Context · W<sub>O</sub></div>
+    <p>Since W<sub>UV</sub> and W<sub>O</sub> are fixed at training time, we can absorb W<sub>UV</sub> · W<sub>O</sub> into a single precomputed matrix. During inference, we use the same cached C<sub>KV</sub> to compute values (via C<sub>KV</sub> · W<sub>UV</sub>) and then weight-sum with attention weights to get the context vector for the new token.</p>
+
+    <div class="callout ok"><p><strong>The absorption trick in one sentence:</strong> Because matrix multiplication is associative and W<sub>Q</sub>, W<sub>UK</sub>, W<sub>UV</sub>, W<sub>O</sub> are fixed after training, we fold the up-projection weights into the query and output paths — leaving only C<sub>KV</sub> to be cached and updated at inference time.</p></div>
+
+    <h3 style="margin-top:28px;">Why Heads Stay Diverse</h3>
+    <p>W<sub>UK</sub> and W<sub>UV</sub> have <strong>different weights for every attention head</strong>. Even though all heads read from the same latent cache C<sub>KV</sub>, the up-projection reconstructs head-specific keys and values. Head 0's W<sub>UK</sub> differs from Head 1's W<sub>UK</sub>, producing different K matrices. This is fundamentally different from MQA, where the same K/V content is literally shared.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Per-Head Weight Diversity</h4>
+      <p style="font-size:0.9rem;margin-bottom:12px;">Heatmaps of W<sub>UK</sub> and W<sub>UV</sub> per head — no two heads share identical weights (unlike MQA).</p>
+      <div class="btn-group">
+        <button class="btn active" id="headDiv2">2 heads (toy)</button>
+        <button class="btn" id="headDiv8">8 heads (scale)</button>
+      </div>
+      <canvas id="headDivCanvas" width="560" height="280" style="width:100%;background:var(--bg-card-alt);"></canvas>
+      <div class="output-readout" id="headDivReadout">Head 0 and Head 1 W<sub>UK</sub> matrices are completely different — diversity preserved.</div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>What Happens When a New Token Arrives</h2>
+    <p>The following traces the exact inference steps when a new token — say <strong>"bright"</strong> — arrives, assuming <em>"The next day is"</em> is already cached as four latent vectors.</p>
+
+    <h3 style="margin-top:28px;">Before MLA: Standard KV Cache Steps</h3>
+    <p>With standard MHA caching, when <strong>"bright"</strong> arrives:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li>Compute q<sub>bright</sub> = x<sub>bright</sub> · W<sub>Q</sub></li>
+      <li>Compute k<sub>bright</sub> = x<sub>bright</sub> · W<sub>K</sub>, append to K cache</li>
+      <li>Compute v<sub>bright</sub> = x<sub>bright</sub> · W<sub>V</sub>, append to V cache</li>
+      <li>scores = q<sub>bright</sub> · K<sup>T</sup> (using full K cache)</li>
+      <li>context = weights · V (using full V cache)</li>
+    </ol>
+    <p>Two separate caches (K and V), each growing by N × H dimensions per new token.</p>
+
+    <h3 style="margin-top:28px;">With MLA: Latent Cache Steps</h3>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li><strong>Absorbed query:</strong> q<sub>abs</sub> = x<sub>bright</sub> · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> (W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> precomputed)</li>
+      <li><strong>New latent vector:</strong> c<sub>new</sub> = x<sub>bright</sub> · W<sub>DKV</sub> (optionally layer-normalized)</li>
+      <li><strong>Update cache:</strong> append c<sub>new</sub> to C<sub>KV</sub> cache → shape grows from (4 × d<sub>L</sub>) to (5 × d<sub>L</sub>)</li>
+      <li><strong>Attention scores:</strong> scores = q<sub>abs</sub> · C<sub>KV</sub><sup>T</sup> (one cache, no key cache)</li>
+      <li><strong>Attention weights:</strong> scale by √d, apply causal mask, softmax</li>
+      <li><strong>Values from same cache:</strong> V = C<sub>KV</sub> · W<sub>UV</sub> (same C<sub>KV</sub>, no separate V cache)</li>
+      <li><strong>Context vector:</strong> context = weights · V → only the row for <strong>"bright"</strong> matters</li>
+    </ol>
+
+    <div class="interactive-panel">
+      <h4>Interactive · New Token Inference Flow</h4>
+      <div class="token-row" id="inferFlowTokens"></div>
+      <div class="step-indicator" id="inferSteps">
+        <div class="step-dot active" data-step="0">Q</div>
+        <div class="step-dot" data-step="1">C</div>
+        <div class="step-dot" data-step="2">S</div>
+        <div class="step-dot" data-step="3">W</div>
+        <div class="step-dot" data-step="4">V</div>
+        <div class="step-dot" data-step="5">Ctx</div>
+      </div>
+      <canvas id="inferFlowCanvas" width="560" height="200" style="width:100%;background:var(--bg-card-alt);"></canvas>
+      <div class="btn-group">
+        <button class="btn" id="inferFlowPrev">← Back</button>
+        <button class="btn" id="inferFlowNext">Next Step →</button>
+        <button class="btn" id="inferFlowReset">Reset</button>
+      </div>
+      <div class="output-readout" id="inferFlowReadout">Step 1: Compute absorbed query q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup></div>
+    </div>
+
+    
+    <h3 style="margin-top:28px;">Side-by-Side: MHA vs MLA for Token "bright"</h3>
+    <p>Input sequence after appending <strong>"bright"</strong>: 5 tokens total. New inference step processes only the embedding for <strong>"bright"</strong>.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h3>Standard MHA</h3>
+        <p><strong>Compute:</strong> q = x · W<sub>Q</sub> (1×4 per head)</p>
+        <p><strong>Compute:</strong> k = x · W<sub>K</sub> → append to K cache (5×4 per head)</p>
+        <p><strong>Compute:</strong> v = x · W<sub>V</sub> → append to V cache (5×4 per head)</p>
+        <p><strong>Cache read:</strong> K (5×4), V (5×4) — two separate caches per head</p>
+        <p><strong>Storage:</strong> 2 caches × 2 heads × 5 tokens × 4 dims = 80 values</p>
+      </div>
+      <div class="card">
+        <h3>MLA</h3>
+        <p><strong>Compute:</strong> q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> (1×4 per head)</p>
+        <p><strong>Compute:</strong> c = LN(x · W<sub>DKV</sub>) → append to C<sub>KV</sub> (5×4 shared)</p>
+        <p><strong>Cache read:</strong> C<sub>KV</sub> (5×4) — one shared cache</p>
+        <p><strong>Compute:</strong> V = C<sub>KV</sub> · W<sub>UV</sub> on the fly (not cached)</p>
+        <p><strong>Storage:</strong> 1 cache × 5 tokens × 4 dims = 20 values</p>
+      </div>
+    </div>
+
+    <p>In this toy example, MLA stores 4× fewer cache values. At DeepSeek scale (d<sub>L</sub>=576 vs 2×128×128=32768), the ratio is 57×.</p>
+
+    <div class="callout ok"><p><strong>The single-cache insight:</strong> The same updated C<sub>KV</sub> matrix is used twice — once to compute attention scores (via the absorbed query) and once to reconstruct values (via W<sub>UV</sub>). No key cache. No value cache. Just one latent cache.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6b">
+  <div class="container">
+    <span class="section-num">06b</span>
+    <h2>Intuition and Numerical Examples</h2>
+
+    <h3 style="margin-top:28px;">Building Intuition: The Autoencoder Analogy</h3>
+    <p>Think of MLA as applying an autoencoder pattern to the KV cache. An autoencoder compresses input into a bottleneck (encoder), then reconstructs from that bottleneck (decoder). Here:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li><strong>Encoder:</strong> W<sub>DKV</sub> compresses the input embedding into the latent vector c (dimension d<sub>L</sub>)</li>
+      <li><strong>Bottleneck (cached):</strong> C<sub>KV</sub> — the compressed representation stored in memory</li>
+      <li><strong>Decoders (per head):</strong> W<sub>UK</sub> and W<sub>UV</sub> reconstruct head-specific keys and values from the shared bottleneck</li>
+    </ul>
+    <p>Unlike MQA — where every head reads the same decoded output — each head in MLA has its own decoder weights. Head 1's W<sub>UK</sub> produces different keys from the same C<sub>KV</sub> than Head 2's W<sub>UK</sub>. The bottleneck is shared; the reconstructions are not.</p>
+
+    <h3 style="margin-top:28px;">Numerical Example: Toy Model Cache Bytes</h3>
+    <p>For d_model=8, n_heads=2, d_h=4, d_L=4, S=6 tokens, L=1 layer, B=1 batch, FP16 (2 bytes):</p>
+    <div class="card card-alt" style="font-family:var(--mono);font-size:0.85rem;">
+      <p style="color:var(--text);margin-bottom:8px;"><strong>MHA:</strong> L × B × S × (2 × N × d_h) × 2 bytes</p>
+      <p style="color:var(--text-dim);margin-bottom:8px;">= 1 × 1 × 6 × (2 × 2 × 4) × 2 = 1 × 6 × 16 × 2 = <strong style="color:var(--text);">192 bytes</strong></p>
+      <p style="color:var(--text);margin-bottom:8px;"><strong>MLA:</strong> L × B × S × d_L × 2 bytes</p>
+      <p style="color:var(--text-dim);margin-bottom:8px;">= 1 × 1 × 6 × 4 × 2 = <strong style="color:var(--accent3);">48 bytes</strong></p>
+      <p style="color:var(--text);margin:0;">Ratio: 192 / 48 = <strong style="color:var(--accent3);">4×</strong></p>
+    </div>
+
+    <p>Scale to DeepSeek: replace 2×2×4=16 with 2×128×128=32768, replace d_L=4 with d_L=576, replace S=6 with S=100000, replace L=1 with L=61. The ratio grows from 4× to ~57× because d_L scales sublinearly with model capacity.</p>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Memory Savings — From 400 GB to 6 GB</h2>
+
+    
+    <h3 style="margin-top:28px;">Detailed Memory Calculation — DeepSeek Numbers</h3>
+    <p>The DeepSeek-R1/V3 KV cache size breaks down as follows, with all parameters explicit:</p>
+
+    <div class="card card-alt" style="font-family:var(--mono);font-size:0.85rem;">
+      <p style="color:var(--text);margin-bottom:8px;"><strong>Standard MHA:</strong></p>
+      <p style="color:var(--text-dim);margin-bottom:4px;">L = 61, B = 1, N = 128, H = 128, S = 100,000</p>
+      <p style="color:var(--text-dim);margin-bottom:4px;">Bytes = 61 × 1 × 128 × 128 × 100,000 × 2 × 2</p>
+      <p style="color:var(--text-dim);margin-bottom:4px;">= 61 × 128 × 128 × 100,000 × 4</p>
+      <p style="color:var(--text-dim);margin-bottom:4px;">= 61 × 16,384 × 100,000 × 4</p>
+      <p style="color:var(--text-dim);margin-bottom:8px;">= 61 × 1.6384 × 10<sup>12</sup> ≈ <strong style="color:var(--danger);">400 GB</strong></p>
+      <p style="color:var(--text);margin-bottom:8px;"><strong>MLA with d<sub>L</sub> = 576:</strong></p>
+      <p style="color:var(--text-dim);margin-bottom:4px;">Bytes = 61 × 1 × 576 × 100,000 × 2</p>
+      <p style="color:var(--text-dim);margin-bottom:4px;">= 61 × 576 × 100,000 × 2</p>
+      <p style="color:var(--text-dim);margin-bottom:8px;">≈ <strong style="color:var(--accent3);">7 GB → ~6 GB in practice</strong></p>
+      <p style="color:var(--text);margin:0;">Reduction = 400 / 7 ≈ <strong style="color:var(--accent3);">57×</strong></p>
+    </div>
+
+    <h3 style="margin-top:28px;">Where Each Factor Goes</h3>
+    <table class="dim-table">
+      <tr><th>Factor</th><th>MHA</th><th>MLA</th><th>Impact</th></tr>
+      <tr><td>Separate K/V caches</td><td>×2</td><td>×1</td><td>2× reduction</td></tr>
+      <tr><td>Columns per token</td><td>N×H = 16,384</td><td>d<sub>L</sub> = 576</td><td>~28× reduction</td></tr>
+      <tr><td>Combined</td><td>2 × 16,384 = 32,768</td><td>576</td><td>~57× reduction</td></tr>
+    </table>
+
+    <p>The choice of d<sub>L</sub> = 576 is a deliberate architectural decision. It must be large enough that the latent bottleneck preserves the information needed for high-quality language modeling, but small enough to achieve dramatic memory savings. Too small → quality collapse (like extreme compression). Too large → approaching MHA memory costs without benefit.</p>
+
+    <h3 style="margin-top:28px;">Standard MHA Cache Size</h3>
+    <div class="formula">Size<sub>MHA</sub> = L × B × S × (2 × N × H) × 2 bytes</div>
+    <p>The inner 2 × N × H is: factor 2 for separate K and V caches, N × H for per-head key/value dimension.</p>
+
+    <h3 style="margin-top:28px;">MLA Latent Cache Size</h3>
+    <div class="formula">Size<sub>MLA</sub> = L × B × S × d<sub>L</sub> × 2 bytes</div>
+    <p>One cache instead of two. Column dimension is d<sub>L</sub> (latent dimension) instead of N × H.</p>
+
+    <h3 style="margin-top:28px;">The Compression Ratio</h3>
+    <div class="formula">Reduction = (2 × N × H) / d<sub>L</sub></div>
+
+    <p>For DeepSeek: N = 128, H = 128, so N × H = 16,384. With separate K/V caches: 2 × 128 × 128 = 32,768 effective dimensions per token. DeepSeek chose d<sub>L</sub> = 576.</p>
+    <div class="formula">Reduction = (2 × 128 × 128) / 576 = 32,768 / 576 ≈ 57×</div>
+
+    <p>Starting from ~400 GB with standard MHA caching at 100K context:</p>
+    <div class="formula">400 GB / 57 ≈ 7 GB → approximately 6 GB in practice</div>
+
+    <table class="data-table">
+      <tr><th>Parameter</th><th>Standard MHA</th><th>MLA (DeepSeek)</th></tr>
+      <tr><td>Caches per token</td><td>2 (K + V)</td><td>1 (C<sub>KV</sub>)</td></tr>
+      <tr><td>Columns per cache</td><td>N × H = 16,384</td><td>d<sub>L</sub> = 576</td></tr>
+      <tr><td>Effective dims/token</td><td>2 × 16,384 = 32,768</td><td>576</td></tr>
+      <tr><td>Total at 100K ctx</td><td>~400 GB</td><td>~6 GB</td></tr>
+      <tr><td>Head diversity</td><td>Full (unique K/V per head)</td><td>Full (via W<sub>UK</sub>, W<sub>UV</sub> per head)</td></tr>
+    </table>
+
+    <div class="interactive-panel">
+      <h4>Interactive · MLA Compression Ratio Calculator</h4>
+      <div class="two-col">
+        <div class="slider-container"><label>Heads (N): <span class="slider-value" id="compN">128</span></label><input type="range" id="compNSlider" min="1" max="128" value="128"></div>
+        <div class="slider-container"><label>Head dim (H): <span class="slider-value" id="compH">128</span></label><input type="range" id="compHSlider" min="32" max="256" step="32" value="128"></div>
+        <div class="slider-container"><label>Latent dim (d<sub>L</sub>): <span class="slider-value" id="compDL">576</span></label><input type="range" id="compDLSlider" min="64" max="2048" step="64" value="576"></div>
+        <div class="slider-container"><label>Context (S): <span class="slider-value" id="compS">100000</span></label><input type="range" id="compSSlider" min="4096" max="128000" step="4096" value="100000"></div>
+      </div>
+      <div class="two-col" style="margin-top:12px;">
+        <div class="progress-bar-wrap"><div class="progress-bar" id="compMhaBar" style="width:100%;background:var(--accent);">MHA</div></div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="compMlaBar" style="width:2%;background:var(--accent3);">MLA</div></div>
+      </div>
+      <div class="output-readout" id="compReadout"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Cache Growth During Inference</h4>
+      <p style="font-size:0.9rem;margin-bottom:12px;">Watch the latent cache grow as tokens are appended. Shape: (S × d<sub>L</sub>).</p>
+      <div class="btn-group">
+        <button class="btn" id="cacheAddBtn">Add Token</button>
+        <button class="btn" id="cacheResetBtn">Reset</button>
+        <button class="btn" id="cacheAutoBtn">Auto (+10)</button>
+      </div>
+      <div class="output-readout" id="cacheReadout">Cache shape: (5 × 4) — 5 tokens cached, latent dim = 4</div>
+      <canvas id="cacheGrowthCanvas" width="560" height="120" style="width:100%;background:var(--bg-card-alt);margin-top:12px;"></canvas>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: why d<sub>L</sub> = 576 specifically?</div>
+      <p>d<sub>L</sub> is a hyperparameter balancing compression vs. quality. Too small and the latent bottleneck loses information; too large and memory savings diminish. DeepSeek chose 576 through architectural search — large enough to preserve performance, small enough to achieve ~57× cache reduction at their scale (128 heads, 128 head dim).</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>PyTorch Implementation — RolessMLA from Scratch</h2>
+    <p>Theory is necessary but not sufficient. This section implements the simplest MLA variant in PyTorch, walking through every matrix dimension. The class is named <code style="font-family:var(--mono);color:var(--accent);">RolessMLA</code> because advanced MLA variants incorporate rotary positional embeddings (RoPE) — which we omit here for clarity.</p>
+
+    <h3 style="margin-top:28px;">Hyperparameters for Our Toy Model</h3>
+    <table class="dim-table">
+      <tr><th>Symbol</th><th>Value</th><th>Meaning</th></tr>
+      <tr><td>d<sub>model</sub></td><td>8</td><td>Embedding dimension</td></tr>
+      <tr><td>d<sub>L</sub></td><td>4</td><td>Latent KV dimension</td></tr>
+      <tr><td>N (heads)</td><td>2</td><td>Number of attention heads</td></tr>
+      <tr><td>d<sub>h</sub></td><td>4</td><td>Head dimension (d<sub>model</sub> / N)</td></tr>
+      <tr><td>S (context)</td><td>6</td><td>Tokens after appending new token ("The next day is bright" + new)</td></tr>
+    </table>
+
+    <h3 style="margin-top:28px;">Weight Matrices</h3>
+    <table class="dim-table">
+      <tr><th>Matrix</th><th>Shape</th><th>Role</th></tr>
+      <tr><td>W<sub>Q</sub></td><td>(8 × 8)</td><td>Query projection</td></tr>
+      <tr><td>W<sub>DKV</sub></td><td>(8 × 4)</td><td>Down-projection to latent space</td></tr>
+      <tr><td>W<sub>UK</sub></td><td>(4 × 8)</td><td>Up-projection to keys</td></tr>
+      <tr><td>W<sub>UV</sub></td><td>(4 × 8)</td><td>Up-projection to values</td></tr>
+      <tr><td>W<sub>O</sub></td><td>(8 × 8)</td><td>Output projection to logits</td></tr>
+    </table>
+
+    <div class="code-block"><span class="kw">import</span> torch
+<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
+<span class="kw">import</span> torch.nn.functional <span class="kw">as</span> F
+
+<span class="kw">class</span> <span class="cls">RolessMLA</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, d_model, n_heads, latent_dim):
+        <span class="fn">super</span>().__init__()
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_h = d_model // n_heads
+        self.latent_dim = latent_dim
+
+        <span class="cmt"># Query projection: (d_model → d_model)</span>
+        self.WQ = nn.Linear(d_model, d_model, bias=<span class="kw">False</span>)
+
+        <span class="cmt"># Down-projection KV: (d_model → latent_dim) — THE key matrix</span>
+        self.WDKV = nn.Linear(d_model, latent_dim, bias=<span class="kw">False</span>)
+
+        <span class="cmt"># Up-projections: (latent_dim → d_model)</span>
+        self.WUK = nn.Linear(latent_dim, d_model, bias=<span class="kw">False</span>)
+        self.WUV = nn.Linear(latent_dim, d_model, bias=<span class="kw">False</span>)
+
+        <span class="cmt"># Output projection</span>
+        self.WO = nn.Linear(d_model, d_model, bias=<span class="kw">False</span>)
+
+        <span class="cmt"># Layer norm on latent vectors (as in DeepSeek implementation)</span>
+        self.ln = nn.LayerNorm(latent_dim)
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x, kv_cache=<span class="kw">None</span>):
+        <span class="cmt"># x shape: (batch, seq_len, d_model) — during inference often (1, 1, 8)</span>
+        B, T, D = x.shape
+
+        <span class="cmt"># Step 1: Precompute absorbed query matrix WQ @ WUK.T</span>
+        <span class="cmt"># WQ.weight: (d_model, d_model), WUK.weight: (d_model, latent_dim)</span>
+        absorbed_qk = torch.matmul(self.WQ.weight, self.WUK.weight.T)
+        <span class="cmt"># absorbed_qk shape: (d_model, d_model) = (8, 8)</span>
+
+        <span class="cmt"># Split absorbed matrix across heads: (n_heads, d_h, latent_dim)</span>
+        absorbed_qk = absorbed_qk.view(self.n_heads, self.d_h, self.d_model)
+        <span class="cmt"># Actually split columns by head: view as (n_heads, d_h, d_model)</span>
+        absorbed_qk = absorbed_qk.view(self.n_heads, self.d_h, -1)
+        <span class="cmt"># For d_model=8, n_heads=2: shape (2, 4, 8) — but we need (2, 4, 4) latent</span>
+        absorbed_qk = torch.matmul(
+            self.WQ.weight.view(self.n_heads, self.d_h, D),
+            self.WUK.weight.T.view(D, self.n_heads, self.d_h)
+        ) <span class="cmt"># Per-head absorbed: (n_heads, d_h, latent_dim)</span>
+
+        <span class="cmt"># Step 2: Compute new latent KV vector for incoming token(s)</span>
+        new_kv = self.ln(self.WDKV(x))  <span class="cmt"># (B, T, latent_dim)</span>
+
+        <span class="cmt"># Step 3: Update cache — append new latent vectors</span>
+        <span class="kw">if</span> kv_cache <span class="kw">is not None</span>:
+            kv_cache = torch.cat([kv_cache, new_kv], dim=<span class="num">1</span>)
+        <span class="kw">else</span>:
+            kv_cache = new_kv
+        <span class="cmt"># kv_cache shape: (B, S_total, latent_dim) e.g. (1, 6, 4)</span>
+
+        <span class="cmt"># Step 4: Compute absorbed query vectors per head</span>
+        x_heads = x.view(B, T, self.n_heads, self.d_h).transpose(<span class="num">1</span>, <span class="num">2</span>)
+        <span class="cmt"># x_heads: (B, n_heads, T, d_h)</span>
+        q_abs = torch.matmul(x_heads, absorbed_qk)  <span class="cmt"># (B, n_heads, T, latent_dim)</span>
+
+        <span class="cmt"># Step 5: Attention scores = q_abs @ kv_cache.T</span>
+        scores = torch.matmul(q_abs, kv_cache.transpose(-<span class="num">2</span>, -<span class="num">1</span>))
+        <span class="cmt"># (B, n_heads, T, S_total) e.g. (1, 2, 1, 6)</span>
+        scores = scores / (self.d_h ** <span class="num">0.5</span>)
+
+        <span class="cmt"># Causal mask + softmax</span>
+        S = kv_cache.shape[<span class="num">1</span>]
+        mask = torch.triu(torch.ones(T, S), diagonal=S-T+<span class="num">1</span>).bool()
+        scores = scores.masked_fill(mask, float(<span class="str">'-inf'</span>))
+        weights = F.softmax(scores, dim=-<span class="num">1</span>)
+
+        <span class="cmt"># Step 6: Values from same cache</span>
+        values = self.WUV(kv_cache)  <span class="cmt"># (B, S, d_model)</span>
+        values = values.view(B, S, self.n_heads, self.d_h).transpose(<span class="num">1</span>, <span class="num">2</span>)
+        <span class="cmt"># values: (B, n_heads, S, d_h)</span>
+
+        <span class="cmt"># Step 7: Context = weights @ values</span>
+        context = torch.matmul(weights, values)  <span class="cmt"># (B, n_heads, T, d_h)</span>
+        context = context.transpose(<span class="num">1</span>, <span class="num">2</span>).contiguous().view(B, T, D)
+
+        <span class="kw">return</span> context, kv_cache</div>
+
+    
+    <h3 style="margin-top:28px;">Initializing Weight Matrices in PyTorch</h3>
+    <p>Using <code style="font-family:var(--mono);color:var(--accent);">nn.Linear</code> instead of raw <code style="font-family:var(--mono);color:var(--accent);">nn.Parameter</code> provides better weight initialization out of the box. All linear layers use <code style="font-family:var(--mono);color:var(--accent);">bias=False</code> — standard for attention projections in modern LLMs.</p>
+
+    <div class="code-block"><span class="cmt"># Matrix dimensions for d_model=8, latent_dim=4, n_heads=2</span>
+self.WQ   = nn.Linear(<span class="num">8</span>, <span class="num">8</span>, bias=<span class="kw">False</span>)   <span class="cmt"># (d_model × d_model)</span>
+self.WDKV = nn.Linear(<span class="num">8</span>, <span class="num">4</span>, bias=<span class="kw">False</span>)   <span class="cmt"># (d_model × latent_dim) — CRITICAL</span>
+self.WUK  = nn.Linear(<span class="num">4</span>, <span class="num">8</span>, bias=<span class="kw">False</span>)   <span class="cmt"># (latent_dim × d_model)</span>
+self.WUV  = nn.Linear(<span class="num">4</span>, <span class="num">8</span>, bias=<span class="kw">False</span>)   <span class="cmt"># (latent_dim × d_model)</span>
+self.WO   = nn.Linear(<span class="num">8</span>, <span class="num">8</span>, bias=<span class="kw">False</span>)   <span class="cmt"># output projection</span>
+self.ln   = nn.LayerNorm(<span class="num">4</span>)             <span class="cmt"># normalize latent vectors</span></div>
+
+    <h3 style="margin-top:28px;">The Forward Pass — Line by Line</h3>
+
+    <div class="card">
+      <h3>Line 1: Absorbed Query Matrix</h3>
+      <p><code style="font-family:var(--mono);color:var(--accent);">absorbed = WQ.weight @ WUK.weight.T</code></p>
+      <p>WQ.weight shape: (8, 8). WUK.weight shape: (4, 8), transpose → (8, 4). Product: (8, 8). This is computed once per forward call (or precomputed and stored). Reshape to (n_heads, d_h, d_h) = (2, 4, 4) for per-head absorbed query matrices.</p>
+    </div>
+
+    <div class="card">
+      <h3>Line 2: New Latent Vector + Cache Update</h3>
+      <p><code style="font-family:var(--mono);color:var(--accent);">new_kv = ln(WDKV(x))</code> then <code style="font-family:var(--mono);color:var(--accent);">kv_cache = cat([kv_cache, new_kv], dim=1)</code></p>
+      <p>Input x: (1, 1, 8). WDKV output: (1, 1, 4). After layer norm: (1, 1, 4). Previous cache (5 tokens): (1, 5, 4). Updated cache: (1, 6, 4).</p>
+    </div>
+
+    <div class="card">
+      <h3>Line 3: Per-Head Absorbed Query</h3>
+      <p>Split x into heads: (1, 2, 1, 4). For head 0: x_head0 (1, 1, 4) multiplied by absorbed[0] (4, 4) → q_abs0 (1, 1, 4). Same for head 1.</p>
+    </div>
+
+    <div class="card">
+      <h3>Line 4: Attention Scores</h3>
+      <p><code style="font-family:var(--mono);color:var(--accent);">scores = q_abs @ kv_cache.transpose(-2, -1)</code></p>
+      <p>q_abs0: (1, 1, 4). kv_cache.T: (1, 4, 6). scores0: (1, 1, 6). Six scores because six tokens in cache. Scale by √4 = 2. Apply causal mask. Softmax.</p>
+    </div>
+
+    <div class="card">
+      <h3>Line 5: Values from Same Cache</h3>
+      <p><code style="font-family:var(--mono);color:var(--accent);">values = WUV(kv_cache)</code> → (1, 6, 8). Split into heads: (1, 2, 6, 4).</p>
+    </div>
+
+    <div class="card">
+      <h3>Line 6: Context Vector</h3>
+      <p><code style="font-family:var(--mono);color:var(--accent);">context = weights @ values</code> → (1, 2, 1, 4). Merge heads: (1, 1, 8). This is the context vector for the new token — the only output we need for next-token prediction.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Testing: Four Demonstrations</h3>
+    <p>The implementation supports four verification tests:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li><strong>Memory test:</strong> Compare KV cache bytes for MHA vs MLA at d_model=512, d_L=256. Expected: ~4× reduction (2× from single cache, 2× from d_L &lt; d_model).</li>
+      <li><strong>Single inference cache test:</strong> Cache shape grows from (1, 5, 4) to (1, 6, 4) when one token added.</li>
+      <li><strong>Multi-inference loop:</strong> Starting at 50 tokens, each new inference increments cache length by 1: 50 → 51 → 52 → ...</li>
+      <li><strong>Head weight visualization:</strong> Heatmaps of W<sub>UK</sub> and W<sub>UV</sub> per head confirm no two heads share identical weights — unlike MQA.</li>
+    </ol>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Cache Shape Tracker</h4>
+      <p style="font-size:0.9rem;margin-bottom:12px;">Simulate multi-step inference and watch cache shape (B, S, d<sub>L</sub>) grow.</p>
+      <div class="btn-group">
+        <button class="btn" id="multiInferBtn">Infer Next Token</button>
+        <button class="btn" id="multiInferReset">Reset to 50 tokens</button>
+      </div>
+      <div class="output-readout" id="multiInferReadout">Cache shape: (1, 50, 4) — 50 tokens inferred</div>
+    </div>
+
+    <h3 style="margin-top:28px;">Forward Pass — Dimension Trace</h3>
+    <p>Scenario: five tokens already cached (<em>"The next day is bright"</em>), new token arrives. x has shape <strong>(1, 1, 8)</strong>.</p>
+
+    <div class="flow">
+      <div class="flow-step"><strong>Absorbed QK matrix:</strong> W<sub>Q</sub> (8×8) · W<sub>UK</sub><sup>T</sup> (8×4) → (8×8), split into 2 heads of (4×4) each</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Previous cache:</strong> (5 × 4) — five tokens, latent dim 4</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>New latent vector:</strong> x (1×8) · W<sub>DKV</sub> (8×4) → (1×4), layer-normed, appended → cache (6 × 4)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Absorbed query (head 0):</strong> x[:4] (1×4) · absorbed_qk[0] (4×4) → (1×4)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Scores (head 0):</strong> (1×4) · (4×6) → (1×6) — six attention scores for six tokens</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Values:</strong> cache (6×4) · W<sub>UV</sub> (4×8) → (6×8), split → head 0 gets (6×4)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Context (head 0):</strong> weights (1×6) · values (6×4) → (1×4). Merge heads → (1×8)</div>
+    </div>
+
+    <div class="callout"><p><strong>Sanity check on score length:</strong> Six values in the attention score vector because there are six tokens in the cache — the new token attends to itself and all five prior tokens. Each score measures how much the new token should attend to each cached position.</p></div>
+
+    <h3 style="margin-top:28px;">Memory Test Results</h3>
+    <p>In a demonstration with d<sub>model</sub> = 512 and d<sub>L</sub> = 256:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li>Standard MHA KV cache: stores 2 × d<sub>model</sub> = 2 × 512 = 1024 dims per token → ~80 KB</li>
+      <li>MLA latent cache: stores d<sub>L</sub> = 256 dims per token → ~20 KB</li>
+      <li>Reduction: 4× (2× from joint cache, 2× from latent dim &lt; d<sub>model</sub>)</li>
+    </ul>
+    <p>At DeepSeek scale the reduction reaches 57× because d<sub>L</sub> = 576 ≪ 2 × 128 × 128.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Matrix Dimensions — Hand Calculation Walkthrough</h2>
+    <p>Intuition without dimensions is fragile. This section reproduces the exact matrix arithmetic for the toy model, so you can verify every shape on paper.</p>
+
+    <h3 style="margin-top:28px;">Setup</h3>
+    <p>Tokens: <em>The, next, day, is, bright</em> (5 cached) + 1 new token = 6 total. d<sub>model</sub> = 8, d<sub>L</sub> = 4, n_heads = 2, d<sub>h</sub> = 4.</p>
+
+    <h3 style="margin-top:28px;">Step-by-Step Matrix Multiplications</h3>
+
+    <div class="card card-alt">
+      <h3>1. Absorbed Query Matrix</h3>
+      <p>W<sub>Q</sub> is (8×8). W<sub>UK</sub><sup>T</sup> is (8×4) because W<sub>UK</sub> is (4×8). Product: (8×8) · (8×4) = <strong>(8×4)</strong>. Split across 2 heads → each head gets absorbed matrix of shape <strong>(4×4)</strong>.</p>
+    </div>
+
+    <div class="card card-alt">
+      <h3>2. Latent Cache Update</h3>
+      <p>Previous C<sub>KV</sub>: (5×4). New token embedding x: (1×8). W<sub>DKV</sub>: (8×4). New row: (1×8)·(8×4) = (1×4). After append: <strong>(6×4)</strong>.</p>
+    </div>
+
+    <div class="card card-alt">
+      <h3>3. Absorbed Query Vector (Head 0)</h3>
+      <p>Split x (1×8) into two halves: x<sub>0</sub> = (1×4) for head 0. q<sub>abs,0</sub> = x<sub>0</sub> · absorbed_qk[0] = (1×4)·(4×4) = <strong>(1×4)</strong>.</p>
+    </div>
+
+    <div class="card card-alt">
+      <h3>4. Attention Scores (Head 0)</h3>
+      <p>scores<sub>0</sub> = q<sub>abs,0</sub> · C<sub>KV</sub><sup>T</sup> = (1×4)·(4×6) = <strong>(1×6)</strong>. Six scores — one per cached token.</p>
+    </div>
+
+    <div class="card card-alt">
+      <h3>5. Values Matrix</h3>
+      <p>V = C<sub>KV</sub> · W<sub>UV</sub> = (6×4)·(4×8) = <strong>(6×8)</strong>. Split for head 0: first 4 columns → V<sub>0</sub> of shape <strong>(6×4)</strong>.</p>
+    </div>
+
+    <div class="card card-alt">
+      <h3>6. Context Vector (Head 0)</h3>
+      <p>context<sub>0</sub> = weights<sub>0</sub> · V<sub>0</sub> = (1×6)·(6×4) = <strong>(1×4)</strong>. Same for head 1 → (1×4). Concatenate → final context <strong>(1×8)</strong>.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Projection Step-by-Step</h4>
+      <div class="step-indicator" id="projSteps">
+        <div class="step-dot active" data-step="0">1</div>
+        <div class="step-dot" data-step="1">2</div>
+        <div class="step-dot" data-step="2">3</div>
+        <div class="step-dot" data-step="3">4</div>
+        <div class="step-dot" data-step="4">5</div>
+        <div class="step-dot" data-step="5">6</div>
+      </div>
+      <div id="projMatrixDisplay" style="font-family:var(--mono);font-size:0.85rem;color:var(--text);min-height:120px;"></div>
+      <div class="btn-group">
+        <button class="btn" id="projPrevBtn">← Back</button>
+        <button class="btn" id="projNextBtn">Next →</button>
+      </div>
+      <div class="output-readout" id="projReadout">Step 1: W<sub>Q</sub> (8×8) · W<sub>UK</sub><sup>T</sup> (8×4) → absorbed (8×4) → per head (4×4)</div>
+    </div>
+
+    <h3 style="margin-top:28px;">Cache Accumulation Over Multiple Inferences</h3>
+    <p>Starting with 50 tokens cached (shape 1×50×4), inferring token 51 grows cache to (1×51×4). Token 52 → (1×52×4). The cache grows linearly in S, but each new row adds only d<sub>L</sub> = 4 values — not 2 × N × H = 16 values that standard MHA would require for this toy model.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · MHA vs MLA Side-by-Side Memory</h4>
+      <canvas id="sideBySideCanvas" width="560" height="300" style="width:100%;background:var(--bg-card-alt);"></canvas>
+      <div class="two-col" style="margin-top:12px;">
+        <div class="slider-container"><label>Toy d<sub>model</sub>: <span class="slider-value" id="sbsD">512</span></label><input type="range" id="sbsDSlider" min="128" max="1024" step="128" value="512"></div>
+        <div class="slider-container"><label>Latent d<sub>L</sub>: <span class="slider-value" id="sbsDL">256</span></label><input type="range" id="sbsDLSlider" min="64" max="512" step="64" value="256"></div>
+      </div>
+      <div class="output-readout" id="sbsReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Playground — Explore MLA Parameters</h2>
+    <p>Adjust model scale, latent dimension, and context length to see how MLA compares to standard MHA in real time.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · MLA Playground</h4>
+      <div class="two-col">
+        <div class="slider-container"><label>Layers (L): <span class="slider-value" id="pgL">61</span></label><input type="range" id="pgLSlider" min="12" max="96" value="61"></div>
+        <div class="slider-container"><label>Heads (N): <span class="slider-value" id="pgN">128</span></label><input type="range" id="pgNSlider" min="8" max="128" step="8" value="128"></div>
+        <div class="slider-container"><label>Head dim (H): <span class="slider-value" id="pgH">128</span></label><input type="range" id="pgHSlider" min="64" max="256" step="64" value="128"></div>
+        <div class="slider-container"><label>Context (S): <span class="slider-value" id="pgS">100000</span></label><input type="range" id="pgSSlider" min="4096" max="128000" step="4096" value="100000"></div>
+        <div class="slider-container"><label>Latent dim (d<sub>L</sub>): <span class="slider-value" id="pgDL">576</span></label><input type="range" id="pgDLSlider" min="128" max="2048" step="64" value="576"></div>
+        <div class="slider-container"><label>Batch (B): <span class="slider-value" id="pgB">1</span></label><input type="range" id="pgBSlider" min="1" max="8" value="1"></div>
+      </div>
+      <canvas id="pgChart" width="560" height="260" style="width:100%;background:var(--bg-card-alt);margin:16px 0;"></canvas>
+      <div class="output-readout" id="pgResults"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-tradeoffs">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Trade-offs, Compute, and Ecosystem Context</h2>
+
+    <h3 style="margin-top:28px;">Compute Complexity — With and Without KV Cache</h3>
+    <p>Without KV cache, generating T tokens requires attention computations of size 1² + 2² + 3² + ... + T² = O(T³/3) total attention score entries across all steps. With standard KV cache, each step computes only one new query against T cached keys: O(T) per step, O(T²) total — linear per step instead of quadratic.</p>
+
+    <p>MLA preserves this O(T) per-step compute advantage while reducing the memory per cached token from 2×N×H to d<sub>L</sub>. The down-projection W<sub>DKV</sub> and up-projections W<sub>UK</sub>, W<sub>UV</sub> add constant-factor FLOPs per token, but these are negligible compared to the memory bandwidth savings at long context lengths.</p>
+
+    <h3 style="margin-top:28px;">GPU Memory Bandwidth</h3>
+    <p>Every byte stored in GPU memory during inference consumes bandwidth. Modern GPUs are compute-rich but memory-bandwidth limited. The A100 delivers ~19.5 TFLOPS of FP32 compute but only ~1.9 TB/s of memory bandwidth — a 10× imbalance. When the KV cache grows to hundreds of gigabytes, memory bandwidth becomes the bottleneck for attention, not FLOPs.</p>
+
+    <p>MLA directly attacks this bottleneck by storing 57× fewer bytes per token in the cache. Fewer bytes to read means faster attention score computation and lower cloud inference bills. For a company serving millions of requests, reducing KV cache from 400 GB to 6 GB per sequence translates directly into serving more users on the same hardware — or charging lower prices while maintaining margins.</p>
+
+    <h3 style="margin-top:28px;">Comparison with Other Compression Approaches</h3>
+    <table class="data-table">
+      <tr><th>Approach</th><th>Mechanism</th><th>Head Diversity</th><th>Cache Reduction</th></tr>
+      <tr><td>MHA</td><td>Full K/V per head</td><td>Full</td><td>1× (baseline)</td></tr>
+      <tr><td>MQA</td><td>Shared K/V across all heads</td><td>None</td><td>~N×</td></tr>
+      <tr><td>GQA</td><td>Shared K/V within groups</td><td>Partial (G groups)</td><td>~N/G×</td></tr>
+      <tr><td>MLA</td><td>Latent compression + per-head up-projection</td><td>Full</td><td>~2NH/d<sub>L</sub>×</td></tr>
+      <tr><td>Windowed attention</td><td>Cache only recent W tokens</td><td>Full</td><td>~S/W× (loses long-range)</td></tr>
+      <tr><td>Quantized KV cache</td><td>Store K/V in INT8/INT4</td><td>Full</td><td>~2-4× (quality risk)</td></tr>
+    </table>
+
+    <p>MLA is orthogonal to quantization — DeepSeek could further compress C<sub>KV</sub> with INT8 storage for additional savings. The latent compression is architectural, not a precision reduction hack.</p>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s-summary">
+  <div class="container">
+    <span class="section-num">∞</span>
+    <h2>Summary — The Best of Both Worlds</h2>
+
+    <p>Multi-Head Latent Attention is DeepSeek's answer to a problem that stumped the field for years: how to shrink the KV cache without making every attention head read the same keys and values.</p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>What Changed</h3>
+        <ul style="color:var(--text-dim);margin:0 0 0 1.2em;">
+          <li>Keys and values are not cached directly</li>
+          <li>Input embeddings are down-projected to latent space via W<sub>DKV</sub></li>
+          <li>Only C<sub>KV</sub> is cached — one matrix, d<sub>L</sub> columns per token</li>
+          <li>Up-projections W<sub>UK</sub>, W<sub>UV</sub> recover head-specific K and V</li>
+          <li>Absorption trick folds fixed weights into query and output paths</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>What Was Achieved</h3>
+        <ul style="color:var(--text-dim);margin:0 0 0 1.2em;">
+          <li>~57× KV cache reduction at DeepSeek scale</li>
+          <li>400 GB → ~6 GB at 100K context</li>
+          <li>Full multi-head diversity preserved</li>
+          <li>Linear compute growth in context length maintained</li>
+          <li>Low inference cost without quality collapse</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Seven Key Takeaways</h3>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;line-height:2.2;">
+      <li><strong>Inference repeats work.</strong> Without caching, every new token triggers full recomputation of all prior attention states.</li>
+      <li><strong>Only the last context vector matters</strong> for next-token prediction — but computing it requires the full prefix via attention.</li>
+      <li><strong>KV cache saves compute but costs memory</strong> — growing linearly with context, reaching 400 GB at DeepSeek scale with standard MHA.</li>
+      <li><strong>MQA and GQA reduce memory by sharing K/V</strong> across heads or groups — but degrade quality by limiting head diversity.</li>
+      <li><strong>MLA compresses via latent space:</strong> C<sub>KV</sub> = X · W<sub>DKV</sub> replaces separate K and V caches with one d<sub>L</sub>-dimensional matrix per token.</li>
+      <li><strong>The absorption trick</strong> folds W<sub>UK</sub><sup>T</sup> into W<sub>Q</sub> at inference, eliminating the need to materialize or cache keys.</li>
+      <li><strong>Per-head W<sub>UK</sub> and W<sub>UV</sub></strong> ensure reconstructed K and V differ across heads — preserving MHA-quality diversity from a shared latent bottleneck.</li>
+    </ol>
+
+    <div class="callout ok"><p>Latent spaces have existed in machine learning for decades. DeepSeek's insight was applying them to the KV cache in transformer attention — compress once, reconstruct per head, absorb the rest. That single architectural move is a major reason DeepSeek models run inference at a fraction of the cost of comparable frontier models.</p></div>
+
+    
+    <h3 style="margin-top:28px;">What Comes Next</h3>
+    <p>This chapter covered the simplest MLA variant. The DeepSeek-V2/V3 architecture adds several layers on top:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;line-height:2;">
+      <li><strong>Rotary Positional Embeddings (RoPE)</strong> — encoding token position via rotation in embedding space</li>
+      <li><strong>Decoupled RoPE in MLA</strong> — applying RoPE separately to query and key latent paths within MLA</li>
+      <li><strong>Mixture of Experts (MoE)</strong> — sparse feed-forward layers where only a subset of experts activate per token</li>
+      <li><strong>Multi-Token Prediction</strong> — predicting multiple future tokens simultaneously for training efficiency</li>
+      <li><strong>Full DeepSeek-V3 assembly</strong> — combining MLA, MoE, and training innovations into the complete architecture</li>
+    </ol>
+    <p>Each builds on the foundation established here. If you understand C<sub>KV</sub>, the absorption trick, and the per-head up-projections, the RoPE-extended variant is a incremental modification — not a fundamentally new mechanism.</p>
+
+    <h3 style="margin-top:28px;">Prerequisites from Prior Chapters</h3>
+    <p>This chapter builds directly on:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li><strong>Chapter 02</strong> — Self-attention, Q/K/V matrices, causal masking, attention scores</li>
+      <li><strong>Chapter 03</strong> — Multi-head attention, head splitting, parallel attention computation</li>
+      <li><strong>Chapter 04</strong> — KV cache derivation, MQA, GQA, memory formulas, the 400 GB problem</li>
+    </ul>
+    <p>The novel content begins at Section 03 (Best of Both Worlds) and Section 04 (Latent Space).</p>
+
+    <p style="margin-top:24px;">The next chapter extends MLA with <strong>rotary positional embeddings</strong> — decoupled RoPE applied separately to query and key paths within the latent framework. From there, subsequent chapters cover mixture-of-experts and the full DeepSeek-V3 architecture.</p>
+
+    <h3 style="margin-top:28px;">Quick Reference Card</h3>
+    <div class="card card-alt">
+      <p style="color:var(--text);margin-bottom:12px;font-family:var(--mono);font-size:0.85rem;line-height:1.8;">
+        <strong style="color:var(--accent);">Cache:</strong> C<sub>KV</sub> = X · W<sub>DKV</sub> &nbsp;→&nbsp; shape (S × d<sub>L</sub>)<br>
+        <strong style="color:var(--accent);">Absorbed Q:</strong> q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup><br>
+        <strong style="color:var(--accent);">Scores:</strong> q<sub>abs</sub> · C<sub>KV</sub><sup>T</sup><br>
+        <strong style="color:var(--accent);">Values:</strong> C<sub>KV</sub> · W<sub>UV</sub> (computed on the fly)<br>
+        <strong style="color:var(--accent);">Context:</strong> softmax(scores/√d<sub>h</sub>) · Values<br>
+        <strong style="color:var(--accent);">Memory:</strong> L × B × S × d<sub>L</sub> × 2 bytes<br>
+        <strong style="color:var(--accent);">Reduction:</strong> (2 × N × H) / d<sub>L</sub> ≈ 57× at DeepSeek scale
+      </p>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="section fade-in" id="s-glossary">
+  <div class="container">
+    <span class="section-num">★</span>
+    <h2>Glossary of MLA Terms</h2>
+    <table class="data-table" style="text-align:left;">
+      <tr><th style="width:28%">Term</th><th>Definition</th></tr>
+      <tr><td><strong>C<sub>KV</sub></strong></td><td>The latent KV cache matrix. Computed as X · W<sub>DKV</sub>. Shape (S × d<sub>L</sub>). The only matrix cached during MLA inference.</td></tr>
+      <tr><td><strong>W<sub>DKV</sub></strong></td><td>Down-projection matrix mapping d<sub>model</sub> → d<sub>L</sub>. Shared across heads. Shape (d<sub>model</sub> × d<sub>L</sub>).</td></tr>
+      <tr><td><strong>W<sub>UK</sub></strong></td><td>Up-projection from latent space to keys. Different per head. Shape (d<sub>L</sub> × d<sub>model</sub>).</td></tr>
+      <tr><td><strong>W<sub>UV</sub></strong></td><td>Up-projection from latent space to values. Different per head. Shape (d<sub>L</sub> × d<sub>model</sub>).</td></tr>
+      <tr><td><strong>d<sub>L</sub></strong></td><td>Latent dimension. Controls cache size. DeepSeek uses 576. Toy examples use 4.</td></tr>
+      <tr><td><strong>Absorption trick</strong></td><td>Pre-multiplying W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> at inference time so keys need not be materialized or cached.</td></tr>
+      <tr><td><strong>Absorbed query</strong></td><td>q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup>. Used directly against C<sub>KV</sub> for attention scores.</td></tr>
+      <tr><td><strong>RolessMLA</strong></td><td>Simplest MLA implementation without rotary positional embeddings.</td></tr>
+      <tr><td><strong>Low-rank KV joined compression</strong></td><td>DeepSeek-V2 paper name for the simplest MLA variant covered in this chapter.</td></tr>
+      <tr><td><strong>Decoupled RoPE</strong></td><td>Advanced MLA variant applying rotary embeddings separately to query and key latent paths. Covered in a later chapter.</td></tr>
+      <tr><td><strong>Prefill vs decode</strong></td><td>Prefill processes the initial prompt (many tokens at once). Decode generates one token at a time. MLA cache updates happen during both phases.</td></tr>
+      <tr><td><strong>KV cache dark side</strong></td><td>Memory grows linearly with context length. At 100K tokens and 61 layers, standard MHA cache reaches ~400 GB for DeepSeek-scale models.</td></tr>
+    </table>
+
+    <h3 style="margin-top:28px;">Key Formulas Reference</h3>
+    <div class="formula">C<sub>KV</sub> = X · W<sub>DKV</sub></div>
+    <div class="formula">K = C<sub>KV</sub> · W<sub>UK</sub>&nbsp;&nbsp;|&nbsp;&nbsp;V = C<sub>KV</sub> · W<sub>UV</sub></div>
+    <div class="formula">q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup></div>
+    <div class="formula">scores = q<sub>abs</sub> · C<sub>KV</sub><sup>T</sup></div>
+    <div class="formula">context = softmax(scores / √d<sub>h</sub>) · C<sub>KV</sub> · W<sub>UV</sub></div>
+    <div class="formula">Cache size<sub>MLA</sub> = L × B × S × d<sub>L</sub> × 2 bytes</div>
+    <div class="formula">Reduction = (2 × N × H) / d<sub>L</sub></div>
+
+    <h3 style="margin-top:28px;">Symbol Index</h3>
+    <table class="dim-table">
+      <tr><th>Symbol</th><th>Typical DeepSeek Value</th><th>Toy Example Value</th></tr>
+      <tr><td>L (layers)</td><td>61</td><td>1</td></tr>
+      <tr><td>N (heads)</td><td>128</td><td>2</td></tr>
+      <tr><td>H (head dim)</td><td>128</td><td>4</td></tr>
+      <tr><td>d<sub>model</sub></td><td>4096+</td><td>8</td></tr>
+      <tr><td>d<sub>L</sub> (latent)</td><td>576</td><td>4</td></tr>
+      <tr><td>S (context)</td><td>100,000</td><td>6</td></tr>
+    </table>
+
+    <div class="callout"><p>Bookmark this glossary when implementing MLA from scratch. The symbol names W<sub>DKV</sub>, W<sub>UK</sub>, and W<sub>UV</sub> follow DeepSeek's notation: D = down, U = up, KV = joint key-value path.</p></div>
+
+    <p style="font-size:0.9rem;">Related chapters: <a href="../04-the-cache-chronicles/">Chapter 04 — The Cache Chronicles</a> (KV cache, MQA, GQA prerequisites) · <a href="../06-encoding-position/">Chapter 06 — Encoding Position</a> (RoPE foundations) · <a href="../07-mla-meets-rope/">Chapter 07 — MLA Meets RoPE</a> (decoupled RoPE in MLA).</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-appendix">
+  <div class="container">
+    <span class="section-num">A</span>
+    <h2>Appendix — Complete RolessMLA Reference Implementation</h2>
+    <p>This appendix provides the full, runnable PyTorch class for the simplest MLA variant. Every line is annotated with expected tensor shapes for the toy configuration (d_model=8, n_heads=2, latent_dim=4).</p>
+
+    <div class="code-block"><span class="kw">import</span> torch
+<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
+<span class="kw">import</span> torch.nn.functional <span class="kw">as</span> F
+
+<span class="kw">class</span> <span class="cls">RolessMLA</span>(nn.Module):
+    <span class="str">"""Multi-Head Latent Attention without RoPE (simplest variant)."""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, d_model: <span class="cls">int</span>, n_heads: <span class="cls">int</span>, latent_dim: <span class="cls">int</span>):
+        <span class="fn">super</span>().__init__()
+        <span class="kw">assert</span> d_model % n_heads == <span class="num">0</span>
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_h = d_model // n_heads
+        self.latent_dim = latent_dim
+
+        self.WQ = nn.Linear(d_model, d_model, bias=<span class="kw">False</span>)
+        self.WDKV = nn.Linear(d_model, latent_dim, bias=<span class="kw">False</span>)
+        self.WUK = nn.Linear(latent_dim, d_model, bias=<span class="kw">False</span>)
+        self.WUV = nn.Linear(latent_dim, d_model, bias=<span class="kw">False</span>)
+        self.WO = nn.Linear(d_model, d_model, bias=<span class="kw">False</span>)
+        self.ln = nn.LayerNorm(latent_dim)
+
+    <span class="kw">def</span> <span class="fn">_absorbed_qk</span>(self):
+        <span class="str">"""Precompute W_Q @ W_UK^T split per head → (n_heads, d_h, latent_dim)."""</span>
+        <span class="cmt"># WQ.weight: (d_model, d_model), WUK.weight: (latent_dim, d_model)</span>
+        absorbed = self.WQ.weight @ self.WUK.weight.T  <span class="cmt"># (d_model, d_model)</span>
+        <span class="cmt"># Reshape to per-head: each head takes d_h rows and latent_dim cols</span>
+        <span class="kw">return</span> absorbed.view(self.n_heads, self.d_h, self.d_model)[:, :, :self.latent_dim]
+        <span class="cmt"># Simpler approach: matmul per head after reshaping inputs</span>
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x: torch.Tensor, kv_cache: torch.Tensor | <span class="kw">None</span> = <span class="kw">None</span>):
+        <span class="str">"""
+        Args:
+            x: (B, T, d_model) — new token(s); T=1 during single-token inference
+            kv_cache: (B, S_prev, latent_dim) — existing latent cache or None
+        Returns:
+            context: (B, T, d_model)
+            kv_cache: (B, S_total, latent_dim)
+        """</span>
+        B, T, D = x.shape
+
+        <span class="cmt"># --- Absorbed query matrix: W_Q @ W_UK^T ---</span>
+        absorbed_full = self.WQ.weight @ self.WUK.weight.T  <span class="cmt"># (D, D)</span>
+
+        <span class="cmt"># --- Update latent KV cache ---</span>
+        new_kv = self.ln(self.WDKV(x))  <span class="cmt"># (B, T, latent_dim)</span>
+        kv_cache = torch.cat([kv_cache, new_kv], dim=<span class="num">1</span>) <span class="kw">if</span> kv_cache <span class="kw">is not None</span> <span class="kw">else</span> new_kv
+        S = kv_cache.shape[<span class="num">1</span>]
+
+        <span class="cmt"># --- Per-head absorbed queries ---</span>
+        x_heads = x.view(B, T, self.n_heads, self.d_h).transpose(<span class="num">1</span>, <span class="num">2</span>)  <span class="cmt"># (B, nh, T, dh)</span>
+        abs_heads = absorbed_full.view(self.n_heads, self.d_h, D)  <span class="cmt"># (nh, dh, D)</span>
+        <span class="cmt"># Use first latent_dim columns of absorbed matrix per head</span>
+        abs_heads = abs_heads[:, :, :self.latent_dim]  <span class="cmt"># (nh, dh, latent_dim)</span>
+        q_abs = torch.einsum(<span class="str">'bhtd,hdl->bhtl'</span>, x_heads, abs_heads)  <span class="cmt"># (B, nh, T, latent_dim)</span>
+
+        <span class="cmt"># --- Attention scores: q_abs @ kv_cache^T ---</span>
+        scores = torch.matmul(q_abs, kv_cache.transpose(-<span class="num">2</span>, -<span class="num">1</span>))  <span class="cmt"># (B, nh, T, S)</span>
+        scores = scores / (self.d_h ** <span class="num">0.5</span>)
+
+        <span class="cmt"># Causal mask</span>
+        <span class="kw">if</span> T == S:
+            mask = torch.triu(torch.ones(T, S, device=x.device), diagonal=<span class="num">1</span>).bool()
+        <span class="kw">else</span>:
+            mask = torch.zeros(T, S, device=x.device).bool()
+            mask[:, :S-T] = <span class="kw">True</span>  <span class="cmt"># can attend to all cached + current</span>
+        scores = scores.masked_fill(mask.unsqueeze(<span class="num">0</span>).unsqueeze(<span class="num">0</span>), float(<span class="str">'-inf'</span>))
+        weights = F.softmax(scores, dim=-<span class="num">1</span>)
+
+        <span class="cmt"># --- Values from same cache ---</span>
+        values = self.WUV(kv_cache)  <span class="cmt"># (B, S, d_model)</span>
+        values = values.view(B, S, self.n_heads, self.d_h).transpose(<span class="num">1</span>, <span class="num">2</span>)  <span class="cmt"># (B, nh, S, dh)</span>
+
+        <span class="cmt"># --- Context ---</span>
+        context = torch.matmul(weights, values)  <span class="cmt"># (B, nh, T, dh)</span>
+        context = context.transpose(<span class="num">1</span>, <span class="num">2</span>).contiguous().view(B, T, D)
+
+        <span class="kw">return</span> context, kv_cache
+
+
+<span class="kw">def</span> <span class="fn">kv_cache_bytes</span>(mha_dims, mla_latent, seq_len, layers=<span class="num">1</span>, batch=<span class="num">1</span>, bytes_per=<span class="num">2</span>):
+    <span class="str">"""Compare MHA vs MLA cache memory."""</span>
+    mha = layers * batch * mha_dims * seq_len * <span class="num">2</span> * bytes_per  <span class="cmt"># 2 for K+V</span>
+    mla = layers * batch * mla_latent * seq_len * bytes_per
+    <span class="kw">return</span> mha, mla, mha / mla
+
+
+<span class="cmt"># --- Demo ---</span>
+<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
+    torch.manual_seed(<span class="num">42</span>)
+    model = RolessMLA(d_model=<span class="num">8</span>, n_heads=<span class="num">2</span>, latent_dim=<span class="num">4</span>)
+
+    <span class="cmt"># Process 5 tokens to build cache</span>
+    prefix = torch.randn(<span class="num">1</span>, <span class="num">5</span>, <span class="num">8</span>)
+    _, cache = model(prefix)  <span class="cmt"># cache: (1, 5, 4)</span>
+    print(f<span class="str">"Cache after prefix: {cache.shape}"</span>)
+
+    <span class="cmt"># Single new token inference</span>
+    new_tok = torch.randn(<span class="num">1</span>, <span class="num">1</span>, <span class="num">8</span>)
+    ctx, cache = model(new_tok, cache)  <span class="cmt"># cache: (1, 6, 4)</span>
+    print(f<span class="str">"Cache after new token: {cache.shape}"</span>)
+    print(f<span class="str">"Context shape: {ctx.shape}"</span>)
+
+    mha, mla, ratio = kv_cache_bytes(mha_dims=<span class="num">512</span>, mla_latent=<span class="num">256</span>, seq_len=<span class="num">1024</span>, layers=<span class="num">32</span>)
+    print(f<span class="str">"MHA cache: {mha/1024:.1f} KB, MLA cache: {mla/1024:.1f} KB, ratio: {ratio:.1f}x"</span>)</div>
+
+    <h3 style="margin-top:28px;">Usage Notes</h3>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
+      <li>During training, the full forward pass computes K and V explicitly through C<sub>KV</sub> · W<sub>UK</sub> and C<sub>KV</sub> · W<sub>UV</sub>. Gradients flow through W<sub>DKV</sub>, W<sub>UK</sub>, and W<sub>UV</sub>.</li>
+      <li>During inference, only C<sub>KV</sub> is cached and updated. W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> is precomputed once per layer when the model is loaded.</li>
+      <li>LayerNorm on the latent vector stabilizes cache entries across long sequences.</li>
+      <li>The causal mask logic handles both prefill (T = S) and single-token decode (T = 1, S &gt; 1) modes.</li>
+      <li>For production DeepSeek-scale models, d<sub>L</sub> = 576, N = 128, H = 128, L = 61.</li>
+    </ul>
+
+    <h3 style="margin-top:28px;">Verification Checklist</h3>
+    <table class="data-table">
+      <tr><th>Check</th><th>Expected Result</th></tr>
+      <tr><td>Cache shape after N tokens</td><td>(1, N, latent_dim)</td></tr>
+      <tr><td>Attention scores for new token</td><td>(1, n_heads, 1, N) — N scores per head</td></tr>
+      <tr><td>Context vector shape</td><td>(1, 1, d_model)</td></tr>
+      <tr><td>MLA vs MHA memory (d=512, d_L=256)</td><td>~4× reduction</td></tr>
+      <tr><td>MLA vs MHA memory (DeepSeek scale)</td><td>~57× reduction</td></tr>
+      <tr><td>W_UK differs per head</td><td>True — verify via heatmap</td></tr>
+    </table>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Decoding DeepSeek · Chapter 05 · Latent Attention Unlocked</p>
+  <p style="margin-top:8px;">Multi-Head Latent Attention — from 400 GB KV cache to 6 GB via latent compression and the absorption trick.</p>
+  <p style="margin-top:8px;"><a href="../">← Back to Decoding DeepSeek</a> · <a href="../../">All Learning Blogs</a> · <a href="https://llamasearch.dev/">The Context Window</a></p>
+</footer>
+
+<script>
+// ============================================================
+// CHAPTER 05: LATENT ATTENTION UNLOCKED — INTERACTIVE DEMOS
+// Decoding DeepSeek — Multi-Head Latent Attention
+// Demos: compression calculator, absorption steps, cache growth,
+//        MHA vs MLA comparison, head diversity, playground
+// ============================================================
+
+// ===== UTILITIES =====
+function fmtBytes(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(1) + ' GB';
+  if (b >= 1e6) return (b/1e6).toFixed(1) + ' MB';
+  if (b >= 1e3) return (b/1e3).toFixed(1) + ' KB';
+  return b + ' B';
+}
+
+const HEAD_COLORS = ['#6c8cff','#a78bfa','#34d399','#f472b6','#fbbf24','#22d3ee','#fb923c','#e879f9'];
+
+// ===== EVOLUTION NODES =====
+const evoData = {
+  evoMHA: 'MHA: ~400 GB cache at DeepSeek scale. Best performance — every head has unique K/V.',
+  evoMQA: 'MQA: ~4 GB cache (128× reduction). Worst quality — all heads share identical K/V.',
+  evoGQA: 'GQA: ~32 GB cache (16 groups). Medium quality and memory — partial head sharing.',
+  evoMLA: 'MLA: ~6 GB cache (57× reduction). High performance — latent compression with per-head up-projections.'
+};
+Object.keys(evoData).forEach(id => {
+  document.getElementById(id).onclick = function() {
+    document.querySelectorAll('.evolution-node').forEach(n => n.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('evoReadout').textContent = evoData[id];
+  };
+});
+
+// ===== SECTION 1: REPETITION EXPLORER =====
+const repPrompt = ['The','next','day','is'];
+const repNext = ['bright','and','sunny','.'];
+let repStep = 0;
+function renderRepTokens() {
+  const el = document.getElementById('repTokens');
+  el.innerHTML = '';
+  const tokens = repPrompt.slice();
+  for (let i = 0; i < repStep && i < repNext.length; i++) tokens.push(repNext[i]);
+  tokens.forEach((t, i) => {
+    const s = document.createElement('span');
+    s.className = 'token ' + (i >= repPrompt.length ? 'token-new' : (i < repStep ? 'token-cached' : 'token-word'));
+    s.textContent = t;
+    el.appendChild(s);
+  });
+}
+function drawRepCanvas() {
+  const c = document.getElementById('repCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const n = repPrompt.length + repStep;
+  const cell = Math.min(40, (c.width - 40) / n);
+  const recomputed = n;
+  const cached = Math.max(0, n - 1);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const x = 30 + j * cell, y = 20 + i * cell;
+      const isOld = i < n - 1 && j < n - 1;
+      ctx.fillStyle = isOld ? 'rgba(251,191,36,0.3)' : 'rgba(108,140,255,0.3)';
+      ctx.fillRect(x, y, cell-2, cell-2);
+      if (isOld) { ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 1; ctx.strokeRect(x,y,cell-2,cell-2); }
+    }
+  }
+  ctx.fillStyle = '#8888a0'; ctx.font = '11px monospace';
+  ctx.fillText('Yellow = repeated computation from previous step', 30, c.height - 8);
+}
+function updateRep() {
+  renderRepTokens();
+  drawRepCanvas();
+  const n = repPrompt.length + repStep;
+  document.getElementById('repReadout').textContent =
+    `Step ${repStep}: ${n} tokens. ${Math.max(0,n-1)}×${Math.max(0,n-1)} prior attention block recomputed (yellow). Only row ${n} is new.`;
+}
+document.getElementById('repStepBtn').onclick = () => { if (repStep < repNext.length) { repStep++; updateRep(); } };
+document.getElementById('repResetBtn').onclick = () => { repStep = 0; updateRep(); };
+updateRep();
+
+// ===== KV CACHE CALCULATOR =====
+function updateKVSize() {
+  const L = +document.getElementById('kvLSlider').value;
+  const N = +document.getElementById('kvNSlider').value;
+  const H = +document.getElementById('kvHSlider').value;
+  const S = +document.getElementById('kvSSlider').value;
+  const B = 1;
+  ['kvL','kvN','kvH','kvS'].forEach((id,i) => document.getElementById(id).textContent = [L,N,H,S][i]);
+  const bytes = L * B * N * H * S * 2 * 2;
+  document.getElementById('kvReadout').innerHTML =
+    `<strong style="color:var(--danger);">MHA KV Cache: ${fmtBytes(bytes)}</strong><br>` +
+    `Formula: ${L} × ${B} × ${N} × ${H} × ${S} × 2 (K+V) × 2 (FP16 bytes)`;
+  const c = document.getElementById('kvGrowthCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.strokeStyle = '#6c8cff'; ctx.lineWidth = 2; ctx.beginPath();
+  const pts = [0.1,0.15,0.22,0.3,0.4,0.52,0.65,0.8,0.9,1.0];
+  pts.forEach((p,i) => {
+    const x = 40 + i * ((c.width-60)/9);
+    const y = c.height - 20 - p * (c.height - 40);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  ctx.fillStyle = '#8888a0'; ctx.font = '10px monospace';
+  ctx.fillText('Linear growth with KV cache (vs quadratic without)', 40, 14);
+}
+['kvLSlider','kvNSlider','kvHSlider','kvSSlider'].forEach(id =>
+  document.getElementById(id).oninput = updateKVSize);
+updateKVSize();
+
+// ===== MHA vs MQA vs GQA MEMORY =====
+function renderMemChart() {
+  const N = +document.getElementById('memNSlider').value;
+  let G = +document.getElementById('memGSlider').value;
+  if (G > N) G = N;
+  document.getElementById('memN').textContent = N;
+  document.getElementById('memG').textContent = G;
+  document.getElementById('memGSlider').max = N;
+  const base = 400;
+  const data = [
+    { label: 'MHA', val: base, color: '#6c8cff' },
+    { label: 'GQA', val: base * G / N, color: '#a78bfa' },
+    { label: 'MQA', val: base / N, color: '#34d399' },
+    { label: 'MLA', val: base * 576 / (2*N*128), color: '#f472b6' }
+  ];
+  const max = base;
+  const chart = document.getElementById('memBarChart');
+  chart.innerHTML = '';
+  data.forEach(d => {
+    const wrap = document.createElement('div');
+    wrap.className = 'bar-wrapper';
+    wrap.innerHTML = `<div class="bar-value">${d.val.toFixed(1)} GB</div><div class="bar" style="height:${Math.max(d.val/max*100,2)}%;background:${d.color};"></div><div class="bar-label">${d.label}</div>`;
+    chart.appendChild(wrap);
+  });
+  document.getElementById('memReadout').innerHTML =
+    `At DeepSeek scale: MHA <strong>${base} GB</strong> → GQA(${G}) <strong>${(base*G/N).toFixed(1)} GB</strong> → MQA <strong>${(base/N).toFixed(1)} GB</strong> → MLA <strong>${(base*576/(2*N*128)).toFixed(1)} GB</strong>`;
+}
+document.getElementById('memNSlider').oninput = renderMemChart;
+document.getElementById('memGSlider').oninput = renderMemChart;
+renderMemChart();
+
+// ===== LATENT COMPRESSION VISUALIZER =====
+function drawLatent() {
+  const dm = +document.getElementById('latDmodelSlider').value;
+  const dl = +document.getElementById('latDLSlider').value;
+  document.getElementById('latDmodel').textContent = dm;
+  document.getElementById('latDL').textContent = dl;
+  const c = document.getElementById('latentCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const drawMat = (x, y, rows, cols, label, color) => {
+    const cw = Math.min(24, 200/cols), rh = Math.min(20, 120/rows);
+    for (let r=0;r<rows;r++) for (let col=0;col<cols;col++) {
+      ctx.fillStyle = color + '44'; ctx.fillRect(x+col*cw, y+r*rh, cw-2, rh-2);
+      ctx.strokeStyle = color; ctx.strokeRect(x+col*cw, y+r*rh, cw-2, rh-2);
+    }
+    ctx.fillStyle = '#e0e0e8'; ctx.font = '11px monospace'; ctx.fillText(label, x, y-6);
+    ctx.fillText(`${rows}×${cols}`, x, y+rows*rh+14);
+  };
+  drawMat(30, 40, 4, dm, 'X (input)', '#6c8cff');
+  ctx.fillStyle = '#8888a0'; ctx.font = '16px monospace'; ctx.fillText('×', 30+dm*Math.min(24,200/dm)+20, 70);
+  drawMat(30+dm*Math.min(24,200/dm)+40, 40, dm, dl, 'W_DKV', '#a78bfa');
+  ctx.fillStyle = '#8888a0'; ctx.fillText('→', 30+dm*Math.min(24,200/dm)+40+dl*Math.min(24,200/dl)+20, 70);
+  drawMat(30+dm*Math.min(24,200/dm)+40+dl*Math.min(24,200/dl)+40, 40, 4, dl, 'C_KV (cached)', '#34d399');
+  drawMat(380, 40, dl, dm, 'W_UK', '#f472b6');
+  drawMat(380, 140, dl, dm, 'W_UV', '#fbbf24');
+  ctx.fillStyle = '#8888a0'; ctx.font = '11px monospace';
+  ctx.fillText('↑ up-project to K and V (per head)', 380, 130);
+  const ratio = (2*dm) / dl;
+  document.getElementById('latentReadout').textContent =
+    `Per-token storage: MHA = 2×${dm} = ${2*dm} dims. MLA = ${dl} dims. Ratio: ${ratio.toFixed(1)}×`;
+}
+document.getElementById('latDmodelSlider').oninput = drawLatent;
+document.getElementById('latDLSlider').oninput = drawLatent;
+drawLatent();
+
+// ===== ABSORPTION TRICK STEPS =====
+const absSteps = [
+  'Step 1: Q = X·W_Q and K = X·W_DKV·W_UK. Standard attention scores = Q·K^T.',
+  'Step 2: Expand K^T = W_UK^T · W_DKV^T · X^T. Scores = X·W_Q·W_UK^T·W_DKV^T·X^T.',
+  'Step 3: W_Q and W_UK^T are fixed at training time. Precompute W_absorbed = W_Q·W_UK^T.',
+  'Step 4: For new token x: q_abs = x·W_absorbed. Cache holds C_KV = X·W_DKV.',
+  'Step 5: scores = q_abs · C_KV^T. No key cache needed! Same C_KV used for values via W_UV.'
+];
+let absStep = 0;
+function updateAbs() {
+  document.querySelectorAll('#absSteps .step-dot').forEach((d,i) => {
+    d.classList.toggle('active', i === absStep);
+    d.classList.toggle('done', i < absStep);
+  });
+  document.getElementById('absReadout').innerHTML = absSteps[absStep];
+  const c = document.getElementById('absCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const labels = ['X','W_Q','W_UK^T','W_DKV','C_KV'];
+  const colors = ['#6c8cff','#a78bfa','#f472b6','#34d399','#fbbf24'];
+  labels.forEach((l,i) => {
+    const x = 40 + i * 100;
+    const highlight = (absStep===0&&i<3)||(absStep===1&&i>=2)||(absStep===2&&i===1)||(absStep===3&&i===4)||(absStep===4&&i===4);
+    ctx.fillStyle = highlight ? colors[i]+'66' : colors[i]+'22';
+    ctx.fillRect(x, 80, 70, 50);
+    ctx.strokeStyle = colors[i]; ctx.strokeRect(x, 80, 70, 50);
+    ctx.fillStyle = '#e0e0e8'; ctx.font = '11px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(l, x+35, 110);
+  });
+  ctx.textAlign = 'left';
+  if (absStep >= 2) {
+    ctx.fillStyle = '#34d399'; ctx.font = '12px monospace';
+    ctx.fillText('W_Q · W_UK^T → W_absorbed (precomputed)', 40, 170);
+  }
+}
+document.getElementById('absPrevBtn').onclick = () => { absStep = Math.max(0, absStep-1); updateAbs(); };
+document.getElementById('absNextBtn').onclick = () => { absStep = Math.min(absSteps.length-1, absStep+1); updateAbs(); };
+document.querySelectorAll('#absSteps .step-dot').forEach(d => d.onclick = () => { absStep = +d.dataset.step; updateAbs(); });
+updateAbs();
+
+// ===== HEAD DIVERSITY CANVAS =====
+let headDivN = 2;
+function drawHeadDiv() {
+  const c = document.getElementById('headDivCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const n = headDivN;
+  const cols = Math.min(n, 4);
+  const rows = Math.ceil(n / cols);
+  const w = (c.width - 20) / cols, h = (c.height - 30) / rows;
+  for (let i = 0; i < n; i++) {
+    const col = i % cols, row = Math.floor(i / cols);
+    const seed = (i+1) * 37;
+    for (let x = 0; x < w-8; x++) for (let y = 0; y < h-8; y++) {
+      const v = (Math.sin(x*0.08*seed)+Math.cos(y*0.08*seed)+2)/4;
+      ctx.fillStyle = `hsl(${seed*20},55%,${18+v*35}%)`;
+      ctx.fillRect(10+col*w+x, 20+row*h+y, 2, 2);
+    }
+    ctx.fillStyle = '#e0e0e8'; ctx.font = '10px monospace';
+    ctx.fillText('Head '+i+' W_UK', 10+col*w+4, 20+row*h+12);
+  }
+  document.getElementById('headDivReadout').textContent =
+    n + ' heads — all W_UK heatmaps differ. No shared content (unlike MQA).';
+}
+document.getElementById('headDiv2').onclick = function() { headDivN=2; this.classList.add('active'); document.getElementById('headDiv8').classList.remove('active'); drawHeadDiv(); };
+document.getElementById('headDiv8').onclick = function() { headDivN=8; this.classList.add('active'); document.getElementById('headDiv2').classList.remove('active'); drawHeadDiv(); };
+drawHeadDiv();
+
+// ===== INFERENCE FLOW =====
+const inferTokens = ['The','next','day','is','bright','!'];
+let inferFlowStep = 0;
+const inferFlowTexts = [
+  'Step 1: Compute absorbed query q_abs = x · W_Q · W_UK^T (per head)',
+  'Step 2: Compute new latent vector c = LayerNorm(x · W_DKV), append to C_KV cache',
+  'Step 3: Attention scores = q_abs · C_KV^T → shape (1 × 6) for 6 tokens',
+  'Step 4: Scale by √d_h, apply causal mask, softmax → attention weights',
+  'Step 5: Values V = C_KV · W_UV, split per head → (6 × 4) per head',
+  'Step 6: Context = weights · V → (1 × 4) per head → concat → (1 × 8) final context'
+];
+function updateInferFlow() {
+  const el = document.getElementById('inferFlowTokens');
+  el.innerHTML = '';
+  inferTokens.forEach((t,i) => {
+    const s = document.createElement('span');
+    s.className = 'token ' + (i === inferTokens.length-1 ? 'token-new' : 'token-cached');
+    s.textContent = t;
+    el.appendChild(s);
+  });
+  document.querySelectorAll('#inferSteps .step-dot').forEach((d,i) => {
+    d.classList.toggle('active', i === inferFlowStep);
+    d.classList.toggle('done', i < inferFlowStep);
+  });
+  document.getElementById('inferFlowReadout').textContent = inferFlowTexts[inferFlowStep];
+}
+document.getElementById('inferFlowPrev').onclick = () => { inferFlowStep = Math.max(0, inferFlowStep-1); updateInferFlow(); };
+document.getElementById('inferFlowNext').onclick = () => { inferFlowStep = Math.min(inferFlowTexts.length-1, inferFlowStep+1); updateInferFlow(); };
+document.getElementById('inferFlowReset').onclick = () => { inferFlowStep = 0; updateInferFlow(); };
+updateInferFlow();
+
+// ===== COMPRESSION CALCULATOR =====
+function updateComp() {
+  const N = +document.getElementById('compNSlider').value;
+  const H = +document.getElementById('compHSlider').value;
+  const dL = +document.getElementById('compDLSlider').value;
+  const S = +document.getElementById('compSSlider').value;
+  const L = 61, B = 1;
+  ['compN','compH','compDL','compS'].forEach((id,i) => document.getElementById(id).textContent = [N,H,dL,S][i]);
+  const mha = L*B*N*H*S*2*2;
+  const mla = L*B*dL*S*2;
+  const ratio = (2*N*H)/dL;
+  const mlaPct = Math.max(2, mla/mha*100);
+  document.getElementById('compMhaBar').style.width = '100%';
+  document.getElementById('compMlaBar').style.width = mlaPct + '%';
+  document.getElementById('compMhaBar').textContent = fmtBytes(mha);
+  document.getElementById('compMlaBar').textContent = fmtBytes(mla);
+  document.getElementById('compReadout').innerHTML =
+    `Reduction factor: <strong style="color:var(--accent3);">${ratio.toFixed(1)}×</strong> &nbsp;|&nbsp; MHA: <strong>${fmtBytes(mha)}</strong> → MLA: <strong style="color:var(--accent3);">${fmtBytes(mla)}</strong>`;
+}
+['compNSlider','compHSlider','compDLSlider','compSSlider'].forEach(id =>
+  document.getElementById(id).oninput = updateComp);
+updateComp();
+
+// ===== CACHE GROWTH =====
+let cacheTokens = 5;
+const cacheDL = 4;
+function updateCacheGrowth() {
+  document.getElementById('cacheReadout').textContent =
+    `Cache shape: (${cacheTokens} × ${cacheDL}) — ${cacheTokens} tokens, ${cacheTokens * cacheDL} stored values`;
+  const c = document.getElementById('cacheGrowthCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const cw = Math.min(80, (c.width-40)/Math.max(cacheTokens,1));
+  for (let i = 0; i < cacheTokens; i++) {
+    ctx.fillStyle = i === cacheTokens-1 ? 'rgba(52,211,153,0.4)' : 'rgba(108,140,255,0.3)';
+    ctx.fillRect(20+i*cw, 20, cw-4, c.height-40);
+    ctx.fillStyle = '#8888a0'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('t'+(i+1), 20+i*cw+cw/2-2, c.height-6);
+  }
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#34d399'; ctx.font = '10px monospace';
+  ctx.fillText('Green = newly appended latent row', 20, 14);
+}
+document.getElementById('cacheAddBtn').onclick = () => { cacheTokens++; updateCacheGrowth(); };
+document.getElementById('cacheResetBtn').onclick = () => { cacheTokens = 5; updateCacheGrowth(); };
+document.getElementById('cacheAutoBtn').onclick = () => { for(let i=0;i<10;i++) cacheTokens++; updateCacheGrowth(); };
+updateCacheGrowth();
+
+// ===== PROJECTION STEPS =====
+const projSteps = [
+  { html: '<strong>W_Q</strong> (8×8) · <strong>W_UK</strong><sup>T</sup> (8×4) → absorbed (8×4) → split → per head <strong>(4×4)</strong>', text: 'Step 1: Precompute absorbed query matrix per head' },
+  { html: 'Previous C_KV: <strong>(5×4)</strong>. New token x: <strong>(1×8)</strong>', text: 'Step 2: Existing latent cache + new token embedding' },
+  { html: 'x · W_DKV = <strong>(1×4)</strong>. Append → C_KV: <strong>(6×4)</strong>', text: 'Step 3: Down-project and append to cache' },
+  { html: 'Head 0: x[:4] · absorbed[0] = <strong>(1×4)</strong>', text: 'Step 4: Absorbed query for head 0' },
+  { html: '(1×4) · (4×6) = <strong>(1×6)</strong> attention scores', text: 'Step 5: Scores against all 6 cached tokens' },
+  { html: 'weights · V_0 = <strong>(1×4)</strong>. Merge heads → <strong>(1×8)</strong> context', text: 'Step 6: Context vector for next-token prediction' }
+];
+let projStep = 0;
+function updateProj() {
+  document.querySelectorAll('#projSteps .step-dot').forEach((d,i) => {
+    d.classList.toggle('active', i===projStep);
+    d.classList.toggle('done', i<projStep);
+  });
+  document.getElementById('projMatrixDisplay').innerHTML = projSteps[projStep].html;
+  document.getElementById('projReadout').textContent = projSteps[projStep].text;
+}
+document.getElementById('projPrevBtn').onclick = () => { projStep=Math.max(0,projStep-1); updateProj(); };
+document.getElementById('projNextBtn').onclick = () => { projStep=Math.min(projSteps.length-1,projStep+1); updateProj(); };
+updateProj();
+
+// ===== SIDE BY SIDE =====
+function updateSBS() {
+  const dm = +document.getElementById('sbsDSlider').value;
+  const dl = +document.getElementById('sbsDLSlider').value;
+  document.getElementById('sbsD').textContent = dm;
+  document.getElementById('sbsDL').textContent = dl;
+  const mhaPerToken = 2 * dm * 2;
+  const mlaPerToken = dl * 2;
+  const ratio = mhaPerToken / mlaPerToken;
+  document.getElementById('sbsReadout').innerHTML =
+    `Per token: MHA = 2×${dm}×2 bytes = <strong>${mhaPerToken} B</strong> &nbsp;|&nbsp; MLA = ${dl}×2 bytes = <strong>${mlaPerToken} B</strong> &nbsp;|&nbsp; <strong style="color:var(--accent3);">${ratio.toFixed(1)}× smaller</strong>`;
+  const c = document.getElementById('sideBySideCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const maxH = c.height - 60;
+  const mhaH = maxH;
+  const mlaH = maxH * mlaPerToken / mhaPerToken;
+  ctx.fillStyle = '#6c8cff'; ctx.fillRect(80, 40+maxH-mhaH, 120, mhaH);
+  ctx.fillStyle = '#34d399'; ctx.fillRect(320, 40+maxH-mlaH, 120, mlaH);
+  ctx.fillStyle = '#e0e0e8'; ctx.font = '12px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('MHA KV Cache', 140, 30);
+  ctx.fillText('MLA Latent Cache', 380, 30);
+  ctx.fillText(fmtBytes(mhaPerToken*50), 140, c.height-10);
+  ctx.fillText(fmtBytes(mlaPerToken*50), 380, c.height-10);
+  ctx.textAlign = 'left';
+}
+document.getElementById('sbsDSlider').oninput = updateSBS;
+document.getElementById('sbsDLSlider').oninput = updateSBS;
+updateSBS();
+
+// ===== PLAYGROUND =====
+function updatePG() {
+  const L=+document.getElementById('pgLSlider').value;
+  const N=+document.getElementById('pgNSlider').value;
+  const H=+document.getElementById('pgHSlider').value;
+  const S=+document.getElementById('pgSSlider').value;
+  const dL=+document.getElementById('pgDLSlider').value;
+  const B=+document.getElementById('pgBSlider').value;
+  ['pgL','pgN','pgH','pgS','pgDL','pgB'].forEach((id,i)=>document.getElementById(id).textContent=[L,N,H,S,dL,B][i]);
+  const mha = L*B*N*H*S*2*2;
+  const mla = L*B*dL*S*2;
+  const ratio = mha/mla;
+  document.getElementById('pgResults').innerHTML = `
+    <div class="card card-alt" style="font-family:var(--mono);font-size:0.85rem;">
+      <p style="color:var(--text);margin-bottom:8px;">MHA KV Cache: <strong style="color:var(--accent);">${fmtBytes(mha)}</strong></p>
+      <p style="color:var(--text);margin-bottom:8px;">MLA Latent Cache: <strong style="color:var(--accent3);">${fmtBytes(mla)}</strong></p>
+      <p style="color:var(--text-dim);margin:0;">Compression: <strong style="color:var(--accent5);">${ratio.toFixed(1)}×</strong> &nbsp;|&nbsp; Effective dims/token: MHA=${2*N*H}, MLA=${dL}</p>
+    </div>`;
+  const c = document.getElementById('pgChart');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  [mha, mla].forEach((b,i) => {
+    const barH = (b/mha)*(c.height-50);
+    ctx.fillStyle = ['#6c8cff','#34d399'][i];
+    ctx.fillRect(100+i*220, c.height-30-barH, 160, barH);
+    ctx.fillStyle='#8888a0'; ctx.font='12px monospace'; ctx.textAlign='center';
+    ctx.fillText(['MHA','MLA'][i], 180+i*220, c.height-8);
+    ctx.fillText(fmtBytes(b), 180+i*220, c.height-35-barH);
+  });
+}
+['pgLSlider','pgNSlider','pgHSlider','pgSSlider','pgDLSlider','pgBSlider'].forEach(id=>
+  document.getElementById(id).oninput = updatePG);
+updatePG();
+
+
+// ===== MULTI INFERENCE TRACKER =====
+let multiInferS = 50;
+function updateMultiInfer() {
+  document.getElementById('multiInferReadout').textContent =
+    `Cache shape: (1, ${multiInferS}, 4) — ${multiInferS} tokens inferred. Memory: ${multiInferS * 4 * 2} bytes (FP16)`;
+}
+if (document.getElementById('multiInferBtn')) {
+  document.getElementById('multiInferBtn').onclick = () => { multiInferS++; updateMultiInfer(); };
+  document.getElementById('multiInferReset').onclick = () => { multiInferS = 50; updateMultiInfer(); };
+  updateMultiInfer();
+}
+
+// ===== OP COUNT CANVAS =====
+function drawOpCount() {
+  const c = document.getElementById('opCountCanvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const ops = [
+    { label: 'MHA: K cache write', mha: 1, mla: 0 },
+    { label: 'MHA: V cache write', mha: 1, mla: 0 },
+    { label: 'MLA: C_KV write', mha: 0, mla: 1 },
+    { label: 'Query compute', mha: 1, mla: 1 },
+    { label: 'Score compute', mha: 1, mla: 1 },
+    { label: 'Value reconstruct', mha: 0, mla: 1 },
+    { label: 'Context compute', mha: 1, mla: 1 },
+  ];
+  const barW = 30, gap = 70;
+  ops.forEach((op, i) => {
+    const x = 60 + i * gap;
+    const mhaH = op.mha * 40, mlaH = op.mla * 40;
+    ctx.fillStyle = '#6c8cff'; ctx.fillRect(x, 160-mhaH, barW, mhaH || 2);
+    ctx.fillStyle = '#34d399'; ctx.fillRect(x+barW+4, 160-mlaH, barW, mlaH || 2);
+    ctx.save(); ctx.translate(x+barW/2, 175); ctx.rotate(-0.5); ctx.fillStyle='#8888a0'; ctx.font='8px monospace';
+    ctx.fillText(op.label.split(':')[0], 0, 0); ctx.restore();
+  });
+  ctx.fillStyle='#6c8cff'; ctx.fillRect(420,20,12,12); ctx.fillStyle='#e0e0e8'; ctx.font='10px monospace'; ctx.fillText('MHA', 436, 30);
+  ctx.fillStyle='#34d399'; ctx.fillRect(420,40,12,12); ctx.fillText('MLA', 436, 50);
+}
+drawOpCount();
+
+
+
+// ===== COMPRESSION RATIO EXPLORER =====
+function updateCR() {
+  const N = +document.getElementById('crNSlider').value;
+  const H = +document.getElementById('crHSlider').value;
+  const dL = +document.getElementById('crDLSlider').value;
+  document.getElementById('crN').textContent = N;
+  document.getElementById('crH').textContent = H;
+  document.getElementById('crDL').textContent = dL;
+  const ratio = (2*N*H)/dL;
+  document.getElementById('crFormula').innerHTML = `Reduction = (2 × ${N} × ${H}) / ${dL} = <strong style="color:var(--accent3);">${ratio.toFixed(1)}×</strong>`;
+  const mhaDims = 2*N*H;
+  const mlaDims = dL;
+  document.getElementById('crReadout').innerHTML =
+    `MHA effective dims/token: <strong>${mhaDims.toLocaleString()}</strong> &nbsp;|&nbsp; MLA dims/token: <strong>${dL}</strong> &nbsp;|&nbsp; Saved: <strong style="color:var(--accent3);">${((1-mlaDims/mhaDims)*100).toFixed(1)}%</strong> of per-token storage`;
+  const c = document.getElementById('crCanvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const maxW = c.width - 80;
+  ctx.fillStyle = '#6c8cff'; ctx.fillRect(40, 40, maxW, 40);
+  ctx.fillStyle = '#34d399'; ctx.fillRect(40, 100, maxW * Math.min(mlaDims/mhaDims, 1), 40);
+  ctx.fillStyle = '#e0e0e8'; ctx.font = '11px monospace';
+  ctx.fillText(`MHA: ${mhaDims} dims`, 40, 30);
+  ctx.fillText(`MLA: ${dL} dims`, 40, 90);
+}
+['crNSlider','crHSlider','crDLSlider'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.oninput = updateCR;
+});
+updateCR();
+
+
+// ===== SCROLL =====
+const nav = document.getElementById('nav');
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    if (el.getBoundingClientRect().top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+</body>
+</html>

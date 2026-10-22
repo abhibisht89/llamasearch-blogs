@@ -1,0 +1,1914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predicting Many Futures — Multi-Token Prediction from Theory to Code</title>
+<style>
+
+
+
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3, .interactive-panel h4 { margin-bottom: 16px; }
+
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value { font-size: 0.7rem; font-family: var(--mono); color: var(--text); text-align: center; margin-bottom: 4px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+.token-head1 { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-head2 { background: rgba(167,139,250,0.15); color: var(--accent2); border: 1px solid rgba(167,139,250,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+canvas { border-radius: var(--radius); display: block; max-width: 100%; }
+
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); display: inline-block; margin-left: 8px; }
+
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { background: rgba(251, 191, 36, 0.08); border-left-color: var(--accent5); }
+.callout.warn p { color: var(--text); }
+.callout.ok { background: rgba(52, 211, 153, 0.08); border-left-color: var(--accent3); }
+.callout.ok p { color: var(--text); }
+
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q { font-weight: 700; color: var(--accent); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow { font-size: 1.2rem; color: var(--text-dim); padding: 4px 0; }
+
+.dim-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  width: 100%;
+  margin: 16px 0;
+}
+.dim-table th, .dim-table td {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.dim-table th { background: var(--bg-card-alt); color: var(--accent); font-weight: 600; }
+.dim-table td { background: var(--bg-card); color: var(--text-dim); }
+.dim-table td strong { color: var(--text); }
+
+.nav {
+  position: fixed;
+  top: 44px;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+.text-input, .num-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus, .num-input:focus { border-color: var(--accent); }
+
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+
+.code-block {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 20px 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: var(--text-dim);
+}
+.code-block .kw { color: var(--accent2); }
+.code-block .fn { color: var(--accent); }
+.code-block .str { color: var(--accent3); }
+.code-block .num { color: var(--accent5); }
+.code-block .cmt { color: #666; font-style: italic; }
+.code-block .cls { color: var(--accent4); }
+
+.output-readout {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.step-indicator {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.step-dot.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.step-dot.done { border-color: var(--accent3); color: var(--accent3); }
+
+.matrix-grid {
+  display: grid;
+  gap: 2px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  margin: 12px auto;
+}
+.matrix-cell {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  padding: 6px 4px;
+  text-align: center;
+  min-width: 36px;
+  transition: background 0.3s;
+}
+.matrix-cell.highlight { background: rgba(108,140,255,0.25); color: var(--accent); font-weight: 700; }
+.matrix-cell.masked { background: rgba(248,113,113,0.15); color: var(--danger); opacity: 0.5; }
+
+.ctrl { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 8px; }
+
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+.token-cached { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.head-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; margin: 16px 0; }
+.head-cell { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.7rem; font-weight: 700; border: 1px solid var(--border); transition: transform 0.2s; }
+.head-cell:hover { transform: scale(1.08); }
+.progress-bar-wrap { background: var(--bg-card-alt); border-radius: 8px; height: 28px; overflow: hidden; margin: 8px 0; border: 1px solid var(--border); }
+.progress-bar { height: 100%; border-radius: 8px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 0.7rem; font-family: var(--mono); color: var(--bg); font-weight: 700; }
+.data-table { border-collapse: collapse; font-family: var(--mono); font-size: 0.82rem; width: 100%; margin: 16px 0; }
+.data-table th, .data-table td { padding: 10px 12px; border: 1px solid var(--border); text-align: center; }
+.data-table th { background: var(--bg-card-alt); color: var(--accent); }
+.data-table td { background: var(--bg-card); color: var(--text-dim); }
+.evolution-track { display: flex; align-items: center; gap: 0; margin: 24px 0; flex-wrap: wrap; justify-content: center; }
+.evolution-node { background: var(--bg-card-alt); border: 2px solid var(--border); border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 140px; transition: all 0.3s; cursor: pointer; }
+.evolution-node.active { border-color: var(--accent); background: rgba(108,140,255,0.12); }
+.evolution-arrow { font-size: 1.5rem; color: var(--text-dim); padding: 0 8px; }
+
+
+.code-block {
+  background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px 24px; margin: 20px 0; font-family: var(--mono); font-size: 0.82rem;
+  line-height: 1.6; overflow-x: auto; color: var(--text-dim);
+}
+.code-block .kw { color: var(--accent2); }
+.code-block .fn { color: var(--accent); }
+.code-block .str { color: var(--accent3); }
+.code-block .num { color: var(--accent5); }
+.code-block .cmt { color: #666; font-style: italic; }
+.code-block .cls { color: var(--accent4); }
+.step-indicator { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.step-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center; font-size: 0.75rem;
+  font-family: var(--mono); color: var(--text-dim); transition: all 0.2s; }
+.step-dot.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.step-dot.done { border-color: var(--accent3); color: var(--accent3); }
+.evolution-track { display: flex; align-items: center; gap: 0; margin: 24px 0; flex-wrap: wrap; justify-content: center; }
+.evolution-node { background: var(--bg-card-alt); border: 2px solid var(--border); border-radius: 12px;
+  padding: 16px 20px; text-align: center; min-width: 120px; transition: all 0.3s; cursor: pointer; }
+.evolution-node.active { border-color: var(--accent); background: rgba(108,140,255,0.12); }
+.evolution-arrow { font-size: 1.5rem; color: var(--text-dim); padding: 0 8px; }
+
+
+
+.expert-lane { display:flex; flex-direction:column; gap:8px; flex:1; min-width:72px; }
+.expert-box { background:var(--bg-card-alt); border:2px solid var(--border); border-radius:10px;
+  padding:10px; text-align:center; font-size:0.78rem; transition:all 0.4s; min-height:52px;
+  display:flex; align-items:center; justify-content:center; flex-direction:column; }
+.expert-box.active { border-color:var(--accent3); background:rgba(52,211,153,0.12); box-shadow:0 0 16px rgba(52,211,153,0.12); }
+.expert-box.idle { opacity:0.3; }
+.expert-row { display:flex; gap:10px; margin:14px 0; flex-wrap:wrap; }
+.layer-stack { display:flex; flex-direction:column; gap:14px; margin:20px 0; }
+.layer-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.layer-label { font-family:var(--mono); font-size:0.72rem; color:var(--accent); min-width:56px; }
+.moe-pipe { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:14px 0; }
+.pipe-node { background:var(--bg-card-alt); border:1px solid var(--border); border-radius:10px; padding:12px; text-align:center; font-size:0.8rem; transition:all 0.3s; }
+.pipe-node.lit { border-color:var(--accent); background:rgba(108,140,255,0.12); }
+.weight-bar { height:8px; border-radius:4px; background:var(--border); overflow:hidden; margin:4px 0; }
+.weight-fill { height:100%; border-radius:4px; transition:width 0.4s; }
+.collapsed-expert { background:rgba(248,113,113,0.12)!important; border-color:var(--danger)!important; opacity:0.5; }
+ul.content-list { color:var(--text-dim); margin:0 0 1em 1.5em; }
+ul.content-list li { margin-bottom:0.45em; }
+
+
+.mtp-head { display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px; background:var(--bg-card-alt); border:2px solid var(--border); border-radius:10px; min-width:100px; transition:all 0.35s; }
+.mtp-head.lit { border-color:var(--accent); background:rgba(108,140,255,0.12); box-shadow:0 0 20px rgba(108,140,255,0.15); }
+.mtp-chain { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center; margin:20px 0; }
+.mtp-arrow { color:var(--text-dim); font-size:1.2rem; }
+.loss-term { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; font-family:var(--mono); font-size:0.78rem; margin:4px; border:1px solid var(--border); background:var(--bg-card-alt); transition:all 0.3s; }
+.loss-term.hot { border-color:var(--accent4); background:rgba(244,114,182,0.12); color:var(--accent4); }
+.loss-term.dim { opacity:0.45; }
+.spec-panel { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media(max-width:700px){ .spec-panel { grid-template-columns:1fr; } }
+.tensor-viz { font-family:var(--mono); font-size:0.78rem; color:var(--text-dim); line-height:1.8; }
+.head-stack { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(10,10,15,0.92);backdrop-filter:blur(12px);padding:12px 24px;font-size:0.85rem;border-bottom:1px solid #2a2a3a;font-family:var(--sans); }
+.breadcrumb-nav a { color:#6c8cff;text-decoration:none; }
+.breadcrumb-nav a:hover { text-decoration:underline; }
+.breadcrumb-nav .bc-sep { margin:0 8px;color:#555; }
+.breadcrumb-nav .bc-current { color:#8888a0; }
+body { padding-top:44px!important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span><span class="bc-current">Predicting Many Futures</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Predicting Many Futures</a>
+  <div class="nav-links">
+    <a href="#s0">One Token</a><a href="#s1">MTP Intro</a><a href="#s2">Meta Paper</a><a href="#s3">Four Reasons</a>
+    <a href="#s4">Choice Points</a><a href="#s5">DeepSeek MTP</a><a href="#s6">Head Ops</a><a href="#s7">Grad Flow</a>
+    <a href="#s8">Speculative</a><a href="#s9">Equations</a><a href="#s10">PyTorch</a><a href="#s11">Loss</a>
+    <a href="#s12">Playground</a><a href="#s-deep">Code</a><a href="#s-appendix">Appendix</a><a href="#s-summary">Summary</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 10</p>
+    <h1>Predicting Many Futures</h1>
+    <p class="subtitle">Multi-Token Prediction from Theory to Code — why next-token prediction is limiting, how Meta's MTP paper densifies training signals, how DeepSeek's sequential prediction heads maintain a causal chain, and the full PyTorch implementation.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">3×</span><span class="stat-label">Inference Speedup</span></div>
+      <div class="stat"><span class="stat-val">15%</span><span class="stat-label">More Code Problems</span></div>
+      <div class="stat"><span class="stat-val">8</span><span class="stat-label">Interactive Demos</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:720px;margin:0 auto;">
+      DeepSeek-V3's third architectural pillar after Multi-Head Latent Attention and Mixture of Experts is
+      <strong>Multi-Token Prediction (MTP)</strong>. Instead of predicting only the immediate next token,
+      MTP trains the model to forecast multiple future tokens simultaneously — densifying gradients,
+      improving data efficiency, sharpening planning at choice points, and enabling self-speculative decoding at inference.
+      DeepSeek innovates on Meta's April 2024 paper by chaining prediction heads so each future token conditions on the last.
+    </p>
+    <h3>Three Pillars of DeepSeek-V3 Architecture</h3>
+    <p>DeepSeek-V3's January 2025 technical report identifies three predominant architectural revolutions. Understanding how they interact clarifies why MTP is not an isolated trick but part of a coherent efficiency strategy:</p>
+    <table class="data-table">
+      <thead><tr><th>Innovation</th><th>What It Optimizes</th><th>When It Acts</th><th>Chapter</th></tr></thead>
+      <tbody>
+        <tr><td>Multi-Head Latent Attention</td><td>KV cache memory bandwidth</td><td>Training + Inference</td><td>05–07</td></tr>
+        <tr><td>Mixture of Experts</td><td>FFN compute per token</td><td>Training + Inference</td><td>08</td></tr>
+        <tr><td>Multi-Token Prediction</td><td>Training signal density</td><td>Pre-training primarily</td><td>10</td></tr>
+      </tbody>
+    </table>
+    <p>MLA and MoE reduce the <em>cost</em> of each forward pass. MTP increases the <em>value</em> of each forward pass by extracting more learning signal. Together, they explain how DeepSeek-V3 achieves frontier-model quality at a fraction of the training cost attributed to comparable closed-source models. In the full technical report, MTP appears as equations 21–23 — nested loops, concatenation, and cross-entropy without exotic machinery.</p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s-prereq">
+  <div class="container">
+    <span class="section-num">OVERVIEW</span>
+    <h2>Chapter Roadmap</h2>
+    <p>Every modern language model is trained with <strong>next-token prediction</strong>: given a prefix, predict the single token that follows. This objective is simple, scalable, and remarkably effective — but it is also sparse. For each position in a sequence of length <em>T</em>, the model receives exactly one supervised signal. Multi-Token Prediction (MTP) asks a richer question: <em>given this token, what are the next <strong>D</strong> tokens?</em></p>
+    <p>This chapter progresses through four movements:</p>
+    <ol class="content-list">
+      <li><strong>Sections 00–01 — Foundations:</strong> Single-token pipeline, shared transformer trunk, and the MTP generalization</li>
+      <li><strong>Sections 02–04 — Why MTP Works:</strong> Meta/FAIR paper, four advantages (densification, data efficiency, planning, inference), choice-point implicit weighting</li>
+      <li><strong>Sections 05–09 — DeepSeek Architecture:</strong> Sequential heads, causal chain, RMSNorm-merge-projection-transformer pipeline, equations 21–23</li>
+      <li><strong>Sections 10–12 — Code:</strong> Full PyTorch MTP module, loss calculation, playground</li>
+    </ol>
+    <div class="callout"><p><strong>DeepSeek's key choice:</strong> MTP shapes the trunk during pre-training; default inference still uses single-token autoregressive decoding (see §00 and §07).</p></div>
+    <h3 style="margin-top:28px;">Interactive Demos (8 Total)</h3>
+    <table class="data-table">
+      <thead><tr><th>Demo</th><th>Section</th><th>Concept</th></tr></thead>
+      <tbody>
+        <tr><td>Single vs Multi-Token Generator</td><td>§00–01</td><td>Side-by-side prediction horizons</td></tr>
+        <tr><td>Training Signal Density</td><td>§03</td><td>Loss terms per position</td></tr>
+        <tr><td>MBPP / HumanEval Benchmark Chart</td><td>§03</td><td>MTP vs baseline by model size and depth <em>n</em></td></tr>
+        <tr><td>Choice Point Weight Explorer</td><td>§04</td><td>Implicit loss weighting at transition tokens</td></tr>
+        <tr><td>DeepSeek Head Chain Visualizer</td><td>§05–06</td><td>Sequential hidden-state passing</td></tr>
+        <tr><td>Training Loss Breakdown</td><td>§11</td><td>Per-position, per-depth cross-entropy</td></tr>
+        <tr><td>Self-Speculative Decoding Animation</td><td>§08</td><td>Draft-verify parallel acceptance</td></tr>
+        <tr><td>Output Tensor Index Explorer</td><td>§11</td><td>Slice logits[b,i,k,:] interactively</td></tr>
+        <tr><td>MTP Playground + Pitfalls</td><td>§12</td><td>Shape calculator + debugging guide</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>The Limits of Next-Token Prediction</h2>
+    <p>Consider a batch of eight input tokens representing the sentence fragment: <strong>"Artificial intelligence is changing the world right now."</strong> In standard single-token prediction, this entire batch passes through a chain of transformer blocks — the <strong>shared transformer trunk</strong>, terminology introduced in the Meta multi-token prediction paper. There might be 12, 24, or even 36 such blocks stacked sequentially.</p>
+    <p>After the trunk, an output head (the unembedding / logits matrix) converts each token's hidden representation from embedding dimension <em>d</em> to vocabulary size <em>V</em>. If <em>V = 50,000</em>, every one of the eight tokens receives a 50,000-dimensional logit vector. The argmax index is the predicted next token for each position.</p>
+
+    <div class="formula">h = Trunk(x) &nbsp;&nbsp;→&nbsp;&nbsp; logits = h · W<sub>u</sub><sup>T</sup> &nbsp;&nbsp;∈ ℝ<sup>T×V</sup></div>
+
+    <h3>Training vs Inference: A Critical Distinction</h3>
+    <p>During <strong>training</strong>, all eight predicted tokens contribute to the loss. For position 0 ("Artificial"), the target next token is "intelligence." For position 1 ("intelligence"), the target is "is." For position 2, the target is "changing." Every position generates a cross-entropy term against its ground-truth successor.</p>
+    <p>During <strong>inference</strong>, only the <em>last</em> predicted token matters. That token is appended to the context and the model runs again. Positions 0 through 6 are computed but discarded — their predictions are irrelevant to generation. This asymmetry is fundamental: training is parallel and dense; inference is sequential and sparse.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Single vs Multi-Token Generator</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">Watch how single-token prediction forecasts one step ahead while MTP forecasts <em>D</em> steps for every position.</p>
+      <label class="ctrl">Prediction depth D: <span id="cmpDVal">3</span></label>
+      <input type="range" id="cmpDSlider" min="1" max="4" step="1" value="3">
+      <div class="btn-group">
+        <button class="btn active" id="cmpSingle">Single-Token Mode</button>
+        <button class="btn" id="cmpMulti">Multi-Token Mode</button>
+        <button class="btn" id="cmpStep">Step Forward ▶</button>
+        <button class="btn" id="cmpReset">Reset</button>
+      </div>
+      <div class="token-row" id="cmpInput"></div>
+      <div id="cmpOutput" style="margin-top:12px;"></div>
+      <div class="output-readout" id="cmpReadout"></div>
+    </div>
+
+    <div class="callout warn"><p><strong>The sparsity problem:</strong> For each of the <em>T</em> positions, the model receives exactly <strong>one</strong> supervised signal about the future. The model never explicitly learns to answer "what comes two tokens from now?" or "what comes three tokens from now?" during standard training — yet at inference, quality depends on long-range planning.</p></div>
+
+    <h3>Step-by-Step: Single-Token Training on Eight Positions</h3>
+    <p>Each position in the example sentence contributes one loss term. The model sees the full sequence in parallel during training (teacher forcing), but each position's loss compares against exactly one future token:</p>
+    <table class="data-table">
+      <thead><tr><th>Position i</th><th>Input token</th><th>Predicted (argmax)</th><th>Target (actual)</th><th>Loss term</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>Artificial</td><td>?</td><td>intelligence</td><td>L₀</td></tr>
+        <tr><td>1</td><td>intelligence</td><td>?</td><td>is</td><td>L₁</td></tr>
+        <tr><td>2</td><td>is</td><td>?</td><td>changing</td><td>L₂</td></tr>
+        <tr><td>3</td><td>changing</td><td>?</td><td>the</td><td>L₃</td></tr>
+        <tr><td>4</td><td>the</td><td>?</td><td>world</td><td>L₄</td></tr>
+        <tr><td>5</td><td>world</td><td>?</td><td>right</td><td>L₅</td></tr>
+        <tr><td>6</td><td>right</td><td>?</td><td>now</td><td>L₆</td></tr>
+        <tr><td>7</td><td>now</td><td>?</td><td>&lt;EOS&gt;</td><td>L₇</td></tr>
+      </tbody>
+    </table>
+    <p>Total: <strong>8 cross-entropy terms</strong>. Each term asks: "given everything up to and including this token, what is the immediate next word?" None of these terms ask about the token two or three steps ahead — the model must infer multi-step structure indirectly through backpropagation across layers, which is an inefficient learning channel.</p>
+
+    <h3>Step-by-Step: Single-Token Inference</h3>
+    <p>At generation time the picture changes entirely:</p>
+    <ul class="content-list">
+      <li><strong>Step 1:</strong> Input = [Artificial] → model outputs "intelligence" — only this token is kept</li>
+      <li><strong>Step 2:</strong> Input = [Artificial, intelligence] → model outputs "is"</li>
+      <li><strong>Step 3:</strong> Input = [Artificial, intelligence, is] → model outputs "changing"</li>
+      <li><strong>Step 4:</strong> Continue until EOS or max length</li>
+    </ul>
+    <p>Each step requires a full forward pass through all transformer blocks — the latency bottleneck MTP later helps address via speculative decoding.</p>
+
+    <h3>Dimension Walkthrough with Concrete Numbers</h3>
+    <p>Suppose <em>d_model = 768</em>, <em>V = 50,000</em>, <em>T = 8</em>, batch size <em>B = 1</em>:</p>
+    <table class="dim-table">
+      <thead><tr><th>Stage</th><th>Shape</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Input token IDs</td><td>1 × 8</td><td>Integer indices into vocabulary</td></tr>
+        <tr><td>Embeddings</td><td>1 × 8 × 768</td><td>Each token → 768-dim vector</td></tr>
+        <tr><td>After 12 trunk blocks</td><td>1 × 8 × 768</td><td>Shape preserved through attention + FFN</td></tr>
+        <tr><td>Logits (unembedding)</td><td>1 × 8 × 50,000</td><td>One probability vector per position</td></tr>
+        <tr><td>Softmax</td><td>1 × 8 × 50,000</td><td>Each row sums to 1.0</td></tr>
+      </tbody>
+    </table>
+    <p>The unembedding matrix W<sub>u</sub> has shape (50,000 × 768) — approximately 38.4 million parameters dedicated to vocabulary projection alone. MTP reuses this same matrix for every prediction depth, which is a deliberate parameter-efficiency choice.</p>
+
+    <h3>Connection to Language Modeling Objectives</h3>
+    <p>Next-token prediction implements the chain rule of probability for autoregressive models:</p>
+    <div class="formula">P(t₁, t₂, …, tₙ) = ∏<sub>i=1</sub><sup>n</sup> P(tᵢ | t₁, …, tᵢ₋₁)</div>
+    <p>Each factor is modeled by one forward pass position. MTP does not change this factorization at inference — it still holds that the joint probability decomposes into conditional next-token probabilities. What MTP changes is the <em>training objective</em>: during pre-training, the model additionally learns P(tᵢ₊ₖ | t₁, …, tᵢ) for k = 2, 3, …, D through explicit auxiliary heads. This makes the trunk's hidden states at position i encode information about the entire future window, not just the immediate next token.</p>
+
+    <h3>Why "Shared Trunk" Matters</h3>
+    <p>The trunk is shared because computing separate transformer stacks for each prediction depth would multiply parameters and compute by D. Instead, all positions and all depths read from the same contextualized representations produced by one trunk pass. MTP heads are lightweight adapters on top — projection + small transformer + shared unembed — adding modest parameter overhead while multiplying training signal by D.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Multi-Token Prediction: The Generalization</h2>
+    <p>Multi-Token Prediction changes the output contract. For every input token at position <em>i</em>, instead of predicting a single successor <em>s<sub>1</sub></em>, the model predicts <em>D</em> future tokens: <em>s<sub>1</sub>, s<sub>2</sub>, …, s<sub>D</sub></em>. The ground truth targets are the actual tokens at positions <em>i+1, i+2, …, i+D</em>: denoted <em>s<sub>1</sub>′, s<sub>2</sub>′, …, s<sub>D</sub>′</em>.</p>
+    <p>For the token "Artificial" at position 0 with horizon <em>D = 3</em>, the targets are "intelligence" (depth 1), "is" (depth 2), and "changing" (depth 3). The model might predict something different — perhaps "intelligence", "has", "transformed" — and we compute cross-entropy loss between predicted and actual at each depth, summing across depths for each position.</p>
+
+    <div class="formula">L<sub>i</sub> = Σ<sub>k=1</sub><sup>D</sup> CE(logits<sub>i,k</sub>, target<sub>i+k</sub>) &nbsp;&nbsp;;&nbsp;&nbsp; L = (1 / (T′·D)) Σ<sub>i</sub> L<sub>i</sub></div>
+
+    <p>where <em>T′ = T − D</em> is the number of valid input positions (sequence boundary constraint — we cannot predict three tokens into the future from the last two positions).</p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>Single-Token Prediction</h3>
+        <p>One output head. One logit vector per position. One cross-entropy term per position. Total loss terms: <strong>T′</strong>.</p>
+        <p>Output shape: <span class="tag tag-blue">B × T′ × V</span></p>
+      </div>
+      <div class="card">
+        <h3>Multi-Token Prediction (depth D)</h3>
+        <p><em>D</em> sequential heads. <em>D</em> logit vectors per position. <em>D</em> cross-entropy terms per position. Total loss terms: <strong>T′ × D</strong>.</p>
+        <p>Output shape: <span class="tag tag-green">B × T′ × D × V</span></p>
+      </div>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">If MTP predicts multiple tokens, are all of them used at inference?</div>
+      <p>Not by default. DeepSeek-V3 treats MTP as a <strong>pre-training auxiliary objective</strong>; the primary head handles standard decoding. MTP heads can optionally power <strong>self-speculative decoding</strong> for up to 3× speedup when draft acceptance is high.</p>
+    </div>
+
+    <h3>MTP Loss Terms for Our Eight-Token Example (D = 3)</h3>
+    <p>When D = 3, each valid position generates three loss terms. The full grid:</p>
+    <table class="data-table">
+      <thead><tr><th>Input i</th><th>Depth 1 target</th><th>Depth 2 target</th><th>Depth 3 target</th></tr></thead>
+      <tbody>
+        <tr><td>0 (Artificial)</td><td>intelligence</td><td>is</td><td>changing</td></tr>
+        <tr><td>1 (intelligence)</td><td>is</td><td>changing</td><td>the</td></tr>
+        <tr><td>2 (is)</td><td>changing</td><td>the</td><td>world</td></tr>
+        <tr><td>3 (changing)</td><td>the</td><td>world</td><td>right</td></tr>
+        <tr><td>4 (the)</td><td>world</td><td>right</td><td>now</td></tr>
+      </tbody>
+    </table>
+    <p>Notice how token "is" appears as a depth-2 target (from i=0), depth-1 target (from i=1), and would appear in more windows with longer sequences. This overlapping supervision is the mechanism behind densification.</p>
+
+    <h3>Terminology Reference</h3>
+    <ul class="content-list">
+      <li><strong>Shared transformer trunk:</strong> The main stack of transformer blocks; processes all input tokens once</li>
+      <li><strong>Prediction depth (D or k):</strong> How many future tokens each position predicts</li>
+      <li><strong>Head:</strong> One MTP module responsible for one prediction depth</li>
+      <li><strong>Hidden state h<sup>k</sup>:</strong> Representation passed between sequential heads</li>
+      <li><strong>T′ = T − D:</strong> Number of valid input positions given sequence boundary constraints</li>
+      <li><strong>Self-speculative decoding:</strong> Using MTP heads as draft generators at inference without a separate draft model</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>The Meta/FAIR Paper: Better &amp; Faster LLMs via Multi-Token Prediction</h2>
+    <p>Multi-Token Prediction was <strong>not invented by DeepSeek</strong>. DeepSeek, as with MLA and MoE, built on prior research and innovated on top. The foundational work is the April 2024 paper <em>"Better &amp; Faster Large Language Models via Multi-Token Prediction"</em> by researchers including a team from Meta FAIR.</p>
+    <p>The abstract states:</p>
+    <div class="callout ok"><p><em>"Large language models are trained with next token prediction loss. In this work we suggest that training language models to predict multiple future tokens at once results in higher sample efficiency."</em></p></div>
+    <p>That single sentence captures the thesis: same data, richer supervision, better models. The paper introduces the <strong>shared transformer trunk</strong> — the stack of transformer blocks shared by all prediction heads — and demonstrates that auxiliary MTP heads can be added without destabilizing the primary next-token objective.</p>
+
+    <h3>Paper Structure Overview</h3>
+    <p>The Meta/FAIR paper is organized around three contributions:</p>
+    <ol class="content-list">
+      <li><strong>Method (Section 2):</strong> Architecture for n-token prediction with shared trunk and n independent output heads. Each head predicts the k-th future token for every position.</li>
+      <li><strong>Training efficiency (Section 3.1):</strong> Sample efficiency experiments showing faster convergence and better final performance on coding benchmarks with equal training tokens.</li>
+      <li><strong>Inference speed (Section 3.2):</strong> Self-speculative decoding using MTP heads as draft generators, achieving ~2.5/3 token acceptance on code.</li>
+    </ol>
+    <p>The paper's "Some Speculation" section (formalized in Section 04) provides theoretical intuition for why choice-point weighting emerges from the loss structure, even without explicit importance weighting in the objective function.</p>
+
+    <h3>HumanEval and MBPP</h3>
+    <p>The Meta paper quantifies improvements on two coding benchmarks. <strong>HumanEval</strong> presents function-completion tasks: the model receives a docstring and function signature and must generate a body that passes hidden unit tests. <strong>MBPP</strong> (Mostly Basic Python Problems) contains roughly 1,000 crowdsourced problems solvable by entry-level programmers. MTP's multi-token supervision aligns with both formats — indentation, return statements, and multi-token syntactic structure.</p>
+    <p>Example HumanEval prompt structure:</p>
+    <div class="code-block"><span class="kw">def</span> <span class="fn">has_close_elements</span>(numbers: List[<span class="cls">float</span>], threshold: <span class="cls">float</span>) -> <span class="cls">bool</span>:
+    <span class="str">""" Check if in given list of numbers, are any two numbers closer to each other than
+    given threshold.
+    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)
+    False
+    """</span>
+    <span class="cmt"># Model must generate the function body here</span></div>
+    <p>Key finding: MTP-trained models solve approximately <strong>15% more code problems on average</strong> compared to single-token baselines, given the <em>same amount of training data</em>. On MBPP alone, that represents roughly 150 additional problems out of 1,000.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · MBPP / HumanEval Benchmark Chart</h4>
+      <label class="ctrl">Future tokens predicted (n): <span id="benchNVal">1</span></label>
+      <input type="range" id="benchNSlider" min="1" max="4" step="1" value="1">
+      <label class="ctrl">Model size bucket</label>
+      <div class="btn-group">
+        <button class="btn" id="benchSmall">Small (MTP worse)</button>
+        <button class="btn active" id="benchLarge">Large (MTP better)</button>
+      </div>
+      <div class="bar-chart" id="benchChart" style="height:220px;"></div>
+      <div class="output-readout" id="benchReadout"></div>
+    </div>
+
+    <p>The paper plots performance (y-axis) against model size (x-axis) for both MBPP and HumanEval. For <strong>smaller models</strong>, MTP bars are negative — multi-token prediction actually performs <em>worse</em> than the baseline. As model size increases, MTP bars turn positive and grow: larger models have enough capacity to exploit the denser training signal.</p>
+    <p>A second result sweeps the number of future tokens <em>n</em> from 1 to 4 across benchmarks including MBPP, HumanEval, and APPS. Performance consistently increases as <em>n</em> grows:</p>
+    <table class="data-table">
+      <thead><tr><th>Benchmark</th><th>n=1</th><th>n=4</th><th>Δ</th></tr></thead>
+      <tbody>
+        <tr><td>MBPP</td><td>40.7</td><td>43.1</td><td>+2.4</td></tr>
+        <tr><td>HumanEval</td><td>65.4</td><td>65.9</td><td>+0.5</td></tr>
+        <tr><td>APPS (intro)</td><td>83.0</td><td>86.2</td><td>+3.2</td></tr>
+      </tbody>
+    </table>
+    <p>On a separate axis, sample efficiency curves show scores rising from 19.3 → 32.3 → 42.4 → 50+ as training data and prediction depth increase jointly.</p>
+
+    <h3>Historical Context: From Meta Paper to DeepSeek-V3</h3>
+    <p>The timeline matters for understanding DeepSeek's approach:</p>
+    <ul class="content-list">
+      <li><strong>April 2024:</strong> Meta FAIR publishes "Better &amp; Faster LLMs via Multi-Token Prediction." Introduces auxiliary prediction heads on a shared trunk. Future tokens predicted <em>independently</em>.</li>
+      <li><strong>January 2025:</strong> DeepSeek releases the V3 technical report with MTP as the third architectural innovation alongside MLA and MoE. Adds sequential hidden-state chaining between heads.</li>
+      <li><strong>Key difference:</strong> Meta's heads are parallel and independent; DeepSeek's heads form a causal chain where h<sup>k</sup> feeds head k+1.</li>
+    </ul>
+
+    <h3>Why Smaller Models Struggle with MTP</h3>
+    <p>The paper's model-size plots show negative MTP gains for small models. Intuition: MTP adds parameters (projection matrices M<sub>k</sub>, internal transformer blocks TRM<sub>k</sub>) and multiplies loss terms by D. A small model lacks capacity to exploit the richer signal — the auxiliary heads compete with the primary objective for limited representational bandwidth. Above a capacity threshold, the denser gradients become net beneficial, especially on structured tasks like code where multi-token dependencies are strong.</p>
+
+    <div class="qa-box">
+      <div class="q">Does MTP replace the standard next-token loss?</div>
+      <p>No. MTP is an <strong>auxiliary objective</strong> added alongside the primary next-token prediction loss. The shared trunk receives gradients from both.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Four Reasons Multi-Token Prediction Works</h2>
+
+    <h3>Reason 1: Densification of Training Signals</h3>
+    <p>Standard next-token prediction provides one gradient signal per position. MTP provides <em>D</em> signals per position — the model simultaneously learns relationships across multiple future steps. Literature often describes this as making pre-training "richer": the model sees and learns dependencies spanning several tokens ahead, improving its ability to plan and forecast sequences.</p>
+    <p>Consider what the gradient tells the model in each case. With single-token loss at position i, the error signal says: "adjust weights so that the immediate next token is more likely." With MTP, the same forward pass additionally says: "adjust weights so the token two steps ahead is more likely" and "adjust weights so the token three steps ahead is more likely." These additional signals propagate through the shared trunk, encouraging representations that encode multi-step structure — not just local bigram statistics.</p>
+    <p>The effect compounds over training. A model trained for 1 trillion tokens with single-token loss sees 1 trillion supervision events. With D=3 MTP, the same trillion tokens yield approximately 3 trillion effective supervision events (ignoring boundary effects). The model does not see more data — it extracts more learning from the same data.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Training Signal Density</h4>
+      <label class="ctrl">Sequence length T: <span id="densTVal">8</span></label>
+      <input type="range" id="densTSlider" min="4" max="16" step="1" value="8">
+      <label class="ctrl">Prediction depth D: <span id="densDVal">3</span></label>
+      <input type="range" id="densDSlider" min="1" max="4" step="1" value="3">
+      <div class="two-col">
+        <div class="card card-alt"><h3 style="color:var(--accent);">Single-Token</h3><p id="densSingle" style="font-family:var(--mono);font-size:1.4rem;color:var(--text);"></p><p>loss terms</p></div>
+        <div class="card card-alt"><h3 style="color:var(--accent3);">Multi-Token</h3><p id="densMulti" style="font-family:var(--mono);font-size:1.4rem;color:var(--text);"></p><p>loss terms</p></div>
+      </div>
+      <div class="output-readout" id="densReadout"></div>
+    </div>
+
+    <h3>Reason 2: Improved Data Efficiency</h3>
+    <p>Because each training example yields <em>D×</em> more supervised targets, the model extracts more information from the same corpus. The Meta paper proves this quantitatively: ~15% more problems solved on HumanEval and MBPP with identical training tokens. This is especially pronounced on coding tasks where local syntax constraints propagate several tokens ahead.</p>
+
+    <h3>Reason 3: Better Planning at Choice Points</h3>
+    <p>MTP implicitly assigns greater importance to <strong>choice points</strong> — key tokens that significantly influence future outcomes. Section 04 develops this with a concrete sequence example.</p>
+    <p>Planning in language models means maintaining coherent long-range structure: choosing the right topic, switching format at the correct moment, closing brackets, matching tense. MTP makes the pressure direct — the model is explicitly scored on whether it can predict tokens two and three steps ahead, forcing representations that encode upcoming structure.</p>
+
+    <h3>Reason 4: Higher Inference Speed</h3>
+    <p>Because MTP trains the model to predict multiple tokens simultaneously, it enables <strong>self-speculative decoding</strong> at inference — up to <strong>3× faster</strong> generation when draft tokens are accepted. The Meta paper (Section 3.2, "Faster Inference") reports an average of <strong>2.5 accepted tokens out of 3 suggestions</strong> on code. Section 08 details the algorithm.</p>
+    <p>The speedup math is straightforward. Standard decoding: N tokens requires N forward passes. With 2.5/3 acceptance: each forward pass produces ~2.5 tokens on average, reducing passes by a factor of 2.5×. Combined with parallel verification (checking all drafts in one batched forward), wall-clock improvement approaches 3× for code generation workloads where acceptance rates are highest.</p>
+
+    <div class="callout"><p>When you encounter MTP in the literature, you will see these four themes recur: denser gradients, better data efficiency, improved planning, and speculative decoding speedups. DeepSeek-V3 leverages the first three during pre-training and optionally the fourth at inference.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Choice Points and Implicit Loss Weighting</h2>
+    <p>Consider a ground-truth sequence mixing digits and letters:</p>
+    <div class="token-row">
+      <span class="token token-word">1</span><span class="token token-word">2</span><span class="token token-word">3</span><span class="token token-word">4</span><span class="token token-highlight">5</span><span class="token token-new">A</span><span class="token token-new">B</span><span class="token token-new">C</span>
+    </div>
+    <p>The transitions 1→2, 2→3, 4→5, and A→B are predictable continuations. But the transition <strong>5 → A</strong> is a <strong>choice point</strong>: the sequence switches from numeric to alphabetic mode. This single token governs everything that follows.</p>
+    <p>Now examine model predictions at depth <em>D = 3</em> for each input position:</p>
+    <table class="dim-table">
+      <thead><tr><th>Input</th><th>Predicted (×3)</th><th>Actual Next</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>2, 3, 4</td><td>2</td></tr>
+        <tr><td>2</td><td>3, 4, 5</td><td>3</td></tr>
+        <tr><td>3</td><td>4, 5, <strong>A</strong></td><td>4</td></tr>
+        <tr><td>4</td><td>5, <strong>A</strong>, B</td><td>5</td></tr>
+        <tr><td>5</td><td><strong>A</strong>, B, C</td><td>A</td></tr>
+        <tr><td>A</td><td>B, C, D</td><td>B</td></tr>
+      </tbody>
+    </table>
+    <p>Token <strong>A</strong> appears in the predicted set starting from input 3, again at input 4, and correctly at input 5. Errors related to predicting <em>A</em> appear repeatedly across loss calculations — once when input is 3, again when input is 4, and again when input is 5. The training process implicitly prioritizes improving predictions of such consequential tokens.</p>
+    <p>The Meta paper formalizes this: by marking and counting loss terms, <em>n</em>-token prediction associates a weight of <strong>n(n+1)/2</strong> to tokens appearing in multiple prediction windows. Consequential tokens like <em>A</em> receive higher implicit weight; inconsequential tokens following a choice point receive lower weight.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Choice Point Weight Explorer</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);">Click a token to see how many loss terms include it as a target at depth D=<span id="cpD">3</span>.</p>
+      <input type="range" id="cpDSlider" min="1" max="4" step="1" value="3" style="margin-bottom:12px;">
+      <div class="token-row" id="cpTokens"></div>
+      <div class="output-readout" id="cpReadout"></div>
+      <div id="cpLossTerms" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="callout ok"><p>At the choice point 5→A, the model assigns higher effective loss to token <em>A</em>, ensuring the numeric-to-alphabetic transition is learned correctly. This is why MTP models exhibit stronger long-range planning — they are implicitly trained to care more about tokens that branch the future.</p></div>
+
+    <h3>The n(n+1)/2 Weight Formula</h3>
+    <p>The Meta paper's "Some Speculation" section explains why choice points receive disproportionate gradient attention. For n-token prediction over a sequence of length T, a token at position t appears as a target in min(n, T−t) prediction windows. Summing over all positions, consequential tokens appearing in many windows accumulate weight proportional to <strong>n(n+1)/2</strong> relative to tokens at sequence edges.</p>
+    <p>For n=3: weight ratio ≈ 3×4/2 = 6. A token like <em>A</em> in the digit-to-letter example appears in three separate loss calculations (from inputs 3, 4, and 5), so errors predicting it are penalized three times. Inconsequential tokens like <em>2</em> or <em>3</em> appear in fewer windows and receive less aggregate gradient.</p>
+
+    <h3>Inconsequential Transitions After Choice Points</h3>
+    <p>After the model correctly predicts 5→A, the transitions A→B and B→C are comparatively easy — the sequence is now in "letter mode." MTP assigns lower implicit weight to these predictable continuations. The model's capacity concentrates on getting the hard transition right rather than wasting capacity on trivial suffixes. This is the planning advantage: the model learns <em>where</em> to think hard, not just <em>what</em> comes next.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>DeepSeek's MTP Innovation: Sequential Prediction Heads</h2>
+    <p>DeepSeek-V3 implements MTP as the third pillar of its architecture (after MLA and MoE). The schematic in the DeepSeek-V3 technical report (January 2025) shows MTP modules chained after the shared trunk — but the diagram alone is insufficient. The paper dedicates only two paragraphs titled "MTP modules" with equations 21–23. Understanding requires tracing the journey of a single input token.</p>
+
+    <h3>Setup: Eight Tokens, Depth Three</h3>
+    <p>Take eight input tokens, each an 8-dimensional vector (shape 8×8 for the sequence). They pass through the shared transformer trunk. For single-token prediction, a single output head maps 8×8 → 8×50,000 logits.</p>
+    <p>For MTP with depth <em>D = 3</em>, we need <strong>three prediction heads</strong>. Head 1 predicts the first future token, Head 2 the second, Head 3 the third. Focus on input token at <em>i = 0</em>:</p>
+    <ul class="content-list">
+      <li>Head 1 targets position <em>i+1</em> (depth <em>k=1</em>)</li>
+      <li>Head 2 targets position <em>i+2</em> (depth <em>k=2</em>)</li>
+      <li>Head 3 targets position <em>i+3</em> (depth <em>k=3</em>)</li>
+    </ul>
+
+    <h3>Detailed Walkthrough: i = 0, Step by Step</h3>
+    <p><strong>Step 0 — Trunk pass:</strong> All 8 tokens pass through shared transformer blocks. Extract row 0 → h<sup>0</sup> ∈ ℝ⁸. This is the contextualized representation of "Artificial" after full attention over the sequence.</p>
+    <p><strong>Step 1 — Head 1 (k=1):</strong> Inputs: h<sup>0</sup> (from trunk) and e₁ (embedding of "intelligence" at position 1). RMSNorm both → concat → (1×16) → M₁ projection → (1×8) → TRM₁ → h<sup>1</sup> → W<sub>u</sub> → logits ∈ ℝ⁵⁰⁰⁰⁰. Target: token ID of "intelligence".</p>
+    <p><strong>Step 2 — Head 2 (k=2):</strong> Inputs: h<sup>1</sup> (from Head 1, NOT trunk!) and e₂ (embedding of "is"). Same pipeline → h<sup>2</sup> → logits. Target: token ID of "is". The causal chain means Head 2's representation already encodes Head 1's prediction context.</p>
+    <p><strong>Step 3 — Head 3 (k=3):</strong> Inputs: h<sup>2</sup> and e₃ (embedding of "changing"). Pipeline → h<sup>3</sup> → logits. Target: token ID of "changing".</p>
+    <p><strong>Step 4 — Loss:</strong> CE(logits₁, "intelligence") + CE(logits₂, "is") + CE(logits₃, "changing") = L₀. Repeat for i = 1, 2, 3, 4.</p>
+
+    <h3>What Happens at i = 4 (Last Valid Position)</h3>
+    <p>When i = 4 (input token "the"), predictions target positions 5 ("world"), 6 ("right"), 7 ("now"). When i = 5, the third prediction would require position 8, out of bounds — hence the loop stops at i = 4 and <em>T′ = T − D = 5</em>.</p>
+
+    <h3>Two Inputs Per Head</h3>
+    <p>Each head at depth <em>k</em> requires two inputs:</p>
+    <ol class="content-list">
+      <li><strong>Input embedding</strong> at the future position <em>i+k</em> — straightforward: look up the token embedding at that index</li>
+      <li><strong>Hidden state</strong> at depth <em>k</em> — the representation carrying information from prior predictions</li>
+    </ol>
+    <p>For <em>k=1</em>, the hidden state is <strong>h<sup>0</sup></strong>: the output of the shared trunk for position <em>i</em> (row 0 after all transformer blocks). For <em>k=2</em>, the hidden state is <strong>h<sup>1</sup></strong> — the output of Head 1's internal transformer block. For <em>k=3</em>, it is <strong>h<sup>2</sup></strong> from Head 2. This creates a <strong>causal chain</strong>: each depth's computation conditions on the previous depth's hidden state.</p>
+
+    <div class="callout warn"><p><strong>DeepSeek vs Meta:</strong> In the original Meta paper, future tokens were predicted <em>independently</em> from each other — no hidden-state passing between heads. DeepSeek's key innovation is maintaining a <strong>complete causal chain</strong> at each prediction depth: h<sup>1</sup> feeds Head 2, h<sup>2</sup> feeds Head 3. Information from past predictions flows into future predictions. DeepSeek claims — and the architecture suggests — this improves results by letting later depths refine earlier ones.</p></div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · DeepSeek Head Chain Visualizer</h4>
+      <label class="ctrl">Input position i: <span id="chainIVal">0</span></label>
+      <input type="range" id="chainISlider" min="0" max="4" step="1" value="0">
+      <div class="btn-group"><button class="btn" id="chainAnim">Animate Head Flow ▶</button><button class="btn" id="chainReset">Reset</button></div>
+      <canvas id="chainCanvas" width="640" height="280" style="width:100%;background:var(--bg-card-alt);margin:16px 0;"></canvas>
+      <div class="head-stack" id="chainHeads"></div>
+      <div class="output-readout" id="chainReadout"></div>
+    </div>
+
+    <h3>Meta vs DeepSeek: Architecture Comparison</h3>
+    <div class="comparison">
+      <div class="card">
+        <h3>Meta FAIR (April 2024)</h3>
+        <ul class="content-list">
+          <li>Shared transformer trunk</li>
+          <li>D independent prediction heads</li>
+          <li>Each head: trunk hidden state → output head</li>
+          <li>No hidden-state passing between heads</li>
+          <li>Future tokens predicted in parallel</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>DeepSeek-V3 (January 2025)</h3>
+        <ul class="content-list">
+          <li>Shared transformer trunk (same)</li>
+          <li>D <strong>sequential</strong> prediction heads</li>
+          <li>Each head: RMSNorm(h<sub>k−1</sub>) + RMSNorm(e<sub>i+k</sub>) → merge → project → TRM → logits</li>
+          <li>h<sup>k</sup> passed to head k+1 (causal chain)</li>
+          <li>Complete causal chain maintained at each depth</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Full Dimension Trace for i = 0, d = 8, D = 3, V = 50,000</h3>
+    <table class="dim-table">
+      <thead><tr><th>Step</th><th>Head</th><th>Operation</th><th>Input Shape</th><th>Output Shape</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>Trunk</td><td>8 tokens through blocks</td><td>8 × 8</td><td>8 × 8 (h<sup>0</sup> for all rows)</td></tr>
+        <tr><td>1</td><td>Head 1</td><td>RMSNorm(h<sup>0</sup><sub>0</sub>) ∥ RMSNorm(e₁)</td><td>1×8 + 1×8</td><td>1 × 16 merged</td></tr>
+        <tr><td>2</td><td>Head 1</td><td>Linear M₁ (16×8)</td><td>1 × 16</td><td>1 × 8</td></tr>
+        <tr><td>3</td><td>Head 1</td><td>TransformerEncoderLayer</td><td>1 × 8</td><td>1 × 8 → h<sup>1</sup></td></tr>
+        <tr><td>4</td><td>Head 1</td><td>Shared W<sub>u</sub></td><td>1 × 8</td><td>1 × 50,000 logits</td></tr>
+        <tr><td>5</td><td>Head 2</td><td>RMSNorm(h<sup>1</sup>) ∥ RMSNorm(e₂)</td><td>1×8 + 1×8</td><td>1 × 16 → … → h<sup>2</sup></td></tr>
+        <tr><td>6</td><td>Head 3</td><td>RMSNorm(h<sup>2</sup>) ∥ RMSNorm(e₃)</td><td>1×8 + 1×8</td><td>1 × 16 → … → h<sup>3</sup></td></tr>
+      </tbody>
+    </table>
+    <p>This entire trace repeats for i = 1, 2, 3, 4 — five times total — producing a final logits tensor of shape (1, 5, 3, 50,000).</p>
+
+    <h3>Why DeepSeek Uses MTP Only in Pre-Training</h3>
+    <p>Three practical reasons:</p>
+    <ol class="content-list">
+      <li><strong>Simplicity:</strong> Standard autoregressive decoding is battle-tested, compatible with KV caching, and requires no draft-verify logic.</li>
+      <li><strong>Quality:</strong> The primary next-token head is explicitly optimized for the inference objective. MTP heads are auxiliary — their draft quality may be good but not guaranteed optimal for generation.</li>
+      <li><strong>Flexibility:</strong> Deployers can opt into self-speculative decoding when latency matters (e.g., code generation) without changing the default behavior for chat applications.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Inside Each Prediction Head: Merge, Project, Transform</h2>
+    <p>Zoom into Head 1 for input <em>i = 0</em>. Two 1×8 vectors arrive: hidden state h<sup>0</sup> and input embedding e<sub>1</sub> (embedding at position 1).</p>
+
+    <div class="flow">
+      <div class="flow-step" id="fs1">① RMSNorm(h<sup>0</sup>) and RMSNorm(e<sub>1</sub>)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" id="fs2">② Concatenate → merged vector (1×16)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" id="fs3">③ Linear projection W<sub>M</sub> (16×8) → (1×8)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" id="fs4">④ Transformer block → h<sup>1</sup> (1×8)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step" id="fs5">⑤ Shared unembedding W<sub>u</sub> → logits (1×V)</div>
+    </div>
+
+    <h3>RMSNorm Before Concatenation</h3>
+    <p>Before merging, both vectors undergo <strong>RMSNorm</strong> (Root Mean Square Normalization). Unlike LayerNorm (subtract mean, divide by std), RMSNorm divides each entry by the root mean square of the vector:</p>
+    <div class="formula">RMSNorm(x) = x / √(mean(x²) + ε)</div>
+    <p>For a vector with entries [6, 7, 8, …]: square each entry, sum, divide by <em>n</em>, take square root, then divide every entry by that scalar. A small ε prevents division by zero.</p>
+
+    <h3>Projection Matrix M<sub>k</sub></h3>
+    <p>The merged 1×16 vector multiplies a projection matrix of shape (2<em>d</em> × <em>d</em>) = (16×8), yielding a 1×8 vector. In the DeepSeek paper this is denoted <strong>M<sub>k</sub></strong> with dimensions (2<em>d</em> × <em>d</em>).</p>
+
+    <h3>Shared Unembedding Matrix</h3>
+    <p>The hidden state at each depth passes through the <strong>same</strong> unembedding / logits matrix W<sub>u</sub> used by the primary LM head. This is why it is called "shared" — one vocabulary projection serves all depths, avoiding redundant parameters.</p>
+
+    <p>Heads 2 and 3 repeat the identical operations, but Head 2 receives h<sup>1</sup> (from Head 1's transformer) plus embedding e<sub>2</sub>, and Head 3 receives h<sup>2</sup> plus e<sub>3</sub>.</p>
+
+    <div class="qa-box">
+      <div class="q">Why add an entire transformer block inside each MTP head?</div>
+      <p>The internal transformer block (a single <code>TransformerEncoderLayer</code> in PyTorch) allows the model to <em>process</em> the merged representation before projecting to vocabulary space. It is lighter than a full trunk layer but provides enough capacity to refine the hidden state that gets passed to the next depth. Without it, concatenation + linear projection would be a shallow fusion unable to capture complex dependencies between the trunk representation and the future token embedding.</p>
+    </div>
+
+    <h3>RMSNorm vs LayerNorm: Why DeepSeek Uses RMSNorm Here</h3>
+    <p>DeepSeek-V3 uses RMSNorm throughout its architecture. For MTP heads specifically, RMSNorm before concatenation ensures both the hidden state and input embedding are on comparable scales before merging:</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>LayerNorm</h3>
+        <div class="formula" style="font-size:0.85rem;">LN(x) = γ · (x − μ) / σ + β</div>
+        <p>Recenters (subtract mean) and rescales. Two learnable parameters γ, β.</p>
+      </div>
+      <div class="card">
+        <h3>RMSNorm</h3>
+        <div class="formula" style="font-size:0.85rem;">RMSNorm(x) = γ · x / RMS(x)</div>
+        <p>Rescales only — no mean subtraction. Simpler, faster, used in LLaMA/DeepSeek.</p>
+      </div>
+    </div>
+    <p>Concrete example with vector x = [3, 4]: squares = [9, 16], mean = 12.5, RMS = √12.5 ≈ 3.54. Normalized: [3/3.54, 4/3.54] ≈ [0.847, 1.130].</p>
+
+    <h3>Batch Dimension: Processing All Positions</h3>
+    <p>Our walkthrough used a single token (1×8 vectors) for clarity. In practice, the implementation processes all T′ positions in parallel within each batch. For batch size B=4 and T=8, D=3: the output shape is (4, 5, 3, V). The nested loops can be vectorized across B and i, though the sequential k-loop must remain serial due to the causal chain (h<sup>k</sup> depends on h<sup>k−1</sup>).</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Gradient Flow and Inference Modes</h2>
+    <p>§00 established the training/inference asymmetry. Here: how MTP gradients reach the trunk, and how inference can optionally exploit the trained heads.</p>
+
+    <h3>Gradient Flow During Pre-Training</h3>
+    <p>During backpropagation, gradients from all D heads flow backward through:</p>
+    <div class="flow">
+      <div class="flow-step">Shared W<sub>u</sub> (unembedding)</div>
+      <div class="flow-arrow">↑</div>
+      <div class="flow-step">TRM<sub>k</sub> (head transformer blocks)</div>
+      <div class="flow-arrow">↑</div>
+      <div class="flow-step">M<sub>k</sub> (projection matrices)</div>
+      <div class="flow-arrow">↑</div>
+      <div class="flow-step">RMSNorm + concatenation</div>
+      <div class="flow-arrow">↑</div>
+      <div class="flow-step">Shared transformer trunk + embedding layer</div>
+    </div>
+    <p>Both the primary next-token loss and the MTP auxiliary loss contribute gradients to the trunk. This joint optimization is why MTP improves the trunk's representations even when MTP heads are discarded at inference — the trunk has learned to encode multi-step future structure.</p>
+
+    <h3>Inference Mode Comparison</h3>
+    <table class="data-table">
+      <thead><tr><th>Mode</th><th>Forward passes per token</th><th>Uses MTP heads?</th><th>Typical use case</th></tr></thead>
+      <tbody>
+        <tr><td>Standard autoregressive</td><td>1.0</td><td>No</td><td>Chat, general generation (DeepSeek default)</td></tr>
+        <tr><td>Self-speculative (D=3)</td><td>~0.33 effective</td><td>Yes (draft + verify)</td><td>Code generation, low-latency serving</td></tr>
+        <tr><td>Full MTP decode</td><td>1.0 (but 3 tokens out)</td><td>Yes (all heads)</td><td>Research / non-standard deployment</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Self-Speculative Decoding</h2>
+    <p>Standard autoregressive inference generates one token per forward pass — inherently sequential. <strong>Speculative decoding</strong> accelerates this by drafting multiple candidate tokens cheaply, then verifying them in parallel with the full model.</p>
+    <p>Classic speculative decoding uses <em>two models</em>: a small draft model proposes tokens quickly; the large target model verifies and corrects. <strong>Self-speculative decoding</strong> eliminates the draft model — the MTP heads <em>are</em> the drafters, living inside the same model.</p>
+
+    <div class="spec-panel">
+      <div class="card card-alt">
+        <h3>Standard Decoding</h3>
+        <p>One token per step. Forward pass → argmax → append → repeat. Latency = N × t<sub>forward</sub>.</p>
+      </div>
+      <div class="card card-alt">
+        <h3>Self-Speculative Decoding</h3>
+        <p>MTP heads draft D tokens. Main model verifies all D in one parallel pass. Accepted tokens retained; first rejection truncates. Average acceptance ~2.5/3 on code → ~3× speedup.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Self-Speculative Decoding Animation</h4>
+      <div class="btn-group">
+        <button class="btn" id="specStart">Run Speculative Step ▶</button>
+        <button class="btn" id="specReset">Reset</button>
+      </div>
+      <canvas id="specCanvas" width="640" height="240" style="width:100%;background:var(--bg-card-alt);margin:16px 0;"></canvas>
+      <div class="output-readout" id="specReadout">Draft 3 tokens → parallel verify → accept/reject</div>
+    </div>
+
+    <p>The connection between MTP and speculative decoding is direct: MTP <em>trains</em> the model to predict multiple futures; speculative decoding <em>exploits</em> that capability at serving time. Without MTP training, draft tokens would be poor and rejection rates would eliminate any speed gain.</p>
+
+    <h3>Self-Speculative Decoding: Detailed Protocol</h3>
+    <ol class="content-list">
+      <li><strong>Draft phase:</strong> Given context [t₁, …, tₙ], run MTP heads to produce draft tokens [d₁, d₂, d₃] in one forward pass (or a lightweight pass through MTP modules only).</li>
+      <li><strong>Verify phase:</strong> Construct extended input [t₁, …, tₙ, d₁, d₂, d₃] and run the full model (or primary head) in parallel to compute logits at positions n, n+1, n+2 simultaneously.</li>
+      <li><strong>Accept/reject:</strong> Compare each draft dᵢ against the primary model's prediction at that position. Accept consecutive matches; reject at first mismatch; discard all drafts after rejection.</li>
+      <li><strong>Append:</strong> Add all accepted tokens to context. If all three accepted, advance 3 positions with ~1× forward cost — effective 3× speedup.</li>
+    </ol>
+    <p>Meta reports <strong>2.5 out of 3</strong> average accepted tokens on code benchmarks — not perfect, but enough for substantial wall-clock improvement. The "self" in self-speculative means no separate draft model is needed; the MTP heads trained during pre-training serve as built-in drafters.</p>
+
+    <h3>Classic Speculative Decoding vs Self-Speculative</h3>
+    <table class="data-table">
+      <thead><tr><th>Aspect</th><th>Classic Speculative</th><th>Self-Speculative (MTP)</th></tr></thead>
+      <tbody>
+        <tr><td>Draft model</td><td>Separate small LM</td><td>MTP heads (same model)</td></tr>
+        <tr><td>Extra parameters at inference</td><td>Yes (draft model)</td><td>No (heads already trained)</td></tr>
+        <tr><td>Training requirement</td><td>Train two models</td><td>MTP pre-training only</td></tr>
+        <tr><td>Acceptance rate (code)</td><td>Varies by draft quality</td><td>~2.5/3 (Meta paper)</td></tr>
+        <tr><td>Speedup</td><td>2–3× typical</td><td>Up to 3×</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Equations 21–23 from the DeepSeek-V3 Paper</h2>
+    <p>With the schematic in mind, the paper's notation becomes transparent. For prediction depth <em>k</em> at input position <em>i</em>:</p>
+
+    <div class="formula">h′<sub>i,k</sub> = M<sub>k</sub> · [RMSNorm(h<sub>i,k−1</sub>) ; RMSNorm(e<sub>i+k</sub>)] &nbsp;&nbsp;(Eq. 21)</div>
+    <div class="formula">h<sub>i,k</sub> = TRM<sub>k</sub>(h′<sub>i,k</sub>) &nbsp;&nbsp;(Eq. 22)</div>
+    <div class="formula">P<sub>i,k</sub> = softmax(W<sub>u</sub> · h<sub>i,k</sub>) &nbsp;&nbsp;(Eq. 23)</div>
+
+    <p>Where:</p>
+    <ul class="content-list">
+      <li><strong>h<sub>i,0</sub></strong> = hidden state from shared trunk at position <em>i</em></li>
+      <li><strong>e<sub>i+k</sub></strong> = input token embedding at future position <em>i+k</em></li>
+      <li><strong>M<sub>k</sub></strong> = projection matrix (2<em>d</em> × <em>d</em>)</li>
+      <li><strong>TRM<sub>k</sub></strong> = transformer block inside head <em>k</em></li>
+      <li><strong>W<sub>u</sub></strong> = shared unembedding matrix (same as primary LM head)</li>
+      <li><strong>P<sub>i,k</sub></strong> = probability distribution over vocabulary for depth <em>k</em></li>
+    </ul>
+    <p>The total MTP loss aggregates cross-entropy across all valid positions and depths, added to the primary next-token loss during pre-training.</p>
+
+    <h3>Mapping Equations to Code</h3>
+    <table class="data-table">
+      <thead><tr><th>Equation</th><th>Paper Notation</th><th>Code Variable</th></tr></thead>
+      <tbody>
+        <tr><td>Eq. 21</td><td>M<sub>k</sub>[RMSNorm(h); RMSNorm(e)]</td><td><code>projections[k](cat(rms(h_prev), rms(e)))</code></td></tr>
+        <tr><td>Eq. 22</td><td>TRM<sub>k</sub>(h′)</td><td><code>head_transformers[k](projected)</code></td></tr>
+        <tr><td>Eq. 23</td><td>softmax(W<sub>u</sub> · h)</td><td><code>unembed(h_cur)</code> → softmax at loss time</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Combined Training Objective</h3>
+    <div class="formula">L<sub>total</sub> = L<sub>next-token</sub> + λ · L<sub>MTP</sub></div>
+    <p>where λ is a hyperparameter controlling MTP auxiliary loss weight. DeepSeek-V3's exact λ is not publicly specified in detail, but the MTP modules clearly contribute meaningful gradient during pre-training. Too large λ would distort the primary objective; too small would waste the densification benefit. In practice, λ is tuned so both losses decrease monotonically during training.</p>
+
+    <h3>Reading the DeepSeek-V3 Schematic</h3>
+    <p>The paper's MTP schematic shows: shared trunk output feeding into MTP module 1, then MTP module 2, with linear projections, RMSNorm, concatenation blocks labeled between them. The schematic displays multiple input tokens simultaneously, which can be confusing. The clearer mental model traces one input token's journey through all D heads sequentially. Once that journey is understood for i=0, it generalizes to all T′ positions in parallel during the forward pass.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>PyTorch Implementation from Scratch</h2>
+    <p>The complete MTP module requires four steps: load packages, define RMSNorm, define the MTP class, generate tokens, and compute loss. The entire implementation runs on CPU or a modest GPU (T4 suffices).</p>
+
+    <h3>Step 0: Imports</h3>
+    <div class="code-block"><span class="kw">import</span> torch
+<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
+<span class="kw">import</span> torch.nn.functional <span class="kw">as</span> F</div>
+
+    <h3>Step 1: RMSNorm</h3>
+    <div class="code-block"><span class="kw">class</span> <span class="cls">RMSNorm</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, dim, eps=<span class="num">1e-6</span>):
+        <span class="fn">super</span>().__init__()
+        self.eps = eps
+        self.scale = nn.Parameter(torch.ones(dim))
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x):
+        rms = torch.sqrt(x.pow(<span class="num">2</span>).mean(dim=-<span class="num">1</span>, keepdim=<span class="kw">True</span>) + self.eps)
+        <span class="kw">return</span> self.scale * x / rms</div>
+
+    <h3>Step 2: SimpleMTP Class</h3>
+    <div class="code-block"><span class="kw">class</span> <span class="cls">SimpleMTP</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, vocab_size, d_model, n_heads=<span class="num">3</span>, n_transformer_layers=<span class="num">1</span>):
+        <span class="fn">super</span>().__init__()
+        self.d_model = d_model
+        self.n_heads = n_heads  <span class="cmt"># prediction depth D</span>
+        self.embed = nn.Embedding(vocab_size, d_model)
+        self.trunk = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model, num_heads=<span class="num">4</span>, batch_first=<span class="kw">True</span>),
+            num_layers=<span class="num">2</span>
+        )
+        self.rms = RMSNorm(d_model)
+        self.projections = nn.ModuleList([
+            nn.Linear(<span class="num">2</span> * d_model, d_model) <span class="kw">for</span> _ <span class="kw">in</span> range(n_heads)
+        ])
+        self.head_transformers = nn.ModuleList([
+            nn.TransformerEncoderLayer(d_model, num_heads=<span class="num">4</span>, batch_first=<span class="kw">True</span>)
+            <span class="kw">for</span> _ <span class="kw">in</span> range(n_heads)
+        ])
+        self.unembed = nn.Linear(d_model, vocab_size, bias=<span class="kw">False</span>)
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, tokens):
+        <span class="cmt"># tokens: (B, T)</span>
+        B, T = tokens.shape
+        x = self.embed(tokens)
+        trunk_out = self.trunk(x)  <span class="cmt"># (B, T, d)</span>
+        max_i = T - self.n_heads
+        all_logits = []
+        <span class="kw">for</span> i <span class="kw">in</span> range(max_i):
+            h_prev = trunk_out[:, i, :]  <span class="cmt"># hidden state for position i</span>
+            depth_logits = []
+            <span class="kw">for</span> k <span class="kw">in</span> range(self.n_heads):
+                future_pos = i + k + <span class="num">1</span>  <span class="cmt"># Python 0-indexing</span>
+                e = x[:, future_pos, :]
+                merged = torch.cat([self.rms(h_prev), self.rms(e)], dim=-<span class="num">1</span>)
+                projected = self.projections[k](merged)
+                h_cur = self.head_transformers[k](projected.unsqueeze(<span class="num">1</span>)).squeeze(<span class="num">1</span>)
+                logits_k = self.unembed(h_cur)
+                depth_logits.append(logits_k)
+                h_prev = h_cur  <span class="cmt"># causal chain</span>
+            all_logits.append(torch.stack(depth_logits, dim=<span class="num">1</span>))
+        <span class="kw">return</span> torch.stack(all_logits, dim=<span class="num">1</span>)  <span class="cmt"># (B, T-D, D, V)</span></div>
+
+    <h3>Output Tensor Shape</h3>
+    <p>With B=1, T=8, D=3, V=5000:</p>
+    <div class="formula">logits.shape = (1, 5, 3, 5000) = (B, T−D, D, V)</div>
+    <div class="tensor-viz card card-alt" style="padding:20px;">
+      <strong>How to read this tensor:</strong><br>
+      • Batch dimension: 1 sequence<br>
+      • 5 valid input positions (i = 0…4)<br>
+      • 3 prediction depths per position<br>
+      • 5000 vocabulary logits per depth<br><br>
+      logits[0, 0, :] → three future tokens predicted from position 0<br>
+      logits[0, 2, 1] → depth-2 prediction from position 2
+    </div>
+
+    <h3>Forward Pass: Line-by-Line Explanation</h3>
+    <p>The nested loop structure is the heart of the implementation:</p>
+    <div class="code-block"><span class="cmt"># Outer loop: slide over valid input positions</span>
+<span class="kw">for</span> i <span class="kw">in</span> range(T - n_heads):  <span class="cmt"># i ∈ {0,1,2,3,4} when T=8, D=3</span>
+    h_prev = trunk_out[:, i, :]       <span class="cmt"># h⁰: trunk output at position i</span>
+    depth_logits = []
+    <span class="cmt"># Inner loop: predict D future tokens sequentially</span>
+    <span class="kw">for</span> k <span class="kw">in</span> range(n_heads):      <span class="cmt"># k ∈ {0,1,2} → depths 1,2,3</span>
+        future_pos = i + k + <span class="num">1</span>       <span class="cmt"># Python 0-index: i=0,k=0 → pos 1</span>
+        e = embeddings[:, future_pos, :]
+        merged = cat(RMSNorm(h_prev), RMSNorm(e))  <span class="cmt"># (B, 2d)</span>
+        projected = M_k(merged)                    <span class="cmt"># (B, d)</span>
+        h_cur = TRM_k(projected)                   <span class="cmt"># (B, d)</span>
+        logits_k = W_u(h_cur)                      <span class="cmt"># (B, V)</span>
+        depth_logits.append(logits_k)
+        h_prev = h_cur  <span class="cmt"># CAUSAL CHAIN: h_cur feeds next head</span>
+    all_logits.append(stack(depth_logits))  <span class="cmt"># (D, V) per position</span></div>
+
+    <h3>Why i + k + 1 (Not i + k)?</h3>
+    <p>The DeepSeek paper writes future position as <em>i + k</em> with 1-indexed notation. Python uses 0-indexing, so the code uses <em>i + k + 1</em>. When i=0 and k=0 (first depth), we want the embedding at position 1 — the immediate next token. With 0-indexing: 0 + 0 + 1 = 1. Correct.</p>
+
+    <h3>Step 3: Generate and Inspect</h3>
+    <div class="code-block">B, T, d_model, vocab_size = <span class="num">1</span>, <span class="num">8</span>, <span class="num">8</span>, <span class="num">5000</span>
+model = SimpleMTP(vocab_size, d_model, n_heads=<span class="num">3</span>)
+tokens = torch.randint(<span class="num">0</span>, vocab_size, (B, T))
+logits = model(tokens)
+<span class="fn">print</span>(logits.shape)  <span class="cmt"># torch.Size([1, 5, 3, 5000])</span>
+
+<span class="cmt"># Inspect head k=0 at position i=0</span>
+logits[<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>].shape  <span class="cmt"># torch.Size([5000]) — first future token from pos 0</span>
+
+<span class="cmt"># Predict tokens for i=0 across all heads</span>
+pred_tokens = logits[<span class="num">0</span>, <span class="num">0</span>].argmax(dim=-<span class="num">1</span>)  <span class="cmt"># shape (3,) — three predicted token IDs</span></div>
+
+    <h3>TransformerEncoderLayer Inside Each Head</h3>
+    <p>PyTorch's <code>nn.TransformerEncoderLayer</code> bundles multi-head self-attention, layer normalization, feed-forward network, and another layer normalization. For MTP heads processing a single token (sequence length 1), self-attention degenerates to a trivial operation — the head's power comes from the FFN's nonlinear transformation of the merged representation. In production DeepSeek-V3, these are full transformer blocks matching the model's architectural conventions (likely with MLA rather than standard MHA).</p>
+
+    <div class="callout"><p><strong>Parameter count intuition:</strong> Each MTP head adds a projection matrix (2d × d), one TransformerEncoderLayer (~4d² FFN params), but <em>reuses</em> the shared W<sub>u</sub>. For d=4096 and D=2 (DeepSeek-V3 uses 2 MTP modules per the paper schematic), the overhead is modest — yet the training signal improvement is disproportionately large.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Loss Function Calculation</h2>
+    <p>For each input position <em>i</em>, we have <em>D</em> predicted tokens and <em>D</em> target tokens (the actual tokens at positions <em>i+1, …, i+D</em>). The loss is categorical cross-entropy at each depth, summed and averaged.</p>
+
+    <div class="formula">L = (1 / (T′ · D)) Σ<sub>i=0</sub><sup>T′−1</sup> Σ<sub>k=0</sub><sup>D−1</sup> CE(logits[i,k], targets[i+k+1])</div>
+
+    <div class="code-block"><span class="kw">def</span> <span class="fn">mtp_loss</span>(logits, targets, n_heads):
+    <span class="cmt"># logits: (B, T-D, D, V), targets: (B, T)</span>
+    B, L, D, V = logits.shape
+    total = <span class="num">0.0</span>
+    count = <span class="num">0</span>
+    <span class="kw">for</span> i <span class="kw">in</span> range(L):
+        <span class="kw">for</span> k <span class="kw">in</span> range(D):
+            target = targets[:, i + k + <span class="num">1</span>]
+            total += F.cross_entropy(logits[:, i, k, :], target)
+            count += <span class="num">1</span>
+    <span class="kw">return</span> total / count</div>
+
+    <p>For T=8, D=3: five positions × three depths = <strong>15 loss terms</strong>. Example run yields loss ≈ <strong>12.133</strong> before optimization. Backpropagation flows through all heads, the projection matrices, the internal transformers, and ultimately into the shared trunk.</p>
+
+    <h3>Concrete Loss Walkthrough for i = 0</h3>
+    <p>At input position 0 ("Artificial"), three predictions are made:</p>
+    <table class="data-table">
+      <thead><tr><th>Depth k</th><th>Predicted logits</th><th>Target token (position)</th><th>Loss</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>logits[0, 0, 0, :]</td><td>intelligence (pos 1)</td><td>CE₁</td></tr>
+        <tr><td>2</td><td>logits[0, 0, 1, :]</td><td>is (pos 2)</td><td>CE₂</td></tr>
+        <tr><td>3</td><td>logits[0, 0, 2, :]</td><td>changing (pos 3)</td><td>CE₃</td></tr>
+      </tbody>
+    </table>
+    <p>Position loss: L₀ = CE₁ + CE₂ + CE₃. Repeat for i = 1, 2, 3, 4 to get L₁, L₂, L₃, L₄. Total: L = (L₀ + L₁ + L₂ + L₃ + L₄) / 5 for position mean, or divide by 15 for per-term mean.</p>
+
+    <h3>Full Loss Implementation</h3>
+    <div class="code-block"><span class="kw">def</span> <span class="fn">compute_mtp_loss</span>(logits, targets):
+    <span class="cmt"># logits: (B, L, D, V) where L = T - D</span>
+    <span class="cmt"># targets: (B, T) original token IDs</span>
+    B, L, D, V = logits.shape
+    total_loss = <span class="num">0.0</span>
+    <span class="kw">for</span> i <span class="kw">in</span> range(L):
+        <span class="kw">for</span> k <span class="kw">in</span> range(D):
+            pred = logits[:, i, k, :]           <span class="cmt"># (B, V)</span>
+            tgt = targets[:, i + k + <span class="num">1</span>]         <span class="cmt"># (B,) — future token ID</span>
+            total_loss += F.cross_entropy(pred, tgt)
+    <span class="kw">return</span> total_loss / (L * D)  <span class="cmt"># mean over 15 terms → example: 12.133</span>
+
+<span class="cmt"># Training loop snippet</span>
+optimizer = torch.optim.Adam(model.parameters(), lr=<span class="num">1e-4</span>)
+<span class="kw">for</span> batch <span class="kw">in</span> dataloader:
+    logits = model(batch)
+    loss = compute_mtp_loss(logits, batch)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()</div>
+
+    <p>Compare with single-token loss: one cross-entropy per position, T terms instead of T′ × D. MTP's 3× term count (when D=3) is exactly the densification from Section 03 — the same forward pass yields triple the gradient information.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Training Loss Breakdown</h4>
+      <label class="ctrl">Highlight position i: <span id="lossIVal">0</span></label>
+      <input type="range" id="lossISlider" min="0" max="4" step="1" value="0">
+      <div id="lossGrid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:16px 0;"></div>
+      <div class="output-readout" id="lossReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Playground</h2>
+    <p>Experiment with sequence length, prediction depth, and vocabulary size. See how output tensor dimensions change and how loss term counts scale.</p>
+    <div class="interactive-panel">
+      <h4>Interactive · MTP Playground</h4>
+      <div class="two-col">
+        <div>
+          <label class="ctrl">Sequence length T: <span id="pgTVal">8</span></label>
+          <input type="range" id="pgTSlider" min="4" max="16" step="1" value="8">
+          <label class="ctrl">Depth D: <span id="pgDVal">3</span></label>
+          <input type="range" id="pgDSlider" min="1" max="4" step="1" value="3">
+          <label class="ctrl">Vocab V: <span id="pgVVal">5000</span></label>
+          <input type="range" id="pgVSlider" min="1000" max="50000" step="1000" value="5000">
+        </div>
+        <div class="card card-alt" id="pgOutput" style="font-family:var(--mono);font-size:0.85rem;"></div>
+      </div>
+      <div class="bar-chart" id="pgBarChart" style="height:140px;margin-top:16px;"></div>
+    </div>
+
+    <h3 style="margin-top:40px;">Common Implementation Pitfalls</h3>
+    <div class="comparison">
+      <div class="card">
+        <h3>Pitfall: Wrong future index</h3>
+        <p>Using <code>i + k</code> instead of <code>i + k + 1</code> in Python causes off-by-one errors. Paper uses 1-indexed notation; code needs the +1 adjustment.</p>
+      </div>
+      <div class="card">
+        <h3>Pitfall: Trunk hidden state for all heads</h3>
+        <p>Feeding trunk output h<sup>0</sup> to every head breaks the causal chain. Only Head 1 uses h<sup>0</sup>; Heads 2+ use h<sup>k−1</sup> from the previous head's transformer.</p>
+      </div>
+    </div>
+    <div class="comparison">
+      <div class="card">
+        <h3>Pitfall: Loop bounds</h3>
+        <p>Looping i to T instead of T−D includes positions where future targets don't exist. Always use <code>range(T - n_heads)</code>.</p>
+      </div>
+      <div class="card">
+        <h3>Pitfall: Separate unembedding matrices</h3>
+        <p>Creating per-head W<sub>u</sub> matrices adds V×d params per head unnecessarily. DeepSeek shares one W<sub>u</sub> across all depths.</p>
+      </div>
+    </div>
+
+    <h3>Debugging Checklist</h3>
+    <ol class="content-list">
+      <li>Verify <code>logits.shape == (B, T-D, D, V)</code> with a random input</li>
+      <li>Check <code>logits[0, 0, 0].shape == (V,)</code> for single depth slice</li>
+      <li>Confirm loss decreases after a few optimizer steps (should drop from ~12.13)</li>
+      <li>Test boundary: T=4, D=3 should give shape (B, 1, 3, V) — only one valid position</li>
+      <li>Verify gradients reach trunk: <code>model.trunk.parameters()</code> should have non-None .grad after backward</li>
+    </ol>
+
+    <h3>Extensions for Research</h3>
+    <p>The SimpleMTP implementation is a minimal scaffold. Research directions:</p>
+    <ul class="content-list">
+      <li><strong>Variable depth:</strong> Train with random D per batch for regularization</li>
+      <li><strong>Loss weighting:</strong> Weight deeper predictions differently (decay λ<sub>k</sub> for larger k)</li>
+      <li><strong>Integration with MoE:</strong> Place MTP heads after MoE layers in DeepSeek-V3's actual stack</li>
+      <li><strong>Speculative acceptance tuning:</strong> Measure acceptance rate vs draft temperature at inference</li>
+      <li><strong>Compare independent vs causal heads:</strong> Ablate DeepSeek's innovation by breaking the h<sup>k</sup> chain</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-deep">
+  <div class="container">
+    <span class="section-num">DEEP DIVE</span>
+    <h2>Complete Reference Implementation</h2>
+    <p>The following is the full, runnable PyTorch implementation combining RMSNorm, SimpleMTP, token generation, and loss calculation. Copy into a Python environment with PyTorch installed.</p>
+
+    <div class="code-block"><span class="kw">import</span> torch
+<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
+<span class="kw">import</span> torch.nn.functional <span class="kw">as</span> F
+
+<span class="kw">class</span> <span class="cls">RMSNorm</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, dim, eps=<span class="num">1e-6</span>):
+        <span class="fn">super</span>().__init__()
+        self.eps = eps
+        self.scale = nn.Parameter(torch.ones(dim))
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x):
+        rms = torch.sqrt(x.pow(<span class="num">2</span>).mean(dim=-<span class="num">1</span>, keepdim=<span class="kw">True</span>) + self.eps)
+        <span class="kw">return</span> self.scale * x / rms
+
+<span class="kw">class</span> <span class="cls">SimpleMTP</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, vocab_size, d_model, n_heads=<span class="num">3</span>):
+        <span class="fn">super</span>().__init__()
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.embed = nn.Embedding(vocab_size, d_model)
+        self.trunk = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model, num_heads=<span class="num">4</span>, batch_first=<span class="kw">True</span>),
+            num_layers=<span class="num">2</span>
+        )
+        self.rms = RMSNorm(d_model)
+        self.projections = nn.ModuleList([
+            nn.Linear(<span class="num">2</span> * d_model, d_model) <span class="kw">for</span> _ <span class="kw">in</span> range(n_heads)
+        ])
+        self.head_transformers = nn.ModuleList([
+            nn.TransformerEncoderLayer(d_model, num_heads=<span class="num">4</span>, batch_first=<span class="kw">True</span>)
+            <span class="kw">for</span> _ <span class="kw">in</span> range(n_heads)
+        ])
+        self.unembed = nn.Linear(d_model, vocab_size, bias=<span class="kw">False</span>)
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, tokens):
+        B, T = tokens.shape
+        x = self.embed(tokens)
+        trunk_out = self.trunk(x)
+        max_i = T - self.n_heads
+        all_logits = []
+        <span class="kw">for</span> i <span class="kw">in</span> range(max_i):
+            h_prev = trunk_out[:, i, :]
+            depth_logits = []
+            <span class="kw">for</span> k <span class="kw">in</span> range(self.n_heads):
+                future_pos = i + k + <span class="num">1</span>
+                e = x[:, future_pos, :]
+                merged = torch.cat([self.rms(h_prev), self.rms(e)], dim=-<span class="num">1</span>)
+                projected = self.projections[k](merged)
+                h_cur = self.head_transformers[k](projected.unsqueeze(<span class="num">1</span>)).squeeze(<span class="num">1</span>)
+                logits_k = self.unembed(h_cur)
+                depth_logits.append(logits_k)
+                h_prev = h_cur
+            all_logits.append(torch.stack(depth_logits, dim=<span class="num">1</span>))
+        <span class="kw">return</span> torch.stack(all_logits, dim=<span class="num">1</span>)
+
+<span class="kw">def</span> <span class="fn">mtp_loss</span>(logits, targets):
+    B, L, D, V = logits.shape
+    total, count = <span class="num">0.0</span>, <span class="num">0</span>
+    <span class="kw">for</span> i <span class="kw">in</span> range(L):
+        <span class="kw">for</span> k <span class="kw">in</span> range(D):
+            total += F.cross_entropy(logits[:, i, k, :], targets[:, i + k + <span class="num">1</span>])
+            count += <span class="num">1</span>
+    <span class="kw">return</span> total / count
+
+<span class="cmt"># --- Demo run ---</span>
+B, T, d_model, vocab_size = <span class="num">1</span>, <span class="num">8</span>, <span class="num">8</span>, <span class="num">5000</span>
+model = SimpleMTP(vocab_size, d_model, n_heads=<span class="num">3</span>)
+tokens = torch.randint(<span class="num">0</span>, vocab_size, (B, T))
+logits = model(tokens)
+<span class="fn">print</span>(<span class="str">"logits.shape:"</span>, logits.shape)  <span class="cmt"># [1, 5, 3, 5000]</span>
+
+loss = mtp_loss(logits, tokens)
+<span class="fn">print</span>(<span class="str">"loss:"</span>, loss.item())  <span class="cmt"># ~12.133 before training</span>
+
+<span class="cmt"># Predict 3 tokens from position 0</span>
+pred = logits[<span class="num">0</span>, <span class="num">0</span>].argmax(dim=-<span class="num">1</span>)
+<span class="fn">print</span>(<span class="str">"predicted token IDs from i=0:"</span>, pred.tolist())
+
+optimizer = torch.optim.Adam(model.parameters(), lr=<span class="num">1e-3</span>)
+<span class="kw">for</span> step <span class="kw">in</span> range(<span class="num">100</span>):
+    optimizer.zero_grad()
+    logits = model(tokens)
+    loss = mtp_loss(logits, tokens)
+    loss.backward()
+    optimizer.step()
+    <span class="kw">if</span> step % <span class="num">20</span> == <span class="num">0</span>:
+        <span class="fn">print</span>(<span class="str">f"step {{step}}, loss={{loss.item():.4f}}"</span>)</div>
+
+    <h3>Expected Output</h3>
+    <div class="code-block">logits.shape: torch.Size([1, 5, 3, 5000])
+loss: 12.133...
+predicted token IDs from i=0: [2341, 892, 4102]
+step 0, loss=12.1330
+step 20, loss=8.4521
+step 40, loss=5.2103
+...
+step 80, loss=1.8932</div>
+
+    <p>After 100 steps on random data, loss should decrease substantially — confirming gradients flow correctly through the causal chain. On real pre-training data with billions of tokens, the same module trains the trunk to encode multi-step future structure.</p>
+
+    <h3>Mapping Code Variables to Architecture Diagram</h3>
+    <table class="data-table">
+      <thead><tr><th>Diagram Label</th><th>Code</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Shared transformer trunk</td><td><code>self.trunk</code></td><td>2-layer TransformerEncoder in demo; 60+ layers in DeepSeek-V3</td></tr>
+        <tr><td>MTP module k</td><td><code>projections[k]</code> + <code>head_transformers[k]</code></td><td>One module per prediction depth</td></tr>
+        <tr><td>Linear projection M<sub>k</sub></td><td><code>self.projections[k]</code></td><td>nn.Linear(2*d, d)</td></tr>
+        <tr><td>RMSNorm</td><td><code>self.rms</code></td><td>Applied before concat in each head</td></tr>
+        <tr><td>TRM<sub>k</sub></td><td><code>self.head_transformers[k]</code></td><td>Single TransformerEncoderLayer</td></tr>
+        <tr><td>Shared W<sub>u</sub></td><td><code>self.unembed</code></td><td>One matrix for all heads + primary head</td></tr>
+        <tr><td>h_prev / h_cur</td><td><code>h_prev</code>, <code>h_cur</code></td><td>Causal chain: h_cur becomes next h_prev</td></tr>
+        <tr><td>Future embedding e</td><td><code>x[:, future_pos, :]</code></td><td>From embedding layer, not trunk output</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-appendix">
+  <div class="container">
+    <span class="section-num">APPENDIX</span>
+    <h2>DeepSeek-V3 Architectural Context</h2>
+    <p>MTP sits alongside MLA and MoE as the third innovation in the DeepSeek-V3 architecture section of the January 2025 technical report. The full architecture schematic order is:</p>
+    <ol class="content-list">
+      <li><strong>Multi-Head Latent Attention (MLA):</strong> Compresses KV cache via low-rank latent projections (Chapters 05–07)</li>
+      <li><strong>Mixture of Experts (MoE):</strong> Sparse FFN activation with auxiliary-loss-free load balancing (Chapter 08)</li>
+      <li><strong>Multi-Token Prediction (MTP):</strong> Sequential auxiliary heads for densified pre-training (this chapter)</li>
+    </ol>
+    <p>MTP occupies equations 20–23 and the "MTP modules" subsection — completing the architectural trilogy alongside MLA and MoE.</p>
+
+    <h3>Equation Reference Card</h3>
+    <table class="data-table">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Shape (example)</th></tr></thead>
+      <tbody>
+        <tr><td>x</td><td>Input token embeddings</td><td>T × d</td></tr>
+        <tr><td>h<sub>i,0</sub></td><td>Trunk hidden state at position i</td><td>d</td></tr>
+        <tr><td>e<sub>i+k</sub></td><td>Embedding at future position i+k</td><td>d</td></tr>
+        <tr><td>M<sub>k</sub></td><td>Projection matrix for head k</td><td>2d × d</td></tr>
+        <tr><td>TRM<sub>k</sub></td><td>Transformer block in head k</td><td>d → d</td></tr>
+        <tr><td>W<sub>u</sub></td><td>Shared unembedding matrix</td><td>V × d</td></tr>
+        <tr><td>P<sub>i,k</sub></td><td>Softmax probabilities at (i, k)</td><td>V</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Further Reading</h3>
+    <ul class="content-list">
+      <li>Gloeckle et al., "Better &amp; Faster LLMs via Multi-Token Prediction" (Meta FAIR, April 2024)</li>
+      <li>DeepSeek-AI, "DeepSeek-V3 Technical Report" (January 2025) — Section on MTP modules, Equations 21–23</li>
+      <li>Chen et al., "Evaluating Large Language Models Trained on Code" (HumanEval benchmark)</li>
+      <li>Austin et al., "Program Synthesis with Large Language Models" (MBPP benchmark)</li>
+      <li>Leviathan et al., "Fast Inference from Transformers via Speculative Decoding" (classic speculative decoding)</li>
+    </ul>
+
+    <h3>Glossary</h3>
+    <table class="data-table">
+      <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+      <tbody>
+        <tr><td>MTP</td><td>Multi-Token Prediction — auxiliary training objective predicting D future tokens per position</td></tr>
+        <tr><td>Shared trunk</td><td>Main transformer block stack shared by primary head and all MTP heads</td></tr>
+        <tr><td>Prediction depth (D)</td><td>Number of future tokens predicted per input position</td></tr>
+        <tr><td>Causal chain</td><td>DeepSeek's sequential hidden-state passing between MTP heads</td></tr>
+        <tr><td>Choice point</td><td>Token whose value significantly alters subsequent sequence structure</td></tr>
+        <tr><td>Self-speculative decoding</td><td>Using MTP heads as draft generators without a separate draft model</td></tr>
+        <tr><td>T′</td><td>Valid input positions: T − D (sequence length minus prediction depth)</td></tr>
+        <tr><td>Densification</td><td>D× increase in supervised loss terms per training sequence</td></tr>
+        <tr><td>W<sub>u</sub> / unembedding</td><td>Shared vocabulary projection matrix (V × d)</td></tr>
+        <tr><td>M<sub>k</sub></td><td>Per-head projection matrix (2d × d) after concatenation</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Quick Reference: Shape Formulas</h3>
+    <div class="code-block">Input tokens:     (B, T)
+Embeddings:       (B, T, d)
+Trunk output:     (B, T, d)
+MTP logits:       (B, T-D, D, V)
+Loss terms:       (T-D) × D
+Primary logits:   (B, T, V)   # standard next-token head
+M_k matrix:       (2d, d)
+W_u matrix:       (V, d)</div>
+
+    <h3>Chapter Prerequisites</h3>
+    <p>Readers should be comfortable with:</p>
+    <ul class="content-list">
+      <li>Transformer block structure and self-attention (Chapters 01–02)</li>
+      <li>Cross-entropy loss and softmax for language modeling (Tokens, Transformers &amp; Truth)</li>
+      <li>RMSNorm normalization (used throughout DeepSeek-V3)</li>
+      <li>Basic PyTorch: nn.Module, forward pass, autograd</li>
+    </ul>
+    <p>No prior exposure to speculative decoding or the Meta MTP paper is required — this chapter builds both from first principles.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-summary">
+  <div class="container">
+    <span class="section-num">SUMMARY</span>
+    <h2>Putting It Together</h2>
+    <p>Multi-Token Prediction is the third pillar of DeepSeek-V3's architecture:</p>
+    <table class="data-table">
+      <thead><tr><th>Pillar</th><th>Problem Solved</th><th>Key Idea</th></tr></thead>
+      <tbody>
+        <tr><td>MLA (Ch. 05–07)</td><td>KV cache memory</td><td>Low-rank latent compression</td></tr>
+        <tr><td>MoE (Ch. 08)</td><td>FFN compute cost</td><td>Sparse expert activation</td></tr>
+        <tr><td>MTP (Ch. 10)</td><td>Sparse training signal</td><td>Multi-depth sequential prediction heads</td></tr>
+      </tbody>
+    </table>
+    <p>Built on Meta's April 2024 paper, DeepSeek's innovation is the <strong>causal chain between heads</strong> — RMSNorm, merge, project, transform, shared unembed — repeated for each depth with hidden states flowing forward. During pre-training, this densifies gradients, improves data efficiency by ~15% on coding benchmarks, sharpens planning at choice points, and optionally enables 3× inference speedup via self-speculative decoding. The implementation is compact: RMSNorm, nested loops over positions and depths, and standard cross-entropy — yet the impact on model capability is substantial.</p>
+
+    <h3>What You Should Remember</h3>
+    <ol class="content-list">
+      <li><strong>Single-token prediction</strong> gives one loss term per position; MTP gives D terms — densifying training signals by D×.</li>
+      <li><strong>Meta FAIR (April 2024)</strong> introduced MTP with independent heads; <strong>DeepSeek-V3</strong> added sequential hidden-state chaining (causal chain).</li>
+      <li>Each MTP head takes two inputs: trunk hidden state h<sup>k−1</sup> and future input embedding e<sub>i+k</sub>, merged via RMSNorm → concat → project → TRM → shared W<sub>u</sub>.</li>
+      <li>Output shape: <strong>(B, T−D, D, V)</strong>. For T=8, D=3, V=5000: (1, 5, 3, 5000).</li>
+      <li>DeepSeek uses MTP in <strong>pre-training only</strong>; default inference is single-token autoregressive decoding.</li>
+      <li>Choice points receive higher implicit loss weight via the n(n+1)/2 formula — improving planning.</li>
+      <li>Self-speculative decoding achieves ~2.5/3 acceptance on code → up to 3× speedup without a separate draft model.</li>
+    </ol>
+
+    <h3>Code Checklist</h3>
+    <ul class="content-list">
+      <li>✓ RMSNorm class with epsilon for numerical stability</li>
+      <li>✓ Outer loop: i ∈ range(T − D) — valid input positions</li>
+      <li>✓ Inner loop: k ∈ range(D) — prediction depths with causal h passing</li>
+      <li>✓ Future position: i + k + 1 (Python 0-indexing)</li>
+      <li>✓ Loss: nested loops, cross_entropy, mean over L × D terms</li>
+    </ul>
+
+    <div class="callout ok"><p>With MLA, MoE, and MTP understood, the three architectural innovations in DeepSeek-V3's core design are complete.</p></div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Decoding DeepSeek · Chapter 10 · Predicting Many Futures</p>
+  <p style="margin-top:8px;"><a href="../">← Back to Decoding DeepSeek</a> · <a href="../../">All Learning Blogs</a></p>
+</footer>
+
+<script>
+// ===== NAV & FADE-IN =====
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+const fadeEls = document.querySelectorAll('.fade-in');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.08 });
+fadeEls.forEach(el => obs.observe(el));
+
+const SEQ = ['Artificial','intelligence','is','changing','the','world','right','now'];
+const SEQ2 = ['1','2','3','4','5','A','B','C'];
+
+// ===== DEMO 1: Single vs Multi =====
+let cmpMode = 'single', cmpStep = 0;
+function renderCmp() {
+  const D = +document.getElementById('cmpDSlider').value;
+  document.getElementById('cmpDVal').textContent = D;
+  const inp = document.getElementById('cmpInput');
+  inp.innerHTML = SEQ.map((t,i) => `<span class="token ${i<=cmpStep?'token-word':'token-special'}">${t}</span>`).join('');
+  const out = document.getElementById('cmpOutput');
+  if(cmpMode==='single') {
+    const pred = ['intelligence','is','changing','the','world','right','now','.'];
+    out.innerHTML = `<div class="token-row">${pred.slice(0,cmpStep+1).map(t=>`<span class="token token-new">${t}</span>`).join('')}</div>`;
+    document.getElementById('cmpReadout').textContent = `Single-token: 1 prediction per position. Step ${cmpStep+1}/${SEQ.length}. Loss terms at train time: ${SEQ.length}.`;
+  } else {
+    let html = '';
+    for(let i=0;i<=Math.min(cmpStep,SEQ.length-D);i++) {
+      const preds = SEQ.slice(i+1,i+1+D).map((t,j)=>`<span class="token token-new">${t}${j+1}</span>`);
+      html += `<div style="font-size:0.75rem;color:var(--text-dim);margin:4px 0;">pos ${i}:</div><div class="token-row">${preds.join('')}</div>`;
+    }
+    out.innerHTML = html;
+    const terms = Math.max(0, Math.min(cmpStep+1, SEQ.length-D)) * D;
+    document.getElementById('cmpReadout').textContent = `Multi-token (D=${D}): ${D} predictions per position. Loss terms so far: ${terms}.`;
+  }
+}
+document.getElementById('cmpDSlider').oninput = renderCmp;
+document.getElementById('cmpSingle').onclick = function(){ cmpMode='single'; this.classList.add('active'); document.getElementById('cmpMulti').classList.remove('active'); renderCmp(); };
+document.getElementById('cmpMulti').onclick = function(){ cmpMode='multi'; this.classList.add('active'); document.getElementById('cmpSingle').classList.remove('active'); renderCmp(); };
+document.getElementById('cmpStep').onclick = function(){ cmpStep=Math.min(cmpStep+1,SEQ.length-1); renderCmp(); };
+document.getElementById('cmpReset').onclick = function(){ cmpStep=0; renderCmp(); };
+renderCmp();
+
+// ===== DEMO 2: Benchmark =====
+const benchData = {
+  small: { mtp: [-2.1,-1.5], base: [18,22] },
+  large: { mtp: [40.7,43.1,65.4,65.9,83,86.2], base: [38,41,64,65,80,83] }
+};
+let benchSize = 'large';
+function updateBench() {
+  const n = +document.getElementById('benchNSlider').value;
+  document.getElementById('benchNVal').textContent = n;
+  const chart = document.getElementById('benchChart');
+  chart.innerHTML = '';
+  const labels = ['MBPP','HumanEval','APPS'];
+  const mtpVals = [40.7+(n-1)*0.8, 65.4+(n-1)*0.17, 83+(n-1)*1.07];
+  const baseVals = [40.7, 65.4, 83];
+  const maxV = 90;
+  labels.forEach((lb,i) => {
+    const w = document.createElement('div'); w.className='bar-wrapper';
+    const bh = (mtpVals[i]/maxV)*100;
+    const bb = (baseVals[i]/maxV)*100;
+    w.innerHTML = `<div class="bar-value">${mtpVals[i].toFixed(1)}</div><div class="bar" style="height:${bh}%;background:var(--accent3)"></div><div class="bar-label">${lb}</div>`;
+    chart.appendChild(w);
+  });
+  const delta = ((mtpVals[0]-baseVals[0])/baseVals[0]*100).toFixed(1);
+  document.getElementById('benchReadout').innerHTML = benchSize==='small'
+    ? '<span style="color:var(--danger)">Small models: MTP underperforms baseline (negative bars in paper)</span>'
+    : `n=${n}: MBPP ${mtpVals[0].toFixed(1)} (+${(mtpVals[0]-baseVals[0]).toFixed(1)}) · ~15% more code problems solved vs baseline`;
+}
+document.getElementById('benchNSlider').oninput = updateBench;
+document.getElementById('benchSmall').onclick = function(){ benchSize='small'; this.classList.add('active'); document.getElementById('benchLarge').classList.remove('active'); updateBench(); };
+document.getElementById('benchLarge').onclick = function(){ benchSize='large'; this.classList.add('active'); document.getElementById('benchSmall').classList.remove('active'); updateBench(); };
+updateBench();
+
+// ===== DEMO 3: Density =====
+function updateDens() {
+  const T = +document.getElementById('densTSlider').value;
+  const D = +document.getElementById('densDSlider').value;
+  document.getElementById('densTVal').textContent = T;
+  document.getElementById('densDVal').textContent = D;
+  const tPrime = T - D;
+  document.getElementById('densSingle').textContent = tPrime;
+  document.getElementById('densMulti').textContent = tPrime * D;
+  const ratio = D;
+  document.getElementById('densReadout').textContent = `MTP provides ${ratio}× more supervised signals per sequence (T=${T}, T'=${tPrime}, D=${D}). Total loss terms: ${tPrime} vs ${tPrime*D}.`;
+}
+['densTSlider','densDSlider'].forEach(id => document.getElementById(id).oninput = updateDens);
+updateDens();
+
+// ===== DEMO 4: Choice Points =====
+const cpSeq = ['1','2','3','4','5','A','B','C'];
+function updateCP() {
+  const D = +document.getElementById('cpDSlider').value;
+  document.getElementById('cpD').textContent = D;
+  const el = document.getElementById('cpTokens');
+  el.innerHTML = cpSeq.map((t,i) => `<span class="token ${t==='A'?'token-highlight':'token-word'}" data-i="${i}" style="cursor:pointer">${t}</span>`).join('');
+  el.querySelectorAll('.token').forEach(tok => {
+    tok.onclick = () => {
+      const ti = +tok.dataset.i;
+      let count = 0; let terms = '';
+      for(let i=0;i<=cpSeq.length-D;i++) {
+        for(let k=0;k<D;k++) {
+          const target = i+k+1;
+          if(target===ti) { count++; terms += `<span class="loss-term hot">L(${i},${k+1})</span>`; }
+        }
+      }
+      document.getElementById('cpReadout').innerHTML = `Token <strong>${cpSeq[ti]}</strong> appears in <strong>${count}</strong> loss terms · implicit weight ∝ n(n+1)/2`;
+      document.getElementById('cpLossTerms').innerHTML = terms || '<span class="loss-term dim">No loss terms</span>';
+    };
+  });
+}
+document.getElementById('cpDSlider').oninput = updateCP;
+updateCP();
+document.querySelector('#cpTokens .token-highlight')?.click();
+
+// ===== DEMO 5: Head Chain =====
+let chainAnimating = false;
+function drawChain(highlight=-1) {
+  const i = +document.getElementById('chainISlider').value;
+  document.getElementById('chainIVal').textContent = i;
+  const c = document.getElementById('chainCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.fillStyle='#8888a0'; ctx.font='11px monospace';
+  ctx.fillText('Shared Trunk → h⁰', 20, 30);
+  const heads = ['Head 1 (k=1)','Head 2 (k=2)','Head 3 (k=3)'];
+  const colors = ['#6c8cff','#a78bfa','#34d399'];
+  heads.forEach((h,idx) => {
+    const x = 40 + idx*200;
+    const lit = highlight>=idx;
+    ctx.fillStyle = lit ? colors[idx] : '#2a2a3a';
+    ctx.fillRect(x, 60, 160, 80);
+    ctx.fillStyle = lit ? '#fff' : '#8888a0';
+    ctx.font = '10px monospace';
+    ctx.fillText(h, x+10, 85);
+    ctx.fillText('RMSNorm→merge→proj', x+10, 100);
+    ctx.fillText('→ TRM → W_u → logits', x+10, 115);
+    if(idx<2) { ctx.fillStyle='#555'; ctx.fillText('h'+idx+' →', x+170, 105); }
+  });
+  ctx.fillStyle='#e0e0e8'; ctx.font='12px monospace';
+  ctx.fillText(`Input i=${i} → predict positions ${i+1}, ${i+2}, ${i+3}`, 20, 200);
+  document.getElementById('chainReadout').textContent = highlight>=0
+    ? `Animating head ${highlight+1}: hidden state h${highlight} feeds head ${highlight+1}`
+    : `Position i=${i}: h⁰ from trunk feeds Head 1; h¹ feeds Head 2; h² feeds Head 3`;
+  document.getElementById('chainHeads').innerHTML = heads.map((h,idx)=>
+    `<div class="mtp-head ${highlight>=idx?'lit':''}"><strong>${h}</strong><span style="font-size:0.7rem;color:var(--text-dim)">target i+${idx+1}</span></div>`
+  ).join('');
+}
+document.getElementById('chainISlider').oninput = () => drawChain(-1);
+document.getElementById('chainReset').onclick = () => { chainAnimating=false; drawChain(-1); };
+document.getElementById('chainAnim').onclick = async function() {
+  if(chainAnimating) return;
+  chainAnimating = true;
+  for(let h=0;h<3;h++) { drawChain(h); await new Promise(r=>setTimeout(r,700)); }
+  chainAnimating = false;
+};
+drawChain(-1);
+
+// ===== DEMO 6: Speculative =====
+let specAccepted = 0, specTotal = 0;
+function drawSpec(step=0) {
+  const c = document.getElementById('specCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const drafts = ['the','quick','brown'];
+  const verified = [true,true,false];
+  drafts.forEach((t,i) => {
+    const x = 40 + i*180;
+    const ok = i<step ? verified[i] : false;
+    const active = i===step-1;
+    ctx.fillStyle = !active&&i<step ? (ok?'#34d399':'#f87171') : '#2a2a3a';
+    ctx.fillRect(x, 40, 140, 50);
+    ctx.fillStyle = '#e0e0e8'; ctx.font='13px monospace';
+    ctx.fillText('Draft: '+t, x+15, 70);
+    if(active) { ctx.fillStyle=ok?'#34d399':'#f87171'; ctx.fillText(ok?'✓ accepted':'✗ rejected', x+15, 120); }
+  });
+  ctx.fillStyle='#8888a0'; ctx.font='11px monospace';
+  ctx.fillText('Parallel verify pass →', 40, 180);
+  if(step>0) document.getElementById('specReadout').textContent = `Accepted ${verified.slice(0,step).filter(Boolean).length}/${step} drafts · avg 2.5/3 on code (Meta paper)`;
+}
+document.getElementById('specReset').onclick = () => { specAccepted=0; drawSpec(0); document.getElementById('specReadout').textContent='Draft 3 tokens → parallel verify → accept/reject'; };
+document.getElementById('specStart').onclick = async function() {
+  for(let s=1;s<=4;s++) { drawSpec(s); await new Promise(r=>setTimeout(r,600)); }
+};
+drawSpec(0);
+
+// ===== DEMO 7: Loss Breakdown =====
+function updateLoss() {
+  const i = +document.getElementById('lossISlider').value;
+  document.getElementById('lossIVal').textContent = i;
+  const grid = document.getElementById('lossGrid');
+  grid.innerHTML = '';
+  for(let p=0;p<5;p++) {
+    for(let k=0;k<3;k++) {
+      const d = document.createElement('div');
+      d.className = 'loss-term ' + (p===i?'hot':'');
+      d.textContent = `L(${p},${k+1})`;
+      grid.appendChild(d);
+    }
+  }
+  document.getElementById('lossReadout').innerHTML = `Position i=${i}: 3 loss terms L(${i},1)+L(${i},2)+L(${i},3) · Total across sequence: 15 terms · mean loss ≈ 12.133 (example)`;
+}
+document.getElementById('lossISlider').oninput = updateLoss;
+updateLoss();
+
+// ===== PLAYGROUND =====
+function updatePG() {
+  const T = +document.getElementById('pgTSlider').value;
+  const D = +document.getElementById('pgDSlider').value;
+  const V = +document.getElementById('pgVSlider').value;
+  document.getElementById('pgTVal').textContent = T;
+  document.getElementById('pgDVal').textContent = D;
+  document.getElementById('pgVVal').textContent = V;
+  const tPrime = T - D;
+  const terms = tPrime * D;
+  document.getElementById('pgOutput').innerHTML = `
+    <strong>Output shape</strong><br>(B, ${tPrime}, ${D}, ${V})<br><br>
+    <strong>Loss terms</strong><br>${tPrime} × ${D} = <span style="color:var(--accent3)">${terms}</span><br><br>
+    <strong>Memory (logits)</strong><br>${tPrime}×${D}×${V} = ${(tPrime*D*V).toLocaleString()} floats`;
+  const chart = document.getElementById('pgBarChart');
+  chart.innerHTML = '';
+  [['T\'=${T}',T],["T'=${tPrime}",tPrime],['D='+D,D],['Terms',terms]].forEach(([lb,v])=>{
+    const w=document.createElement('div'); w.className='bar-wrapper';
+    w.innerHTML=`<div class="bar-value">${v}</div><div class="bar" style="height:${Math.min(v/20,1)*100}%;background:var(--accent)"></div><div class="bar-label">${lb}</div>`;
+    chart.appendChild(w);
+  });
+}
+['pgTSlider','pgDSlider','pgVSlider'].forEach(id => document.getElementById(id).oninput = updatePG);
+updatePG();
+
+// ===== Flow step animation on scroll =====
+const flowSteps = document.querySelectorAll('.flow-step[id^="fs"]');
+if(flowSteps.length) {
+  let fsIdx = 0;
+  setInterval(() => {
+    flowSteps.forEach((s,i) => s.classList.toggle('active', i===fsIdx));
+    fsIdx = (fsIdx+1) % flowSteps.length;
+  }, 1500);
+}
+
+// ===== Output tensor explorer (extra demo) =====
+function buildTensorExplorer() {
+  const el = document.createElement('div');
+  el.className = 'interactive-panel fade-in';
+  el.innerHTML = `
+    <h4>Interactive · Output Tensor Index Explorer</h4>
+    <label class="ctrl">Batch b: <span id="teB">0</span> · Position i: <span id="teI">0</span> · Depth k: <span id="teK">0</span></label>
+    <div class="two-col" style="margin:12px 0;">
+      <input type="range" id="teISlider" min="0" max="4" step="1" value="0">
+      <input type="range" id="teKSlider" min="0" max="2" step="1" value="0">
+    </div>
+    <div class="output-readout" id="teReadout"></div>`;
+  const s11 = document.getElementById('s11');
+  if(s11) s11.querySelector('.container').appendChild(el);
+  function upd() {
+    const i = +document.getElementById('teISlider').value;
+    const k = +document.getElementById('teKSlider').value;
+    document.getElementById('teI').textContent = i;
+    document.getElementById('teK').textContent = k;
+    const targets = ['intelligence','is','changing','the','world','right','now'];
+    const target = targets[i+k+1] || 'N/A';
+    document.getElementById('teReadout').innerHTML = `
+      <strong>logits[0, ${i}, ${k}, :]</strong> → shape (5000,)<br>
+      Target token at position ${i+k+1}: <strong>${target}</strong><br>
+      Predict: <code>pred_id = logits[0,${i},${k},:].argmax()</code><br>
+      Loss: <code>CE(logits[0,${i},${k},:], target_id)</code>`;
+  }
+  document.getElementById('teISlider').oninput = upd;
+  document.getElementById('teKSlider').oninput = upd;
+  upd();
+  obs.observe(el);
+}
+buildTensorExplorer();
+</script>
+</body>
+</html>

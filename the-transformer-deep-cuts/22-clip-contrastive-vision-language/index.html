@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLIP: Contrastive Image-Text Alignment — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #5eead4;
+  --accent2: #818cf8;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); margin-bottom: 20px; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+.nav-wrap {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav-wrap.visible { transform: translateY(0); }
+.nav-inner {
+  max-width: 920px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.nav-back { font-weight: 700; color: var(--accent2); white-space: nowrap; font-size: 0.85rem; }
+.nav-toggle {
+  margin-left: auto; display: none;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.75rem; cursor: pointer; font-family: inherit;
+}
+.nav-toggle:hover { border-color: var(--accent); }
+.nav-links {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  font-size: 0.78rem;
+}
+.nav-links a { color: var(--text-dim); }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: block; }
+  .nav-links {
+    display: none; width: 100%; flex-direction: column; align-items: flex-start;
+    padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px;
+  }
+  .nav-wrap.open .nav-links { display: flex; }
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 88px 24px 64px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(129,140,248,0.14) 0%, transparent 68%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 14px; position: relative; z-index: 1; }
+.subtitle {
+  font-size: 1.12rem; color: var(--text-dim);
+  max-width: 720px; margin: 0 auto 28px; position: relative; z-index: 1;
+}
+.stats {
+  display: flex; gap: 28px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 28px; position: relative; z-index: 1;
+}
+.stat { text-align: center; }
+.stat-val {
+  display: block; font-size: 1.85rem; font-weight: 700;
+  color: var(--accent); font-family: var(--mono);
+}
+.stat-label {
+  font-size: 0.72rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 18px 0;
+}
+.comparison {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;
+}
+@media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; margin: 18px 0;
+  font-family: var(--mono); font-size: 0.88rem; color: var(--accent3);
+  text-align: center; overflow-x: auto;
+}
+
+.callout {
+  background: rgba(129,140,248,0.07); border-left: 3px solid var(--accent2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 20px; margin: 20px 0;
+}
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.06); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.callout p:last-child { margin-bottom: 0; }
+
+.qa-box {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 22px; margin: 22px 0;
+}
+.qa-box .q {
+  font-weight: 600; color: var(--text); margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); }
+
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 22px 0;
+}
+.interactive-panel h4 {
+  font-size: 0.95rem; color: var(--text); margin-bottom: 14px; font-weight: 600;
+}
+
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.88rem; cursor: pointer; margin: 4px 6px 4px 0;
+  font-family: inherit;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: rgba(94,234,212,0.15); border-color: var(--accent); color: var(--accent); }
+
+input[type="range"] { width: 100%; max-width: 360px; }
+label.lbl { font-size: 0.8rem; color: var(--text-dim); display: block; margin-top: 8px; }
+
+ul.clean { margin: 12px 0 12px 1.2em; color: var(--text-dim); }
+ul.clean li { margin-bottom: 0.5em; }
+
+.fade-in { opacity: 0; transform: translateY(28px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent4); }
+
+.matrix-wrap { overflow-x: auto; margin: 16px 0; }
+.matrix {
+  display: inline-grid; gap: 4px;
+  font-family: var(--mono); font-size: 0.72rem;
+}
+.matrix-cell {
+  min-width: 52px; height: 40px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; border: 1px solid var(--border);
+}
+.matrix-cell.head { background: var(--bg-card-alt); color: var(--text-dim); font-size: 0.65rem; }
+.matrix-cell.diag { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.bar-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 0.8rem; }
+.bar-row span.lbl { width: 120px; flex-shrink: 0; color: var(--text-dim); font-family: var(--mono); }
+.bar-track {
+  flex: 1; height: 22px; background: var(--bg-card-alt); border-radius: 6px;
+  border: 1px solid var(--border); overflow: hidden;
+}
+.bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); transition: width 0.25s ease; }
+.bar-row span.val { width: 48px; text-align: right; font-family: var(--mono); color: var(--accent3); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.play-canvas {
+  width: 100%; max-width: 420px; aspect-ratio: 1;
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); display: block; margin: 12px auto;
+}
+
+.step-flow {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0;
+}
+.step-pill {
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-card-alt); font-size: 0.75rem; font-family: var(--mono);
+  color: var(--text-dim);
+}
+.step-pill.on { border-color: var(--accent3); color: var(--accent); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">CLIP: Vision-Language Alignment</span></nav>
+
+
+<nav class="nav-wrap" id="navWrap" aria-label="Chapter navigation">
+  <div class="nav-inner">
+    <a class="nav-back" href="../">Advanced NLP V2</a>
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#s00">00</a>
+      <a href="#s01">01</a>
+      <a href="#s02">02</a>
+      <a href="#s03">03</a>
+      <a href="#s04">04</a>
+      <a href="#s05">05</a>
+      <a href="#s06">06</a>
+      <a href="#s07">07</a>
+      <a href="#s08">08</a>
+      <a href="#play">Playground</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>CLIP: Contrastive Image-Text Alignment</h1>
+    <p class="subtitle">
+      <strong>CLIP</strong> (Contrastive Language–Image Pre-training, OpenAI 2021) learns a joint embedding space for images and text. This chapter covers the contrastive objective on an <em>N</em>×<em>N</em> similarity grid, zero-shot classification via prompts, and how the text tower conditions generative models such as Stable Diffusion.
+    </p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">2×</span><span class="stat-label">Encoders</span></div>
+      <div class="stat"><span class="stat-val">N×N</span><span class="stat-label">Similarity grid</span></div>
+      <div class="stat"><span class="stat-val">CE</span><span class="stat-label">Row + column</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00</span>
+  <h2>Why connect text and images?</h2>
+  <p>
+    Many real-world problems are fundamentally <strong>classification</strong>: assign a discrete label to an image. Classic pipelines learn a function from pixels to one of <em>K</em> predefined categories. That works when categories are stable, cheap to annotate, and visually separable.
+  </p>
+  <p>
+    <strong>CLIP</strong> (Contrastive Language–Image Pre-training; Radford et al., OpenAI, 2021) learns a <strong>joint embedding space</strong>: images and natural-language descriptions that belong together should land near each other as vectors. Once aligned, you can compare an image to <em>any</em> short text—class names, sentences, attributes—without retraining the backbone for a new label set. Language is a compressible interface to an open set of concepts: the same encoder can score “dog,” “a photo of a dog,” or “a shaggy dog in snow” without architectural changes.
+  </p>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01</span>
+  <h2>Image classification before CLIP-style alignment</h2>
+  <p>
+    A traditional supervised image classifier stacks <strong>convolutional</strong> layers, <strong>max pooling</strong>, and nonlinearities, then ends in a <strong>fully connected</strong> layer that outputs one score per class. At inference, whichever class receives the <strong>largest activation</strong> is taken as the prediction. Picture a two-class setup—cats versus dogs—on a standard benchmark-style diagram: feed a cat image, and the “cat” logit or activation should be highest; feed a dog image, and the “dog” side should win. That local behavior is intuitive and, with enough data, remarkably strong.
+  </p>
+  <div class="comparison">
+    <div class="card">
+      <h3>What worked well</h3>
+      <ul class="clean">
+        <li>Strong performance when the number of classes is modest and classes are visually distinct.</li>
+        <li>Clear training objective: minimize cross-entropy over fixed classes.</li>
+        <li>End-to-end CNN training was the dominant recipe for years and still matters inside many encoders.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Structural limitations</h3>
+      <ul class="clean">
+        <li><strong>Label cost:</strong> you need many images <em>per</em> class and someone to build, label, and <strong>verify</strong> that labels are correct. In medical imaging, that often means a clinician—not a random crowd worker—separating cancer from non-cancer on device output; expertise is expensive and throughput is limited.</li>
+        <li><strong>Poor open-set behavior:</strong> a model trained on cats vs. dogs does not automatically handle new categories without retraining or retuning the head.</li>
+        <li><strong>Task brittleness:</strong> performance drops when the target taxonomy or visual domain shifts; a classifier tuned to one narrow taxonomy can perform very badly on other classification protocols.</li>
+      </ul>
+    </div>
+  </div>
+  <p>
+    CLIP addresses the <em>representation</em> problem first: learn general vision–language features from noisy but abundant (image, text) pairs, then specialize at inference via prompts rather than by rebuilding a labeled closed-set dataset for every new task.
+  </p>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02</span>
+  <h2>CLIP architecture and training data at a glance</h2>
+  <p>
+    The name <strong>CLIP</strong> encodes the idea: <strong>Contrastive</strong> Language–Image <strong>Pre-training</strong>—contrastive learning over paired images and free-form text. The architecture is deliberately dual: <strong>two encoders</strong>, an <strong>image encoder</strong> and a <strong>text encoder</strong>. A training batch contains <strong>N</strong> images and <strong>N</strong> text strings, and alignment is known by construction: the first caption corresponds to the first image, the second to the second, and so on. Think of a concrete pair—a short caption like “Pepper the Aussie pup” matched to its photograph—so that batch index <em>i</em> is a true positive for (<em>image<sub>i</sub></em>, <em>text<sub>i</sub></em>) and a negative for every cross term.
+  </p>
+  <p>
+    Radford et al. assembled on the order of <strong>400 million</strong> image–text pairs scraped from the public internet—images that were, in principle, “well described” by the accompanying user text (titles, comments, alt text, captions). That scale trades pristine manual ontology for breadth: the model sees how people actually write about pictures.
+  </p>
+  <div class="step-flow" id="archFlow">
+    <span class="step-pill on" data-i="0">Image batch</span>
+    <span class="step-pill" data-i="1">Image encoder</span>
+    <span class="step-pill" data-i="2">Project → d</span>
+    <span class="step-pill" data-i="3">Text batch</span>
+    <span class="step-pill" data-i="4">Text encoder</span>
+    <span class="step-pill" data-i="5">Project → d</span>
+    <span class="step-pill" data-i="6">Cosine sim N×N</span>
+    <span class="step-pill" data-i="7">Symmetric CE loss</span>
+  </div>
+  <p>
+    <button type="button" class="btn primary" id="archStepBtn">Advance training step</button>
+    <span class="lbl" id="archStepLabel" style="display:inline-block;margin-left:12px;color:var(--text-dim);font-size:0.85rem;">Step 1 of 8</span>
+  </p>
+  <div class="callout warn">
+    <p>Web supervision is noisy: not every caption is faithful, and filtering matters. Compare that to classic ImageNet-scale collection: the CLIP authors note that ImageNet-class efforts involved on the order of <strong>25,000 workers</strong> annotating about <strong>14 million</strong> images for roughly <strong>22,000</strong> object categories. Against that labor-intensive baseline, learning from internet text paired with images can look—colloquially—<strong>almost free</strong> at the margin: the raw material is abundant, even though curation and compute are still serious costs.</p>
+  </div>
+  <div class="callout ok">
+    <p>The same broad pattern—<strong>download public text and images, then train large models</strong>—shows up in modern language modeling (e.g., GPT-style corpora) and in generative stacks that reuse CLIP-style representations. CLIP is not the only ingredient, but it is a canonical example of scaling with weak supervision instead of a single closed taxonomy.</p>
+  </div>
+  <p>
+    Forward pass, matching the paper’s pseudocode narrative: run the <strong>batch of images</strong> through the image encoder to obtain one feature vector per image of dimension <code class="inline">d<sub>i</sub></code> (image-side dimension before projection). Run the <strong>N</strong> texts through the text encoder to obtain text features of dimension <code class="inline">d<sub>t</sub></code>. Multiply image features by one learned matrix and text features by another so that <strong>both</strong> sides land in a shared dimension <code class="inline">d<sub>e</sub></code>. After normalization, take <strong>dot products</strong> (equivalently <strong>cosine similarity</strong> when vectors are unit length) between <em>every</em> image embedding and <em>every</em> text embedding. That yields an <strong>N×N</strong> grid of scores—the <strong>logits</strong> for contrastive training.
+  </p>
+  <div class="interactive-panel">
+    <h4>Interactive: encoder data flow (conceptual)</h4>
+    <p style="margin-bottom:12px;font-size:0.9rem;">Each pill highlights one stage in the forward pass used to build the contrastive similarity matrix. This mirrors the pseudocode structure: encode → linear projections to a common dimension → pairwise logits.</p>
+    <canvas class="play-canvas" id="flowCanvas" width="420" height="420" aria-label="Diagram of dual encoders"></canvas>
+  </div>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03</span>
+  <h2>Image encoder: ResNet and Vision Transformer (ViT)</h2>
+  <p>
+    The image tower can be implemented as a <strong>ResNet</strong>-style convolutional network or a <strong>Vision Transformer (ViT)</strong>. In both cases, Radford et al. take the feature vector from the <strong>last layer</strong> of the vision backbone—after the usual global pooling for ResNet-style models or the appropriate pooled token for ViT variants—and treat that as the image embedding before the projection head.
+  </p>
+  <p>
+    Those raw features typically pass through a <strong>learned linear map</strong> into a shared embedding dimension <code class="inline">d_e</code>, so image vectors are comparable to text vectors after normalization.
+  </p>
+  <div class="card">
+    <h3>Notation (matching the paper-style description)</h3>
+    <p>Let the image encoder output features of dimension <code class="inline">d_i</code> for each image in a batch. A weight matrix maps from <code class="inline">d_i</code> to <code class="inline">d_e</code>. Text features analogously start at <code class="inline">d_t</code> before projection to <code class="inline">d_e</code>.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04</span>
+  <h2>Text encoder: Transformer and the end-of-text representation</h2>
+  <p>
+    The text tower uses the <strong>encoder stack of a Transformer</strong> only—<strong>not</strong> a decoder stack for this representation step. Following Radford et al., the text sequence is bracketed with a <strong>start-of-sequence</strong> token and an <strong>end-of-text</strong> token. The model reads the whole caption; the activation at the <strong>highest (final) layer</strong> of the Transformer, at the position of the <strong>end-of-text</strong> token, is treated as the <strong>feature representation of the text</strong>. That vector is then multiplied by a learned projection <code class="inline">W<sub>t</sub></code> into the same dimension <code class="inline">d<sub>e</sub></code> as the projected image embeddings so cosine similarities are well-defined in a shared space.
+  </p>
+  <div class="formula">
+    h<sub>text</sub> = W<sub>t</sub> · TransformerEnc(x)<sub>EOT</sub>
+  </div>
+  <p>
+    Intuitively, the end-of-text position aggregates context over the full caption via self-attention. The paper fixes one unambiguous readout: <strong>last layer, end-of-text index</strong>—so checkpoints and fine-tunes stay comparable.
+  </p>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05</span>
+  <h2>The N×N similarity matrix and contrastive loss</h2>
+  <p>
+    After L2-normalizing the projected embeddings (so dot products equal <strong>cosine similarity</strong>), form logits
+    <strong>L ∈ ℝ<sup>N×N</sup></strong> where <code class="inline">L[i,j]</code> compares image <em>i</em> with text <em>j</em>. Ground-truth pairs lie on the <strong>main diagonal</strong>: <code class="inline">(i,i)</code> for <em>i = 0…N−1</em>. Training should push those diagonal entries to be the <strong>largest</strong> in their row and column; off-diagonal pairs—every mismatched image–caption combination in the batch—should score lower, ideally far lower, so they act as negatives within the mini-batch.
+  </p>
+  <p>
+    The training objective is exactly that diagonal-dominance constraint, implemented with softmax cross-entropy. For <strong>rows</strong>: fix an image row <em>i</em> and treat the <em>N</em> text columns as a categorical problem where the correct class index is <strong>i</strong>—the label you would enumerate as <code class="inline">0, 1, …, N−1</code> aligned with batch order. Row <em>i</em> should put maximum mass on column <em>i</em>. For <strong>columns</strong>: fix a text column <em>j</em> and require the highest similarity at row <em>j</em> among all images. Compute cross-entropy between the row-wise softmax predictions and those indices; compute cross-entropy again for the column-wise reading of the same logits; <strong>sum the two losses and divide by two</strong>. That average is the standard CLIP contrastive loss—symmetric <strong>InfoNCE</strong> / noise-contrastive estimation across the batch, penalizing both “which text matches this image?” and “which image matches this text?” mistakes.
+  </p>
+  <div class="formula">
+    logits L[i,j] = cos(z<sub>i</sub><sup>img</sup>, z<sub>j</sub><sup>txt</sup>) &nbsp;(after projection to d<sub>e</sub> and ℓ2-normalization)
+  </div>
+  <div class="formula">
+    ℓ<sub>i→t</sub> = −log ( e<sup>L<sub>i,i</sub></sup> / Σ<sub>k</sub> e<sup>L<sub>i,k</sub></sup> )<br>
+    ℓ<sub>t→i</sub> analogously on columns &nbsp;→&nbsp; ℒ = (ℓ<sub>i→t</sub> + ℓ<sub>t→i</sub>) / 2
+  </div>
+  <div class="comparison">
+    <div class="card">
+      <h3>Row view (image → texts)</h3>
+      <p>For each image <em>i</em>, among all <em>N</em> captions in the batch, caption <em>i</em> is the positive. Every other caption in that row is a hard negative drawn from the same minibatch.</p>
+    </div>
+    <div class="card">
+      <h3>Column view (text → images)</h3>
+      <p>For each text <em>j</em>, among all <em>N</em> images, image <em>j</em> is the positive. Symmetry ensures the similarity matrix is trained coherently from both modalities’ viewpoints.</p>
+    </div>
+  </div>
+
+  <p>
+    Concretely, take <strong>N = 3</strong>. Indices <code class="inline">0, 1, 2</code> are both the batch order and the supervised targets. For each row <em>i</em>, softmax cross-entropy should concentrate probability on column <em>i</em>; for each column <em>j</em>, on row <em>j</em>. Compute row-oriented CE, column-oriented CE, add them, divide by <strong>two</strong>. Because the image and text towers are different networks, optimizing only one direction would let the other free-ride—averaging both forces each modality to predict the other.
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Demo 1 — Contrastive similarity matrix</h4>
+    <p>Adjust alignment strength. High alignment yields large values on the diagonal (correct pairs) and smaller off-diagonal values—what training pushes toward.</p>
+    <label class="lbl">Diagonal dominance (training target clarity)</label>
+    <input type="range" id="matAlign" min="0" max="100" value="72">
+    <div class="matrix-wrap">
+      <div class="matrix" id="matrixGrid" style="grid-template-columns: repeat(5, auto);"></div>
+    </div>
+    <p class="lbl" id="matrixHint" style="margin-top:10px;"></p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo 2 — Row softmax and cross-entropy (image → texts)</h4>
+    <p>Row 0 below uses the first row of the matrix above. The correct index is <strong>0</strong>. Cross-entropy penalizes probability mass away from that index.</p>
+    <div id="softmaxBars"></div>
+    <p style="margin-top:12px;font-family:var(--mono);font-size:0.85rem;color:var(--accent3);" id="ceReadout"></p>
+    <label class="lbl">Temperature τ (sharpness of softmax)</label>
+    <input type="range" id="tempScale" min="5" max="100" value="40">
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo 3 — Symmetric loss components</h4>
+    <p>CLIP averages image-to-text and text-to-image cross-entropy. Slide batch noise to see both terms rise when off-diagonal logits compete with the diagonal.</p>
+    <label class="lbl">Off-diagonal noise level</label>
+    <input type="range" id="noiseSym" min="0" max="80" value="25">
+    <p style="margin-top:12px;font-family:var(--mono);font-size:0.85rem;color:var(--text-dim);" id="symLossReadout"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06</span>
+  <h2>Zero-shot transfer and inference</h2>
+  <p>
+    Inference is deliberately simple and, in deployment, often <strong>efficient</strong>. Suppose you are given a new image—say, a dog photo—and a closed list of candidate classes you care about right now, such as <strong>plane, car, dog, bird</strong> (the exact inventory is up to you). First, build a <strong>prompt</strong> for each class using a template like <strong>“a photo of a {class}”</strong> (or richer variants you prefer). Run <strong>every</strong> prompt through the <strong>text encoder</strong> once, apply the text projection, and store the resulting vectors—call them <code class="inline">t<sub>1</sub>, t<sub>2</sub>, …, t<sub>K</sub></code> for <em>K</em> classes. Those embeddings are <strong>cacheable</strong>: if your label set does not change, you never need to recompute them for the next image.
+  </p>
+  <p>
+    Then encode the query image with the <strong>image encoder</strong> and its projection to obtain a single vector <code class="inline">z<sub>img</sub></code>. Compute cosine similarity (dot product after normalization) between <code class="inline">z<sub>img</sub></code> and each stored <code class="inline">t<sub>k</sub></code>. The index <em>k</em> with the <strong>highest</strong> score wins; the corresponding text prompt’s class name is your <strong>zero-shot</strong> label. No fine-tuning step is required—only forward passes and a small vector comparison.
+  </p>
+  <div class="callout">
+    <p><strong>Amortization:</strong> text-side work is paid <em>once per label set</em>. Each additional image costs one image forward pass plus similarity against <em>K</em> cached vectors—exactly the pattern that makes large-scale screening cheap once prompts are fixed.</p>
+  </div>
+  <div class="callout warn">
+    <p>Zero-shot CLIP is strong on many benchmarks that resemble internet captions—<strong>coarse object recognition</strong>, some <strong>action</strong> phrases, and certain <strong>OCR</strong>-adjacent cues—but it is <strong>not</strong> uniformly capable. Tasks that are hard for humans in a strict zero-shot setting can still be hard for the model. Domains <strong>far from the training mixture</strong> also hurt. Concrete failure families include <strong>counting objects</strong> in an image and other fine-grained relational reasoning that short captions rarely supervise at scale.</p>
+  </div>
+  <p>
+    Relative to traditional pipelines that train a new softmax head per taxonomy, the same backbone supports many tasks by swapping prompts—an operational reason CLIP-style models became popular entry points for vision–language experimentation.
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Demo 4 — Zero-shot scoring (toy embedding space)</h4>
+    <p>Synthetic 2-D normalized “embeddings” illustrate argmax over class prompts. Drag the image point or pick a preset scene.</p>
+    <canvas class="play-canvas" id="zsCanvas" width="420" height="420" style="cursor:crosshair;" aria-label="2D zero-shot toy plot"></canvas>
+    <div style="text-align:center;margin-top:8px;">
+      <button type="button" class="btn" id="zsPreset1">Airport scene</button>
+      <button type="button" class="btn" id="zsPreset2">Pet close-up</button>
+      <button type="button" class="btn" id="zsPreset3">Street text</button>
+    </div>
+    <div id="zsBars" style="margin-top:16px;"></div>
+    <p class="lbl" id="zsPred" style="margin-top:10px;color:var(--accent);"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07</span>
+  <h2>Prompt engineering for classification</h2>
+  <p>
+    Because labels enter through the <strong>text encoder</strong>, wording matters. Zero-shot classification is not “class index 7”—it is “the vector for a hand-written prompt.” A minimal pattern from the CLIP recipe is <strong>“a photo of a …”</strong> filled with each candidate class name: <code class="inline">a photo of a plane</code>, <code class="inline">a photo of a car</code>, <code class="inline">a photo of a dog</code>, and so on. Templates like <code class="inline">a sketch of a {label}</code>, domain-specific phrasing, or <strong>ensembling</strong> several prompts per class can shift decision boundaries without changing image weights—useful when the default phrase under-represents a category’s real appearance in your deployment data.
+  </p>
+  <div class="callout warn">
+    <p>Prompt engineering is a lever, not a cheat code: if the vision encoder never saw supervision similar to your domain, better strings help only up to a point.</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo 5 — Template effect on relative scores (simulated)</h4>
+    <p>Model responses to phrasing are illustrated with a simple bias model: richer context slightly up-weights semantically “grounded” classes. Toggle templates to see rank changes for the same underlying scene embedding.</p>
+    <select id="promptTpl" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card-alt);color:var(--text);font-family:inherit;max-width:100%;">
+      <option value="plain">{label}</option>
+      <option value="photo" selected>a photo of a {label}</option>
+      <option value="render">a high-quality rendering of a {label}</option>
+      <option value="medical">a medical scan showing {label}</option>
+    </select>
+    <div id="promptBars" style="margin-top:16px;"></div>
+    <p class="lbl" id="promptNote"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s08">
+  <span class="section-num">08</span>
+  <h2>Connection to text-conditioned diffusion</h2>
+  <p>
+    CLIP’s visibility spiked again when generative image models such as <strong>Stable Diffusion</strong> reused its ideas: download large-scale web data, train multimodal representations, then plug the text side (or related open-weight variants) into a denoising stack. Latent diffusion models in that family typically condition generation on a <strong>text embedding</strong> produced by a frozen language encoder. Early public checkpoints often used a CLIP-derived text tower (or closely related OpenCLIP weights) to map prompts into vectors that the U-Net or transformer denoiser conditions on via cross-attention or projection layers.
+  </p>
+  <p>
+    The same contrastive pre-training that aligns captions with images also yields <strong>semantically organized text features</strong> that are useful as conditioning signals: nearby prompts tend to produce related generations even though diffusion training is a different objective than CLIP’s contrastive loss.
+  </p>
+  <div class="interactive-panel">
+    <h4>Demo 6 — Shared idea: image ↔ text vector agreement</h4>
+    <p>Move the slider to “encode” a noisy image vector toward or away from a fixed text direction. Higher agreement (cosine) corresponds to what CLIP would score as a strong match—and loosely parallels stronger conditioning signal for generative models.</p>
+    <label class="lbl">Align image noise projection with text axis</label>
+    <input type="range" id="sdAlign" min="0" max="100" value="50">
+    <canvas class="play-canvas" id="sdCanvas" width="420" height="420" aria-label="Cosine alignment visualization"></canvas>
+    <p style="text-align:center;font-family:var(--mono);font-size:0.88rem;color:var(--accent3);" id="sdCosReadout"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="play">
+  <span class="section-num">Playground</span>
+  <h2>Playground — Demo 7: pairwise image–text similarity</h2>
+  <p>
+    Explore cosine similarity between two customizable 3-D vectors (L2-normalized). This mirrors the per-pair score inside the CLIP logits matrix, stripped down to elementary geometry.
+  </p>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Vector A (image side)</h3>
+      <label class="lbl">A<sub>x</sub></label>
+      <input type="range" id="pa1" min="-100" max="100" value="70">
+      <label class="lbl">A<sub>y</sub></label>
+      <input type="range" id="pa2" min="-100" max="100" value="20">
+      <label class="lbl">A<sub>z</sub></label>
+      <input type="range" id="pa3" min="-100" max="100" value="50">
+    </div>
+    <div class="card">
+      <h3>Vector B (text side)</h3>
+      <label class="lbl">B<sub>x</sub></label>
+      <input type="range" id="pb1" min="-100" max="100" value="65">
+      <label class="lbl">B<sub>y</sub></label>
+      <input type="range" id="pb2" min="-100" max="100" value="25">
+      <label class="lbl">B<sub>z</sub></label>
+      <input type="range" id="pb3" min="-100" max="100" value="55">
+    </div>
+  </div>
+  <p style="text-align:center;font-size:1.1rem;margin:20px 0;">
+    Cosine similarity: <strong id="pairCos" style="color:var(--accent);font-family:var(--mono);">—</strong>
+  </p>
+  <canvas class="play-canvas" id="pairCanvas" width="420" height="420" aria-label="3D vectors projected to 2D"></canvas>
+  <p class="lbl" style="text-align:center;">Projection fixes the third axis as depth (brightness). Vectors are normalized before cosine is reported.</p>
+
+  <div class="interactive-panel" style="margin-top:32px;">
+    <h4>Quick reference</h4>
+    <ul class="clean">
+      <li><strong>Training:</strong> maximize diagonal of N×N cosine logits; symmetric CE over rows and columns; targets are indices <code class="inline">0…N−1</code> aligned with batch order.</li>
+      <li><strong>Scale (Radford et al.):</strong> ~<strong>400M</strong> image–text pairs from the web vs. ImageNet-era annotation on the order of <strong>25k</strong> workers, <strong>14M</strong> images, <strong>22k</strong> object categories.</li>
+      <li><strong>Image tower:</strong> ResNet or ViT → last-layer features → linear map to <code class="inline">d_e</code>.</li>
+      <li><strong>Text tower:</strong> Transformer encoder only; pool final layer at end-of-text; linear map to <code class="inline">d_e</code>.</li>
+      <li><strong>Zero-shot:</strong> embed class prompts once (e.g. “a photo of a {class}”); encode image; take argmax similarity.</li>
+      <li><strong>Strengths / limits:</strong> strong on many open-vocabulary tasks; weak on e.g. <strong>counting</strong>, some human-hard zero-shot settings, and domains far from pre-training.</li>
+      <li><strong>Diffusion link:</strong> CLIP-style text embeddings as conditioning for denoisers (e.g. Stable Diffusion lineage).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  const N = 4;
+  const labels = ['T0', 'T1', 'T2', 'T3'];
+
+  function buildMatrixGrid() {
+    const grid = document.getElementById('matrixGrid');
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = 'auto repeat(' + N + ', auto)';
+    const corner = document.createElement('div');
+    corner.className = 'matrix-cell head';
+    corner.textContent = 'i \\ j';
+    grid.appendChild(corner);
+    for (let j = 0; j < N; j++) {
+      const h = document.createElement('div');
+      h.className = 'matrix-cell head';
+      h.textContent = labels[j];
+      grid.appendChild(h);
+    }
+    for (let i = 0; i < N; i++) {
+      const rh = document.createElement('div');
+      rh.className = 'matrix-cell head';
+      rh.textContent = 'I' + i;
+      grid.appendChild(rh);
+      for (let j = 0; j < N; j++) {
+        const c = document.createElement('div');
+        c.className = 'matrix-cell';
+        c.dataset.i = String(i);
+        c.dataset.j = String(j);
+        grid.appendChild(c);
+      }
+    }
+  }
+
+  function softmaxRow(logits, tau) {
+    const scaled = logits.map(function (z) { return z / tau; });
+    let m = -Infinity;
+    scaled.forEach(function (z) { if (z > m) m = z; });
+    const ex = scaled.map(function (z) { return Math.exp(z - m); });
+    const s = ex.reduce(function (a, b) { return a + b; }, 0);
+    return ex.map(function (e) { return e / s; });
+  }
+
+  function crossEntropyFromProbs(probs, trueIdx) {
+    const p = Math.max(probs[trueIdx], 1e-12);
+    return -Math.log(p);
+  }
+
+  function heatColor(t) {
+    const r = Math.floor(40 + t * 120);
+    const g = Math.floor(30 + t * 180);
+    const b = Math.floor(50 + (1 - t) * 100);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function updateMatrixDemo() {
+    const align = parseInt(document.getElementById('matAlign').value, 10) / 100;
+    const cells = document.querySelectorAll('#matrixGrid .matrix-cell:not(.head)');
+    const logits = [];
+    for (let i = 0; i < N; i++) {
+      const row = [];
+      for (let j = 0; j < N; j++) {
+        const base = i === j ? 0.85 * align + 0.15 : (1 - align) * (0.35 + Math.sin(i * 2.1 + j * 1.7) * 0.15);
+        const v = base;
+        row.push(Math.max(0.02, Math.min(0.98, v)));
+      }
+      logits.push(row);
+    }
+    cells.forEach(function (cell) {
+      const i = parseInt(cell.dataset.i, 10);
+      const j = parseInt(cell.dataset.j, 10);
+      const t = logits[i][j];
+      cell.textContent = t.toFixed(2);
+      cell.style.background = heatColor(t);
+      cell.style.color = t > 0.55 ? '#0a0a0f' : '#e0e0e8';
+      if (i === j) cell.classList.add('diag'); else cell.classList.remove('diag');
+    });
+    window._clipLogits = logits.map(function (r) { return r.map(function (x) { return x * 8 - 2; }); });
+    document.getElementById('matrixHint').textContent =
+      'Goal: diagonal entries (matched pairs) should dominate each row and column after training.';
+    updateSoftmaxDemo();
+    updateSymLoss();
+  }
+
+  function updateSoftmaxDemo() {
+    const logits = window._clipLogits;
+    if (!logits) return;
+    const tau = parseInt(document.getElementById('tempScale').value, 10) / 20;
+    const row0 = logits[0];
+    const probs = softmaxRow(row0, tau);
+    const wrap = document.getElementById('softmaxBars');
+    wrap.innerHTML = '';
+    const ce = crossEntropyFromProbs(probs, 0);
+    probs.forEach(function (p, j) {
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = '<span class="lbl">text ' + j + '</span><div class="bar-track"><div class="bar-fill"></div></div><span class="val"></span>';
+      row.querySelector('.bar-fill').style.width = (p * 100) + '%';
+      row.querySelector('.val').textContent = p.toFixed(3);
+      if (j === 0) row.querySelector('.lbl').style.color = 'var(--accent)';
+      wrap.appendChild(row);
+    });
+    document.getElementById('ceReadout').textContent =
+      'Cross-entropy (row 0, true j=0): ' + ce.toFixed(4) + '   (lower is better when diagonal logits win)';
+  }
+
+  function updateSymLoss() {
+    const noise = parseInt(document.getElementById('noiseSym').value, 10) / 100;
+    const n = 4;
+    const L = [];
+    for (let i = 0; i < n; i++) {
+      const row = [];
+      for (let j = 0; j < n; j++) {
+        const v = i === j ? 2.0 : noise * (0.8 + 0.2 * Math.sin(i + j * 2));
+        row.push(v);
+      }
+      L.push(row);
+    }
+    const tau = 0.25;
+    let ceI = 0, ceT = 0;
+    for (let i = 0; i < n; i++) {
+      const probs = softmaxRow(L[i], tau);
+      ceI += crossEntropyFromProbs(probs, i);
+    }
+    for (let j = 0; j < n; j++) {
+      const col = [];
+      for (let i = 0; i < n; i++) col.push(L[i][j]);
+      const probs = softmaxRow(col, tau);
+      ceT += crossEntropyFromProbs(probs, j);
+    }
+    ceI /= n;
+    ceT /= n;
+    const mean = (ceI + ceT) / 2;
+    document.getElementById('symLossReadout').textContent =
+      'CE image→text (batch mean): ' + ceI.toFixed(3) +
+      '  |  CE text→image: ' + ceT.toFixed(3) +
+      '  |  CLIP-style average: ' + mean.toFixed(3);
+  }
+
+  buildMatrixGrid();
+  document.getElementById('matAlign').addEventListener('input', updateMatrixDemo);
+  document.getElementById('tempScale').addEventListener('input', updateSoftmaxDemo);
+  document.getElementById('noiseSym').addEventListener('input', updateSymLoss);
+  updateMatrixDemo();
+  updateSymLoss();
+
+  let archStep = 0;
+  const archPills = document.querySelectorAll('#archFlow .step-pill');
+  const flowCanvas = document.getElementById('flowCanvas');
+  const fctx = flowCanvas.getContext('2d');
+
+  function roundRectPath(ctx, x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.lineTo(x + w - rr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+    ctx.lineTo(x + w, y + h - rr);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+    ctx.lineTo(x + rr, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+    ctx.lineTo(x, y + rr);
+    ctx.quadraticCurveTo(x, y, x + rr, y);
+    ctx.closePath();
+  }
+
+  function drawFlow(step) {
+    const W = flowCanvas.width, H = flowCanvas.height;
+    fctx.fillStyle = '#181825';
+    fctx.fillRect(0, 0, W, H);
+    fctx.strokeStyle = '#2a2a3a';
+    fctx.lineWidth = 1;
+    for (let g = 0; g < W; g += 28) {
+      fctx.beginPath();
+      fctx.moveTo(g, 0);
+      fctx.lineTo(g, H);
+      fctx.stroke();
+    }
+    function node(x, y, w, h, label, active) {
+      fctx.fillStyle = active ? 'rgba(94,234,212,0.18)' : 'rgba(24,24,37,0.9)';
+      fctx.strokeStyle = active ? '#5eead4' : '#3a3a4a';
+      fctx.lineWidth = active ? 2 : 1;
+      roundRectPath(fctx, x, y, w, h, 10);
+      fctx.fill();
+      fctx.stroke();
+      fctx.fillStyle = active ? '#e0e0e8' : '#8888a0';
+      fctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+      fctx.textAlign = 'center';
+      fctx.textBaseline = 'middle';
+      fctx.fillText(label, x + w / 2, y + h / 2);
+    }
+    const imgX = 40, txtX = 240, boxW = 140, boxH = 44, midY = 120;
+    node(imgX, 40, boxW, boxH, 'Images', step >= 0);
+    node(imgX, midY, boxW, boxH, 'Image enc.', step >= 1);
+    node(imgX, 200, boxW, boxH, 'Proj → d_e', step >= 2);
+    node(txtX, 40, boxW, boxH, 'Captions', step >= 3);
+    node(txtX, midY, boxW, boxH, 'Text enc.', step >= 4);
+    node(txtX, 200, boxW, boxH, 'Proj → d_e', step >= 5);
+    if (step >= 1) {
+      fctx.strokeStyle = '#5eead4';
+      fctx.beginPath();
+      fctx.moveTo(imgX + boxW / 2, 84);
+      fctx.lineTo(imgX + boxW / 2, midY);
+      fctx.stroke();
+    }
+    if (step >= 4) {
+      fctx.strokeStyle = '#818cf8';
+      fctx.beginPath();
+      fctx.moveTo(txtX + boxW / 2, 84);
+      fctx.lineTo(txtX + boxW / 2, midY);
+      fctx.stroke();
+    }
+    if (step >= 6) {
+      fctx.fillStyle = 'rgba(244,114,182,0.12)';
+      fctx.strokeStyle = '#f472b6';
+      fctx.lineWidth = 2;
+      const mx = 95, my = 290, mw = 230, mh = 90;
+      roundRectPath(fctx, mx, my, mw, mh, 12);
+      fctx.fill();
+      fctx.stroke();
+      fctx.fillStyle = '#f472b6';
+      fctx.font = 'bold 13px ' + getComputedStyle(document.body).fontFamily;
+      fctx.textAlign = 'center';
+      fctx.fillText('N × N cosine logits', mx + mw / 2, my + 28);
+      fctx.font = '11px monospace';
+      fctx.fillStyle = '#8888a0';
+      fctx.fillText('L[i,j] = cos(z_i^I , z_j^T)', mx + mw / 2, my + 52);
+    }
+    if (step >= 7) {
+      fctx.fillStyle = 'rgba(251,191,36,0.15)';
+      fctx.strokeStyle = '#fbbf24';
+      const bx = 95, by = 330, bw = 230, bh = 36;
+      roundRectPath(fctx, bx, by, bw, bh, 8);
+      fctx.fill();
+      fctx.stroke();
+      fctx.fillStyle = '#fbbf24';
+      fctx.font = '12px monospace';
+      fctx.textAlign = 'center';
+      fctx.fillText('ℒ = (CE_row + CE_col) / 2', bx + bw / 2, by + bh / 2 + 4);
+    }
+  }
+
+  document.getElementById('archStepBtn').addEventListener('click', function () {
+    archStep = (archStep + 1) % archPills.length;
+    archPills.forEach(function (p, i) {
+      p.classList.toggle('on', i <= archStep);
+    });
+    document.getElementById('archStepLabel').textContent = 'Step ' + (archStep + 1) + ' of ' + archPills.length;
+    drawFlow(archStep);
+  });
+  drawFlow(0);
+
+  const zsCanvas = document.getElementById('zsCanvas');
+  const zctx = zsCanvas.getContext('2d');
+  const classes = [
+    { name: 'plane', x: 0.92, y: 0.25 },
+    { name: 'car', x: 0.78, y: 0.72 },
+    { name: 'dog', x: 0.35, y: 0.55 },
+    { name: 'bird', x: 0.22, y: 0.28 }
+  ];
+  let imgPt = { x: 0.88, y: 0.3 };
+  let drag = false;
+
+  function norm2(v) {
+    const n = Math.hypot(v.x, v.y) || 1;
+    return { x: v.x / n, y: v.y / n };
+  }
+
+  function drawZS() {
+    const W = zsCanvas.width, H = zsCanvas.height;
+    zctx.fillStyle = '#181825';
+    zctx.fillRect(0, 0, W, H);
+    zctx.strokeStyle = '#2a2a3a';
+    zctx.strokeRect(40, 40, W - 80, H - 80);
+    zctx.fillStyle = '#8888a0';
+    zctx.font = '11px monospace';
+    zctx.fillText('toy embedding plane (L2 unit vectors)', 44, 28);
+    const ip = norm2({ x: imgPt.x - 0.5, y: imgPt.y - 0.5 });
+    const scores = classes.map(function (c) {
+      const cp = norm2({ x: c.x - 0.5, y: c.y - 0.5 });
+      return ip.x * cp.x + ip.y * cp.y;
+    });
+    const tau = 8;
+    const ex = scores.map(function (s) { return Math.exp(s * tau); });
+    const sum = ex.reduce(function (a, b) { return a + b; }, 0);
+    const probs = ex.map(function (e) { return e / sum; });
+    classes.forEach(function (c) {
+      const px = 40 + c.x * (W - 80), py = 40 + c.y * (H - 80);
+      zctx.beginPath();
+      zctx.arc(px, py, 14, 0, Math.PI * 2);
+      zctx.fillStyle = 'rgba(129,140,248,0.35)';
+      zctx.fill();
+      zctx.strokeStyle = '#818cf8';
+      zctx.stroke();
+      zctx.fillStyle = '#e0e0e8';
+      zctx.font = '11px sans-serif';
+      zctx.textAlign = 'center';
+      zctx.fillText(c.name, px, py + 32);
+    });
+    const ix = 40 + imgPt.x * (W - 80), iy = 40 + imgPt.y * (H - 80);
+    zctx.beginPath();
+    zctx.arc(ix, iy, 16, 0, Math.PI * 2);
+    zctx.fillStyle = 'rgba(94,234,212,0.45)';
+    zctx.fill();
+    zctx.strokeStyle = '#5eead4';
+    zctx.lineWidth = 2;
+    zctx.stroke();
+    zctx.fillStyle = '#5eead4';
+    zctx.font = 'bold 11px sans-serif';
+    zctx.fillText('image', ix, iy - 22);
+
+    const bars = document.getElementById('zsBars');
+    bars.innerHTML = '';
+    let best = 0, bestP = -1;
+    probs.forEach(function (p, j) {
+      if (p > bestP) { bestP = p; best = j; }
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = '<span class="lbl">' + classes[j].name + '</span><div class="bar-track"><div class="bar-fill"></div></div><span class="val"></span>';
+      row.querySelector('.bar-fill').style.width = (p * 100) + '%';
+      row.querySelector('.val').textContent = p.toFixed(3);
+      bars.appendChild(row);
+    });
+    document.getElementById('zsPred').textContent = 'Zero-shot argmax class: ' + classes[best].name.toUpperCase();
+  }
+
+  function canvasToNorm(clientX, clientY) {
+    const r = zsCanvas.getBoundingClientRect();
+    const x = (clientX - r.left) / r.width;
+    const y = (clientY - r.top) / r.height;
+    return {
+      x: Math.max(0.08, Math.min(0.92, (x * zsCanvas.width - 40) / (zsCanvas.width - 80))),
+      y: Math.max(0.08, Math.min(0.92, (y * zsCanvas.height - 40) / (zsCanvas.height - 80)))
+    };
+  }
+  zsCanvas.addEventListener('mousedown', function (e) { drag = true; imgPt = canvasToNorm(e.clientX, e.clientY); drawZS(); });
+  window.addEventListener('mouseup', function () { drag = false; });
+  zsCanvas.addEventListener('mousemove', function (e) {
+    if (!drag) return;
+    imgPt = canvasToNorm(e.clientX, e.clientY);
+    drawZS();
+  });
+  document.getElementById('zsPreset1').addEventListener('click', function () { imgPt = { x: 0.9, y: 0.28 }; drawZS(); });
+  document.getElementById('zsPreset2').addEventListener('click', function () { imgPt = { x: 0.38, y: 0.52 }; drawZS(); });
+  document.getElementById('zsPreset3').addEventListener('click', function () { imgPt = { x: 0.55, y: 0.78 }; drawZS(); });
+  drawZS();
+
+  const baseScores = { plane: 0.82, car: 0.55, dog: 0.48, bird: 0.62 };
+  function updatePromptDemo() {
+    const tpl = document.getElementById('promptTpl').value;
+    const bias = {
+      plain: { plane: 0, car: 0, dog: 0, bird: 0 },
+      photo: { plane: 0.06, car: 0.05, dog: 0.08, bird: 0.04 },
+      render: { plane: 0.1, car: 0.02, dog: -0.02, bird: 0.03 },
+      medical: { plane: -0.2, car: -0.25, dog: -0.15, bird: -0.18 }
+    };
+    const b = bias[tpl] || bias.plain;
+    const names = Object.keys(baseScores);
+    const logits = names.map(function (n) { return baseScores[n] + (b[n] || 0); });
+    const ex = logits.map(function (z) { return Math.exp(z * 6); });
+    const s = ex.reduce(function (a, x) { return a + x; }, 0);
+    const probs = ex.map(function (e) { return e / s; });
+    const wrap = document.getElementById('promptBars');
+    wrap.innerHTML = '';
+    let best = 0;
+    probs.forEach(function (p, i) {
+      if (p > probs[best]) best = i;
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = '<span class="lbl">' + names[i] + '</span><div class="bar-track"><div class="bar-fill"></div></div><span class="val"></span>';
+      row.querySelector('.bar-fill').style.width = (p * 100) + '%';
+      row.querySelector('.val').textContent = p.toFixed(3);
+      wrap.appendChild(row);
+    });
+    document.getElementById('promptNote').textContent =
+      'Top class with this template: ' + names[best] + '. Real CLIP responds to subtle lexical cues; this panel is a qualitative stand-in.';
+  }
+  document.getElementById('promptTpl').addEventListener('change', updatePromptDemo);
+  updatePromptDemo();
+
+  const sdCanvas = document.getElementById('sdCanvas');
+  const sctx = sdCanvas.getContext('2d');
+  function drawSD() {
+    const al = parseInt(document.getElementById('sdAlign').value, 10) / 100;
+    const W = sdCanvas.width, H = sdCanvas.height;
+    sctx.fillStyle = '#181825';
+    sctx.fillRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2;
+    sctx.strokeStyle = '#2a2a3a';
+    sctx.beginPath();
+    sctx.moveTo(0, cy);
+    sctx.lineTo(W, cy);
+    sctx.moveTo(cx, 0);
+    sctx.lineTo(cx, H);
+    sctx.stroke();
+    const tx = 120, ty = -40;
+    const ix = 30 + al * 150, iy = -20 + (1 - al) * 80;
+    const tn = Math.hypot(tx, ty) || 1;
+    const in_ = Math.hypot(ix, iy) || 1;
+    const cos = (tx * ix + ty * iy) / (tn * in_);
+    function arrow(x1, y1, x2, y2, col) {
+      sctx.strokeStyle = col;
+      sctx.lineWidth = 2.5;
+      sctx.beginPath();
+      sctx.moveTo(x1, y1);
+      sctx.lineTo(x2, y2);
+      sctx.stroke();
+    }
+    arrow(cx, cy, cx + tx, cy - ty, '#818cf8');
+    arrow(cx, cy, cx + ix, cy - iy, '#5eead4');
+    sctx.fillStyle = '#818cf8';
+    sctx.font = '12px sans-serif';
+    sctx.fillText('text axis', cx + tx + 8, cy - ty);
+    sctx.fillStyle = '#5eead4';
+    sctx.fillText('image embedding', cx + ix + 6, cy - iy + 14);
+    document.getElementById('sdCosReadout').textContent = 'cos(text, image) ≈ ' + cos.toFixed(3);
+  }
+  document.getElementById('sdAlign').addEventListener('input', drawSD);
+  drawSD();
+
+  const pairCanvas = document.getElementById('pairCanvas');
+  const pctx = pairCanvas.getContext('2d');
+
+  function drawPair() {
+    const a = [
+      parseFloat(document.getElementById('pa1').value) / 100,
+      parseFloat(document.getElementById('pa2').value) / 100,
+      parseFloat(document.getElementById('pa3').value) / 100
+    ];
+    const b = [
+      parseFloat(document.getElementById('pb1').value) / 100,
+      parseFloat(document.getElementById('pb2').value) / 100,
+      parseFloat(document.getElementById('pb3').value) / 100
+    ];
+    function norm(v) {
+      const n = Math.hypot(v[0], v[1], v[2]) || 1;
+      return [v[0] / n, v[1] / n, v[2] / n];
+    }
+    const na = norm(a), nb = norm(b);
+    const cos = na[0] * nb[0] + na[1] * nb[1] + na[2] * nb[2];
+    document.getElementById('pairCos').textContent = cos.toFixed(4);
+
+    const W = pairCanvas.width, H = pairCanvas.height;
+    pctx.fillStyle = '#181825';
+    pctx.fillRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2, sc = 140;
+    function proj(v) {
+      const x = v[0], y = v[1], z = v[2];
+      const px = x - z * 0.35;
+      const py = y - z * 0.2;
+      return [cx + px * sc, cy - py * sc];
+    }
+    pctx.strokeStyle = '#2a2a3a';
+    pctx.beginPath();
+    pctx.moveTo(0, cy);
+    pctx.lineTo(W, cy);
+    pctx.moveTo(cx, 0);
+    pctx.lineTo(cx, H);
+    pctx.stroke();
+    function arrow3(v, col, label) {
+      const p = proj(v);
+      pctx.strokeStyle = col;
+      pctx.lineWidth = 2.5;
+      pctx.beginPath();
+      pctx.moveTo(cx, cy);
+      pctx.lineTo(p[0], p[1]);
+      pctx.stroke();
+      pctx.fillStyle = col;
+      pctx.font = '11px monospace';
+      pctx.fillText(label, p[0] + 6, p[1]);
+    }
+    arrow3(na, '#5eead4', 'image');
+    arrow3(nb, '#f472b6', 'text');
+  }
+  ['pa1', 'pa2', 'pa3', 'pb1', 'pb2', 'pb3'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', drawPair);
+  });
+  drawPair();
+
+  const navWrap = document.getElementById('navWrap');
+  const navToggle = document.getElementById('navToggle');
+
+  navToggle.addEventListener('click', function () {
+    const open = navWrap.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.querySelectorAll('#navLinks a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      navWrap.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  window.addEventListener('scroll', function () {
+    const y = window.scrollY;
+    navWrap.classList.toggle('visible', y > 220);
+    document.querySelectorAll('.fade-in:not(.visible)').forEach(function (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 50) el.classList.add('visible');
+    });
+  }, { passive: true });
+  window.dispatchEvent(new Event('scroll'));
+})();
+</script>
+</body>
+</html>

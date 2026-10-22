@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLaMA Dissected: RoPE, GQA, KV Cache &amp; SwiGLU — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.75;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2rem); margin-bottom: 20px; }
+h3 { font-size: 1.1rem; color: var(--accent); margin: 24px 0 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 20px;
+  font-size: 0.85rem;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav.visible { transform: translateY(0); }
+.nav-title { font-weight: 700; white-space: nowrap; }
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 100px 24px 80px; position: relative;
+}
+.hero::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108,140,255,0.18), transparent),
+              radial-gradient(ellipse 60% 40% at 100% 50%, rgba(167,139,250,0.08), transparent);
+  pointer-events: none;
+}
+.hero .container { position: relative; z-index: 1; }
+.hero h1 { margin-bottom: 16px; }
+.subtitle { font-size: 1.1rem; color: var(--text-dim); max-width: 640px; margin: 0 auto 28px; }
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+.pill {
+  font-size: 0.75rem; font-family: var(--mono);
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim);
+}
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 18px 0;
+}
+.comparison {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;
+}
+@media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; margin: 18px 0;
+  font-family: var(--mono); font-size: 0.95rem; color: var(--accent3);
+  text-align: center; overflow-x: auto;
+}
+.callout {
+  background: rgba(108,140,255,0.07); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 20px 0;
+}
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.06); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.06); }
+.callout p:last-child { margin-bottom: 0; }
+table.scale {
+  width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 16px 0;
+  font-family: var(--mono);
+}
+table.scale th, table.scale td {
+  border: 1px solid var(--border); padding: 10px 8px; text-align: left;
+}
+table.scale th { background: var(--bg-card-alt); color: var(--accent); }
+table.scale td { color: var(--text-dim); }
+table.scale td strong { color: var(--text); }
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 24px 0;
+}
+.interactive-panel h4 {
+  font-size: 0.95rem; color: var(--text); margin-bottom: 14px;
+  font-family: var(--mono);
+}
+canvas.demo-canvas {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+}
+label.ctrl { display: block; font-size: 0.8rem; color: var(--text-dim); margin: 12px 0 4px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.output-readout {
+  font-family: var(--mono); font-size: 0.85rem; color: var(--accent4);
+  margin-top: 10px; padding: 10px; background: var(--bg); border-radius: 8px;
+}
+.fade-in { opacity: 0; transform: translateY(28px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+ul.tight { margin: 0 0 1em 1.2em; color: var(--text-dim); }
+ul.tight li { margin-bottom: 0.45em; }
+.qa-box {
+  margin: 16px 0; padding: 16px; border-radius: var(--radius);
+  border: 1px dashed var(--border); background: rgba(167,139,250,0.05);
+}
+.qa-box .q { color: var(--accent2); font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; }
+code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5); }
+.playground-grid {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.btn {
+  font-family: var(--mono); font-size: 0.8rem;
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-card-alt); color: var(--text); cursor: pointer; margin: 4px 4px 4px 0;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.discussion-panel {
+  margin-top: 28px; padding: 22px; border-radius: var(--radius);
+  background: rgba(167,139,250,0.04); border: 1px solid rgba(167,139,250,0.15);
+}
+.discussion-panel h4 {
+  font-family: var(--mono); font-size: 0.82rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 18px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border);
+}
+.disc-item { margin-bottom: 16px; padding: 14px 16px; border-radius: 8px; }
+.disc-item:last-child { margin-bottom: 0; }
+.disc-item.ai-q { border-left: 3px solid var(--accent); background: rgba(108,140,255,0.06); }
+.disc-item.user-q { border-left: 3px solid var(--accent4); background: rgba(244,114,182,0.06); }
+.disc-label {
+  font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: 1px; margin-bottom: 6px; display: block;
+}
+.disc-item.ai-q .disc-label { color: var(--accent); }
+.disc-item.user-q .disc-label { color: var(--accent4); }
+.disc-item .disc-q { font-weight: 600; color: var(--text); font-size: 0.92rem; margin-bottom: 8px; }
+.disc-item .disc-a { color: var(--text-dim); font-size: 0.88rem; line-height: 1.65; }
+.disc-item .disc-a strong { color: var(--text); }
+.disc-item .disc-a em { color: var(--accent2); font-style: italic; }
+.comp-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0; }
+.comp-table th, .comp-table td { border: 1px solid var(--border); padding: 12px 14px; text-align: left; }
+.comp-table th { background: var(--bg-card-alt); color: var(--accent); font-family: var(--mono); font-size: 0.8rem; }
+.comp-table td { color: var(--text-dim); }
+.comp-table td strong { color: var(--text); }
+.comp-table .arrow { color: var(--accent3); font-weight: 700; text-align: center; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+  background: #111118; border-bottom: 1px solid #23232f;
+  padding: 10px 24px; font-size: 0.82rem; color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">LLaMA: RoPE, GQA, KV Cache &amp; SwiGLU</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Advanced NLP V2</a>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>LLaMA Dissected: RoPE, GQA, KV Cache &amp; SwiGLU</h1>
+    <p class="subtitle">
+      A structured walkthrough of the decoder-only LLaMA family: pre-norm blocks, RMSNorm, rotary embeddings,
+      inference-time KV caching, grouped-query attention, and the SwiGLU feed-forward — with interactive figures you can manipulate.
+    </p>
+    <div class="pill-row">
+      <span class="pill">Decoder-only</span>
+      <span class="pill">Pre-norm</span>
+      <span class="pill">RMSNorm</span>
+      <span class="pill">RoPE</span>
+      <span class="pill">KV cache</span>
+      <span class="pill">MQA / GQA</span>
+      <span class="pill">SwiGLU</span>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00</span>
+  <h2>Roadmap</h2>
+  <p>This chapter connects architectural choices to their goals: stable training, relative position awareness in attention, fast autoregressive inference, memory-bandwidth-aware attention, and expressive feed-forward layers.</p>
+  <div class="card">
+    <ul class="tight">
+      <li><strong>Architecture</strong> — Why LLaMA drops the encoder and uses a stack of identical decoder-style blocks.</li>
+      <li><strong>Pre-norm vs post-norm</strong> — Where normalization sits relative to sublayers and residual paths.</li>
+      <li><strong>RMSNorm</strong> — Rescaling without mean-centering; fewer statistics than LayerNorm.</li>
+      <li><strong>RoPE</strong> — Rotary position applied to queries and keys; geometric intuition via rotations.</li>
+      <li><strong>KV cache</strong> — Reusing past key/value projections across decode steps.</li>
+      <li><strong>MQA &amp; GQA</strong> — Sharing key/value heads to cut memory traffic; GQA as a middle ground.</li>
+      <li><strong>SwiGLU</strong> — Gated feed-forward with SiLU; three projection matrices vs two in the classic ReLU FFN.</li>
+    </ul>
+  </div>
+  <div class="callout ok">
+    <p><strong>Prerequisites.</strong> Familiarity with matrix multiplication, dot products, and scaled softmax attention from <a href="../01-transformer-architecture-and-math/">Chapter 01</a> (encoder vs decoder contrast in <a href="../03-bert-encoder-models/">Chapter 03</a>). Complex numbers help for RoPE but are not strictly required if you accept the rotation-matrix view.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01</span>
+  <h2>Decoder-only stack vs encoder–decoder</h2>
+  <p>The original Transformer pairs an <strong>encoder</strong> (bidirectional context over the input) with a <strong>decoder</strong> (causal self-attention plus cross-attention into the encoder). LLaMA is a <strong>large language model</strong> trained primarily on <strong>next-token prediction</strong>: a single stream of tokens is embedded, processed with <strong>causal self-attention</strong> only, and the model learns to predict the next token from all previous ones.</p>
+  <div class="comparison">
+    <div class="card">
+      <h3>Encoder–decoder</h3>
+      <p>Separate stacks; decoder attends to encoder representations. Natural for tasks with distinct source and target sequences.</p>
+    </div>
+    <div class="card">
+      <h3>Decoder-only (LLaMA)</h3>
+      <p>One repeating block (×N layers): normalization → attention → residual → normalization → feed-forward → residual → … The output of the last layer is fed to a final RMS Norm, then a linear layer, then softmax over the vocabulary.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <p><strong>Block-level differences from classic decoder blocks.</strong> Positional information is not added to embeddings as sinusoidal vectors; <strong>rotary positional embeddings (RoPE)</strong> act inside attention on <strong>queries and keys</strong> after their linear projections. The feed-forward uses <strong>SwiGLU</strong> instead of ReLU between two layers. Larger variants use <strong>grouped-query attention (GQA)</strong> to reduce key/value head count.</p>
+    <p style="margin-bottom:0"><strong>Decoder-only.</strong> LLaMA drops the encoder stack entirely: one repeating decoder block, causal self-attention only, no cross-attention—trained purely on next-token prediction.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02</span>
+  <h2>Pre-norm vs post-norm</h2>
+  <p>In many early Transformer diagrams, layer normalization appeared <strong>after</strong> each sublayer, combined with the residual (post-norm). In LLaMA, all normalizations have been moved <strong>before</strong> every block — before the attention sublayer and before the feed-forward (pre-norm). The sublayer always sees a normalized residual stream.</p>
+  <div class="formula">x<sub>out</sub> = x + Sublayer( Norm(x) )</div>
+  <p>Pre-norm often yields smoother optimization in deep stacks: gradients flow through the residual path more directly, while the normalized activations keep scale controlled going into attention and MLP weights. In pre-norm, <code class="inline">x<sub>out</sub> = x + branch(x)</code>, so the gradient for <code class="inline">x</code> is <strong>1 + (gradient of the branch)</strong>—a direct highway through dozens of layers. Post-norm normalizes after each sublayer, so gradients pass through more transforms at every stop; pre-norm keeps the raw residual stream intact while each branch adds a normalized correction.</p>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03</span>
+  <h2>Embeddings and token IDs</h2>
+  <p>Text is split into <strong>tokens</strong> (commonly subword units via BPE or SentencePiece — not naive whitespace splitting). Each token maps to an integer index in a fixed <strong>vocabulary</strong> — the list of all tokens the model recognizes. The <strong>embedding table</strong> maps each index to a learnable vector of dimension <code class="inline">d_model</code> (the same lookup pattern as in <a href="../01-transformer-architecture-and-math/">Chapter 01</a> and <a href="../03-bert-encoder-models/">Chapter 03</a>). In the original Transformer this was <code class="inline">512</code>; in LLaMA it grows to <code class="inline">4096</code> or larger depending on the model size.</p>
+  <p>Take a sentence like <em>“Your cat is a lovely cat.”</em> The tokenizer splits it into subword tokens; each token becomes an <strong>input ID</strong> that indexes the embedding table. If <code class="inline">d_model = 4096</code>, the word “cat” becomes a vector of 4096 floating-point numbers.</p>
+  <div class="callout ok">
+    <p><strong>Semantic geometry.</strong> Because embeddings are <strong>learnable parameters</strong>, they shift during training so that semantically related tokens end up with <strong>similar vectors</strong>. For example, “cat” and “dog” — both animals — will develop nearby embeddings. Similarly, “house” and “building” — both structures — will cluster together in embedding space. The geometry of embedding space reflects co-occurrence patterns and semantic relationships in the training corpus.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04</span>
+  <h2>Why normalize? Linear layers and internal covariate shift</h2>
+  <h3>Linear layers: the building block</h3>
+  <p>A linear layer (e.g. <code class="inline">nn.Linear(3, 5, bias=True)</code> in PyTorch) creates two learnable objects: a weight matrix <code class="inline">W</code> of shape <strong>(output_features × input_features)</strong> — so 5×3 here — and a bias vector <code class="inline">b</code> of length 5 (one bias per output neuron). You can think of each <strong>row</strong> of W as one neuron, with one weight per input feature.</p>
+  <div class="formula">Y = X W<sup>T</sup> + b &nbsp;&nbsp; (row-wise: each output is dot-products plus bias)</div>
+  <p>Given an input <code class="inline">X</code> of shape (10 items × 3 features), the output <code class="inline">Y</code> is (10 × 5). Each output element <code class="inline">Z₁</code> for item 1 is the dot product of that item’s feature row with neuron 1’s weight column, plus the bias: <code class="inline">Z₁ = (a₁·w₁ + a₂·w₂ + a₃·w₃) + b₁</code>. The key insight: <strong>the output of a neuron for an item depends only on that item’s features and the neuron’s weights</strong> — not on other items in the batch. The bias <code class="inline">b</code> is broadcast (added to every row independently via PyTorch broadcasting). After the linear layer, a <strong>non-linearity</strong> (like ReLU) is typically applied — the input to this non-linearity is called the <strong>activation</strong> of the neuron.</p>
+
+  <h3>The problem: internal covariate shift</h3>
+  <p>Since the input to a layer is the <strong>output of the previous layer</strong>, a problem arises during training. When a lower layer’s weights are updated by gradient descent, its output distribution can change <strong>drastically</strong>. The next layer then receives inputs it has never seen before — forcing it to readjust its own weights heavily. This makes training <strong>oscillate and slow down</strong>, as each layer chases a constantly moving target. This phenomenon — the distribution of internal layer inputs changing during training — is called <strong>internal covariate shift</strong>. <strong>Normalization</strong> standardizes each handoff so the next sublayer always sees activations in a predictable range, no matter how far the previous layer moved.</p>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05</span>
+  <h2>LayerNorm: mean, variance, and learnable gain</h2>
+  <p><strong>Layer normalization</strong> (derived in <a href="../01-transformer-architecture-and-math/">Chapter 01</a>) computes, <em>per row</em> (per token position in a sequence batch), the mean <code class="inline">μ</code> and variance <code class="inline">σ²</code> across features, standardizes, then applies learnable <code class="inline">γ</code> and <code class="inline">β</code>. LLaMA replaces this with RMSNorm in the next section.</p>
+  <div class="formula">LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β</div>
+  <p>Variance uses the mean: <code class="inline">σ² = (1/d) ∑<sub>i</sub> (x<sub>i</sub> − μ)²</code>. Here <code class="inline">ε</code> avoids division by zero. <strong>Batch normalization</strong> differs by normalizing across the batch dimension per feature (column-wise statistics), whereas LayerNorm is row-wise — better suited to variable-length sequences in Transformers.</p>
+  <div class="callout">
+    <p><strong>Standardization intuition.</strong> If a scalar random variable has mean 5 and variance 36, then <code class="inline">(X − 5) / 6</code> has mean 0 and variance 1 — a standard Gaussian. This is exactly what LayerNorm does: it transforms feature distributions into zero mean and unit variance, then lets the learnable γ and β adjust as needed.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06</span>
+  <h2>RMSNorm: rescaling without centering</h2>
+  <p><em>Root Mean Square Layer Normalization</em> (RMSNorm) was introduced in the paper <strong>“Root Mean Square Layer Normalization.”</strong> LayerNorm provides two properties: <strong>recentering invariance</strong> (insensitivity to shift noise on inputs and weights — enabled by subtracting the mean) and <strong>rescaling invariance</strong> (keeping representations stable under random scaling — enabled by dividing by the standard deviation).</p>
+  <div class="callout">
+    <p><strong>The key hypothesis.</strong> The paper states: <em>“In this paper we hypothesize that the rescaling invariance is the reason for success of layer Norm, rather than the recentering invariance.”</em> In other words: it’s the <strong>division by scale</strong> (having variance ~1) that matters for stable training — not the subtraction of the mean (having mean ~0). Can we drop mean-centering entirely and still get the same benefit?</p>
+  </div>
+  <p>Since variance requires the mean (<code class="inline">σ² = (1/d) Σ(xᵢ − μ)²</code>), the authors needed a different statistic that doesn’t depend on μ at all. They chose the <strong>root-mean-square</strong>:</p>
+  <div class="formula">RMS(x) = √( (1/d) ∑<sub>i</sub> x<sub>i</sub>² + ε ) &nbsp;&nbsp;→&nbsp;&nbsp; RMSNorm(x) = γ ⊙ ( x / RMS(x) )</div>
+  <p>The RMS statistic is calculated per row (per token position), just like LayerNorm — but it needs only <strong>one statistic</strong> instead of two. You just square each element, average, and take the square root. Then divide and multiply by the learnable <code class="inline">γ</code> (no <code class="inline">β</code> needed since we’re not recentering). At billion-parameter scale, applied at every layer and token position, skipping the mean saves measurable compute. In practice, RMSNorm works just as well as LayerNorm in models like LLaMA — confirming the hypothesis that rescaling invariance is what drives most of the training benefit.</p>
+
+  <div class="interactive-panel">
+    <h4>Interactive · LayerNorm vs RMSNorm on a tiny vector</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">Adjust three features. Compare mean/variance normalization vs RMS-only scaling (γ=1, β=0 for clarity).</p>
+    <label class="ctrl">x₁: <span id="x1v">1.0</span></label>
+    <input type="range" id="x1" min="-3" max="3" step="0.1" value="1">
+    <label class="ctrl">x₂: <span id="x2v">0.5</span></label>
+    <input type="range" id="x2" min="-3" max="3" step="0.1" value="0.5">
+    <label class="ctrl">x₃: <span id="x3v">-0.8</span></label>
+    <input type="range" id="x3" min="-3" max="3" step="0.1" value="-0.8">
+    <div class="output-readout" id="normOut"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07</span>
+  <h2>Position: absolute vs relative</h2>
+  <p><strong>Absolute</strong> positional encodings are like <strong>latitude and longitude</strong> on a map: every slot in the sequence gets a fixed address. Each position receives a <strong>unique vector</strong> that is <strong>computed once</strong> (not learned from data), then <strong>reused for every sentence</strong> at that index.</p>
+  <p>In the vanilla Transformer, those are typically <strong>sinusoidal</strong> vectors of size (for example) <code class="inline">512</code>, <strong>added directly to token embeddings</strong>. When attention later forms <code class="inline">Q·K<sup>T</sup></code>, the queries and keys already have <strong>absolute position baked in</strong> alongside semantic content.</p>
+  <h3>Relative positional encodings: reasoning about pairs</h3>
+  <p>Relative schemes reason about <strong>two tokens at a time</strong>: instead of encoding “I am position 47,” they encode <strong>how far apart</strong> two tokens are. Absolute encodings hard-code a slot index, but language usually cares about <strong>relative distance</strong>—the phrase <em>“the cat sat”</em> means the same at position 0 or 500. Relative methods add distance-dependent terms to the attention score matrix (see <a href="../01-transformer-architecture-and-math/">Chapter 01</a> for the base softmax attention formula).</p>
+  <div class="callout warn">
+    <p><strong>RoPE placement.</strong> RoPE is applied <strong>after</strong> multiplication by <code class="inline">W<sub>Q</sub></code> and <code class="inline">W<sub>K</sub></code> (not before, unlike adding sinusoids to embeddings in the vanilla Transformer). It is <strong>not</strong> applied to <code class="inline">V</code>—only <strong>Q</strong> and <strong>K</strong> form the scoring mechanism; <strong>V</strong> carries the content being mixed.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s08">
+  <span class="section-num">08</span>
+  <h2>RoPE (Rotary Position Embedding)</h2>
+  <p><strong>RoFormer</strong>, from a Chinese research group, asked a sharp question: can we arrange the attention inner product so it <strong>depends only on the token embeddings and their relative distance</strong> (e.g. <code class="inline">m − n</code>), not on absolute indices alone?</p>
+  <p>The construction often starts in <strong>complex space</strong> with a function <code class="inline">g(x<sub>m</sub>, x<sub>n</sub>, m−n)</code> and <strong>Euler&apos;s formula</strong> linking rotation to <code class="inline">e<sup>iθ</sup></code>. In two real dimensions, each pair of coordinates acts like a <strong>2×2 rotation</strong>:</p>
+  <div class="formula">x&apos; = cos(θ) · x − sin(θ) · y<br>y&apos; = sin(θ) · x + cos(θ) · y &nbsp;(≈ 2×2 rotation)</div>
+  <p>For higher model dimensions, RoPE uses a <strong>block-sparse</strong> structure: mostly zeros with <strong>2×2 rotation blocks</strong> along the diagonal (each pair of feature dimensions gets its own angle). In efficient implementations, that becomes <strong>element-wise</strong> multiply with precomputed <strong>cos / sin</strong> vectors, plus <strong>swapped pairs</strong> scaled by sin — no need to materialize the full huge matrix.</p>
+  <p>The base frequencies <code class="inline">θ<sub>i</sub></code> follow a <strong>fixed geometric series</strong>, e.g. <code class="inline">θ<sub>i</sub> = base<sup>−2i/d</sup></code> — <strong>nothing to learn</strong> in the geometry itself; the model learns how to use the resulting positional signal. Because rotations depend on <code class="inline">m − n</code>, the dot product of rotated <strong>Q</strong> and <strong>K</strong> encodes <strong>relative distance</strong>; when <code class="inline">m = n</code>, the relative angle is zero and the score is purely content-based.</p>
+  <div class="callout">
+    <p><strong>Complex form.</strong> You can read RoPE as applying a position-dependent complex phase per 2D subspace; the real implementation is the same rotations written out with cos and sin.</p>
+  </div>
+  <div class="callout ok">
+    <p><strong>Long-term decay intuition.</strong> Different frequency channels respond at different spans; the construction induces an <strong>envelope</strong> where very distant pairs are softly down-weighted — helpful inductive bias for modeling locality while still allowing attention to long context.</p>
+  </div>
+  <div class="interactive-panel">
+    <h4>Interactive · 2D RoPE rotation</h4>
+    <canvas id="ropeCanvas" class="demo-canvas" width="560" height="320"></canvas>
+    <label class="ctrl">Position index m: <span id="mVal">3</span></label>
+    <input type="range" id="mPos" min="0" max="24" step="1" value="3">
+    <label class="ctrl">Base angle θ (radians): <span id="thetaVal">0.50</span></label>
+    <input type="range" id="thetaBase" min="0.05" max="1.5" step="0.05" value="0.5">
+    <label class="ctrl">v<sub>x</sub>: <span id="vxVal">1.00</span></label>
+    <input type="range" id="vx" min="-2" max="2" step="0.05" value="1">
+    <label class="ctrl">v<sub>y</sub>: <span id="vyVal">0.50</span></label>
+    <input type="range" id="vy" min="-2" max="2" step="0.05" value="0.5">
+    <div class="output-readout" id="ropeReadout"></div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Interactive · Illustrative long-range decay envelope</h4>
+    <canvas id="decayCanvas" class="demo-canvas" width="520" height="230"></canvas>
+    <label class="ctrl">Sharpness k: <span id="decaySharpVal">0.25</span></label>
+    <input type="range" id="decaySharp" min="0.02" max="1.2" step="0.02" value="0.25">
+  </div>
+</section>
+
+<section class="section fade-in" id="s09">
+  <span class="section-num">09</span>
+  <h2>Self-attention recap</h2>
+  <p>LLaMA uses <strong>causal self-attention</strong> with RoPE on queries and keys—the full scaled dot-product derivation, multi-head wiring, and matrix shapes are in <a href="../01-transformer-architecture-and-math/">Chapter 01</a>. Bidirectional encoder attention (BERT) is covered in <a href="../03-bert-encoder-models/">Chapter 03</a>. At decode time a <strong>causal mask</strong> zeroes entries above the diagonal so token <em>t</em> may attend only to positions <strong>1…t</strong>.</p>
+  <p><strong>Multi-head attention</strong> in one forward pass: copy hidden states to Q, K, V; multiply by learned matrices; <strong>split</strong> into <strong>H</strong> heads; run attention independently per head; <strong>concatenate</strong>; multiply by <code class="inline">W<sub>O</sub></code> to mix heads back together.</p>
+</section>
+
+<section class="section fade-in" id="s10">
+  <span class="section-num">10</span>
+  <h2>Training vs inference</h2>
+  <p>Decoder models are typically trained on <strong>next-token prediction</strong>. A training target might be a line from Dante: <em>&quot;Nel mezzo del cammin di nostra vita / mi ritrovai per una selva oscura…&quot;</em> — the model sees a prefix and is trained to predict each next token in parallel across positions (with masking so it cannot cheat on future tokens).</p>
+  <p><strong>Training setup:</strong> often a <strong>start-of-sequence</strong> token is prepended and an <strong>end-of-sequence</strong> token appended to the target. Each <strong>input position</strong> maps to an <strong>output position</strong> predicting the following token. The entire sequence is processed in <strong>one forward pass</strong> (“teacher forcing”): no Python <code class="inline">for</code> loop over time steps inside the model for that example.</p>
+  <p><strong>Inference</strong> is different: we generate <strong>step by step</strong>. Step 1: feed <code class="inline">[SOS]</code> and read the distribution for the first word — say <strong>&quot;love&quot;</strong>. Step 2: feed <code class="inline">[SOS, love]</code> and read the next token — say <strong>&quot;that&quot;</strong>, and so on.</p>
+  <p>Even though the network can compute logits for <strong>all</strong> positions in one forward pass, at decode time we usually care only about the <strong>last</strong> token&apos;s prediction. Computing full attention over the growing prefix every time creates <strong>redundant work</strong> — exactly what a <strong>KV cache</strong> is meant to remove.</p>
+</section>
+
+<section class="section fade-in" id="s11">
+  <span class="section-num">11</span>
+  <h2>KV cache</h2>
+  <p>Without caching, each new generated token retriggers attention with a longer prefix. The effective score matrix grows: <strong>1×1</strong>, then <strong>2×2</strong>, <strong>3×3</strong>, <strong>4×4</strong>, … Two issues stand out: <strong>(1)</strong> many dot products are <strong>recomputed</strong> again and again; <strong>(2)</strong> with a causal mask we only need the <strong>last row</strong> of scores at decode time to form the next output.</p>
+  <p><strong>Solution:</strong> store the projected <strong>K</strong> and <strong>V</strong> for all past tokens. The new step only computes <strong>Q</strong> for the <strong>latest</strong> token and dots it against cached keys (and uses cached values when weighting). That trades redundant compute for <strong>memory</strong>: illustrative classroom numbers put cache near <strong>~2.6 MB per token</strong> in some large-model configs (precision, width, layers, and heads all matter), so <strong>~5.2 GB for 2048 tokens</strong> shows how fast VRAM use grows.</p>
+  <div class="card">
+    <h3>Step-by-step with KV cache</h3>
+    <ul class="tight">
+      <li>After processing token t, append that layer&apos;s <strong>K<sub>t</sub></strong> and <strong>V<sub>t</sub></strong> to the cache tensors.</li>
+      <li>At step t+1, compute only <strong>Q<sub>t+1</sub></strong>; attention scores are a single row against all cached keys up to t+1.</li>
+      <li>The weighted sum uses the same cached <strong>V</strong> vectors for past positions plus the new <strong>V<sub>t+1</sub></strong>.</li>
+    </ul>
+  </div>
+  <div class="callout">
+    <p><strong>Inference-only.</strong> KV caching is an <strong>inference-time</strong> optimization. It applies to <strong>all</strong> autoregressive Transformer decoders in principle, not only LLaMA.</p>
+  </div>
+  <div class="interactive-panel">
+    <h4>Interactive · Causal QK<sup>T</sup> and growing prefix</h4>
+    <canvas id="kvCanvas" class="demo-canvas" width="320" height="340"></canvas>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin:12px 0;">Advance the decode step: the green row is what must be computed against all prior keys; the cache avoids rebuilding earlier rows.</p>
+    <button type="button" class="btn" id="kvPrev">Previous step</button>
+    <button type="button" class="btn" id="kvNext">Next step</button>
+    <button type="button" class="btn" id="kvReset">Reset</button>
+    <div class="output-readout" id="kvReadout"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <span class="section-num">12</span>
+  <h2>Memory bandwidth</h2>
+  <p>Modern GPUs are so fast at arithmetic that many Transformer workloads become <strong>memory-bound</strong>. For perspective, an <strong>NVIDIA A100</strong> might offer on the order of <strong>~19.5 TFLOPS</strong> FP32 compute versus <strong>~1.9 TB/s</strong> memory bandwidth — roughly a <strong>10×</strong> imbalance favoring &quot;math is cheap, moving bytes is expensive.&quot;</p>
+  <p>The practical goal is to <strong>minimize memory access</strong>, not only the operation count. Without KV cache, attention can be relatively <strong>compute-heavy</strong> (reuse ratios small). With KV cache, analysis often writes effective traffic ratios in terms of sequence length n, model width d, and bytes-per-element B — schematically like <strong>O(n/d + 1/B)</strong> in simplified roofline stories: when <strong>n</strong> grows toward <strong>d</strong> or <strong>B</strong> is small, the bottleneck tips toward <strong>bandwidth</strong>.</p>
+  <div class="callout warn">
+    <p><strong>Irony.</strong> KV cache <strong>solved</strong> the obvious redundant-<strong>compute</strong> problem for autoregressive decoding, but it can push systems into a regime where <strong>memory bandwidth</strong> and <strong>capacity</strong> dominate — motivating MQA, GQA, quantization, and batching strategies.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <span class="section-num">13</span>
+  <h2>MQA (Multi-Query Attention)</h2>
+  <p><strong>MQA</strong> is due in large part to <strong>Noam Shazeer</strong> (also a co-author on &quot;Attention Is All You Need&quot;). The idea: keep <strong>many query heads</strong> for expressive matching, but share <strong>one</strong> key head and <strong>one</strong> value head across <strong>all</strong> query heads.</p>
+  <p>Where a rough traffic ratio might have scaled like <strong>n/d</strong> in a one-head-per-layer story, sharing K/V across H heads improves it toward something like <strong>n/(d·H)</strong> — a factor of <strong>H</strong> fewer distinct K/V bytes to read from memory per step in that sketch.</p>
+  <p>Reported trade-offs in the MQA paper include small quality deltas on translation benchmarks (e.g. BLEU <strong>26.7</strong> multi-head vs <strong>26.5</strong> MQA) alongside large latency wins (illustrative numbers: inference dropping from <strong>~≈48 μs</strong> to <strong>~≈6 μs</strong> per step — about <strong>8×</strong>). <strong>Local attention</strong> variants restrict keys to a window (e.g. the previous <strong>31</strong> positions) to cap cost for very long sequences.</p>
+</section>
+
+<section class="section fade-in" id="s14">
+  <span class="section-num">14</span>
+  <h2>GQA (Grouped-Query Attention)</h2>
+  <p><strong>GQA</strong> partitions query heads into <strong>G</strong> groups; each group shares its own K/V head pair. <strong>G = H</strong> recovers full <strong>multi-head attention (MHA)</strong>; <strong>G = 1</strong> recovers <strong>MQA</strong>. GQA interpolates quality and bandwidth between the two. With 64 query heads and one shared K/V pair (MQA), cache traffic drops roughly <strong>64×</strong> versus full MHA; collapsing all the way to one pair can hurt quality, so LLaMA 2 uses intermediate grouping on larger checkpoints.</p>
+  <p><strong>LLaMA 2</strong> applies GQA on the larger <strong>34B</strong> and <strong>70B</strong> variants while smaller sizes may still use standard MHA — a pragmatic scaling choice.</p>
+  <div class="interactive-panel">
+    <h4>Interactive · MHA / GQA / MQA wiring</h4>
+    <canvas id="gqaCanvas" class="demo-canvas" width="540" height="200"></canvas>
+    <label class="ctrl">Query heads H: <span id="hVal">8</span></label>
+    <input type="range" id="hHeads" min="1" max="32" step="1" value="8">
+    <label class="ctrl">K/V groups G: <span id="gVal">2</span></label>
+    <input type="range" id="gGroups" min="1" max="32" step="1" value="2">
+    <div class="output-readout" id="gqaReadout"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s15">
+  <span class="section-num">15</span>
+  <h2>SwiGLU feed-forward</h2>
+  <p>Also from <strong>Noam Shazeer</strong> (same research line as attention variants and MQA): compare many activation choices for the Transformer FFN and find <strong>SwiGLU</strong> especially strong.</p>
+  <p>The classic FFN is two matrices with a simple nonlinearity in between, e.g. <strong>W<sub>2</sub> · ReLU(W<sub>1</sub> · x)</strong>. <strong>SwiGLU</strong> uses the <strong>Swish</strong> with β=1, also called <strong>SiLU</strong> (Sigmoid Linear Unit), as a gate:</p>
+  <div class="formula">FFN<sub>SwiGLU</sub>(x) = W<sub>2</sub> ( SiLU(W<sub>1</sub>x) ⊙ (W<sub>3</sub>x) )</div>
+  <p>There are <strong>three</strong> weight matrices; fair comparisons shrink the <strong>intermediate width</strong> so parameter and FLOP counts stay comparable to two-matrix baselines. In Shazeer&apos;s studies, SwiGLU achieves the <strong>lowest perplexity</strong> among the alternatives tested.</p>
+  <div class="callout">
+    <p><strong>Honest science.</strong> Shazeer et al. write: <em>&quot;We offer no explanation for the hookup of our favorite non-linearity and the gated linear unit, hoping that the benefit of the combination is yet another example of the unreasonable effectiveness of divine benevolence.&quot;</em></p>
+  </div>
+  <p><strong>Ablation</strong> studies swap activations and widths while holding compute roughly fixed; <strong>practical evaluation</strong> then checks translation quality and training stability. <strong>SiLU</strong> keeps a small, smooth <strong>tail for negative values</strong> unlike ReLU’s hard zero—avoiding classic <strong>dying ReLU</strong> units that stop receiving gradients. The gate lets the network <strong>modulate</strong> how much of the transformed vector passes through the parallel projection.</p>
+  <div class="interactive-panel">
+    <h4>Interactive · ReLU vs SiLU vs gated SiLU·(g·x)</h4>
+    <canvas id="swigluCanvas" class="demo-canvas" width="520" height="300"></canvas>
+    <label class="ctrl">Gate scale g on the green curve: <span id="gateScaleVal">1.00</span></label>
+    <input type="range" id="gateScale" min="0.2" max="2" step="0.05" value="1">
+  </div>
+</section>
+
+<section class="section fade-in" id="s16">
+  <span class="section-num">16</span>
+  <h2>Scale tables</h2>
+  <h3>LLaMA 1 family (illustrative published configs)</h3>
+  <table class="scale">
+    <thead><tr><th>Model</th><th>d<sub>model</sub></th><th>Heads</th><th>Layers</th><th>Context</th><th>Train tokens (order)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>6.7B</strong></td><td>4096</td><td>32</td><td>32</td><td>2048</td><td>~≈1.0T</td></tr>
+      <tr><td><strong>13B</strong></td><td>5120</td><td>40</td><td>40</td><td>2048</td><td>~≈1.0T</td></tr>
+      <tr><td><strong>32B</strong> (≈33B)</td><td>6656</td><td>52</td><td>60</td><td>2048</td><td>~≈1.4T</td></tr>
+      <tr><td><strong>65B</strong></td><td>8192</td><td>64</td><td>80</td><td>2048</td><td>~≈1.4T</td></tr>
+    </tbody>
+  </table>
+  <h3>Original Transformer encoder–decoder (typical base size)</h3>
+  <table class="scale">
+    <thead><tr><th>Component</th><th>Typical value</th></tr></thead>
+    <tbody>
+      <tr><td>Model dimension <em>d</em></td><td><strong>512</strong></td></tr>
+      <tr><td>Attention heads</td><td><strong>8</strong></td></tr>
+      <tr><td>Encoder / decoder layers</td><td><strong>6</strong> each</td></tr>
+    </tbody>
+  </table>
+  <h3>LLaMA 2 deltas (high level)</h3>
+  <table class="scale">
+    <thead><tr><th>Topic</th><th>Change vs LLaMA 1</th></tr></thead>
+    <tbody>
+      <tr><td>Context length</td><td>Extended to <strong>4096</strong> tokens (family-dependent)</td></tr>
+      <tr><td>Training data</td><td>New mixture; more total tokens; stronger safety tuning pipeline</td></tr>
+      <tr><td>GQA</td><td>Used on <strong>34B</strong> and <strong>70B</strong> models</td></tr>
+      <tr><td>Architecture family</td><td>Same decoder-only RMSNorm + RoPE + SwiGLU DNA; sizes rescaled</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="section fade-in" id="s17">
+  <span class="section-num">17</span>
+  <h2>Playground</h2>
+  <p>Sketch how a few knobs interact. The &quot;decode cost&quot; readout is a <strong>unitless index</strong> for comparing scenarios, not a literal latency measurement.</p>
+  <div class="playground-grid">
+    <div class="interactive-panel">
+      <h4>Decode cost sketch (L × G × seq)</h4>
+      <label class="ctrl">Sequence length: <span id="plSeq">512</span></label>
+      <input type="range" id="plSeqR" min="32" max="8192" step="32" value="512">
+      <label class="ctrl">K/V groups G: <span id="plG">8</span></label>
+      <input type="range" id="plGR" min="1" max="64" step="1" value="8">
+      <label class="ctrl">Layers L: <span id="plL">32</span></label>
+      <input type="range" id="plLR" min="1" max="128" step="1" value="32">
+      <div class="output-readout" id="plOut"></div>
+    </div>
+    <div class="interactive-panel">
+      <h4>RoPE angle ladder (d=128 placeholder)</h4>
+      <label class="ctrl">Base (e.g. 10000): <span id="plTheta">10000</span></label>
+      <input type="range" id="plThetaR" min="1000" max="50000" step="500" value="10000">
+      <label class="ctrl">Pair index i: <span id="plPair">0</span></label>
+      <input type="range" id="plPairR" min="0" max="63" step="1" value="0">
+      <div class="output-readout" id="plRopeOut"></div>
+    </div>
+  </div>
+  <table class="comp-table">
+    <thead><tr><th>Aspect</th><th>Original Transformer</th><th class="arrow">→</th><th>LLaMA-style decoder</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Architecture</strong></td><td>Encoder + decoder stacks</td><td class="arrow">→</td><td><strong>Decoder-only</strong> stack (causal LM)</td></tr>
+      <tr><td><strong>Norm placement</strong></td><td>Post-norm (classic diagram)</td><td class="arrow">→</td><td><strong>Pre-norm</strong> before each sublayer</td></tr>
+      <tr><td><strong>Norm type</strong></td><td>LayerNorm</td><td class="arrow">→</td><td><strong>RMSNorm</strong></td></tr>
+      <tr><td><strong>Position encoding</strong></td><td>Sinusoid added to embeddings</td><td class="arrow">→</td><td><strong>RoPE</strong> on Q and K after projections</td></tr>
+      <tr><td><strong>Inference strategy</strong></td><td>Depends on task; seq2seq decoding</td><td class="arrow">→</td><td>Autoregressive with <strong>KV cache</strong></td></tr>
+      <tr><td><strong>Attention heads</strong></td><td>Fixed H; full K/V per head</td><td class="arrow">→</td><td>Optionally <strong>GQA/MQA</strong> at scale</td></tr>
+      <tr><td><strong>Feed-forward</strong></td><td>2-layer MLP + ReLU</td><td class="arrow">→</td><td><strong>SwiGLU</strong> (3 matrices, SiLU gate)</td></tr>
+    </tbody>
+  </table>
+  <div class="callout ok">
+    <p><strong>Synthesis.</strong> LLaMA&apos;s recipe is not one trick but a chain: <strong>stable residuals</strong> (pre-norm + RMSNorm), <strong>relative position in attention scores</strong> (RoPE), <strong>cheap decoding</strong> (KV cache + GQA/MQA when needed), and a <strong>stronger FFN</strong> (SwiGLU) — each piece addresses a different bottleneck or inductive bias.</p>
+  </div>
+</section>
+
+</main>
+<script>
+(function () {
+  'use strict';
+
+  function updateNormDemo() {
+    const x1 = parseFloat(document.getElementById('x1').value);
+    const x2 = parseFloat(document.getElementById('x2').value);
+    const x3 = parseFloat(document.getElementById('x3').value);
+    document.getElementById('x1v').textContent = x1.toFixed(1);
+    document.getElementById('x2v').textContent = x2.toFixed(1);
+    document.getElementById('x3v').textContent = x3.toFixed(1);
+    const x = [x1, x2, x3];
+    const d = x.length;
+    const eps = 1e-5;
+    const mu = x.reduce(function (a, b) { return a + b; }, 0) / d;
+    const var_ = x.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / d;
+    const ln = x.map(function (v) { return (v - mu) / Math.sqrt(var_ + eps); });
+    const rms = Math.sqrt(x.reduce(function (a, b) { return a + b * b; }, 0) / d + eps);
+    const rmsnorm = x.map(function (v) { return v / rms; });
+    document.getElementById('normOut').innerHTML =
+      '\u03bc = ' + mu.toFixed(4) + ', \u03c3\u00b2 = ' + var_.toFixed(4) + '<br>' +
+      '<span style="color:var(--accent)">LayerNorm (\u03b3=1,\u03b2=0):</span> [' + ln.map(function (v) { return v.toFixed(4); }).join(', ') + ']<br>' +
+      '<span style="color:var(--accent3)">RMSNorm (\u03b3=1):</span> [' + rmsnorm.map(function (v) { return v.toFixed(4); }).join(', ') + ']<br>' +
+      '<span style="color:var(--text-dim)">RMS scalar:</span> ' + rms.toFixed(4);
+  }
+  ['x1', 'x2', 'x3'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', updateNormDemo);
+  });
+  updateNormDemo();
+
+  var ropeCanvas = document.getElementById('ropeCanvas');
+  var rctx = ropeCanvas.getContext('2d');
+  function drawRope() {
+    var m = parseInt(document.getElementById('mPos').value, 10);
+    var theta = parseFloat(document.getElementById('thetaBase').value);
+    var vx = parseFloat(document.getElementById('vx').value);
+    var vy = parseFloat(document.getElementById('vy').value);
+    document.getElementById('mVal').textContent = m;
+    document.getElementById('thetaVal').textContent = theta.toFixed(2);
+    document.getElementById('vxVal').textContent = vx.toFixed(2);
+    document.getElementById('vyVal').textContent = vy.toFixed(2);
+    var ang = m * theta;
+    var c = Math.cos(ang); var s = Math.sin(ang);
+    var rx = c * vx - s * vy; var ry = s * vx + c * vy;
+    var cx = 160; var cy = 160; var scale = 55;
+    rctx.fillStyle = '#0a0a0f'; rctx.fillRect(0, 0, ropeCanvas.width, ropeCanvas.height);
+    rctx.strokeStyle = '#2a2a3a'; rctx.lineWidth = 1;
+    for (var g = -4; g <= 4; g++) {
+      rctx.beginPath(); rctx.moveTo(cx + g * 40, 0); rctx.lineTo(cx + g * 40, 320); rctx.stroke();
+      rctx.beginPath(); rctx.moveTo(0, cy + g * 40); rctx.lineTo(560, cy + g * 40); rctx.stroke();
+    }
+    function arrow(x0, y0, x1, y1, col) {
+      rctx.strokeStyle = col; rctx.lineWidth = 2;
+      rctx.beginPath(); rctx.moveTo(x0, y0); rctx.lineTo(x1, y1); rctx.stroke();
+      var ah = 10; var a = Math.atan2(y1 - y0, x1 - x0);
+      rctx.beginPath(); rctx.moveTo(x1, y1);
+      rctx.lineTo(x1 - ah * Math.cos(a - 0.4), y1 - ah * Math.sin(a - 0.4));
+      rctx.lineTo(x1 - ah * Math.cos(a + 0.4), y1 - ah * Math.sin(a + 0.4));
+      rctx.closePath(); rctx.fillStyle = col; rctx.fill();
+    }
+    arrow(cx, cy, cx + vx * scale, cy - vy * scale, '#6c8cff');
+    arrow(cx, cy, cx + rx * scale, cy - ry * scale, '#34d399');
+    rctx.fillStyle = '#8888a0'; rctx.font = '13px system-ui,sans-serif';
+    rctx.fillText('Original (blue)', 320, 36); rctx.fillText('Rotated m\u00b7\u03b8 (green)', 320, 56);
+    rctx.fillStyle = '#a78bfa'; rctx.font = '12px monospace';
+    rctx.fillText('cos=' + c.toFixed(3) + '  sin=' + s.toFixed(3), 320, 90);
+    rctx.fillText('angle m\u00b7\u03b8 = ' + ang.toFixed(3) + ' rad', 320, 108);
+    document.getElementById('ropeReadout').textContent =
+      'Rotated: (' + rx.toFixed(4) + ', ' + ry.toFixed(4) + ')  |  \u2016v\u2016=' +
+      Math.hypot(vx, vy).toFixed(4) + '  \u2016v\'\u2016=' + Math.hypot(rx, ry).toFixed(4) + ' (length preserved by rotation)';
+  }
+  ['mPos', 'thetaBase', 'vx', 'vy'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', drawRope);
+  });
+  drawRope();
+
+  var decayCanvas = document.getElementById('decayCanvas');
+  var dctx = decayCanvas.getContext('2d');
+  function drawDecay() {
+    var sharp = parseFloat(document.getElementById('decaySharp').value);
+    document.getElementById('decaySharpVal').textContent = sharp.toFixed(2);
+    dctx.fillStyle = '#0a0a0f'; dctx.fillRect(0, 0, decayCanvas.width, decayCanvas.height);
+    dctx.strokeStyle = '#2a2a3a'; dctx.strokeRect(50, 20, 460, 180);
+    dctx.beginPath(); dctx.moveTo(50, 200);
+    for (var px = 0; px <= 460; px++) {
+      var dist = (px / 460) * 40; var env = Math.exp(-sharp * dist);
+      dctx.lineTo(50 + px, 20 + (1 - env) * 170);
+    }
+    dctx.strokeStyle = '#f472b6'; dctx.lineWidth = 2; dctx.stroke();
+    dctx.fillStyle = '#8888a0'; dctx.font = '12px sans-serif';
+    dctx.fillText('Illustrative envelope exp(\u2212k\u00b7distance)', 58, 16);
+    dctx.fillText('Token distance \u2192', 380, 212);
+  }
+  document.getElementById('decaySharp').addEventListener('input', drawDecay);
+  drawDecay();
+
+  var kvCanvas = document.getElementById('kvCanvas');
+  var kvctx = kvCanvas.getContext('2d');
+  var kvStep = 1;
+  function drawKV() {
+    var n = 6; var cell = 36; var ox = 40; var oy = 50;
+    kvctx.fillStyle = '#0a0a0f'; kvctx.fillRect(0, 0, kvCanvas.width, kvCanvas.height);
+    kvctx.fillStyle = '#e0e0e8'; kvctx.font = '14px sans-serif';
+    kvctx.fillText('Causal QK\u1d40 scores (active prefix)', ox, 32);
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        var active = i < kvStep && j < kvStep; var causal = j <= i;
+        kvctx.fillStyle = active && causal ? 'rgba(108,140,255,0.35)' : 'rgba(42,42,58,0.5)';
+        if (active && causal && i === kvStep - 1) kvctx.fillStyle = 'rgba(52,211,153,0.55)';
+        kvctx.fillRect(ox + j * cell, oy + i * cell, cell - 2, cell - 2);
+      }
+    }
+    kvctx.fillStyle = '#e0e0e8';
+    kvctx.fillText('Cached prefix length = ' + kvStep, ox, oy + n * cell + 40);
+    kvctx.font = '12px monospace'; kvctx.fillStyle = '#a78bfa';
+    kvctx.fillRect(ox, oy + n * cell + 52, kvStep * cell, 14);
+    kvctx.strokeStyle = '#2a2a3a'; kvctx.strokeRect(ox, oy + n * cell + 52, n * cell, 14);
+    document.getElementById('kvReadout').innerHTML =
+      'Step <strong>' + kvStep + '</strong>: full matrix would be <strong>' + kvStep + '\u00d7' + kvStep +
+      '</strong>; KV cache computes <strong>one new row</strong> of length ' + kvStep + ' vs stored keys, one output row from cached V.';
+  }
+  document.getElementById('kvNext').addEventListener('click', function () { if (kvStep < 6) kvStep++; drawKV(); });
+  document.getElementById('kvPrev').addEventListener('click', function () { if (kvStep > 1) kvStep--; drawKV(); });
+  document.getElementById('kvReset').addEventListener('click', function () { kvStep = 1; drawKV(); });
+  drawKV();
+
+  var gqaCanvas = document.getElementById('gqaCanvas');
+  var gctx = gqaCanvas.getContext('2d');
+  function groupCenter(x0, spacing, H, G, gTarget) {
+    var heads = []; for (var h = 0; h < H; h++) {
+      var gi = Math.min(G - 1, Math.floor(h * G / H)); if (gi === gTarget) heads.push(h);
+    }
+    if (!heads.length) return x0;
+    return x0 + heads.reduce(function (a, b) { return a + b; }, 0) / heads.length * spacing;
+  }
+  function drawGQA() {
+    var H = parseInt(document.getElementById('hHeads').value, 10);
+    var G = parseInt(document.getElementById('gGroups').value, 10);
+    if (G > H) { G = H; document.getElementById('gGroups').value = G; }
+    document.getElementById('hVal').textContent = H; document.getElementById('gVal').textContent = G;
+    gctx.fillStyle = '#0a0a0f'; gctx.fillRect(0, 0, gqaCanvas.width, gqaCanvas.height);
+    var qy = 40; var ky = 120; var dotR = 6;
+    var spacing = Math.min(14, (500 - 40) / Math.max(H, 1)); var x0 = 30;
+    for (var h = 0; h < H; h++) {
+      var x = x0 + h * spacing;
+      gctx.beginPath(); gctx.arc(x, qy, dotR, 0, Math.PI * 2); gctx.fillStyle = '#6c8cff'; gctx.fill();
+      var gidx = Math.min(G - 1, Math.floor(h * G / H));
+      var kx = groupCenter(x0, spacing, H, G, gidx);
+      gctx.strokeStyle = 'rgba(244,114,182,0.35)'; gctx.beginPath();
+      gctx.moveTo(x, qy + dotR); gctx.lineTo(kx, ky - dotR); gctx.stroke();
+    }
+    for (var g = 0; g < G; g++) {
+      var kxc = groupCenter(x0, spacing, H, G, g);
+      gctx.beginPath(); gctx.arc(kxc, ky, dotR + 2, 0, Math.PI * 2); gctx.fillStyle = '#f472b6'; gctx.fill();
+    }
+    gctx.fillStyle = '#8888a0'; gctx.font = '12px sans-serif';
+    gctx.fillText('Query heads (blue)', 30, 22); gctx.fillText('K/V heads (pink)', 30, 108);
+    var mode = G === H ? 'MHA (full)' : (G === 1 ? 'MQA' : 'GQA');
+    var hpg = H / G;
+    document.getElementById('gqaReadout').innerHTML =
+      '<strong>' + mode + '</strong> \u2014 H=' + H + ', G=' + G + ', ~' +
+      (hpg % 1 === 0 ? hpg : hpg.toFixed(2)) + ' queries per K/V group.';
+  }
+  document.getElementById('hHeads').addEventListener('input', drawGQA);
+  document.getElementById('gGroups').addEventListener('input', drawGQA);
+  drawGQA();
+
+  var swCanvas = document.getElementById('swigluCanvas');
+  var sctx = swCanvas.getContext('2d');
+  function silu(t) { return t / (1 + Math.exp(-t)); }
+  function drawSwiGLU() {
+    var g = parseFloat(document.getElementById('gateScale').value);
+    document.getElementById('gateScaleVal').textContent = g.toFixed(2);
+    sctx.fillStyle = '#0a0a0f'; sctx.fillRect(0, 0, swCanvas.width, swCanvas.height);
+    var ox = 50; var oy = 140; var w = 460; var h = 120;
+    sctx.strokeStyle = '#2a2a3a'; sctx.beginPath();
+    sctx.moveTo(ox, oy - h); sctx.lineTo(ox, oy + h); sctx.lineTo(ox + w, oy + h); sctx.stroke();
+    function plot(fn, col) {
+      sctx.beginPath();
+      for (var px = 0; px <= w; px++) {
+        var t = (px / w) * 8 - 4; var yv = fn(t);
+        var py = oy - Math.max(-h, Math.min(h, yv * 35));
+        if (px === 0) sctx.moveTo(ox + px, py); else sctx.lineTo(ox + px, py);
+      }
+      sctx.strokeStyle = col; sctx.lineWidth = 2; sctx.stroke();
+    }
+    plot(function (t) { return Math.max(0, t); }, '#f87171');
+    plot(silu, '#6c8cff');
+    plot(function (t) { return silu(t) * (g * t); }, '#34d399');
+    sctx.fillStyle = '#8888a0'; sctx.font = '12px sans-serif';
+    sctx.fillText('x', ox + w - 8, oy + h + 18);
+    sctx.fillText('ReLU', ox + w - 200, 28); sctx.fillStyle = '#f87171'; sctx.fillRect(ox + w - 240, 18, 12, 12);
+    sctx.fillStyle = '#8888a0'; sctx.fillText('SiLU', ox + w - 130, 28); sctx.fillStyle = '#6c8cff'; sctx.fillRect(ox + w - 170, 18, 12, 12);
+    sctx.fillStyle = '#8888a0'; sctx.fillText('SiLU\u00b7(g\u00b7x)', ox + w - 68, 28); sctx.fillStyle = '#34d399'; sctx.fillRect(ox + w - 100, 18, 12, 12);
+  }
+  document.getElementById('gateScale').addEventListener('input', drawSwiGLU);
+  drawSwiGLU();
+
+  function updatePlayground() {
+    var seq = parseInt(document.getElementById('plSeqR').value, 10);
+    var G = parseInt(document.getElementById('plGR').value, 10);
+    var L = parseInt(document.getElementById('plLR').value, 10);
+    document.getElementById('plSeq').textContent = seq;
+    document.getElementById('plG').textContent = G;
+    document.getElementById('plL').textContent = L;
+    var relative = L * G * seq;
+    document.getElementById('plOut').innerHTML =
+      'Relative index L\u00d7G\u00d7seq = ' + L + '\u00d7' + G + '\u00d7' + seq +
+      ' = <strong>' + relative.toLocaleString() + '</strong> (unitless; compare scenarios).';
+    var base = parseInt(document.getElementById('plThetaR').value, 10);
+    var pair = parseInt(document.getElementById('plPairR').value, 10);
+    document.getElementById('plTheta').textContent = base;
+    document.getElementById('plPair').textContent = pair;
+    var theta_i = Math.pow(base, -2 * pair / 128);
+    document.getElementById('plRopeOut').innerHTML =
+      '\u03b8<sub>i</sub> with d=128 placeholder: \u03b8<sub>' + pair + '</sub> = base<sup>\u22122i/d</sup> \u2248 <strong>' +
+      theta_i.toExponential(4) + '</strong> (base=' + base + ').';
+  }
+  ['plSeqR', 'plGR', 'plLR', 'plThetaR', 'plPairR'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', updatePlayground);
+  });
+  updatePlayground();
+
+  var nav = document.getElementById('nav');
+  window.addEventListener('scroll', function () {
+    var y = window.scrollY;
+    nav.classList.toggle('visible', y > 300);
+    document.querySelectorAll('.fade-in:not(.visible)').forEach(function (el) {
+      var rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 60) el.classList.add('visible');
+    });
+  }, { passive: true });
+  window.dispatchEvent(new Event('scroll'));
+})();
+
+</script>
+</body>
+</html>

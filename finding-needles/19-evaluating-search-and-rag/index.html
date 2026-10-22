@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Evaluating Search &amp; RAG — Offline Metrics &amp; Online Experiments | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 96px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    @media (max-width: 640px) {
+      .main-nav.collapsed { display: none; }
+    }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover, .main-nav a.active { color: var(--accent); }
+    .nav-toggle {
+      display: none;
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    @media (max-width: 640px) {
+      .nav-toggle { display: block; }
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(52, 211, 153, 0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(34, 211, 238, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(251, 191, 36, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.55rem, 4vw, 2.65rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent3);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .formula {
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 16px 0;
+      color: var(--accent5);
+      overflow-x: auto;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 22px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .callout.warn { border-left-color: var(--accent5); }
+    .callout.ok { border-left-color: var(--accent3); }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 22px 0; }
+    @media (max-width: 900px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      font-size: 0.92rem;
+      color: var(--text-dim);
+    }
+    .comparison > div h4 { margin: 0 0 10px; color: var(--text); font-size: 0.95rem; }
+    .demo {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .demo h4 { margin: 0 0 14px; color: var(--text); font-size: 1rem; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    button.btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    button.btn:hover { border-color: var(--accent); color: var(--accent); }
+    button.btn.primary { background: rgba(34, 211, 238, 0.12); border-color: var(--accent); color: var(--accent); }
+    select.inp, textarea.inp, input.inp {
+      width: 100%;
+      max-width: 100%;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      margin: 8px 0;
+    }
+    textarea.inp { min-height: 80px; resize: vertical; }
+    textarea.inp.mono { font-family: var(--mono); font-size: 0.82rem; }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .metric-tile {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .metric-tile .name { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric-tile .val { font-family: var(--mono); font-size: 1.15rem; color: var(--accent3); margin-top: 4px; }
+    .drag-list { list-style: none; margin: 0; padding: 0; }
+    .drag-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: grab;
+      user-select: none;
+    }
+    .drag-item:active { cursor: grabbing; }
+    .drag-item.dragging { opacity: 0.55; border-color: var(--accent); }
+    .drag-rank { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); min-width: 2rem; }
+    .drag-rel {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--accent5);
+      margin-left: auto;
+    }
+    .playground-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 768px) { .playground-grid { grid-template-columns: 1fr; } }
+    .log-box {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 160px;
+      white-space: pre-wrap;
+      color: var(--text-dim);
+    }
+    .ab-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .ab-row { grid-template-columns: 1fr; } }
+    footer.site-footer {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 16px 0;
+    }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      color: var(--text-dim);
+    }
+    table.data th { background: var(--bg-card); color: var(--text); }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../index.html">Learning Blogs</a><span class="bc-sep">›</span>
+    <a href="../index.html">Search Zero to Hero</a><span class="bc-sep">›</span>
+    <span class="bc-current">Evaluating Search</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="true" aria-controls="mainNav">Sections</button>
+  <nav class="main-nav" id="mainNav" aria-label="Page sections">
+    <a href="#s0">00 · Why hard</a>
+    <a href="#s1">01 · Retrieval</a>
+    <a href="#s2">02 · nDCG</a>
+    <a href="#s3">03 · Judgments</a>
+    <a href="#s4">04 · Golden / Silver</a>
+    <a href="#s5">05 · RAG eval</a>
+    <a href="#s6">06 · LLM judge</a>
+    <a href="#s7">07 · A/B tests</a>
+    <a href="#s8">08 · Playground</a>
+  </nav>
+
+  <header class="hero">
+    <span class="chapter-badge">Chapter 19 of 26 · Search Zero to Hero</span>
+    <h1>Evaluating Search &amp; RAG — Offline Metrics &amp; Online Experiments</h1>
+    <p class="subtitle">
+      Pair <strong>offline measurement</strong> (judged rankings, nDCG, RAG scores) with <strong>online measurement</strong> (controlled experiments on live traffic).
+      Each track catches failures the other misses.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">9</div><div class="lbl">Sections</div></div>
+      <div class="hero-stat"><div class="val">6+</div><div class="lbl">Live demos</div></div>
+      <div class="hero-stat"><div class="val">1</div><div class="lbl">Workbench</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>00 · Why evaluation is hard</h2>
+    <p>
+      <strong>Search quality is subjective.</strong> The same ranked list can be excellent for a power user and mediocre for a novice.
+      Context—locale, session history, task stage—shifts what “good” means and shows up as label noise and annotator disagreement.
+    </p>
+    <p>
+      <strong>Offline metrics diverge from real-world satisfaction.</strong> High <code>nDCG@10</code> on a static benchmark does not guarantee good snippets,
+      fresh results, or usable UI. Modest offline scores can still win online if they reduce pogo-sticking or surface safer answers.
+      Metrics summarize ranked lists; they do not encode latency, trust, diversity, or compliance.
+    </p>
+    <p>
+      Use <strong>both</strong> tracks: offline evaluation for reproducible regression tests; online <code>A/B</code> tests for adoption, session success, and side effects.
+    </p>
+    <div class="comparison">
+      <div>
+        <h4>Offline</h4>
+        Judged lists, nDCG, RAGAS-style scores, LLM rubrics. Fast iteration, tight control, risk of overfitting benchmarks.
+      </div>
+      <div>
+        <h4>Online</h4>
+        CTR, dwell, reformulation, session success. Ground truth for behavior, noisy, needs discipline (sample size, peeking).
+      </div>
+      <div>
+        <h4>Hybrid</h4>
+        Gate deploys with offline parity checks; promote winners after online verification. Calibrate offline to online periodically.
+      </div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>01 · Retrieval metrics</h2>
+    <p>
+      Fix a cutoff <code>k</code>. <strong>Precision@k</strong> is the fraction of the top-<code>k</code> slots that are relevant.
+      <strong>Recall@k</strong> is the fraction of all relevant documents for the query that appear in the top-<code>k</code>.
+      When the total relevant count is unknown, recall is reported against a <em>pooled</em> judgment set (see §03).
+    </p>
+    <p>
+      <strong>F1@k</strong> is the harmonic mean of precision and recall at the same <code>k</code>.
+      <strong>Mean Reciprocal Rank (MRR)</strong> uses <code>1 / rank</code> of the first relevant hit (0 if none)—ruthless about burying the first good answer.
+      <strong>Mean Average Precision (MAP)</strong> averages precision at every depth where a relevant document appears, rewarding multiple relevant hits without junk at the top.
+    </p>
+    <div class="callout ok">
+      <strong>Convention in this page.</strong> For mixed grades, treat a document as <em>relevant</em> for P/R/F1/MRR/MAP when its grade is <code>≥ 1</code> (binary <code>1</code> counts;
+      graded <code>2</code> or <code>3</code> also counts). <code>nDCG</code> uses full grades. Adjust thresholds in your own tooling to match annotation guidelines.
+    </div>
+    <div class="demo" id="demoRetrieval">
+      <h4>Interactive · Ranked list → Precision, Recall, F1, MRR, MAP</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">
+        Enter comma-separated <strong>relevance grades</strong> in rank order (left = best rank). Example: <code>1,0,1,0,0,1</code> with <code>k = 3</code>.
+      </p>
+      <label for="relInput">Relevance grades (comma-separated)</label>
+      <input type="text" id="relInput" class="inp mono" value="1,0,1,0,0,1" autocomplete="off" />
+      <label for="kInput">k for Precision / Recall / F1</label>
+      <input type="number" id="kInput" class="inp" min="1" max="50" value="3" />
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="retrievalCompute">Compute metrics</button>
+        <button type="button" class="btn" id="retrievalPreset1">Preset: perfect top-3</button>
+        <button type="button" class="btn" id="retrievalPreset2">Preset: late first hit</button>
+      </div>
+      <div class="metric-grid" id="retrievalMetrics" aria-live="polite"></div>
+      <p id="retrievalExplain" style="font-size:0.88rem;color:var(--text-dim);margin-bottom:0;"></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>02 · nDCG — graded ranking quality</h2>
+    <p>
+      <strong>Normalized DCG (nDCG@k)</strong> is <code>DCG@k / IDCG@k</code>, in <code>[0, 1]</code> when gains are non-negative.
+      It rewards highly relevant documents at top ranks with a logarithmic position discount.
+      Graded labels and the gain formula were introduced in
+      <a href="../10-cross-encoder-reranking/index.html">Chapter 10</a> (reranking evaluation) and applied to hybrid benchmarks in
+      <a href="../12-hybrid-search/index.html">Chapter 12</a>.
+    </p>
+    <p>
+      Pair nDCG with pool-based recall or session metrics when long-tail coverage matters—it does not measure that by itself.
+    </p>
+    <div class="demo" id="demoNdcg">
+      <h4>Interactive · Drag rows to reorder; watch nDCG@k</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">
+        Each row is a fixed document with a fixed grade. Reordering changes DCG and nDCG. <code>k</code> limits the summation depth.
+      </p>
+      <label for="ndcgK">k</label>
+      <input type="number" id="ndcgK" class="inp" min="1" max="10" value="5" style="max-width:120px;display:inline-block;" />
+      <ul class="drag-list" id="ndcgList" aria-label="Reorderable ranking"></ul>
+      <div class="metric-grid" style="margin-top:16px;">
+        <div class="metric-tile"><div class="name">DCG@k</div><div class="val" id="ndcgDcg">—</div></div>
+        <div class="metric-tile"><div class="name">IDCG@k</div><div class="val" id="ndcgIdcg">—</div></div>
+        <div class="metric-tile"><div class="name">nDCG@k</div><div class="val" id="ndcgVal">—</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>03 · Judgment lists</h2>
+    <p>
+      Offline evaluation rests on <strong>judgment lists</strong>: rows of <code>(query, document_id, relevance)</code> from human annotators or a trusted oracle.
+      Without judgments, “ground truth” is whatever the old system emitted.
+    </p>
+    <h3>Grading scales</h3>
+    <p>
+      Teams use <strong>binary</strong> (relevant vs. not), <strong>4-point</strong> (0–3), or <strong>5-point</strong> (0–4) scales.
+      Finer scales help nDCG but need clearer guidelines and more adjudication. Document boundary cases with examples.
+    </p>
+    <h3>Inter-annotator agreement</h3>
+    <p>
+      Report agreement beyond chance: <strong>Cohen’s kappa</strong> for two raters; <strong>Krippendorff’s alpha</strong> for multiple raters and missing data.
+      Low agreement means fix instructions before trusting a leaderboard spread of 0.002 nDCG.
+    </p>
+    <h3>How many judgments?</h3>
+    <p>
+      Head queries with one obvious answer need fewer labels than tail queries with multiple valid facets.
+      Start with <strong>dozens to hundreds</strong> of queries for directional comparisons; grow to <strong>thousands</strong> when metrics must stabilize across slices.
+    </p>
+    <h3>Pooling and shared-task methodology</h3>
+    <p>
+      <strong>Pooling</strong> unions top results from several systems per query, deduplicates, then judges that pool.
+      Recall is computed relative to the judged pool, not the web at large—the classic <strong>TREC</strong> workflow: reproducible, but blind to relevant docs outside the pool.
+    </p>
+    <div class="card">
+      <h4 style="margin-top:0;color:var(--text);">Quick reference · pooling vs. exhaustive judging</h4>
+      <table class="data">
+        <thead><tr><th>Approach</th><th>Pros</th><th>Cons</th></tr></thead>
+        <tbody>
+          <tr><td>Depth-<code>k</code> pool per query</td><td>Feasible at scale; comparable across submissions</td><td>Underestimates recall; pool depth matters</td></tr>
+          <tr><td>Exhaustive corpus labels</td><td>Unbiased recall in principle</td><td>Often impossible for open web</td></tr>
+          <tr><td>Dynamic pool expansion</td><td>Adds unseen hits when new systems find them</td><td>More rounds of judging; logistics</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>04 · Golden sets vs. silver sets (and synthetic pairs)</h2>
+    <p>
+      <strong>Golden sets</strong> are carefully human-judged evaluation corpora—expensive, authoritative, held out from training and protected from leakage.
+      <strong>Silver sets</strong> come from clicks or implicit feedback—cheap at scale but carry <strong>position bias</strong> and <strong>presentation bias</strong>.
+      Click models like <strong>SDBN</strong> attempt to debias observed clicks into estimated relevance.
+    </p>
+    <p>
+      <strong>Synthetic data</strong> (LLM-generated Q&amp;A from documents) helps cold start when no logs exist; filter, deduplicate, and verify before trusting rare domains.
+    </p>
+    <h3>How to build each</h3>
+    <ul class="fancy">
+      <li><strong>Golden:</strong> sample queries from logs or personas; write annotation guidelines with worked examples; use multiple annotators and adjudication;
+        store rationale for borderline docs; refresh periodically for drift.</li>
+      <li><strong>Silver:</strong> aggregate clicks and hovers per query–document; apply click models or pairwise de-biasing; down-weight ambiguous sessions;
+        cross-check a subset against golden labels to estimate noise.</li>
+      <li><strong>Synthetic:</strong> prompt an LLM with document chunks to produce questions and answers; enforce constraints (answer must be substring or must cite offsets);
+        run consistency checks; discard toxic or off-policy generations.</li>
+    </ul>
+    <div class="comparison">
+      <div>
+        <h4>Golden</h4>
+        Use for <strong>evaluation</strong> and high-stakes regression gates. Keep pristine; do not tune hyperparameters directly on the primary golden test set.
+      </div>
+      <div>
+        <h4>Silver</h4>
+        Use for <strong>training</strong> rerankers and embeddings at scale. Expect noise; monitor calibration to golden slices.</div>
+      <div>
+        <h4>Synthetic</h4>
+        Use for <strong>cold start</strong> and coverage expansion. Always validate with human spot checks before trusting rare-domain behavior.</div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>05 · RAG-specific evaluation</h2>
+    <p>
+      RAG adds <strong>generation</strong> failure modes: unsupported claims, hedging that ignores evidence, fluent but off-topic answers.
+      Frameworks package scoring for these dimensions—<strong>RAGAS</strong> (<code>faithfulness</code>, <code>answer relevancy</code>, <code>context precision</code>, <code>context recall</code>),
+      <strong>DeepEval</strong> (test harnesses), <strong>TruLens</strong> (trace-attached feedback functions).
+    </p>
+    <h3>Key RAG metrics (conceptual)</h3>
+    <ul class="fancy">
+      <li><strong>Faithfulness:</strong> Is the answer entailed by or directly supported by the retrieved context? Penalize added facts.</li>
+      <li><strong>Answer relevancy:</strong> Does the answer address the user question without unnecessary tangents?</li>
+      <li><strong>Context relevancy / precision:</strong> Is retrieved context on-topic and free of distracting passages?</li>
+      <li><strong>Context recall:</strong> Does the context contain the information needed to answer (coverage of necessary facts)?</li>
+      <li><strong>Groundedness:</strong> Can each atomic claim be traced to a source span (sometimes checked with NLI or citation overlap)?</li>
+    </ul>
+    <div class="demo" id="demoRag">
+      <h4>Interactive · Toy RAG scores from question, context, answer</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Deterministic heuristics (token overlap, coverage)—production stacks use cross-encoders or LLM judges.</p>
+      <label for="ragQ">Question</label>
+      <textarea id="ragQ" class="inp" rows="2">What is the refund window for annual plans?</textarea>
+      <label for="ragC">Context</label>
+      <textarea id="ragC" class="inp" rows="4">Annual subscriptions may be refunded within 14 days of purchase if no usage has occurred. Monthly plans are non-refundable.</textarea>
+      <label for="ragA">Answer</label>
+      <textarea id="ragA" class="inp" rows="3">You can get a refund on an annual plan within 14 days if you have not used the product.</textarea>
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="ragScoreBtn">Score</button>
+        <button type="button" class="btn" id="ragHallucinate">Try unsupported answer</button>
+      </div>
+      <div class="metric-grid" id="ragMetrics"></div>
+      <pre class="log-box" id="ragLog" style="margin-top:12px;min-height:100px;"></pre>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>06 · LLM as judge</h2>
+    <p>
+      An <strong>LLM judge</strong> scores answers, compares pairs, or checks entailment against context.
+      <strong>Pairwise</strong> (“Which answer is better?”) reduces verbosity sensitivity; <strong>pointwise</strong> rubrics assign 1–5 with criteria per level.
+    </p>
+    <p>
+      <strong>Pros:</strong> cheap at the margin, consistent on repetitive rubrics, easy in CI.
+      <strong>Cons:</strong> position bias, verbosity bias, self-preference when judge and generator share a family.
+      Mitigate with order swapping, binary checklists, human calibration sets, and cite-match or NLI checks.
+    </p>
+    <p>
+      On well-defined tasks with tight rubrics, LLM–human agreement often lands in the <strong>roughly 80–90%</strong> band—useful for triage, not alone for regulated claims.
+    </p>
+    <div class="demo" id="demoPairwise">
+      <h4>Interactive · Pairwise preference (toy rubric)</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">
+        Two answers are scored by simple overlap with context. Swap order to see <strong>position bias</strong> in naive tie-breaking (the demo prefers the first when scores tie).
+      </p>
+      <div class="ab-row">
+        <div>
+          <label>Answer A</label>
+          <textarea id="pa" class="inp" rows="3">Refund within 14 days for annual plans without usage.</textarea>
+        </div>
+        <div>
+          <label>Answer B</label>
+          <textarea id="pb" class="inp" rows="3">Monthly plans are non-refundable and cheaper overall.</textarea>
+        </div>
+      </div>
+      <textarea id="pctx" class="inp" rows="2" style="font-size:0.88rem;">Annual subscriptions may be refunded within 14 days of purchase if no usage has occurred.</textarea>
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="pairJudge">Judge A vs B</button>
+        <button type="button" class="btn" id="pairSwap">Swap A/B order</button>
+      </div>
+      <p id="pairResult" style="font-size:0.95rem;color:var(--text-dim);margin-bottom:0;"></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>07 · A/B testing for search relevance</h2>
+    <p>
+      Online evaluation compares a <strong>control</strong> to a <strong>treatment</strong> on live traffic.
+      Primary metrics: <strong>CTR</strong>, <strong>reformulation rate</strong>, <strong>dwell time</strong>, and <strong>session success</strong> proxies.
+      Search is sequential—session-level summaries can disagree with query-level CTR.
+    </p>
+    <p>
+      Pre-register sample sizes when possible; compute <code>p</code>-values and confidence intervals.
+      Watch for <strong>novelty effects</strong>, <strong>Simpson’s paradox</strong>, and latency confounds (treatment gets slower pages).
+      A better ranker can lower per-query CTR if it resolves intent faster—pair CTR with success and reformulation signals.
+    </p>
+    <div class="demo" id="demoAb">
+      <h4>Interactive · Two-proportion z-test simulator</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">
+        Enter impressions and observed clicks for control and treatment. The panel estimates a two-sided <code>p</code>-value using a pooled-proportion z-test (large-sample normal approximation).
+      </p>
+      <div class="ab-row">
+        <div class="card" style="margin:0;">
+          <h4 style="margin:0 0 10px;color:var(--text);">Control</h4>
+          <label>Impressions</label>
+          <input type="number" id="abN0" class="inp" min="1" value="4000" />
+          <label>Clicks</label>
+          <input type="number" id="abC0" class="inp" min="0" value="320" />
+        </div>
+        <div class="card" style="margin:0;">
+          <h4 style="margin:0 0 10px;color:var(--text);">Treatment</h4>
+          <label>Impressions</label>
+          <input type="number" id="abN1" class="inp" min="1" value="4100" />
+          <label>Clicks</label>
+          <input type="number" id="abC1" class="inp" min="0" value="361" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="abRun">Compute</button>
+        <button type="button" class="btn" id="abTiny">Preset: tiny sample</button>
+        <button type="button" class="btn" id="abClear">Preset: significant lift</button>
+      </div>
+      <pre class="log-box" id="abOut"></pre>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s8">
+    <h2>08 · Playground — evaluation workbench</h2>
+    <div class="demo" id="demoPlay">
+      <h4>Workbench · Grades + metrics + RAG</h4>
+      <div class="playground-grid">
+        <div>
+          <label for="pgRel">Ranked relevance grades (comma-separated)</label>
+          <textarea id="pgRel" class="inp mono" rows="3">3,2,0,1,0,2</textarea>
+          <label for="pgK">k</label>
+          <input type="number" id="pgK" class="inp" min="1" max="50" value="5" />
+          <button type="button" class="btn primary" id="pgGo">Update all retrieval + nDCG metrics</button>
+          <div class="metric-grid" id="pgMetrics" style="margin-top:14px;"></div>
+        </div>
+        <div>
+          <label for="pgQ">Question</label>
+          <textarea id="pgQ" class="inp" rows="2">Summarize the refund rule.</textarea>
+          <label for="pgC">Context</label>
+          <textarea id="pgC" class="inp" rows="3">Annual plans: 14-day refund if unused. Monthly plans: non-refundable.</textarea>
+          <label for="pgA">Answer</label>
+          <textarea id="pgA" class="inp" rows="2">Annual subscribers have 14 days to refund if they have not used the service.</textarea>
+          <button type="button" class="btn primary" id="pgRag">Score RAG heuristics</button>
+          <div class="metric-grid" id="pgRagOut" style="margin-top:14px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <p>Search Zero to Hero · Chapter 19 · Evaluating Search &amp; RAG</p>
+    <p style="margin-top:8px;">Single-file reference · vanilla JS · dark theme</p>
+  </footer>
+
+  <script>
+(function () {
+  'use strict';
+
+  function log2(x) {
+    return Math.log(x) / Math.LN2;
+  }
+
+  function parseGrades(str) {
+    return str.split(/[,;\s]+/).map(function (s) { return s.trim(); }).filter(Boolean).map(function (x) {
+      var n = Number(x);
+      return Number.isFinite(n) ? n : NaN;
+    });
+  }
+
+  function isRel(g) {
+    return g >= 1;
+  }
+
+  function precisionAtK(rels, k) {
+    var kk = Math.min(k, rels.length);
+    if (kk === 0) return 0;
+    var hit = 0;
+    for (var i = 0; i < kk; i++) if (isRel(rels[i])) hit++;
+    return hit / kk;
+  }
+
+  function recallAtK(rels, k) {
+    var R = rels.filter(isRel).length;
+    if (R === 0) return null;
+    var hit = 0;
+    for (var i = 0; i < Math.min(k, rels.length); i++) if (isRel(rels[i])) hit++;
+    return hit / R;
+  }
+
+  function f1AtK(rels, k) {
+    var p = precisionAtK(rels, k);
+    var r = recallAtK(rels, k);
+    if (r === null) return null;
+    if (p + r === 0) return 0;
+    return 2 * p * r / (p + r);
+  }
+
+  function mrrOne(rels) {
+    for (var i = 0; i < rels.length; i++) {
+      if (isRel(rels[i])) return 1 / (i + 1);
+    }
+    return 0;
+  }
+
+  function averagePrecision(rels) {
+    var relB = rels.map(isRel);
+    var R = relB.filter(Boolean).length;
+    if (R === 0) return 0;
+    var sum = 0;
+    var relSoFar = 0;
+    for (var i = 0; i < rels.length; i++) {
+      if (relB[i]) {
+        relSoFar++;
+        sum += relSoFar / (i + 1);
+      }
+    }
+    return sum / R;
+  }
+
+  function dcgAtK(rels, k) {
+    var kk = Math.min(k, rels.length);
+    var dcg = 0;
+    for (var i = 0; i < kk; i++) {
+      var gain = Math.pow(2, rels[i]) - 1;
+      dcg += gain / log2(i + 2);
+    }
+    return dcg;
+  }
+
+  function idcgAtK(rels, k) {
+    var sorted = rels.slice().sort(function (a, b) { return b - a; });
+    return dcgAtK(sorted, k);
+  }
+
+  function ndcgAtK(rels, k) {
+    var ideal = idcgAtK(rels, k);
+    if (ideal === 0) return 1;
+    return dcgAtK(rels, k) / ideal;
+  }
+
+  function fmt(x, d) {
+    if (x === null || x === undefined || Number.isNaN(x)) return '—';
+    d = d === undefined ? 4 : d;
+    return Number(x).toFixed(d);
+  }
+
+  function renderMetricGrid(el, tiles) {
+    el.innerHTML = tiles.map(function (t) {
+      return '<div class="metric-tile"><div class="name">' + t.name + '</div><div class="val">' + t.val + '</div></div>';
+    }).join('');
+  }
+
+  /* --- Retrieval demo --- */
+  function runRetrievalDemo() {
+    var rels = parseGrades(document.getElementById('relInput').value);
+    var k = parseInt(document.getElementById('kInput').value, 10) || 1;
+    var bad = rels.some(function (g) { return Number.isNaN(g); });
+    var explain = document.getElementById('retrievalExplain');
+    if (bad || rels.length === 0) {
+      document.getElementById('retrievalMetrics').innerHTML = '';
+      explain.textContent = 'Enter numeric grades separated by commas.';
+      return;
+    }
+    var p = precisionAtK(rels, k);
+    var r = recallAtK(rels, k);
+    var f1 = f1AtK(rels, k);
+    var mrr = mrrOne(rels);
+    var map = averagePrecision(rels);
+    var nd = ndcgAtK(rels, k);
+    renderMetricGrid(document.getElementById('retrievalMetrics'), [
+      { name: 'Precision@k', val: fmt(p) },
+      { name: 'Recall@k', val: r === null ? 'n/a (no rel)' : fmt(r) },
+      { name: 'F1@k', val: f1 === null ? 'n/a' : fmt(f1) },
+      { name: 'MRR', val: fmt(mrr) },
+      { name: 'MAP (query)', val: fmt(map) },
+      { name: 'nDCG@k', val: fmt(nd) }
+    ]);
+    explain.textContent = 'Binary metrics treat grades ≥ 1 as relevant. Total relevant in list: ' + rels.filter(isRel).length + '.';
+  }
+
+  document.getElementById('retrievalCompute').addEventListener('click', runRetrievalDemo);
+  document.getElementById('retrievalPreset1').addEventListener('click', function () {
+    document.getElementById('relInput').value = '1,1,1,0,0,0';
+    document.getElementById('kInput').value = '3';
+    runRetrievalDemo();
+  });
+  document.getElementById('retrievalPreset2').addEventListener('click', function () {
+    document.getElementById('relInput').value = '0,0,0,1,1,0';
+    document.getElementById('kInput').value = '5';
+    runRetrievalDemo();
+  });
+
+  /* --- nDCG drag list --- */
+  var ndcgState = [
+    { label: 'Doc A', grade: 3 },
+    { label: 'Doc B', grade: 2 },
+    { label: 'Doc C', grade: 0 },
+    { label: 'Doc D', grade: 2 },
+    { label: 'Doc E', grade: 1 }
+  ];
+  var dragFrom = null;
+
+  function ndcgK() {
+    return Math.max(1, parseInt(document.getElementById('ndcgK').value, 10) || 5);
+  }
+
+  function updateNdcgNumbers() {
+    var k = ndcgK();
+    var rels = ndcgState.map(function (x) { return x.grade; });
+    var dcg = dcgAtK(rels, k);
+    var idcg = idcgAtK(rels, k);
+    var nd = idcg === 0 ? 1 : dcg / idcg;
+    document.getElementById('ndcgDcg').textContent = fmt(dcg, 3);
+    document.getElementById('ndcgIdcg').textContent = fmt(idcg, 3);
+    document.getElementById('ndcgVal').textContent = fmt(nd, 3);
+  }
+
+  function renderNdcgList() {
+    var ul = document.getElementById('ndcgList');
+    ul.innerHTML = '';
+    ndcgState.forEach(function (item, idx) {
+      var li = document.createElement('li');
+      li.className = 'drag-item';
+      li.draggable = true;
+      li.dataset.index = String(idx);
+      li.innerHTML = '<span class="drag-rank">#' + (idx + 1) + '</span><span>' + item.label + '</span><span class="drag-rel">grade ' + item.grade + '</span>';
+      li.addEventListener('dragstart', function (e) {
+        dragFrom = idx;
+        li.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      li.addEventListener('dragend', function () {
+        li.classList.remove('dragging');
+        dragFrom = null;
+      });
+      li.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      li.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var to = idx;
+        if (dragFrom === null || dragFrom === to) return;
+        var from = dragFrom;
+        var moved = ndcgState.splice(from, 1)[0];
+        var insertAt = from < to ? to - 1 : to;
+        ndcgState.splice(insertAt, 0, moved);
+        renderNdcgList();
+        updateNdcgNumbers();
+      });
+      ul.appendChild(li);
+    });
+    updateNdcgNumbers();
+  }
+
+  document.getElementById('ndcgK').addEventListener('input', function () {
+    updateNdcgNumbers();
+  });
+
+  /* --- RAG heuristic scorer --- */
+  function tokenize(t) {
+    return t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(function (w) { return w.length > 2; });
+  }
+
+  function unique(arr) {
+    var s = {};
+    arr.forEach(function (x) { s[x] = true; });
+    return Object.keys(s);
+  }
+
+  function coverageScore(words, text) {
+    if (words.length === 0) return 0;
+    var hit = 0;
+    var low = text.toLowerCase();
+    words.forEach(function (w) {
+      if (low.indexOf(w) >= 0) hit++;
+    });
+    return hit / words.length;
+  }
+
+  function overlapFrac(a, b) {
+    var sa = {};
+    a.forEach(function (x) { sa[x] = true; });
+    var hit = 0;
+    b.forEach(function (x) {
+      if (sa[x]) hit++;
+    });
+    return a.length === 0 && b.length === 0 ? 1 : (hit / Math.max(1, unique(a.concat(b)).length));
+  }
+
+  function ragHeuristicScores(q, c, a) {
+    var qw = tokenize(q);
+    var cw = tokenize(c);
+    var aw = tokenize(a);
+    var faith = 0.35 * coverageScore(aw, c) + 0.65 * overlapFrac(aw, cw);
+    var ansRel = 0.5 * coverageScore(qw, a) + 0.5 * overlapFrac(qw, aw);
+    var ctxPrec = overlapFrac(cw, qw.concat(aw));
+    var need = unique(qw.concat(aw));
+    var ctxRec = coverageScore(need, c);
+    var grounded = coverageScore(unique(aw), c);
+    function clamp01(x) {
+      return Math.max(0, Math.min(1, x));
+    }
+    return {
+      faithfulness: clamp01(faith),
+      answerRelevancy: clamp01(ansRel),
+      contextPrecision: clamp01(ctxPrec),
+      contextRecall: clamp01(ctxRec),
+      groundedness: clamp01(grounded)
+    };
+  }
+
+  function renderRagMetrics(el, s) {
+    renderMetricGrid(el, [
+      { name: 'Faithfulness', val: fmt(s.faithfulness, 3) },
+      { name: 'Answer relevancy', val: fmt(s.answerRelevancy, 3) },
+      { name: 'Context precision', val: fmt(s.contextPrecision, 3) },
+      { name: 'Context recall', val: fmt(s.contextRecall, 3) },
+      { name: 'Groundedness', val: fmt(s.groundedness, 3) }
+    ]);
+  }
+
+  function runRagDemo() {
+    var q = document.getElementById('ragQ').value;
+    var c = document.getElementById('ragC').value;
+    var a = document.getElementById('ragA').value;
+    var s = ragHeuristicScores(q, c, a);
+    renderRagMetrics(document.getElementById('ragMetrics'), s);
+    var lines = [
+      'Heuristic breakdown (toy):',
+      '- Faithfulness: answer terms found in context + overlap with context vocabulary.',
+      '- Answer relevancy: question terms echoed in answer + question/answer overlap.',
+      '- Context precision: context terms aligned with question+answer topic words.',
+      '- Context recall: fraction of question+answer terms present in context.',
+      '- Groundedness: distinct answer word roots covered by context.'
+    ];
+    document.getElementById('ragLog').textContent = lines.join('\n');
+  }
+
+  document.getElementById('ragScoreBtn').addEventListener('click', runRagDemo);
+  document.getElementById('ragHallucinate').addEventListener('click', function () {
+    document.getElementById('ragA').value = 'The refund window is 90 days and includes a free spacecraft upgrade.';
+    runRagDemo();
+  });
+
+  /* --- Pairwise toy judge --- */
+  function overlapScore(ans, ctx) {
+    var a = tokenize(ans);
+    var c = ctx.toLowerCase();
+    return coverageScore(a, c);
+  }
+
+  function runPairwise() {
+    var a = document.getElementById('pa').value;
+    var b = document.getElementById('pb').value;
+    var ctx = document.getElementById('pctx').value;
+    var sa = overlapScore(a, ctx);
+    var sb = overlapScore(b, ctx);
+    var winner;
+    if (Math.abs(sa - sb) < 0.02) winner = 'Tie broken toward the first answer (position bias demo).';
+    else if (sa > sb) winner = 'Prefer A (higher context coverage).';
+    else winner = 'Prefer B (higher context coverage).';
+    document.getElementById('pairResult').textContent = 'Scores — A: ' + fmt(sa, 3) + ', B: ' + fmt(sb, 3) + '. ' + winner;
+  }
+
+  document.getElementById('pairJudge').addEventListener('click', runPairwise);
+  document.getElementById('pairSwap').addEventListener('click', function () {
+    var ta = document.getElementById('pa');
+    var tb = document.getElementById('pb');
+    var tmp = ta.value;
+    ta.value = tb.value;
+    tb.value = tmp;
+    runPairwise();
+  });
+
+  /* --- A/B z-test --- */
+  function erf(x) {
+    var sign = x < 0 ? -1 : 1;
+    x = Math.abs(x);
+    var a1 = 0.254829592;
+    var a2 = -0.284496736;
+    var a3 = 1.421413741;
+    var a4 = -1.453152027;
+    var a5 = 1.061405429;
+    var p = 0.3275911;
+    var t = 1 / (1 + p * x);
+    var y = 1 - (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) * Math.exp(-x * x);
+    return sign * y;
+  }
+
+  function normalCdf(x) {
+    return 0.5 * (1 + erf(x / Math.SQRT2));
+  }
+
+  function twoPropZTest(c0, n0, c1, n1) {
+    if (n0 <= 0 || n1 <= 0) return null;
+    var p0 = c0 / n0;
+    var p1 = c1 / n1;
+    var p = (c0 + c1) / (n0 + n1);
+    var se = Math.sqrt(p * (1 - p) * (1 / n0 + 1 / n1));
+    if (se === 0) return { z: 0, p: 1, p0: p0, p1: p1, uplift: p1 - p0 };
+    var z = (p0 - p1) / se;
+    var pval = 2 * (1 - normalCdf(Math.abs(z)));
+    return { z: z, p: pval, p0: p0, p1: p1, uplift: p1 - p0 };
+  }
+
+  function runAb() {
+    var n0 = parseInt(document.getElementById('abN0').value, 10);
+    var c0 = parseInt(document.getElementById('abC0').value, 10);
+    var n1 = parseInt(document.getElementById('abN1').value, 10);
+    var c1 = parseInt(document.getElementById('abC1').value, 10);
+    var out = document.getElementById('abOut');
+    if (c0 > n0 || c1 > n1) {
+      out.textContent = 'Clicks cannot exceed impressions.';
+      return;
+    }
+    var r = twoPropZTest(c0, n0, c1, n1);
+    if (!r) {
+      out.textContent = 'Invalid input.';
+      return;
+    }
+    out.textContent = [
+      'Control CTR:    ' + fmt(r.p0 * 100, 3) + '%',
+      'Treatment CTR:  ' + fmt(r.p1 * 100, 3) + '%',
+      'Uplift (T - C): ' + fmt(r.uplift * 100, 3) + ' pp',
+      'Z-statistic:    ' + fmt(r.z, 4),
+      'Two-sided p:    ' + fmt(r.p, 4),
+      '',
+      'Interpretation: p < 0.05 is a common threshold; it is not magic. Prefer confidence intervals for reporting.',
+      'Reminder: peeking and optional stopping inflate false positives; pre-register sample sizes when you can.'
+    ].join('\n');
+  }
+
+  document.getElementById('abRun').addEventListener('click', runAb);
+  document.getElementById('abTiny').addEventListener('click', function () {
+    document.getElementById('abN0').value = '120';
+    document.getElementById('abC0').value = '10';
+    document.getElementById('abN1').value = '130';
+    document.getElementById('abC1').value = '14';
+    runAb();
+  });
+  document.getElementById('abClear').addEventListener('click', function () {
+    document.getElementById('abN0').value = '10000';
+    document.getElementById('abC0').value = '800';
+    document.getElementById('abN1').value = '10000';
+    document.getElementById('abC1').value = '880';
+    runAb();
+  });
+
+  /* --- Playground --- */
+  function runPlayground() {
+    var rels = parseGrades(document.getElementById('pgRel').value);
+    var k = parseInt(document.getElementById('pgK').value, 10) || 5;
+    if (rels.length === 0 || rels.some(function (g) { return Number.isNaN(g); })) {
+      document.getElementById('pgMetrics').innerHTML = '<div class="metric-tile"><div class="name">Error</div><div class="val">bad list</div></div>';
+      return;
+    }
+    var p = precisionAtK(rels, k);
+    var r = recallAtK(rels, k);
+    var f1 = f1AtK(rels, k);
+    renderMetricGrid(document.getElementById('pgMetrics'), [
+      { name: 'Precision@k', val: fmt(p) },
+      { name: 'Recall@k', val: r === null ? 'n/a' : fmt(r) },
+      { name: 'F1@k', val: f1 === null ? 'n/a' : fmt(f1) },
+      { name: 'MRR', val: fmt(mrrOne(rels)) },
+      { name: 'MAP', val: fmt(averagePrecision(rels)) },
+      { name: 'DCG@k', val: fmt(dcgAtK(rels, k), 3) },
+      { name: 'nDCG@k', val: fmt(ndcgAtK(rels, k), 3) }
+    ]);
+  }
+
+  document.getElementById('pgGo').addEventListener('click', runPlayground);
+  document.getElementById('pgRag').addEventListener('click', function () {
+    var s = ragHeuristicScores(
+      document.getElementById('pgQ').value,
+      document.getElementById('pgC').value,
+      document.getElementById('pgA').value
+    );
+    renderRagMetrics(document.getElementById('pgRagOut'), s);
+  });
+
+  /* --- Scroll spy + fade in --- */
+  var sections = document.querySelectorAll('section.fade-in');
+  var navLinks = document.querySelectorAll('.main-nav a');
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) en.target.classList.add('visible');
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  sections.forEach(function (s) { obs.observe(s); });
+
+  function onScrollActive() {
+    var scrollPos = window.scrollY + 140;
+    navLinks.forEach(function (link) {
+      var id = link.getAttribute('href');
+      if (!id || id.charAt(0) !== '#') return;
+      var sec = document.querySelector(id);
+      if (!sec) return;
+      var top = sec.offsetTop;
+      var next = sec.nextElementSibling;
+      var bottom = next ? next.offsetTop : top + sec.offsetHeight;
+      if (scrollPos >= top && scrollPos < bottom) link.classList.add('active');
+      else link.classList.remove('active');
+    });
+  }
+  window.addEventListener('scroll', onScrollActive, { passive: true });
+  onScrollActive();
+
+  var navToggle = document.getElementById('navToggle');
+  var mainNav = document.getElementById('mainNav');
+  if (navToggle && mainNav) {
+    navToggle.addEventListener('click', function () {
+      var collapsed = mainNav.classList.toggle('collapsed');
+      navToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+  }
+
+  /* Initial runs */
+  renderNdcgList();
+  runRetrievalDemo();
+  runRagDemo();
+  runAb();
+  runPlayground();
+})();
+  </script>
+</body>
+</html>

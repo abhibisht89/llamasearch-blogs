@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why LLMs Need to Think — Reasoning from Scratch</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 60vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-yellow { background: rgba(251,191,36,0.15); color: var(--accent5); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+td { color: var(--text-dim); }
+.flow-diagram { font-family: var(--mono); font-size: 0.82rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 20px; line-height: 1.9; color: var(--text-dim); overflow-x: auto; }
+.flow-diagram .highlight { color: var(--accent3); }
+.flow-diagram .dim { color: var(--text-dim); opacity: 0.7; }
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token { display: inline-flex; padding: 6px 12px; border-radius: 8px; font-family: var(--mono); font-size: 0.85rem; font-weight: 600; }
+.token-fast { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+.token-think { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.quiz-item { padding: 14px 16px; border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.quiz-item.correct { border-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.quiz-item.wrong { border-color: var(--danger); background: rgba(248,113,113,0.08); }
+.quiz-feedback { margin-top: 16px; padding: 12px 16px; border-radius: 8px; font-size: 0.9rem; display: none; }
+.quiz-feedback.show { display: block; }
+.timeline { position: relative; padding-left: 28px; margin: 24px 0; }
+.timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+.timeline-item { position: relative; margin-bottom: 28px; }
+.timeline-item::before { content: ''; position: absolute; left: -24px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+.bar-chart { display: flex; align-items: flex-end; gap: 12px; height: 180px; padding-top: 20px; margin: 20px 0; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+.bar { width: 100%; border-radius: 6px 6px 0 0; transition: height 0.6s ease; min-height: 8px; }
+.bar-label { font-size: 0.72rem; color: var(--text-dim); text-align: center; }
+.bar-value { font-size: 0.75rem; font-family: var(--mono); color: var(--text); }
+.prompt-block { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; font-family: var(--mono); font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap; color: var(--text-dim); }
+.prompt-block .label { display: block; font-family: var(--sans); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.prompt-block .wrong { color: var(--danger); }
+.prompt-block .right { color: var(--accent3); }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<!-- Breadcrumb nav -->
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; background: #111118; border-bottom: 1px solid #23232f; padding: 10px 24px; font-size: 0.82rem; color: #8888a0; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Reasoning from Scratch</a><span class="bc-sep">›</span><span class="bc-current">Ch.01 — Why LLMs Need to Think</span></nav>
+
+<!-- Floating section nav -->
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Reasoning from Scratch</a>
+  <div class="nav-links">
+    <a href="#thinking">Thinking</a>
+    <a href="#system12">System 1/2</a>
+    <a href="#llm-gap">LLM Gap</a>
+    <a href="#hallucination">Hallucination</a>
+    <a href="#definition">Definition</a>
+    <a href="#paradigms">4 Paradigms</a>
+    <a href="#inference">Inference-Time</a>
+    <a href="#journey">Journey</a>
+  </div>
+</nav>
+
+<!-- HERO: chapter thesis + key stats -->
+<div class="hero">
+  <div class="container">
+    <span class="section-num">CHAPTER 01</span>
+    <h1>Why LLMs Need to Think</h1>
+    <p class="subtitle">Standard language models answer fast — but complex problems demand visible, multi-step reasoning. This chapter defines what reasoning means for LLMs, why pattern matching falls short, and the four paradigms that teach models to think.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">4</span><span class="stat-label">Reasoning Paradigms</span></div>
+      <div class="stat"><span class="stat-val">2</span><span class="stat-label">Thinking Systems</span></div>
+      <div class="stat"><span class="stat-val">95%</span><span class="stat-label">System 1 Share</span></div>
+      <div class="stat"><span class="stat-val">7–8×</span><span class="stat-label">Test-Time Compute Gain</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTENT SECTIONS - built from transcript technical content -->
+<!-- Section 01: Reasoning models definition and production importance -->
+<!-- Section 02: Kahneman System 1/2 + interactive quiz -->
+<!-- Section 03: Next-token prediction, pattern matching, multi-step failures -->
+<!-- Section 04: Hallucination and reasoning error taxonomy -->
+<!-- Section 05: Operational definition of reasoning for this series -->
+<!-- Section 06: Four paradigms comparison table -->
+<!-- Section 07: Inference-time compute, CoT, verifiers, scaling chart -->
+<!-- Section 08: RL, SFT+RL blueprint, distillation -->
+<!-- Section 09: Historical arc from CoT to LRMs -->
+
+<!-- SECTION: What reasoning models are and why they matter -->
+<section class="section fade-in" id="thinking">
+  <div class="container">
+    <span class="section-num">01 — THE PROBLEM</span>
+    <h2>What Are Reasoning Models?</h2>
+    <p>Human beings carry an extraordinary capacity to think deeply about a subject before acting. Consider ordering a birthday cake for your mother: a cascade of thoughts runs through your mind in a fraction of a second — her favorite flavor, whether to try something new, her reaction last time, whether her tastes have changed, recent cravings she has mentioned, dietary restrictions, the bakery's reputation, delivery timing. These interconnected thoughts, happening almost instantly, constitute what we call <strong>thinking</strong> or <strong>reasoning</strong>.</p>
+    <p>That internal monologue is exactly what reasoning models externalize. Instead of a single opaque answer, the model emits a trace you can read, verify, and challenge — the same way you'd ask a colleague to "show your work" on a spreadsheet or proof.</p>
+    <p>Reasoning models bring this same quality to large language models (LLMs). A regular LLM pipeline is simple: you ask a question, it passes through the model, and you receive an answer. A reasoning LLM adds something critical in between — a visible <strong>sequence of thoughts</strong> that leads to the answer. The goal of this series is to take an LLM from the first diagram to the second: from instant answers to transparent, step-by-step reasoning.</p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3><span class="tag tag-pink">Regular LLM</span></h3>
+        <div class="flow-diagram">
+Question ──► LLM ──► Answer
+        </div>
+        <p style="margin-bottom:0;font-size:0.9rem;">Fast, fluent, opaque. You see the output but not the path.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag tag-green">Reasoning LLM</span></h3>
+        <div class="flow-diagram">
+Question ──► LLM ──► <span class="highlight">Thought₁ → Thought₂ → … → Thoughtₙ</span> ──► Answer
+        </div>
+        <p style="margin-bottom:0;font-size:0.9rem;">Slower, more compute, auditable. You see how the model reached its conclusion.</p>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Why it matters in production:</strong> In healthcare, finance, or any high-stakes application, clients trust a system that shows step-by-step reasoning far more than one that delivers a black-box answer. Reasoning models make LLMs <strong>trustworthy</strong>, not just fluent.</p>
+    </div>
+
+    <p>The field moved quickly. OpenAI released <strong>o1</strong> in September 2024 — the first widely deployed reasoning model that visibly "thought" before answering (e.g., spending seconds reasoning about movie recommendations). DeepSeek's <strong>R1</strong> (January 2025) stunned the world again: comparable accuracy to o1, fully open-source architecture, and reasoning learned through pure reinforcement learning — including spontaneous "aha moments" where the model re-evaluates its own steps mid-problem.</p>
+  </div>
+</section>
+
+<!-- SECTION: Kahneman System 1 vs System 2 -->
+<section class="section fade-in" id="system12">
+  <div class="container">
+    <span class="section-num">02 — COGNITIVE FOUNDATIONS</span>
+    <h2>System 1 vs System 2 Thinking</h2>
+    <p>Daniel Kahneman's framework maps cleanly onto LLM behavior. Human reasoning comes in two modes:</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3>System 1 — Fast</h3>
+        <p><span class="tag tag-blue">~95% of cognition</span></p>
+        <p>Driven by <strong>intuition</strong>, past experience, and instinct. Answers arrive immediately.</p>
+        <p style="margin-bottom:0;"><strong>Example:</strong> "What is the capital of India?" → New Delhi, instantly.</p>
+      </div>
+      <div class="card card-alt">
+        <h3>System 2 — Slow</h3>
+        <p><span class="tag tag-purple">Deliberate</span></p>
+        <p>Logical, effortful, sometimes indecisive. Requires time to weigh many factors.</p>
+        <p style="margin-bottom:0;"><strong>Example:</strong> "Which movie should I watch tonight?" → OTT platforms, reviews, Rotten Tomatoes, IMDB, mood, time available…</p>
+      </div>
+    </div>
+
+    <p>ChatGPT 3.5 (November 2022) was <strong>exceptionally capable at System 1 tasks</strong> — fast factual recall, fluent prose, immediate answers. But for complex tasks requiring reasoning — puzzles, planning, multi-step math — it showed no sign of genuine System 2 thinking. You received an answer with no visible chain of thought, leaving you unsure whether the model truly understood the problem.</p>
+
+    <!-- Extended System 2 example: movie selection mirrors o1 behavior -->
+    <div class="card">
+      <h3>System 2 in Action: Choosing a Movie</h3>
+      <p>When o1 recommends a movie, it visibly spends seconds reasoning — checking OTT availability, genre preferences, recent releases, review scores on Rotten Tomatoes and IMDB, runtime constraints, and mood. That deliberation is System 2 behavior encoded in token generation: the model allocates inference compute to intermediate considerations before committing to an answer.</p>
+      <p style="margin-bottom:0;">Contrast this with ChatGPT 3.5's instant movie suggestion: fluent, plausible, but opaque. You cannot audit whether it weighed the same factors you would.</p>
+    </div>
+
+    <!-- Interactive: classify prompts as System 1 or System 2 -->
+    <div class="interactive-panel" id="system-quiz">
+      <h3>Interactive: System 1 or System 2?</h3>
+      <p>Classify each prompt the way Kahneman would. Tap System 1 (instant) or System 2 (deliberate), then check your answers.</p>
+      <div class="quiz-item" data-answer="1">
+        <span>"What is 2 + 2?"</span>
+        <div class="btn-group">
+          <button class="btn" data-choice="1">System 1</button>
+          <button class="btn" data-choice="2">System 2</button>
+        </div>
+      </div>
+      <div class="quiz-item" data-answer="2">
+        <span>"Should I refinance my mortgage given current rates and my break-even horizon?"</span>
+        <div class="btn-group">
+          <button class="btn" data-choice="1">System 1</button>
+          <button class="btn" data-choice="2">System 2</button>
+        </div>
+      </div>
+      <div class="quiz-item" data-answer="1">
+        <span>"Translate 'hello' to French."</span>
+        <div class="btn-group">
+          <button class="btn" data-choice="1">System 1</button>
+          <button class="btn" data-choice="2">System 2</button>
+        </div>
+      </div>
+      <div class="quiz-item" data-answer="2">
+        <span>"Roger has 5 tennis balls. He buys 2 cans of 3 balls each. How many does he have?"</span>
+        <div class="btn-group">
+          <button class="btn" data-choice="1">System 1</button>
+          <button class="btn" data-choice="2">System 2</button>
+        </div>
+      </div>
+      <div class="quiz-item" data-answer="2">
+        <span>"Are there infinitely many prime numbers?"</span>
+        <div class="btn-group">
+          <button class="btn" data-choice="1">System 1</button>
+          <button class="btn" data-choice="2">System 2</button>
+        </div>
+      </div>
+      <button class="btn" id="quiz-check" style="margin-top:12px;">Check Answers</button>
+      <div class="quiz-feedback" id="quiz-feedback"></div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Central question for AI:</strong> Can artificial intelligence reason? Many assume LLMs were built to think like humans. They were not. LLMs are built to <strong>answer like humans</strong> — and that distinction drives everything that follows.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION: Pattern matching gap, next-token prediction -->
+<section class="section fade-in" id="llm-gap">
+  <div class="container">
+    <span class="section-num">03 — THE MECHANISM</span>
+    <h2>Pattern Matching vs Genuine Reasoning</h2>
+    <p>At their core, LLMs are next-token predictors. Given an input, the model predicts the next word with maximum probability, then repeats autoregressively until a full response is generated. ChatGPT, Claude, Gemini, DeepSeek — all share this foundation.</p>
+
+    <div class="formula">P(token<sub>t</sub> | token<sub>1</sub>, …, token<sub>t−1</sub>) → argmax → output</div>
+
+    <p>This architecture excels at <strong>statistical pattern matching</strong>: reproducing fluent, human-like text that resembles answers seen during training. For System 1 queries, pattern matching is often sufficient — the model has seen similar question-answer pairs millions of times.</p>
+
+    <p>Multi-step reasoning breaks this assumption. Consider Sudoku: you cannot fill cells by immediate pattern recall. You must think from multiple angles, backtrack, and verify constraints. Crossword puzzles share the same structure — each clue constrains others, requiring iterative deduction rather than one-shot recall.</p>
+    <p>Mathematical proofs push further still. "Are there infinitely many prime numbers?" is not a System 1 question — it demands a structured argument (Euclid's proof, for instance) built step by step. Exam problems mirror this: students request more time because <strong>more thinking time yields better answers</strong>. LLMs face the identical constraint: without allocated compute for intermediate steps, they collapse complex problems into a single fluent-looking guess.</p>
+
+    <!-- Glossary: pre-training, fine-tuning, inference -->
+    <div class="callout">
+      <p><strong>Three lifecycle stages:</strong> <em>Pre-training</em> teaches general language from massive text corpora. <em>Fine-tuning</em> adapts the model to specific tasks or formats. <em>Inference</em> is when the trained model actually generates answers. Module 1 (CoT, verifiers) operates entirely at inference; Modules 2–4 change weights during fine-tuning or RL training.</p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Task type</th><th>What the model does</th><th>Typical outcome</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Fact recall</td><td>Pattern match from pretraining</td><td>Correct, fast</td></tr>
+        <tr><td>Single-step arithmetic</td><td>Memorized template ("5+6=11")</td><td>Often correct, no visible work</td></tr>
+        <tr><td>Multi-step logic / math</td><td>One-shot generation</td><td>Frequent errors, no self-correction</td></tr>
+        <tr><td>Planning / puzzles</td><td>No intermediate state</td><td>Hallucinated reasoning paths</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Interactive: instant vs thinking demo -->
+    <div class="interactive-panel" id="reasoning-demo">
+      <h3>Interactive: Instant Answer vs Reasoning Trace</h3>
+      <p><strong>Problem:</strong> Roger has 5 tennis balls. He buys 2 cans of 3 tennis balls each. How many tennis balls does he have now?</p>
+      <div class="btn-group">
+        <button class="btn active" id="btn-instant">System 1 Mode (3 tokens)</button>
+        <button class="btn" id="btn-reason">System 2 Mode (23 tokens)</button>
+      </div>
+      <div id="demo-output" style="margin-top:16px;">
+        <p style="color:var(--text);margin-bottom:8px;"><strong>Model output:</strong></p>
+        <div class="token-row" id="token-display">
+          <span class="token token-fast">Answer</span>
+          <span class="token token-fast">is</span>
+          <span class="token token-fast">11</span>
+        </div>
+        <p style="font-size:0.85rem;margin-top:12px;margin-bottom:0;">Tokens used: <strong id="token-count">3</strong> · Test-time compute: <strong>low</strong></p>
+      </div>
+    </div>
+
+    <p>When forced to think step-by-step, the same model produces: "Roger started with 5 balls → 2 cans × 3 = 6 → 5 + 6 = 11 → answer is 11." The answer may be identical, but the <strong>process</strong> is auditable — and on harder problems, the process is what prevents errors.</p>
+  </div>
+</section>
+
+<!-- SECTION: Hallucination and reasoning errors -->
+<section class="section fade-in" id="hallucination">
+  <div class="container">
+    <span class="section-num">04 — FAILURE MODES</span>
+    <h2>Hallucination and Reasoning Errors</h2>
+    <p>ChatGPT 3.5 hallucinated frequently — producing confident answers that made no sense. This is a signature of System 1 behavior without System 2 verification: the model pattern-matches to plausible-sounding continuations rather than constructing a validated argument.</p>
+
+    <div class="callout warn">
+      <p>If a system truly understood a question and reasoned through it, random nonsensical answers would be far less common. Hallucination is evidence that the model was optimized to <strong>answer like humans</strong>, not to <strong>think like humans</strong>.</p>
+    </div>
+
+    <p>Reasoning errors take several forms beyond bare hallucination:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;">
+      <li><strong>Arithmetic slips</strong> — standard prompting gets word problems wrong when it skips intermediate steps</li>
+      <li><strong>Unverified chains</strong> — fluent step-by-step text that contains a logical error in step 2, uncorrected</li>
+      <li><strong>Premature commitment</strong> — locking onto the first plausible answer without exploring alternatives (Sudoku, crosswords, proof search)</li>
+      <li><strong>Missing "aha" recovery</strong> — human experts pause and backtrack; pre-o1 models rarely did</li>
+    </ul>
+
+    <p>DeepSeek R1's breakthrough moment — the model saying "wait, wait, wait… let's re-evaluate this step by step" mid-solution — demonstrated that RL-trained models can learn <strong>self-correction</strong>, something pure pattern matching never develops on its own. The model had no CoT examples telling it to backtrack; the behavior emerged because backtracking led to correct answers and therefore higher reward.</p>
+
+    <!-- Reasoning error taxonomy table -->
+    <table>
+      <thead>
+        <tr><th>Error type</th><th>Symptom</th><th>Root cause</th><th>Mitigation</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Hallucination</td><td>Confident nonsense</td><td>Pattern completion without grounding</td><td>Reasoning traces + verification</td></tr>
+        <tr><td>Arithmetic slip</td><td>Wrong final number</td><td>Skipped intermediate steps</td><td>CoT prompting, calculator tools</td></tr>
+        <tr><td>Logic break</td><td>Invalid inference in step 2+</td><td>No self-checking</td><td>Verifiers, RL self-correction</td></tr>
+        <tr><td>Premature lock-in</td><td>First plausible path kept</td><td>No search over alternatives</td><td>Tree-of-Thought, multiple samples</td></tr>
+      </tbody>
+    </table>
+
+    <div class="card card-alt">
+      <h3>Train Problem: Plain vs Reasoning Response</h3>
+      <p><strong>Question:</strong> A train moves at 60 mph for 3 hours. How far does it travel?</p>
+      <p><span class="tag tag-pink">Regular LLM</span> "The train travels 180 miles." — correct, but no reasoning visible.</p>
+      <p style="margin-bottom:0;"><span class="tag tag-green">Reasoning LLM</span> "To find distance, use <code>distance = speed × time</code>. Given speed = 60 mph and time = 3 hours: distance = 60 × 3 = 180 miles. The train travels 180 miles." — same answer, full audit trail.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION: Formal definition of reasoning for this series -->
+<section class="section fade-in" id="definition">
+  <div class="container">
+    <span class="section-num">05 — DEFINITION</span>
+    <h2>What "Reasoning" Means in This Series</h2>
+    <p>Throughout this series, <strong>reasoning</strong> has a precise, operational definition:</p>
+
+    <div class="callout">
+      <p>The process of answering questions that require <strong>complex multi-step reasoning with intermediate steps</strong> — where each step is visible and the final answer follows from them.</p>
+    </div>
+
+    <p>When we say an LLM "has reasoning powers," we mean it can produce responses like the train example above: state the formula, substitute values, compute, conclude. Whether the model <em>actually thinks</em> in a philosophical sense remains unknown — but we can evaluate and build the behavioral signature of reasoning rigorously.</p>
+
+    <p>An LLM at its core takes input and predicts the next token. Reasoning models extend that loop with a longer, structured generation phase before the final answer — consuming more tokens, more compute, and more wall-clock time in exchange for accuracy on hard tasks.</p>
+  </div>
+</section>
+
+<!-- SECTION: Four paradigms overview -->
+<section class="section fade-in" id="paradigms">
+  <div class="container">
+    <span class="section-num">06 — FOUR APPROACHES</span>
+    <h2>Four Paradigms for Teaching LLMs to Reason</h2>
+    <p>The journey from inference-time tricks to training-time capabilities spans four modules. Each induces reasoning differently — some without changing model weights at all, others through full retraining.</p>
+
+    <table>
+      <thead>
+        <tr><th>#</th><th>Paradigm</th><th>When compute is spent</th><th>Changes weights?</th><th>Key techniques</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Inference-time compute scaling</strong></td>
+          <td>At test / inference</td>
+          <td>No</td>
+          <td>Chain-of-Thought prompting, zero-shot CoT, Tree-of-Thought, verifiers / search</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Pure reinforcement learning</strong></td>
+          <td>Training</td>
+          <td>Yes</td>
+          <td>Reward functions, GRPO, emergent self-correction ("aha moments")</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Supervised fine-tuning + RL</strong></td>
+          <td>Training</td>
+          <td>Yes</td>
+          <td>DeepSeek R1 blueprint; likely o1 architecture; SFT warm-start → RL polish</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Supervised fine-tuning + distillation</strong></td>
+          <td>Training (student)</td>
+          <td>Yes (smaller model)</td>
+          <td>Teacher generates reasoning traces; student learns from input-output pairs</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="comparison">
+      <div class="card">
+        <h3><span class="tag tag-blue">Inference-Time</span></h3>
+        <p>Spend more compute <em>during</em> generation without retraining. Prompt engineering teaches the model to emit reasoning traces; verifiers search over candidate chains.</p>
+        <p style="margin-bottom:0;">Analogy: giving a student more exam time, not new lessons.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag tag-purple">Training-Time</span></h3>
+        <p>Change what the model learns via RL rewards, supervised reasoning datasets, or distillation from a teacher. Reasoning becomes a baked-in capability.</p>
+        <p style="margin-bottom:0;">Analogy: coaching technique until it becomes instinct.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION: Module 1 deep dive - inference time compute -->
+<section class="section fade-in" id="inference">
+  <div class="container">
+    <span class="section-num">07 — INFERENCE-TIME REASONING</span>
+    <h2>Inference-Time Compute Scaling</h2>
+    <p>Humans give better answers when they think longer. Step-by-step deliberation leads to correct conclusions — Sudoku, prime-number proofs, exam problems all share this property. The first method to induce LLM reasoning applies the same principle: <strong>allocate more computational resources during inference</strong>.</p>
+
+    <h3 style="margin-top:32px;">Test-Time Compute</h3>
+    <div class="formula">test-time compute = computing resources used by the model during inference</div>
+    <p><strong>Inference</strong> is everything that happens after training — when the model actually generates an answer. Training is preparation (studying for an exam); inference is performance (writing the exam). Test-time compute scales with tokens generated: 3 tokens for "Answer is 11" vs 23 tokens for a full chain-of-thought — roughly <strong>7–8× more compute</strong> for the reasoning trace.</p>
+
+    <div class="callout ok">
+      <p><strong>Key empirical finding:</strong> Model accuracy generally <strong>scales with test-time compute</strong>. More inference-time thinking → better answers on complex tasks. This is why the field uses the term <em>inference-time compute scaling</em>.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Chain-of-Thought Prompting (Google, 2022)</h3>
+    <p>The Google Brain team introduced Chain-of-Thought (CoT) prompting: instead of asking for a direct answer, you provide few-shot examples where the model shows its work before concluding.</p>
+
+    <div class="card card-alt">
+      <p><strong>Few-shot CoT example (Roger tennis balls):</strong></p>
+      <p style="font-family:var(--mono);font-size:0.85rem;color:var(--text);">Roger started with 5 balls. Two cans of 3 tennis balls each is 6. 5 + 6 = 11. The answer is 11.</p>
+      <p style="margin-top:12px;"><strong>New question:</strong> Cafeteria has 23 apples, uses 20 for lunch, buys 6 more. How many now?</p>
+      <p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent3);margin-bottom:0;">Cafeteria has 23 apples originally. Used 20 → 23 − 20 = 3. Bought 6 more → 3 + 6 = 9. The answer is 9.</p>
+    </div>
+
+    <p>Standard prompting on the cafeteria problem often fails (wrong arithmetic). CoT prompting teaches the model the <em>format</em> of reasoning from examples; the model generalizes to new questions. Subsequent methods extend this space:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;">
+      <li><strong>Zero-shot CoT</strong> — "Let's think step by step" without examples</li>
+      <li><strong>Tree-of-Thought</strong> — explore multiple reasoning branches</li>
+      <li><strong>Verifiers / search</strong> — generate candidates, score them, pick the best</li>
+    </ul>
+
+    <p>All Module 1 techniques share one property: <strong>nothing in pre-training or fine-tuning changes</strong>. Only inference behavior changes — via prompts or search — making this the lightest-weight entry point to reasoning.</p>
+
+    <!-- Standard vs CoT side-by-side: cafeteria apples problem -->
+    <h3 style="margin-top:32px;">Standard Prompting vs Chain-of-Thought</h3>
+    <p>The cafeteria problem illustrates why CoT matters. With standard prompting, models often produce wrong arithmetic because they skip intermediate steps. CoT few-shot examples teach the model to emit a reasoning chain before the final number.</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <span class="tag tag-pink">Standard Prompting</span>
+        <div class="prompt-block" style="margin-top:12px;">
+<span class="label" style="color:var(--danger);">Model output (often wrong)</span>
+Q: Cafeteria had 23 apples. Used 20 for lunch. Bought 6 more. How many?
+A: <span class="wrong">27</span>
+        </div>
+        <p style="margin-bottom:0;font-size:0.88rem;">No intermediate subtraction or addition visible — the model pattern-matches to a plausible number.</p>
+      </div>
+      <div class="card card-alt">
+        <span class="tag tag-green">Chain-of-Thought Prompting</span>
+        <div class="prompt-block" style="margin-top:12px;">
+<span class="label" style="color:var(--accent3);">Model output (correct)</span>
+23 − 20 = 3 apples left.
+3 + 6 = 9 apples now.
+<span class="right">The answer is 9.</span>
+        </div>
+        <p style="margin-bottom:0;font-size:0.88rem;">Each arithmetic step is explicit — errors become detectable and correctable.</p>
+      </div>
+    </div>
+
+    <!-- Interactive bar chart: accuracy vs test-time compute -->
+    <div class="interactive-panel">
+      <h3>Interactive: Accuracy vs Test-Time Compute</h3>
+      <p>Empirical studies show model accuracy on hard reasoning benchmarks generally rises as inference-time compute increases. Drag the slider to see the trade-off.</p>
+      <input type="range" id="compute-slider" min="1" max="5" value="1" style="width:100%;margin:16px 0;accent-color:var(--accent);">
+      <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--text-dim);margin-bottom:16px;">
+        <span>3 tokens (instant)</span>
+        <span id="slider-label">Low compute</span>
+        <span>100+ tokens (deep reasoning)</span>
+      </div>
+      <div class="bar-chart" id="accuracy-chart">
+        <div class="bar-wrapper">
+          <span class="bar-value" id="bar-val-1">42%</span>
+          <div class="bar" id="bar-1" style="height:42%;background:var(--accent4);"></div>
+          <span class="bar-label">GSM8K<br>(standard)</span>
+        </div>
+        <div class="bar-wrapper">
+          <span class="bar-value" id="bar-val-2">38%</span>
+          <div class="bar" id="bar-2" style="height:38%;background:var(--accent5);"></div>
+          <span class="bar-label">MATH<br>(standard)</span>
+        </div>
+        <div class="bar-wrapper">
+          <span class="bar-value" id="bar-val-3">55%</span>
+          <div class="bar" id="bar-3" style="height:55%;background:var(--accent);"></div>
+          <span class="bar-label">GSM8K<br>(CoT)</span>
+        </div>
+        <div class="bar-wrapper">
+          <span class="bar-value" id="bar-val-4">48%</span>
+          <div class="bar" id="bar-4" style="height:48%;background:var(--accent2);"></div>
+          <span class="bar-label">MATH<br>(CoT)</span>
+        </div>
+      </div>
+      <p style="font-size:0.85rem;margin-bottom:0;">Illustrative scaling pattern — exact numbers vary by model, but the <strong>direction</strong> is consistent: more test-time thinking → higher accuracy on multi-step tasks.</p>
+    </div>
+
+    <!-- Verifiers / search-based inference reasoning -->
+    <h3 style="margin-top:32px;">Verifiers and Search-Based Reasoning</h3>
+    <p>Beyond prompting, a second inference-time category uses <strong>verifiers</strong>: auxiliary models or scoring functions that evaluate candidate reasoning chains. The pipeline generates multiple possible solutions, scores each one, and selects the best — analogous to a student writing several draft proofs and picking the one that checks out.</p>
+
+    <div class="flow-diagram">
+Generate K candidate chains ──► Verifier scores each ──► Select highest-scoring ──► Final answer
+    </div>
+
+    <p>Verifiers sit alongside CoT extensions like <strong>Tree-of-Thought</strong> (exploring branching reasoning paths) and <strong>zero-shot CoT</strong> (appending "Let's think step by step" without examples). All three — prompting, tree search, verifiers — fall under inference-time compute scaling because they spend extra compute at generation time without updating model weights.</p>
+
+    <table>
+      <thead>
+        <tr><th>Inference technique</th><th>Mechanism</th><th>Weight updates?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Few-shot CoT</td><td>Examples in prompt teach reasoning format</td><td>No</td></tr>
+        <tr><td>Zero-shot CoT</td><td>Trigger phrase induces step-by-step output</td><td>No</td></tr>
+        <tr><td>Tree-of-Thought</td><td>Branching search over reasoning paths</td><td>No</td></tr>
+        <tr><td>Verifiers</td><td>Score and rank multiple candidate chains</td><td>No (verifier may be separate model)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION: Modules 2-4 summaries -->
+<section class="section fade-in" id="training-time">
+  <div class="container">
+    <span class="section-num">08 — TRAINING-TIME REASONING</span>
+    <h2>RL, SFT+RL, and Distillation</h2>
+
+    <h3>Module 2: Pure Reinforcement Learning</h3>
+    <p>DeepSeek showed that a model can learn to reason <strong>without explicit prompting</strong> — only through reward signals. Given a math problem, the model begins answering, then spontaneously realizes its approach is wrong: "Wait, wait, wait… that's an aha moment. Let's re-evaluate step by step." This self-correction emerged from RL, not from CoT examples in the prompt.</p>
+    <p>Unlike CoT (which modifies the prompt), pure RL uses <strong>reward functions</strong> to teach the model that reasoning is the path to maximum reward. GRPO (Group Relative Policy Optimization) — inspired by PPO — was central to DeepSeek R1's success. The series builds a reasoning model from an open-source base (e.g., Qwen) using this approach.</p>
+
+    <h3 style="margin-top:32px;">Module 3: Supervised Fine-Tuning + RL</h3>
+    <p>DeepSeek R1's full pipeline — now public — is widely regarded as the <strong>blueprint for robust reasoning models</strong>. OpenAI's o1 was likely trained similarly, though its architecture remains proprietary. The pattern: warm-start with supervised fine-tuning on reasoning traces, then RL refinement. This hybrid combines demonstration learning with reward-driven exploration.</p>
+
+    <h3 style="margin-top:32px;">Module 4: Supervised Fine-Tuning + Distillation</h3>
+    <p>Distillation transfers reasoning from a large <strong>teacher</strong> model to a small <strong>student</strong>:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.4em;">
+      <li>Take a large reasoning model (e.g., DeepSeek R1)</li>
+      <li>Generate input-output pairs: questions + full reasoning traces with correct answers</li>
+      <li>Fine-tune a smaller model (Qwen, Phi) on this supervised data</li>
+      <li>The student inherits reasoning capability at a fraction of the parameter count</li>
+    </ol>
+    <p>Think of it as Popeye eating spinach: the small model consumes reasoning-rich data from the teacher and emerges with reasoning strength. DeepSeek R1 distilled into smaller open models; the Sky-T1 project demonstrates the same pipeline from scratch.</p>
+
+    <!-- Classical RL foundations referenced in the series -->
+    <h3 style="margin-top:32px;">RL Foundations (Classical → Modern)</h3>
+    <p>Pure RL and SFT+RL both rely on reinforcement learning machinery. The series builds intuition from classical RL before applying modern policy optimization to language models:</p>
+
+    <div class="card">
+      <h4 style="color:var(--text);margin-bottom:12px;">Classical RL Concepts</h4>
+      <p style="margin-bottom:8px;">Agents interact with an environment, receive rewards, and learn policies that maximize cumulative return. Core building blocks:</p>
+      <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;">
+        <li><strong>Agent &amp; environment</strong> — the learner and the world it acts in</li>
+        <li><strong>Rewards &amp; returns</strong> — scalar feedback and discounted cumulative reward</li>
+        <li><strong>Markov Decision Processes (MDPs)</strong> — formal framework for sequential decisions</li>
+        <li><strong>Value &amp; policy functions</strong> — estimating expected return and action selection</li>
+        <li><strong>Monte Carlo &amp; Temporal Difference (TD) learning</strong> — learning from episodes or bootstrapped estimates</li>
+      </ul>
+      <h4 style="color:var(--text);margin-bottom:12px;">Modern Policy Optimization</h4>
+      <ul style="color:var(--text-dim);margin:0 0 0 1.2em;">
+        <li><strong>TRPO</strong> — Trust Region Policy Optimization; constrains policy updates</li>
+        <li><strong>PPO</strong> — Proximal Policy Optimization; practical, stable policy gradients</li>
+        <li><strong>GRPO</strong> — Group Relative Policy Optimization; DeepSeek R1's algorithm, inspired by PPO, comparing responses within a group to compute relative rewards</li>
+      </ul>
+    </div>
+
+    <div class="formula">reward(answer) = 1 if correct else 0 → policy gradient → longer reasoning chains when they earn reward</div>
+
+    <p>For reasoning LLMs, the reward function is typically outcome-based: correct final answer on math or code tasks earns reward; incorrect answers receive none. Over training, the model discovers that emitting visible reasoning steps correlates with higher reward — even without explicit CoT examples in the prompt.</p>
+
+    <!-- SFT + RL blueprint detail -->
+    <h3 style="margin-top:32px;">The SFT + RL Blueprint</h3>
+    <p>DeepSeek R1's published pipeline — now the reference architecture for building Large Reasoning Models (LRMs) — combines two training phases:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.4em;">
+      <li><strong>Supervised fine-tuning (SFT)</strong> — warm-start the model on curated reasoning traces so it learns the format and basics of step-by-step output</li>
+      <li><strong>Reinforcement learning (RL)</strong> — refine the policy with reward signals so the model discovers better reasoning strategies, including self-correction and backtracking</li>
+    </ol>
+    <p>OpenAI's o1 almost certainly follows a similar recipe, though its exact architecture and training data remain proprietary. The SFT+RL hybrid is more stable than pure RL alone: SFT provides a strong initialization; RL pushes beyond demonstration data into emergent behaviors like "aha moments."</p>
+
+    <!-- Distillation pipeline diagram -->
+    <div class="card card-alt">
+      <h3>Distillation Pipeline</h3>
+      <div class="flow-diagram">
+<span class="highlight">Teacher (large reasoning model)</span>
+  │
+  ├── Generate: question + reasoning trace + answer (many examples)
+  │
+  ▼
+<span class="highlight">Student (smaller base model)</span>
+  │
+  └── SFT on teacher traces → deployable reasoning model
+      </div>
+      <p style="margin-bottom:0;">India's AI Mission, Fractal Analytics, and open projects like Sky-T1 are building LRMs through this exact distillation path — democratizing reasoning capability beyond frontier-scale models.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION: Journey timeline inference → training -->
+<section class="section fade-in" id="journey">
+  <div class="container">
+    <span class="section-num">09 — THE ARC</span>
+    <h2>From Inference-Time to Training-Time Reasoning</h2>
+    <p>The four paradigms form a progression from lightweight prompting to full capability transfer:</p>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <h3>2022 — Chain-of-Thought Prompting</h3>
+        <p style="margin-bottom:0;">Google Brain proves you can elicit multi-step reasoning at inference time with no weight updates. Accuracy scales with tokens generated.</p>
+      </div>
+      <div class="timeline-item">
+        <h3>2022–2024 — Inference extensions</h3>
+        <p style="margin-bottom:0;">Zero-shot CoT, Tree-of-Thought, verifier-based search. All spend compute at test time; model weights frozen.</p>
+      </div>
+      <div class="timeline-item">
+        <h3>Sep 2024 — OpenAI o1</h3>
+        <p style="margin-bottom:0;">First production reasoning model. Visible thinking traces. High-stakes trust through auditable chains. Training recipe undisclosed.</p>
+      </div>
+      <div class="timeline-item">
+        <h3>Jan 2025 — DeepSeek R1</h3>
+        <p style="margin-bottom:0;">Open-source reasoning at o1-level accuracy. Pure RL produces emergent self-correction. Full blueprint published.</p>
+      </div>
+      <div class="timeline-item">
+        <h3>2025+ — Distillation &amp; LRMs</h3>
+        <p style="margin-bottom:0;">Large Reasoning Models (LRMs) proliferate — India's AI Mission, Fractal Analytics, and open projects like Sky-T1 compress teacher reasoning into deployable students.</p>
+      </div>
+    </div>
+
+    <div class="flow-diagram">
+<span class="dim">INFERENCE-TIME (no weight change)</span>
+  Prompting ──► CoT ──► Zero-shot CoT ──► Tree-of-Thought ──► Verifiers
+       │
+       ▼
+<span class="highlight">TRAINING-TIME (weight change)</span>
+  Pure RL ──► SFT + RL (blueprint) ──► Distillation to small models
+    </div>
+
+    <div class="callout">
+      <p><strong>What comes next:</strong> Chapter 02 dives into Chain-of-Thought and zero-shot reasoning in full detail — the first rung on the inference-time ladder, and the foundation every later technique builds upon.</p>
+    </div>
+
+    <!-- Series roadmap: four modules mapped to future chapters -->
+    <h3 style="margin-top:40px;">Series Roadmap</h3>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Topic</th><th>Compute phase</th><th>Future chapter focus</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Prompting &amp; verifiers</td><td>Inference</td><td>CoT, zero-shot, Tree-of-Thought</td></tr>
+        <tr><td>2</td><td>Pure RL</td><td>Training</td><td>Classical RL → GRPO, building from Qwen</td></tr>
+        <tr><td>3</td><td>SFT + RL</td><td>Training</td><td>DeepSeek R1 blueprint, o1-style models</td></tr>
+        <tr><td>4</td><td>Distillation</td><td>Training (student)</td><td>Teacher-student SFT, Sky-T1 pipeline</td></tr>
+      </tbody>
+    </table>
+
+    <div class="comparison" style="margin-top:24px;">
+      <div class="card">
+        <h3>Key Takeaway</h3>
+        <p>LLMs were built to <strong>answer</strong>, not to <strong>think</strong>. Reasoning models close that gap by making intermediate computation visible and trainable — whether through inference-time prompts or training-time RL.</p>
+        <p style="margin-bottom:0;">The shift from 3-token instant answers to 23-token reasoning traces is not cosmetic. It is the foundation of trust, accuracy, and the entire reasoning-model revolution.</p>
+      </div>
+      <div class="card">
+        <h3>Central Tension</h3>
+        <p><span class="tag tag-blue">Speed</span> vs <span class="tag tag-green">Accuracy</span></p>
+        <p>System 1 answers are fast and cheap. System 2 reasoning costs 7–8× more tokens but wins on multi-step tasks. Production systems must choose — or offer both modes, as modern APIs now do with "thinking" toggles.</p>
+        <p style="margin-bottom:0;">Every technique in this series navigates that trade-off.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Chapter navigation footer -->
+<div class="footer">
+  <p><a href="../02-chain-of-thought/">Next: Ch.02 — Chain of Thought &amp; Zero-Shot Reasoning →</a></p>
+</div>
+
+<!-- Scroll-triggered animations, floating nav visibility, and interactive demo logic -->
+<script>
+const nav = document.getElementById('nav');
+const faders = document.querySelectorAll('.fade-in');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+faders.forEach(f => observer.observe(f));
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+
+/* System 1 / System 2 quiz */
+document.querySelectorAll('#system-quiz .quiz-item .btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const group = this.closest('.quiz-item');
+    group.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    group.dataset.selected = this.dataset.choice;
+  });
+});
+document.getElementById('quiz-check').addEventListener('click', () => {
+  let score = 0, total = 0;
+  document.querySelectorAll('#system-quiz .quiz-item').forEach(item => {
+    total++;
+    const sel = item.dataset.selected;
+    const ans = item.dataset.answer;
+    item.classList.remove('correct', 'wrong');
+    if (sel === ans) { item.classList.add('correct'); score++; }
+    else if (sel) { item.classList.add('wrong'); }
+  });
+  const fb = document.getElementById('quiz-feedback');
+  fb.classList.add('show');
+  fb.style.background = score === total ? 'rgba(52,211,153,0.12)' : 'rgba(108,140,255,0.1)';
+  fb.style.color = 'var(--text)';
+  fb.textContent = score === total
+    ? 'Perfect! You can distinguish fast intuition from deliberate reasoning.'
+    : `You got ${score} of ${total}. System 2 tasks need time, multiple factors, or non-trivial computation — not instant recall.`;
+});
+
+/* Instant vs reasoning token demo */
+const instantTokens = ['Answer', 'is', '11'];
+const reasonTokens = ['Roger', 'started', 'with', '5', 'balls', '→', '2', 'cans', '×', '3', '=', '6', '→', '5', '+', '6', '=', '11', '→', 'Answer', 'is', '11'];
+const tokenDisplay = document.getElementById('token-display');
+const tokenCount = document.getElementById('token-count');
+function renderTokens(tokens, mode) {
+  tokenDisplay.innerHTML = tokens.map((t, i) => {
+    const cls = mode === 'instant' ? 'token-fast' : (i >= tokens.length - 3 ? 'token-fast' : 'token-think');
+    return `<span class="token ${cls}">${t}</span>`;
+  }).join('');
+  tokenCount.textContent = tokens.length;
+}
+document.getElementById('btn-instant').addEventListener('click', function() {
+  document.getElementById('btn-instant').classList.add('active');
+  document.getElementById('btn-reason').classList.remove('active');
+  renderTokens(instantTokens, 'instant');
+});
+document.getElementById('btn-reason').addEventListener('click', function() {
+  document.getElementById('btn-reason').classList.add('active');
+  document.getElementById('btn-instant').classList.remove('active');
+  renderTokens(reasonTokens, 'reason');
+});
+
+/* Test-time compute scaling chart */
+const computeLevels = [
+  { label: 'Low compute', gsmStd: 42, mathStd: 38, gsmCoT: 55, mathCoT: 48 },
+  { label: 'Moderate', gsmStd: 48, mathStd: 44, gsmCoT: 68, mathCoT: 58 },
+  { label: 'CoT enabled', gsmStd: 52, mathStd: 50, gsmCoT: 78, mathCoT: 72 },
+  { label: 'Tree search', gsmStd: 55, mathStd: 54, gsmCoT: 85, mathCoT: 80 },
+  { label: 'Deep reasoning', gsmStd: 58, mathStd: 58, gsmCoT: 92, mathCoT: 88 }
+];
+const slider = document.getElementById('compute-slider');
+const sliderLabel = document.getElementById('slider-label');
+function updateChart(level) {
+  const d = computeLevels[level - 1];
+  sliderLabel.textContent = d.label;
+  ['1','2','3','4'].forEach((n, i) => {
+    const vals = [d.gsmStd, d.mathStd, d.gsmCoT, d.mathCoT];
+    document.getElementById('bar-val-' + n).textContent = vals[i] + '%';
+    document.getElementById('bar-' + n).style.height = vals[i] + '%';
+  });
+}
+slider.addEventListener('input', () => updateChart(parseInt(slider.value, 10)));
+</script>
+</body>
+</html>
+<!-- End of Chapter 01: Why LLMs Need to Think -->

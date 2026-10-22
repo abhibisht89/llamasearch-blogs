@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TD Control & Function Approximation — Reasoning from Scratch</title>
+<style>
+/* ============================================================
+   Chapter 07 — shared series tokens (match Ch.01–06)
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 60vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(52,211,153,0.12) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent3), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-yellow { background: rgba(251,191,36,0.15); color: var(--accent5); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent3); background: rgba(52,211,153,0.15); color: var(--accent3); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+.footer a { margin: 0 12px; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+td { color: var(--text-dim); }
+.flow-diagram { font-family: var(--mono); font-size: 0.82rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 20px; line-height: 1.9; color: var(--text-dim); overflow-x: auto; }
+.flow-diagram .highlight { color: var(--accent3); }
+
+/* ============================================================
+   Ch.07-specific: cliff grid, Q-table heatmap, path overlay
+   ============================================================ */
+.cliff-layout { display: grid; grid-template-columns: 1fr 280px; gap: 24px; align-items: start; }
+@media (max-width: 800px) { .cliff-layout { grid-template-columns: 1fr; } }
+
+.cliff-grid-wrap { overflow-x: auto; }
+.cliff-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 36px);
+  grid-template-rows: repeat(4, 36px);
+  gap: 3px;
+  margin: 0 auto;
+  width: fit-content;
+}
+.cliff-cell {
+  width: 36px; height: 36px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 0.65rem; font-weight: 700;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text-dim); position: relative;
+}
+.cliff-cell.start { background: rgba(108,140,255,0.25); border-color: var(--accent); color: var(--accent); }
+.cliff-cell.goal { background: rgba(52,211,153,0.25); border-color: var(--accent3); color: var(--accent3); }
+.cliff-cell.cliff { background: rgba(248,113,113,0.2); border-color: var(--danger); color: var(--danger); }
+.cliff-cell.on-path { box-shadow: inset 0 0 0 2px var(--accent2); }
+.cliff-cell.agent { box-shadow: 0 0 12px var(--accent5); z-index: 2; }
+
+.cliff-sidebar { font-size: 0.85rem; }
+.cliff-sidebar .legend { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.legend-item { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 0.8rem; }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); flex-shrink: 0; }
+
+.q-mini-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.68rem; margin-top: 12px; }
+.q-mini-table th, .q-mini-table td { padding: 4px 6px; text-align: center; border: 1px solid var(--border); }
+.q-mini-table th { font-size: 0.6rem; color: var(--accent); background: var(--bg-card-alt); }
+.q-val-pos { color: var(--accent3); }
+.q-val-neg { color: var(--danger); }
+.q-val-neu { color: var(--text-dim); }
+
+.q-heatmap-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 16px 0;
+}
+@media (max-width: 600px) { .q-heatmap-grid { grid-template-columns: repeat(2, 1fr); } }
+.q-state-card {
+  background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px; font-family: var(--mono); font-size: 0.72rem;
+}
+.q-state-card .state-label { color: var(--accent); font-weight: 700; margin-bottom: 6px; font-size: 0.7rem; }
+.q-action-row { display: flex; justify-content: space-between; padding: 2px 0; color: var(--text-dim); }
+.q-action-row.best { color: var(--accent3); font-weight: 700; }
+
+.path-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0;
+}
+@media (max-width: 600px) { .path-stats { grid-template-columns: 1fr; } }
+.path-stat {
+  background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; text-align: center;
+}
+.path-stat .ps-val { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; color: var(--accent2); }
+.path-stat .ps-label { font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+.method-card { border-left: 3px solid var(--accent3); }
+.method-card.qlearn { border-left-color: var(--accent2); }
+
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<!-- Breadcrumb -->
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; background: #111118; border-bottom: 1px solid #23232f; padding: 10px 24px; font-size: 0.82rem; color: #8888a0; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Reasoning from Scratch</a><span class="bc-sep">›</span><span class="bc-current">Ch.07 — TD Control</span></nav>
+
+<!-- In-chapter nav -->
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Reasoning from Scratch</a>
+  <div class="nav-links">
+    <a href="#bridge">Bridge</a>
+    <a href="#control">Control</a>
+    <a href="#sarsa">SARSA</a>
+    <a href="#qlearning">Q-learning</a>
+    <a href="#on-off">On/Off</a>
+    <a href="#cliff">Cliff</a>
+    <a href="#approx">Approximation</a>
+    <a href="#deep">Deep RL</a>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<div class="hero">
+  <div class="container">
+    <span class="section-num">CHAPTER 07</span>
+    <h1>TD Control &amp; Function Approximation</h1>
+    <p class="subtitle">Chapter 06 taught TD <em>prediction</em>: estimate V<sup>π</sup> for a fixed policy. This chapter crosses into <em>control</em> — learning Q<sup>π</sup> while improving the policy — and then escapes the tabular trap. SARSA and Q-learning differ in one line of math but produce radically different behavior; function approximation turns a Q-table into a neural network and opens the door to DQN, AlphaGo, and LLM training.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">2</span><span class="stat-label">Control Algorithms</span></div>
+      <div class="stat"><span class="stat-val">3</span><span class="stat-label">Approximation Methods</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Cliff Walking Demo</span></div>
+      <div class="stat"><span class="stat-val">∞</span><span class="stat-label">States → Generalize</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     01 — Bridge from prediction to control
+     ============================================================ -->
+<section class="section fade-in" id="bridge">
+  <div class="container">
+    <span class="section-num">01 — FROM PREDICTION TO CONTROL</span>
+    <h2>Why Control Is the Next Step</h2>
+    <p>In TD prediction, we fixed a policy π and learned its value function:</p>
+    <div class="formula">V(S) ← V(S) + α [ R + γ V(S′) − V(S) ]</div>
+    <p>That update bootstraps from the next state’s value — no need to wait for episode end, unlike Monte Carlo. TD methods blend the strengths of dynamic programming (bootstrapping) and Monte Carlo (learning from experience without a model).</p>
+    <p><strong>Control</strong> asks the opposite question: which policy is optimal? The recursive recipe from dynamic programming and Monte Carlo still applies — estimate values, improve policy, repeat — but now we work with the <strong>action-value function</strong> Q(s, a) instead of V(s), because Q directly tells us which action is best in each state.</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-blue">Prediction</span></h3>
+        <p>Given π, estimate V<sup>π</sup> or Q<sup>π</sup>. The policy is fixed.</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-green">Control</span></h3>
+        <p>Find π* that maximizes expected return. Values and policy co-evolve.</p>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Implicit policy iteration:</strong> With ε-greedy action selection, you rarely write “update policy” explicitly. Q-values change every step; the greedy action from Q changes too — policy iteration happens continuously in the background.</p>
+    </div>
+
+    <p>Both SARSA and Q-learning use ε-greedy exploration (probability ε of a random action, otherwise greedy) to balance exploration and exploitation — the same trick from Monte Carlo control in Chapter 06.</p>
+
+    <h3 style="margin-top:28px;">The Three Families (Recap)</h3>
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Needs model?</th><th>Bootstraps?</th><th>When it updates</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Dynamic programming</td><td>Yes — full P(s′|s,a)</td><td>Yes</td><td>Sweeps all states</td></tr>
+        <tr><td>Monte Carlo</td><td>No</td><td>No — uses full return G<sub>t</sub></td><td>End of episode</td></tr>
+        <tr><td>Temporal difference</td><td>No</td><td>Yes — uses V(S′) or Q(S′,·)</td><td>Every step</td></tr>
+      </tbody>
+    </table>
+    <p>The commuting analogy from the lectures: Monte Carlo will not revise your estimate for “junction 3” until you reach home and finish the whole trip. TD revises immediately using the value of the next junction — bootstrapping a guess about the remainder of the journey.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     02 — TD Control overview
+     ============================================================ -->
+<section class="section fade-in" id="control">
+  <div class="container">
+    <span class="section-num">02 — TD CONTROL</span>
+    <h2>Online Control Without a Model</h2>
+    <p>TD control algorithms learn optimal behavior from sample transitions (S, A, R, S′) — no transition probabilities required. They update after every step, making them far more sample-efficient than Monte Carlo for long episodes (think of updating a traffic junction’s value immediately when you hit congestion, rather than waiting until you reach home).</p>
+
+    <div class="flow-diagram">
+<span class="highlight">TD control loop</span>
+
+  Initialize Q(s, a) arbitrarily
+       │
+       ▼
+  For each episode:
+    Observe S, choose A ~ ε-greedy(Q)
+    Take action, observe R, S′
+    Update Q(S, A) using TD target   ← SARSA or Q-learning
+    S ← S′; choose next A (SARSA only)
+       │
+       └── repeat until Q converges → greedy policy ≈ π*
+    </div>
+
+    <p>The entire difference between the two major TD control algorithms lies in <strong>what they put in the TD target</strong> for the next state — the actual next action (SARSA) or the max over actions (Q-learning).</p>
+
+    <h3 style="margin-top:28px;">Action-Value Control with ε-Greedy</h3>
+    <p>Tabular control with TD follows the same recursive pattern as Monte Carlo control from the prior chapter:</p>
+    <ol style="color:var(--text-dim);margin:0 0 1em 1.2em;line-height:1.9;">
+      <li>Start with a random or zero Q-table and an ε-greedy policy derived from it.</li>
+      <li>Generate episodes; after each transition, apply a TD update to Q(S, A).</li>
+      <li>Because Q changed, the greedy action per state may change — the policy improves implicitly.</li>
+      <li>Repeat until Q stabilizes; the greedy policy approximates π*.</li>
+    </ol>
+    <p>With probability ε the agent explores a random action (possibly discovering a better path); with probability 1−ε it exploits the current best action. Without exploration, the agent can get stuck on a suboptimal action it tried first — the same problem that does not arise in dynamic programming where every action’s outcome is known from the model.</p>
+
+    <div class="formula">π(a|s) = (1−ε) · 𝟙[a = argmax<sub>a′</sub> Q(s,a′)] + ε/|A| &nbsp; (uniform random with prob ε)</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     03 — SARSA
+     ============================================================ -->
+<section class="section fade-in" id="sarsa">
+  <div class="container">
+    <span class="section-num">03 — ON-POLICY TD CONTROL</span>
+    <h2>SARSA: State–Action–Reward–State–Action</h2>
+    <p>SARSA is named after the five symbols in its update: (S<sub>t</sub>, A<sub>t</sub>, R<sub>t+1</sub>, S<sub>t+1</sub>, A<sub>t+1</sub>). The algorithm is on-policy: it learns the value of the policy it is actually following, including exploratory random actions.</p>
+
+    <div class="formula">Q(S, A) ← Q(S, A) + α [ R + γ Q(S′, A′) − Q(S, A) ]</div>
+
+    <p>Compare to TD prediction: replace V with Q, and use the Q-value of the <em>next state–action pair</em> (S′, A′) where A′ is the action the agent will actually take next under the current ε-greedy policy.</p>
+
+    <div class="card method-card">
+      <h3>SARSA algorithm (outline)</h3>
+      <ol style="color:var(--text-dim);margin:0 0 0 1.2em;line-height:1.9;font-size:0.9rem;">
+        <li>Initialize Q(s, a) for all s, a (e.g., zeros or small random values).</li>
+        <li>For each episode: initialize S; choose A from S using ε-greedy(Q).</li>
+        <li>Loop: take action A, observe R and S′; choose A′ from S′ using ε-greedy(Q).</li>
+        <li>Apply SARSA update with (S, A, R, S′, A′).</li>
+        <li>Set S ← S′, A ← A′ until S is terminal.</li>
+      </ol>
+    </div>
+
+    <div class="callout">
+      <p><strong>Why include A′?</strong> Because the agent might randomly explore a dangerous action near a cliff. SARSA’s backup accounts for that risk — it learns “if I’m following this exploratory policy, what is Q(S, A) really worth?” That makes SARSA conservative and safe.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">TD Error for Control</h3>
+    <p>The bracketed term in both updates is the TD error δ, now defined over Q rather than V:</p>
+    <div class="formula">δ = R + γ Q(S′, A′) − Q(S, A) &nbsp;&nbsp; (SARSA target)</div>
+    <div class="formula">δ = R + γ max<sub>a′</sub> Q(S′, a′) − Q(S, A) &nbsp;&nbsp; (Q-learning target)</div>
+    <p>Positive δ means the transition was better than expected — bump Q(S, A). Negative δ means worse than expected — lower the estimate. The learning rate α controls how quickly old estimates are overwritten.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     04 — Q-learning
+     ============================================================ -->
+<section class="section fade-in" id="qlearning">
+  <div class="container">
+    <span class="section-num">04 — OFF-POLICY TD CONTROL</span>
+    <h2>Q-Learning: Learning Q* While Exploring</h2>
+    <p>Q-learning makes one critical change: replace Q(S′, A′) with max<sub>a′</sub> Q(S′, a′). The update no longer depends on which action you will actually take next.</p>
+
+    <div class="formula">Q(S, A) ← Q(S, A) + α [ R + γ max<sub>a′</sub> Q(S′, a′) − Q(S, A) ]</div>
+
+    <p>This is the <strong>off-policy</strong> TD control algorithm. The agent can follow an exploratory ε-greedy behavioral policy while the update targets the optimal action-value function Q*. The max operator directly encodes the Bellman optimality equation — it always asks “what if I took the best action next?”</p>
+
+    <div class="card method-card qlearn">
+      <h3>Q-learning algorithm (outline)</h3>
+      <ol style="color:var(--text-dim);margin:0 0 0 1.2em;line-height:1.9;font-size:0.9rem;">
+        <li>Initialize Q(s, a) for all s, a.</li>
+        <li>For each episode: initialize S.</li>
+        <li>Loop: choose A from S using ε-greedy(Q); take action, observe R, S′.</li>
+        <li>Apply Q-learning update (uses max over next actions, not actual A′).</li>
+        <li>S ← S′ until terminal.</li>
+      </ol>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Optimistic but risky during training:</strong> Q-learning’s max pushes values toward the optimal path even when exploration wanders near danger. After convergence, the greedy policy is optimal — but during learning, the agent may fall off cliffs more often because it overestimates safe-looking cliff-edge states.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     05 — On-policy vs off-policy
+     ============================================================ -->
+<section class="section fade-in" id="on-off">
+  <div class="container">
+    <span class="section-num">05 — ON-POLICY VS OFF-POLICY</span>
+    <h2>Two Policies, One Update Rule Apart</h2>
+    <p>Every RL algorithm involves at least two policies conceptually:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;line-height:1.8;">
+      <li><strong>Behavior policy</strong> — the one generating experience (usually ε-greedy).</li>
+      <li><strong>Target policy</strong> — the one whose values we are trying to learn.</li>
+    </ul>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-green">On-policy (SARSA)</span></h3>
+        <p>Behavior = target. You learn about the policy you follow — like improving your bicycle riding by noting mistakes from your own riding style.</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-purple">Off-policy (Q-learning)</span></h3>
+        <p>Behavior ≠ target. You explore randomly but learn optimal Q* — like watching a coach’s perfect form while you practice messily, updating toward the ideal.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:32px;">SARSA vs Q-learning</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>SARSA (on-policy)</th>
+          <th>Q-learning (off-policy)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>TD target (next state)</strong></td><td>Q(S′, A′) — actual next action</td><td>max<sub>a′</sub> Q(S′, a′)</td></tr>
+        <tr><td><strong>What it learns</strong></td><td>Q<sup>π</sup> for current exploratory policy</td><td>Q* (optimal) regardless of exploration</td></tr>
+        <tr><td><strong>Learned path (cliff walking)</strong></td><td>Safe path — avoids cliff edge</td><td>Optimal path — hugs cliff (shorter)</td></tr>
+        <tr><td><strong>Risk during training</strong></td><td>Lower — accounts for exploration noise</td><td>Higher — max ignores exploration slips</td></tr>
+        <tr><td><strong>When to prefer</strong></td><td>Safety-critical robotics, online systems</td><td>Offline batch learning, when π* is the goal</td></tr>
+        <tr><td><strong>LLM analogy (preview)</strong></td><td>On-policy RL (PPO-style): learn from own samples</td><td>Off-policy critics: learn Q* from diverse data</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     06 — Cliff Walking interactive demo
+     ============================================================ -->
+<section class="section fade-in" id="cliff">
+  <div class="container">
+    <span class="section-num">06 — CLIFF WALKING</span>
+    <h2>See SARSA vs Q-learning Diverge</h2>
+    <p>The classic cliff walking grid: start bottom-left (S), goal bottom-right (G). Every step costs −1. Falling off the cliff (red cells) sends you back to start with reward −100. Four actions: up, down, left, right.</p>
+    <p>SARSA learns a <strong>safe</strong> path far from the cliff. Q-learning learns the <strong>optimal</strong> path along the cliff edge — shorter, but only safe once exploration is turned off.</p>
+
+    <h3 style="margin-top:32px;">Expected Path Shapes (After Training)</h3>
+    <p>In the interactive demo below, typical converged policies look like this:</p>
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-green">SARSA</span></h3>
+        <p>~17 steps, route through row 0 or 1 — maximally far from the cliff given ε-greedy exploration during learning.</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-purple">Q-learning</span></h3>
+        <p>~13 steps, route along row 2 — the shortest safe row above the cliff; optimal for the greedy policy.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Cliff Walking Demo</h3>
+      <div class="btn-group" id="algo-toggle">
+        <button type="button" class="btn active" data-algo="sarsa">SARSA (safe path)</button>
+        <button type="button" class="btn" data-algo="qlearning">Q-learning (optimal path)</button>
+      </div>
+      <div class="cliff-layout">
+        <div class="cliff-grid-wrap">
+          <div class="cliff-grid" id="cliff-grid" aria-label="Cliff walking grid"></div>
+        </div>
+        <div class="cliff-sidebar">
+          <p style="font-size:0.85rem;margin-bottom:8px;color:var(--text-dim);" id="algo-desc">SARSA learns a cautious route that stays away from the cliff edge, even though it takes more steps.</p>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-swatch" style="background:rgba(108,140,255,0.4);"></span> Start (S)</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:rgba(52,211,153,0.4);"></span> Goal (G)</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:rgba(248,113,113,0.3);"></span> Cliff (−100)</div>
+            <div class="legend-item"><span class="legend-swatch" style="box-shadow:inset 0 0 0 2px var(--accent2);"></span> Learned path</div>
+          </div>
+          <div class="path-stats">
+            <div class="path-stat"><div class="ps-val" id="path-len">—</div><div class="ps-label">Path length</div></div>
+            <div class="path-stat"><div class="ps-val" id="path-reward">—</div><div class="ps-label">Total reward</div></div>
+            <div class="path-stat"><div class="ps-val" id="train-eps">—</div><div class="ps-label">Episodes run</div></div>
+          </div>
+          <button type="button" class="btn" id="retrain-btn" style="width:100%;justify-content:center;margin-top:8px;">Retrain agent</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Q-table visualization for a small 3×4 excerpt -->
+    <div class="interactive-panel">
+      <h3>Q-Table Snapshot (sample states)</h3>
+      <p style="font-size:0.88rem;margin-bottom:12px;">After training, hover-worthy view of Q(s, ·) for six representative cells. Green values are the greedy best action. This is what a tabular agent stores — one float per (state, action) pair.</p>
+      <div class="q-heatmap-grid" id="q-heatmap"></div>
+    </div>
+
+    <div class="callout warn" style="margin-top:24px;">
+      <p><strong>Why the paths differ:</strong> Q-learning’s max operator always assumes the best next action at the cliff edge. SARSA’s backup uses the actual next action A′, which under ε-greedy sometimes steps off the cliff. SARSA therefore downgrades cliff-adjacent Q-values and learns a detour through the upper rows. Q-learning still converges to Q* whose greedy policy hugs the cliff — shorter, but only safe once ε → 0.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     07 — Why tables fail
+     ============================================================ -->
+<section class="section fade-in" id="approx">
+  <div class="container">
+    <span class="section-num">07 — BEYOND TABULAR METHODS</span>
+    <h2>Why Q-Tables Break at Scale</h2>
+    <p>Tabular methods store one number per state (or per state–action pair). They work beautifully for grid worlds with dozens of cells — and fail catastrophically at scale. Chess has on the order of 10<sup>46</sup> states; a Go board has 10<sup>170</sup>. LLM “states” are essentially all possible token sequences — astronomically larger.</p>
+    <p>The fix is <strong>generalization</strong>: learn values for states you have visited, then extrapolate to states you have not. This is function approximation — the same idea as supervised learning, but with two twists that make RL harder:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;line-height:1.8;">
+      <li>The <strong>target is unknown</strong> — we never observe the true V(s) or Q(s, a).</li>
+      <li>The target is <strong>non-stationary</strong> — as weights update, the target moves (especially with bootstrapping).</li>
+    </ul>
+
+    <h3 style="margin-top:28px;">Three Approximation Methods</h3>
+
+    <div class="card card-alt">
+      <h4><span class="tag tag-yellow">1. State aggregation</span></h4>
+      <p>Group similar states into buckets; share one value per bucket. Coarse graining reduces the table size but loses detail. A robot might treat “battery 47%” and “battery 49%” as the same abstract state.</p>
+    </div>
+
+    <div class="card card-alt">
+      <h4><span class="tag tag-blue">2. Linear function approximation</span></h4>
+      <p>Represent value as a weighted sum of features:</p>
+      <div class="formula">V̂(s, w) = w · x(s) = Σ<sub>i</sub> w<sub>i</sub> x<sub>i</sub>(s)</div>
+      <p>Feature vector x(s) is hand-designed from domain knowledge (distance to goal, threat level, piece counts). Weights w are learned via gradient descent on a TD error. For linear V̂, the gradient ∇<sub>w</sub> V̂(s) = x(s), giving clean semi-gradient TD updates:</p>
+      <div class="formula">w ← w + α [ R + γ V̂(S′, w) − V̂(S, w) ] x(S)</div>
+      <p>Linear methods are simple, analyzable, and still used when features are well understood — but they cannot represent arbitrary nonlinear value surfaces.</p>
+    </div>
+
+    <div class="card card-alt">
+      <h4><span class="tag tag-purple">3. Neural network approximation</span></h4>
+      <p>Replace the linear dot product with a deep network: states (or state–action pairs) enter an input layer, pass through hidden layers, and output V(s) or Q(s, a). Weights are connection strengths — the network fine-tunes them so outputs match TD targets. Nonlinear activations let the network approximate complex functions; depth and width trade off expressiveness against data and compute.</p>
+      <div class="formula">Q̂(s, a; θ) ≈ Q*(s, a) &nbsp;&nbsp; where θ are all network weights</div>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Semi-gradient TD:</strong> When the TD target involves V̂(S′, w), the target itself depends on w. Strict gradient descent would backprop through that dependency; semi-gradient ignores it and treats the target as fixed for one step. It works well in practice despite being “wrong” on paper.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Loss Functions and Targets</h3>
+    <p>Function approximation in RL starts by defining a loss — how far is our estimate from the truth?</p>
+    <div class="formula">L(w) = ½ [ V(s) − V̂(s, w) ]²</div>
+    <p>In supervised learning, V(s) is known (exam score given hours studied). In RL, V(s) is never observed directly. The trick from the lectures: replace the unknown true value with a <strong>target</strong> whose expectation equals the true value:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;line-height:1.8;">
+      <li><strong>Monte Carlo target:</strong> G<sub>t</sub> — the full return from t onward. Unbiased but high variance.</li>
+      <li><strong>TD target:</strong> R + γ V̂(S′, w) — bootstrapped one-step lookahead. Lower variance but biased while w is wrong.</li>
+    </ul>
+    <p>Gradient descent on w using the TD target gives the semi-gradient update shown above. The same pattern extends to Q̂(s, a; w) for action-value control with SARSA or Q-learning targets.</p>
+
+    <h3 style="margin-top:28px;">Linear vs Nonlinear — When to Use Which</h3>
+    <table>
+      <thead>
+        <tr><th>Approach</th><th>Strengths</th><th>Limitations</th><th>Example domains</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>State aggregation</td><td>Trivial to implement</td><td>Coarse; loses fine structure</td><td>Low-res grid worlds</td></tr>
+        <tr><td>Linear FA</td><td>Convergence proofs; fast updates</td><td>Only linearly separable structure</td><td>Cart-pole with hand features</td></tr>
+        <tr><td>Neural FA</td><td>Universal approximator; handles pixels</td><td>Sample-hungry; unstable with bootstrapping</td><td>Atari, Go, LLM policies</td></tr>
+      </tbody>
+    </table>
+    <p>AlphaGo used neural networks to approximate value and policy over the enormous Go state space — the same nonlinear FA idea, combined with Monte Carlo tree search. Reasoning models use transformers as function approximators over token sequences, trained with policy-gradient variants instead of tabular Q updates — but the generalization problem is identical.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     08 — Bridge to Deep RL and LLMs
+     ============================================================ -->
+<section class="section fade-in" id="deep">
+  <div class="container">
+    <span class="section-num">08 — FROM Q-TABLE TO Q-NETWORK</span>
+    <h2>The Path to Deep RL — and Reasoning LLMs</h2>
+    <p>Combining Q-learning with a neural network Q̂(s, a; θ) gives <strong>DQN</strong> (Deep Q-Network): the breakthrough that solved Atari from pixels and launched modern deep RL. The recipe is exactly what this chapter built:</p>
+
+    <div class="flow-diagram">
+<span class="highlight">Tabular Q-learning</span>  →  large state space  →  <span class="highlight">Linear Q̂(s,a) = w·x(s,a)</span>
+       →  nonlinear problems  →  <span class="highlight">Neural Q̂(s,a; θ)</span>  →  <span class="highlight">DQN</span> (2015)
+       →  continuous control, Go, robotics, ...
+    </div>
+
+    <table style="margin-top:24px;">
+      <thead>
+        <tr><th>Stage</th><th>Representation</th><th>Scale</th><th>Landmark</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Tabular</td><td>Q[s, a] lookup table</td><td>10²–10⁴ states</td><td>Cliff walking, grid worlds</td></tr>
+        <tr><td>Linear FA</td><td>w · x(s, a)</td><td>10⁴–10⁶ (with features)</td><td>Tile coding, coarse grids</td></tr>
+        <tr><td>Deep FA</td><td>Neural Q̂(s, a; θ)</td><td>10⁶+ / continuous</td><td>DQN, AlphaGo, AlphaZero</td></tr>
+        <tr><td>Policy networks</td><td>π(a|s; θ) directly</td><td>High-dimensional obs</td><td>PPO, RLHF, GRPO</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:32px;">Why This Matters for Reasoning LLMs</h3>
+    <p>An LLM generating a chain of thought is an agent in an enormous MDP: states are prompts plus generated tokens; actions are next tokens; rewards come from verifiers or human preference. Storing a Q-table over all possible contexts is impossible — the model <em>is</em> the function approximator.</p>
+    <p>Systems like DeepSeek-R1 and GRPO use policy-gradient methods (a sibling branch to Q-learning) with neural networks containing billions of parameters θ. But the conceptual lineage is unchanged from this chapter:</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;line-height:1.8;">
+      <li>Estimate value of states/actions (now via forward pass through a transformer).</li>
+      <li>Update weights from reward signal (now via backprop on a surrogate loss).</li>
+      <li>Balance exploration (sampling diverse reasoning paths) with exploitation (rewarding correct answers).</li>
+      <li>Choose on-policy (PPO: learn from own rollouts) vs off-policy (learn from replay buffers or human demos) — the same SARSA/Q-learning tradeoff at LLM scale.</li>
+    </ul>
+
+    <h3 style="margin-top:32px;">DQN: Q-Learning at Neural Scale</h3>
+    <p>Deep Q-Networks (Mnih et al., 2015) replace the Q-table with a convolutional network that maps Atari frames to Q-values for each action. Experience replay and target networks stabilize the non-stationary TD target — engineering fixes for the same bootstrapping issues discussed in the semi-gradient section. From DQN, the path runs through Double DQN, Rainbow, and distributed variants to AlphaStar and beyond.</p>
+
+    <div class="callout">
+      <p><strong>Chapter arc:</strong> Bandits (Ch.04) → MDPs &amp; Bellman (Ch.05) → solving tabular MDPs (Ch.06) → TD control + function approximation (this chapter) → policy gradients &amp; REINFORCE (Ch.08). Each step adds scale; the final steps add the scale of language.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     09 — Summary
+     ============================================================ -->
+<section class="section fade-in" id="summary">
+  <div class="container">
+    <span class="section-num">09 — SUMMARY</span>
+    <h2>Key Takeaways</h2>
+    <div class="card">
+      <ul style="color:var(--text-dim);margin:0 0 0 1.2em;line-height:1.9;">
+        <li><strong>TD control</strong> extends TD prediction: learn Q while improving policy via ε-greedy.</li>
+        <li><strong>SARSA</strong> (on-policy): Q(S,A) ← Q(S,A) + α[R + γ Q(S′,A′) − Q(S,A)]. Learns Q<sup>π</sup> for the exploratory policy — safe paths.</li>
+        <li><strong>Q-learning</strong> (off-policy): Q(S,A) ← Q(S,A) + α[R + γ max<sub>a′</sub> Q(S′,a′) − Q(S,A)]. Learns Q* — optimal but riskier during training.</li>
+        <li><strong>Cliff walking</strong> makes the on/off-policy difference visceral: safe detour vs cliff-hugging shortcut.</li>
+        <li><strong>Tabular methods</strong> fail at chess/Go/LLM scale; <strong>function approximation</strong> generalizes from seen to unseen states.</li>
+        <li><strong>Linear FA:</strong> V̂(s) = w · x(s). <strong>Neural FA:</strong> Q̂(s,a; θ) → DQN → modern deep RL → LLM RL training.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- Footer nav -->
+<div class="footer">
+  <p>
+    <a href="../06-solving-mdps/">← Ch.06 — Solving MDPs</a>
+    <a href="../08-policy-gradients-and-reinforce/">Ch.08 — Policy Gradients →</a>
+  </p>
+  <p style="margin-top:16px;">Reasoning from Scratch · Chapter 07 of 12</p>
+</div>
+
+<script>
+/* ============================================================
+   Scroll animations + sticky nav
+   ============================================================ */
+const nav = document.getElementById('nav');
+const faders = document.querySelectorAll('.fade-in');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+faders.forEach(f => observer.observe(f));
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+
+/* ============================================================
+   Cliff Walking environment + SARSA / Q-learning trainers
+   Classic 4×12 grid: cliff on bottom row between S and G
+   ============================================================ */
+(function () {
+  const ROWS = 4, COLS = 12;
+  const START = [3, 0], GOAL = [3, 11];
+  const ACTIONS = ['U', 'D', 'L', 'R'];
+  const DELTA = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const STEP_REWARD = -1, CLIFF_REWARD = -100;
+  const ALPHA = 0.5, GAMMA = 1.0, EPSILON = 0.1;
+  const TRAIN_EPISODES = 800;
+
+  /* Deterministic RNG so demo paths are stable across page loads */
+  let rngState = 42;
+  function rand() {
+    rngState = (rngState * 1664525 + 1013904223) >>> 0;
+    return rngState / 4294967296;
+  }
+
+  /* State key: "r,c" for non-terminal cells */
+  function key(r, c) { return r + ',' + c; }
+  function isCliff(r, c) { return r === 3 && c > 0 && c < 11; }
+  function isTerminal(r, c) { return r === GOAL[0] && c === GOAL[1]; }
+
+  function step(r, c, aIdx) {
+    if (isTerminal(r, c)) return { r, c, reward: 0, done: true };
+    let nr = r + DELTA[aIdx][0], nc = c + DELTA[aIdx][1];
+    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) { nr = r; nc = c; }
+    if (isCliff(nr, nc)) return { r: START[0], c: START[1], reward: CLIFF_REWARD, done: false };
+    const reward = isTerminal(nr, nc) ? 0 : STEP_REWARD;
+    return { r: nr, c: nc, reward, done: isTerminal(nr, nc) };
+  }
+
+  function initQ() {
+    const Q = {};
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (isCliff(r, c)) continue;
+        Q[key(r, c)] = [0, 0, 0, 0];
+      }
+    }
+    return Q;
+  }
+
+  function epsGreedy(Q, r, c) {
+    if (rand() < EPSILON) return Math.floor(rand() * 4);
+    const q = Q[key(r, c)];
+    let best = 0;
+    for (let a = 1; a < 4; a++) if (q[a] > q[best]) best = a;
+    return best;
+  }
+
+  function maxQ(Q, r, c) {
+    const q = Q[key(r, c)];
+    return Math.max(q[0], q[1], q[2], q[3]);
+  }
+
+  /* Train SARSA or Q-learning; returns { Q, path, totalReward } */
+  function train(algo) {
+    rngState = algo === 'sarsa' ? 42 : 137; /* separate seeds, stable per algorithm */
+    const Q = initQ();
+    for (let ep = 0; ep < TRAIN_EPISODES; ep++) {
+      let r = START[0], c = START[1];
+      let a = epsGreedy(Q, r, c);
+      let steps = 0;
+      while (!isTerminal(r, c) && steps < 500) {
+        const { r: nr, c: nc, reward, done } = step(r, c, a);
+        const k = key(r, c);
+        if (algo === 'sarsa') {
+          const a2 = done ? 0 : epsGreedy(Q, nr, nc);
+          const target = reward + (done ? 0 : GAMMA * Q[key(nr, nc)][a2]);
+          Q[k][a] += ALPHA * (target - Q[k][a]);
+          r = nr; c = nc; a = a2;
+        } else {
+          const target = reward + (done ? 0 : GAMMA * maxQ(Q, nr, nc));
+          Q[k][a] += ALPHA * (target - Q[k][a]);
+          r = nr; c = nc;
+          a = epsGreedy(Q, r, c);
+        }
+        steps++;
+      }
+    }
+    /* Extract greedy path from start (break on cycles) */
+    const path = [[START[0], START[1]]];
+    const visited = new Set([key(START[0], START[1])]);
+    let r = START[0], c = START[1], totalReward = 0, guard = 0;
+    while (!isTerminal(r, c) && guard < 60) {
+      const q = Q[key(r, c)];
+      let best = 0;
+      for (let a = 1; a < 4; a++) if (q[a] > q[best]) best = a;
+      const { r: nr, c: nc, reward } = step(r, c, best);
+      const nk = key(nr, nc);
+      if (visited.has(nk)) break;
+      visited.add(nk);
+      totalReward += reward;
+      path.push([nr, nc]);
+      r = nr; c = nc;
+      guard++;
+    }
+    return { Q, path, totalReward, episodes: TRAIN_EPISODES };
+  }
+
+  /* --- DOM: cliff grid --- */
+  const gridEl = document.getElementById('cliff-grid');
+  const pathLenEl = document.getElementById('path-len');
+  const pathRewEl = document.getElementById('path-reward');
+  const trainEpsEl = document.getElementById('train-eps');
+  const algoDescEl = document.getElementById('algo-desc');
+  const qHeatmapEl = document.getElementById('q-heatmap');
+  const algoBtns = document.querySelectorAll('#algo-toggle .btn');
+  let currentAlgo = 'sarsa';
+  let cached = { sarsa: null, qlearning: null };
+
+  function buildGridCells() {
+    gridEl.innerHTML = '';
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cliff-cell';
+        cell.dataset.r = r;
+        cell.dataset.c = c;
+        if (r === START[0] && c === START[1]) { cell.classList.add('start'); cell.textContent = 'S'; }
+        else if (r === GOAL[0] && c === GOAL[1]) { cell.classList.add('goal'); cell.textContent = 'G'; }
+        else if (isCliff(r, c)) { cell.classList.add('cliff'); cell.textContent = '☠'; }
+        gridEl.appendChild(cell);
+      }
+    }
+  }
+
+  function renderPath(path) {
+    document.querySelectorAll('.cliff-cell').forEach(el => el.classList.remove('on-path'));
+    path.forEach(([r, c]) => {
+      const el = gridEl.querySelector('[data-r="' + r + '"][data-c="' + c + '"]');
+      if (el) el.classList.add('on-path');
+    });
+  }
+
+  function renderQHeatmap(Q) {
+    /* Sample states for the small Q-table viz */
+    const samples = [
+      [0, 0, 'Top-left'],
+      [0, 6, 'Top mid'],
+      [1, 6, 'Upper lane'],
+      [2, 6, 'Cliff edge'],
+      [3, 0, 'Start'],
+      [2, 10, 'Near goal']
+    ];
+    qHeatmapEl.innerHTML = '';
+    samples.forEach(([r, c, label]) => {
+      const k = key(r, c);
+      if (!Q[k]) return;
+      const q = Q[k];
+      let best = 0;
+      for (let a = 1; a < 4; a++) if (q[a] > q[best]) best = a;
+      const card = document.createElement('div');
+      card.className = 'q-state-card';
+      let html = '<div class="state-label">' + label + ' (' + r + ',' + c + ')</div>';
+      ACTIONS.forEach((name, a) => {
+        const v = q[a];
+        const cls = v > 0 ? 'q-val-pos' : v < -5 ? 'q-val-neg' : 'q-val-neu';
+        const star = a === best ? ' ★' : '';
+        html += '<div class="q-action-row' + (a === best ? ' best' : '') + '"><span>' + name + star + '</span><span class="' + cls + '">' + v.toFixed(1) + '</span></div>';
+      });
+      card.innerHTML = html;
+      qHeatmapEl.appendChild(card);
+    });
+  }
+
+  function show(algo) {
+    currentAlgo = algo;
+    if (!cached[algo]) cached[algo] = train(algo);
+    const { Q, path, totalReward, episodes } = cached[algo];
+    renderPath(path);
+    pathLenEl.textContent = path.length - 1;
+    pathRewEl.textContent = totalReward;
+    trainEpsEl.textContent = episodes;
+    renderQHeatmap(Q);
+    algoDescEl.textContent = algo === 'sarsa'
+      ? 'SARSA learns a cautious route that stays away from the cliff edge, even though it takes more steps.'
+      : 'Q-learning learns the shortest route along the cliff edge — optimal under the greedy policy, but risky during ε-greedy training.';
+    algoBtns.forEach(b => b.classList.toggle('active', b.dataset.algo === algo));
+  }
+
+  buildGridCells();
+  show('sarsa');
+
+  algoBtns.forEach(btn => {
+    btn.addEventListener('click', () => show(btn.dataset.algo));
+  });
+  document.getElementById('retrain-btn').addEventListener('click', () => {
+    cached[currentAlgo] = null;
+    show(currentAlgo);
+  });
+})();
+</script>
+</body>
+</html>

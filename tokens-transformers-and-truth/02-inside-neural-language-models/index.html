@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inside Neural Language Models — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  background: rgba(251,191,36,0.08);
+  border-left-color: var(--accent5);
+}
+.callout.warn p { color: var(--text-dim); }
+.callout.ok {
+  background: rgba(52,211,153,0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text-dim); }
+
+/* ===== Q&A box ===== */
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+.qa-box p { margin-bottom: 0.75em; }
+.qa-box p:last-child { margin-bottom: 0; }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+.flow-step:hover { border-color: var(--accent); background: rgba(108,140,255,0.05); }
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Chart container ===== */
+.chart-container { position: relative; margin: 20px 0; }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Input fields ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Matrix cells ===== */
+.matrix-grid {
+  display: grid;
+  gap: 2px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  margin: 16px 0;
+}
+.matrix-cell {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: center;
+  background: var(--bg-card-alt);
+  transition: all 0.2s;
+}
+.matrix-cell:hover {
+  background: rgba(108,140,255,0.15);
+  border-color: var(--accent);
+  cursor: pointer;
+}
+.matrix-cell.highlight {
+  background: rgba(108,140,255,0.2);
+  border-color: var(--accent);
+}
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Inside Neural Language Models</span></nav>
+
+
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">Inside Neural Language Models</a>
+  <div class="nav-links">
+    <a href="#s0">Prerequisites</a>
+    <a href="#s1">Generalization</a>
+    <a href="#s2">Decoding</a>
+    <a href="#s3">Autoregressive</a>
+    <a href="#s4">N-grams to Neural</a>
+    <a href="#s5">Embeddings</a>
+    <a href="#s6">Composition</a>
+    <a href="#s7">Softmax</a>
+    <a href="#s8">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Inside Neural Language Models</h1>
+    <p class="subtitle">
+      From decoding strategies and embeddings to the softmax layer — how neural language models produce text, one token at a time.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">9</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">8</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1</span>
+        <span class="stat-label">Playground</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Neural language models represent words as dense embeddings, compose them into a prefix vector, and output a probability distribution over the next word. This chapter covers decoding (greedy and sampling), autoregressive generation, and the softmax layer that maps a d-dimensional vector to a V-dimensional distribution.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 0: PREREQUISITES ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Prerequisites</h2>
+
+    <p>
+      Building on the probabilistic foundations from Chapter 1 — joint sequence probability via the chain rule, n-gram estimation by counting, and perplexity as the evaluation metric — this chapter moves from count-based models to neural ones.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 1: GENERALIZATION VS MEMORIZATION ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Generalization vs. Memorization</h2>
+
+    <p>
+      When evaluating a language model, we care about two metrics: <strong>training perplexity</strong> and <strong>test perplexity</strong>. The relationship between them tells us whether the model has learned generalizable patterns or merely memorized the training data.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Generalization ✓</h3>
+        <p><strong>Train perplexity low + test perplexity low.</strong> The model predicts the next word well on both the data it was trained on and on new, unseen data. It has learned general properties of language — grammar, semantics, world knowledge — and can apply them beyond the training set.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--danger);">Overfitting ✗</h3>
+        <p><strong>Train perplexity low + test perplexity high.</strong> The model has over-specialized to the training set. It may have memorized next-word sequences without learning underlying patterns. When given new data, it fails to predict well.</p>
+      </div>
+    </div>
+
+    <p>
+      This is why practitioners monitor both curves during training. Often you'll see training perplexity keep decreasing while test perplexity initially goes down, then — at some point — starts going <strong>up</strong> again. That inflection point is where overfitting begins. You want to stop training near there.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Why track training perplexity at all?</strong> Training perplexity (or equivalently, training loss) tells you whether optimization is working — the model is getting better at predicting held-out positions inside the training distribution as you train. Test perplexity is the mirror that tells you whether that improvement <em>generalizes</em>. You need both: one for learning signal, one for generalization.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Memorization in Modern LLMs</h3>
+    <p>
+      A critical open question with large language models: when you see output from a system, is it <strong>regurgitating</strong> training data verbatim, or is it <strong>composing</strong> novel text from learned patterns? It's often impossible to tell without checking against the training corpus. This remains an active area of research.
+    </p>
+
+    <h3 style="margin-top:28px;">What You Need to Compute Perplexity</h3>
+    <p>
+      To compute perplexity, you need an <strong>existing data set of text</strong>. Typically you have a training set and a held-out test set. For example, you might train on articles from the New York Times and test on articles from the Wall Street Journal. The text might be similar in topic and domain, but written by different people with different styles. The critical requirement: you need some available text to evaluate against.
+    </p>
+
+    <h3 style="margin-top:28px;">Perplexity vs. Generation Quality</h3>
+    <p>
+      Perplexity measures <strong>how probable existing text is</strong> under your model. It does <strong>not</strong> directly measure the quality of text generated by the model. You might want to evaluate generation quality separately — e.g., through human evaluation or task-specific metrics. Perplexity is only one evaluation tool.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Train vs. Test Perplexity</h3>
+      <p>Drag the slider to simulate training steps. Watch how overfitting causes the test curve to diverge from the training curve.</p>
+
+      <div class="slider-container">
+        <label>Training Steps: <span class="slider-value" id="pplStepVal">50</span></label>
+        <input type="range" id="pplSlider" min="1" max="200" value="50">
+      </div>
+
+      <div class="chart-container">
+        <canvas id="pplCanvas" width="840" height="280"></canvas>
+      </div>
+
+      <div style="display:flex; gap:24px; margin-top:12px; font-size:0.8rem;">
+        <span><span style="color:var(--accent);">●</span> Train Perplexity</span>
+        <span><span style="color:var(--danger);">●</span> Test Perplexity</span>
+        <span><span style="color:var(--text-dim);">┊</span> Overfitting starts</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 2: DECODING ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Decoding from Language Models</h2>
+
+    <p>
+      How do we use a language model to <strong>generate new text</strong>? This process goes by several names in papers and APIs — <strong>decoding</strong> from the model, <strong>inference</strong> with the model, and <strong>generating</strong> from the model — and people often use them interchangeably. At a slightly finer grain, <strong>decoding</strong> is the piece of the larger <strong>inference</strong> stage that turns logits into discrete tokens; colloquially, though, "inference," "decoding," and "generation" all refer to the post-training work of producing new text.
+    </p>
+
+    <h3 style="margin-top:28px;">The LM as a Black Box</h3>
+    <p>
+      Think of the language model as a black box. You feed in a prefix (e.g., "my favorite LLM is") and it produces a <strong>V-dimensional probability distribution</strong> over the next word. The distribution has the same dimensionality regardless of the prefix — one probability for <strong>every type in the vocabulary</strong>. You don't get just four probabilities for likely LLM names; you get a probability for every word in the vocabulary (e.g., 100,000 types).
+    </p>
+
+    <p>
+      Concretely, imagine that toy distribution focused on a few familiar names. The model might assign about <strong>5%</strong> to "ChatGPT," put more mass on another assistant you happen to prefer that day, assign a smaller share to a name you currently disfavor, and reserve a large slice — say on the order of <strong>40%</strong> — for "Llama" if the model strongly favors it in context. Those percentages are illustrative, but they match the spirit of how <strong>ancestral sampling</strong> behaves: at each step you draw one word from the <em>full</em> categorical distribution, so a 40% event is selected 40% of the time and a 5% event 5% of the time. The randomness is tied to the model's probabilities; it is not a uniform draw over the vocabulary.
+    </p>
+
+    <p>
+      Decoding can sample from the <strong>full</strong> vocabulary distribution or from a <strong>truncated</strong> one — for example, restricting to the top-<em>k</em> highest-probability types before renormalizing. Truncation trades <strong>diversity</strong> against <strong>safety</strong>: the full distribution can assign tiny but nonzero probability to absurd or toxic continuations, and naive sampling might occasionally land there. A broader subset yields more diverse text; a tighter subset reduces tail risk at the cost of variety.
+    </p>
+
+    <div class="formula">
+      P(w | prefix) for each w ∈ vocabulary
+    </div>
+
+    <p>
+      Given this distribution, how do we choose the next word? Two main strategies:
+    </p>
+
+    <h3 style="margin-top:28px;">Greedy Decoding</h3>
+    <p>
+      <strong>Greedy decoding</strong> picks the word with the <strong>highest probability</strong>. It's deterministic: given the same prefix, you always get the same output. This is simple and widely used, especially with large models.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Determinism has a creative cost.</strong> If you ask for "a story about a unicorn with red hats" and you decode greedily, you will get <em>one</em> canonical completion every time — the locally most probable choice at each step. There is no built-in way to obtain a menu of ten different stories and pick your favorite afterward. Sampling injects the randomness that greedy decoding lacks.</p>
+    </div>
+
+    <div class="card">
+      <ul style="list-style:none; font-size:0.9rem;">
+        <li style="margin-bottom:12px;">
+          <span style="color:var(--danger);">✗</span> <strong>Drawback:</strong> Only one output — you can't explore alternatives. If you want multiple different stories or completions, greedy decoding won't help.
+        </li>
+        <li style="margin-bottom:12px;">
+          <span style="color:var(--danger);">✗</span> <strong>Memorization:</strong> You cannot conclude whether a long continuation was memorized by generating from a prefix and comparing to a single gold document. Matching verbatim text is a very strict test; exploring whether <em>any</em> plausible decoding path recovers training material is combinatorially harder. Greedy and sampling share this limitation — neither gives a free certificate of novelty.
+        </li>
+        <li>
+          <span style="color:var(--accent3);">✓</span> <strong>Historical note:</strong> Weaker models used to produce artifacts like repeated text or nonsense. With larger models, these artifacts reduce dramatically with greedy decoding.
+        </li>
+      </ul>
+    </div>
+
+    <h3 style="margin-top:28px;">Sampling</h3>
+    <p>
+      <strong>Sampling</strong> is stochastic: you randomly sample from the distribution. A word with 40% probability is chosen 40% of the time; one with 5% is chosen 5% of the time. This is <strong>ancestral sampling</strong> — proportional to the probability.
+    </p>
+
+    <p>
+      A common variant is <strong>top-k sampling</strong>: only consider the top k highest-probability words and sample from that subset. This reduces the chance of sampling a completely inappropriate word. There's a trade-off: sampling from the full distribution gives more diversity but more risk of bad outputs; sampling from a smaller subset is safer but less diverse.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>Greedy decoding</h3>
+        <p>Takes <strong>argmax</strong> of P(next token | prefix) at every step. <strong>Deterministic</strong>: identical prefix and model state implies identical continuation. Excellent when you want a single, stable answer; poor when you want exploration or creative variety.</p>
+      </div>
+      <div class="card">
+        <h3>Sampling (ancestral)</h3>
+        <p>Draws the next token from the full categorical distribution (or a truncated variant). <strong>Stochastic</strong>: each run can differ. High-probability tokens appear often; low-probability tokens appear rarely — but anything with positive mass can in principle be chosen.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Greedy vs. Sampling</h3>
+      <p>Compare how greedy decoding and sampling differ on the same next-word distribution. Greedy always picks the highest bar; sampling randomly selects according to the probabilities.</p>
+
+      <div class="btn-group">
+        <button class="btn active" onclick="setDecodeMode('greedy')">Greedy</button>
+        <button class="btn" onclick="setDecodeMode('sampling')">Sampling</button>
+        <button class="btn" onclick="runDecodeSample()">Sample</button>
+      </div>
+
+      <div class="bar-chart" id="decodeChart" style="height:220px;"></div>
+      <div id="decodeResult" style="margin-top:12px; font-family:var(--mono); font-size:0.9rem; color:var(--text);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: AUTOREGRESSIVE GENERATION ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Autoregressive Generation</h2>
+
+    <p>
+      To generate longer text, we repeat: <strong>add the generated word to the prefix</strong>, feed it back into the model, get a new distribution, and pick the next word. The distribution changes because the context changes. After "my favorite LLM is ChatGPT," the next word might be punctuation, "but," or "when" — not another LLM name.
+    </p>
+
+    <p>
+      Walk it through once with a concrete prefix. Start from <strong>"my favorite LLM is"</strong>. Suppose sampling yields <strong>"ChatGPT"</strong> as the next token. The new prefix becomes <strong>"my favorite LLM is ChatGPT"</strong>. You pass that longer string back through the same model; the next-token distribution is <em>not</em> the same as before — mass may shift toward a period, comma, coordinating conjunctions like "but," or subordinators like "when," because the syntax and discourse have moved forward. Sample again from that new distribution, append, and repeat. At every step the vector length of the distribution is still |V|; only the <em>values</em> change with the prefix.
+    </p>
+
+    <div class="callout">
+      <p><strong>Autoregressive decoding</strong> means generating <strong>one token at a time</strong>, each time conditioning on <strong>all previously generated tokens</strong>. That feedback loop — predict, append, re-encode — is the standard for systems you use every day. Variants exist that predict several tokens in parallel to save time (blocks of 5, 10, or even on the order of 100 tokens), but blocking sacrifices <strong>coherence</strong>: inside each block the model cannot refine earlier choices, so grammar, coreference, and topical consistency suffer. Frontier chat systems still rely on autoregressive decoding for quality.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Words vs. Tokens</h3>
+    <p>
+      When people talk about "words" in generation, they usually mean <strong>tokens</strong>. Subword tokenization means one "word" can be multiple tokens. The process is the same: generate one token at a time, add it to the prefix, repeat.
+    </p>
+
+    <h3 style="margin-top:28px;">The EOS Token</h3>
+    <p>
+      How do we know when to stop? The model outputs a probability for every token, including the <strong>end-of-sequence</strong> token. You might see it written as <code>&lt;/s&gt;</code>, <code>EOS</code>, or similar. When the model assigns high probability to this token, we stop — typically by sampling or greedily selecting it.
+    </p>
+
+    <p>
+      Picture a completed sentence such as <strong>"My favorite LLM is ChatGPT."</strong> after a period has been sampled. You still feed the full prefix (including the period) through the model one more time. Often the <strong>EOS</strong> token now receives most of the probability mass while everything else is down-weighted — selecting EOS cleanly terminates generation. In the common case, decoding ends because you sampled or greedily chose that special token.
+    </p>
+
+    <p>
+      Smaller models may never produce the EOS token. Some sequences are <strong>non-terminating</strong>: the model gets stuck in a loop or keeps generating indefinitely. To handle this, we set a <strong>maximum token threshold</strong> — e.g., stop after <strong>5,000</strong> tokens have been produced, on the assumption that going beyond that usually means a runaway loop or an otherwise undesirable stream.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Two practical stopping rules:</strong> (1) emit an end-of-sequence token when its probability is high enough under your decoding policy, or (2) halt when a hard cap (such as 5,000 tokens) is reached. Production systems almost always implement both.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Fixed Distribution Size</h3>
+    <p>
+      The distribution is always V-dimensional. For neural models with softmax, no entry is exactly zero — they're near-zero but nonzero. So in theory, any token could be sampled. In practice, most entries have very low probability. The dimensionality is fixed at |V| every time: one real number per vocabulary type. With n-grams you might picture many exact zeros from unseen events; with a learned softmax the scoring function rarely produces a hard zero. Instead you get a long tail of astronomically small but positive probabilities — which matters because decoding samples from that full object unless you explicitly truncate it.
+    </p>
+
+    <h3 style="margin-top:28px;">Multi-Token Generation</h3>
+    <p>
+      Could we generate multiple tokens at once for speed? Yes — but you lose coherence. Within those blocks, the model struggles to maintain grammar and relevance. Today's state-of-the-art models use autoregressive decoding: one token at a time.
+    </p>
+
+    <h3 style="margin-top:28px;">Can We Go Back?</h3>
+    <p>
+      Both greedy and sampling are <strong>forward-only</strong>. Once you've generated a token, you can't easily go back and correct it. <strong>Beam search</strong> considers multiple hypotheses and can discard one if it becomes unreasonable later — but it's expensive and not used in today's SOTA models. Other approaches include <strong>diffusion language models</strong> (which can plan the whole document) and <strong>reinforcement learning</strong> for planning.
+    </p>
+
+    <p>
+      Greedy decoding and naive sampling both commit irreversibly at each step — neither maintains an explicit search tree of alternatives. <strong>Beam search</strong> keeps several partial hypotheses alive so a dead-end branch can be pruned when its score collapses, but the compute cost is steep enough that it is uncommon in large decoder-only deployments. Longer-horizon <strong>planning</strong> appears in other families: diffusion-based text models can maintain a coarse outline of an entire document and refine it through a denoising process, and reinforcement-learning fine-tuning can incentivize multi-step reasoning in autoregressive models.
+    </p>
+
+    <h3 style="margin-top:28px;">Stop Words and Capitalization</h3>
+    <p>
+      <strong>Stop words</strong> — high-frequency function words like <em>the</em> plus heavy punctuation — are not guaranteed to dominate the distribution. A <strong>weak</strong> model with little context (think small-<em>n</em> n-grams) often assigns them inflated mass because smoothing and sparsity leave few alternatives. A <strong>strong</strong> contemporary system conditions on enough context to emit stop words when grammar demands them and content words when the discourse calls for substance. The fix is representational capacity and training data scale, not a special casing rule baked into decoding.
+    </p>
+
+    <p>
+      <strong>Capitalization</strong> follows the tokenizer. In most modern byte-pair or SentencePiece vocabularies, <code>The</code> and <code>the</code> are distinct types. Some corpora are lowercased during preprocessing, which would collapse the distinction, but frontier models trained on heterogeneous web text usually preserve case so that proper nouns, sentence starts, and SHOUTING carry different embeddings. Always inspect the tokenizer for the system you deploy.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Autoregressive Generation</h3>
+      <p>Click "Next Token" to see how the model generates one token at a time. Each step adds the generated token to the prefix and produces a new distribution.</p>
+
+      <div class="btn-group">
+        <button class="btn" onclick="arNextToken()">Next Token</button>
+        <button class="btn" onclick="arAutoPlay()">Auto-play</button>
+        <button class="btn" onclick="arReset()">Reset</button>
+      </div>
+
+      <div class="token-row" id="arTokens" style="margin: 20px 0;"></div>
+      <div id="arDist" style="font-size:0.85rem; color:var(--text-dim); margin-top:4px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: FROM N-GRAMS TO NEURAL ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>From N-grams to Neural Language Models</h2>
+
+    <p>
+      N-gram models have several limitations: <strong>small context</strong> (e.g., only the last 2–3 words), <strong>no semantic sharing</strong> between similar prefixes, and <strong>huge count tables</strong> that don't scale.
+    </p>
+
+    <h3 style="margin-top:28px;">The Movie vs. Film Example</h3>
+    <p>
+      Consider "my favorite movie is" vs. "my favorite film is." As humans, we treat these as synonymous. We'd expect the same next-word distribution. But in an n-gram model, "movie" and "film" are <strong>completely different</strong> — as equally dissimilar as "movie" and "zebra." There's no notion of semantic similarity.
+    </p>
+
+    <p>
+      The same brittleness appears when wording shifts slightly but meaning does not. Compare <strong>"my favorite language model is Gemini"</strong> with <strong>"my favorite large language model is Gemini."</strong> To you those prefixes are near-paraphrases; to a count-based n-gram model they are unrelated strings with unrelated histories in the table. Every distinct surface form starts its count statistics from scratch, so semantically aligned prefixes do not share evidence.
+    </p>
+
+    <h3 style="margin-top:28px;">Neural LMs: Parameters That Are Trained</h3>
+    <p>
+      Neural language models have <strong>parameters</strong> that are learned through training — not just count and divide. There are two stages: <strong>forward propagation</strong> (how we get from input text to the next-word distribution) and <strong>back propagation</strong> (how we adjust the model to make better predictions). Key concepts: <strong>embeddings</strong>, <strong>composition</strong>, and <strong>gradient descent</strong>.
+    </p>
+
+    <div class="callout">
+      <p><strong>Key difference:</strong> In n-gram models, we build a data structure of counts and then retrieve. In neural models, we make a prediction, see how bad it is, and adjust the model to do slightly better next time on that same data. The model is trained to minimize prediction error.</p>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>N-gram scoring</h3>
+        <p>Given a new corpus, form counts once, normalize, and <strong>look up</strong> conditional probabilities. No iterative optimization — the "parameters" are the stored frequencies (plus smoothing). Adding data means rebuilding or updating tables, not gradient steps.</p>
+      </div>
+      <div class="card">
+        <h3>Neural scoring</h3>
+        <p>Maintain continuous parameters (embeddings, weight matrices). On each training step, <strong>run a forward pass</strong>, measure loss, and <strong>back-propagate</strong> to nudge weights. The same architecture can keep improving as you stream more examples through it.</p>
+      </div>
+    </div>
+
+    <p>
+      Whether the scoring function comes from counts or from a neural net, <strong>autoregressive generation</strong> always asks for the conditional distribution of a <em>single</em> next token given everything generated so far. N-gram models were never special-cased to emit whole clauses in one shot; they also answered "what is P(next token | context)?" The difference is how that conditional is parameterized — table lookup versus learned logits — not the factorization of the generative story.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: WORD EMBEDDINGS ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Word Embeddings</h2>
+
+    <p>
+      The motivation: we want "movie" and "film" to have similar representations, and "movie" and "zebra" to be dissimilar. In n-gram models, words are represented as <strong>one-hot vectors</strong>. The same mathematical picture appears in classical <strong>bag-of-words</strong> models that assume every word type is equally unrelated to every other: a one-hot encoding is the natural representation there as well.
+    </p>
+
+    <h3 style="margin-top:28px;">One-Hot Vectors</h3>
+    <p>
+      A one-hot vector is <strong>V-dimensional</strong>, all zeros except for one dimension — the one associated with that word. So "movie" and "film" have ones in different positions. If you compute the dot product between them, you get <strong>zero</strong>. They're orthogonal. That's bad — we want similar words to have similar representations (high dot product).
+    </p>
+
+    <p>
+      What we are aiming for instead is a <strong>representation space</strong> — really, a geometry on words, multi-word phrases, and even whole documents — where items with similar meanings land near one another. Continuing the dot-product language: we would like <strong>movie · film</strong> to be large and positive while <strong>movie · zebra</strong> (and <strong>film · zebra</strong>) stay small. Modern embeddings learned inside language models approximate that property far better than one-hot bags ever could, which is what enables statistical sharing between paraphrastic prefixes.
+    </p>
+
+    <h3 style="margin-top:28px;">Dense Embeddings</h3>
+    <p>
+      <strong>Dense embeddings</strong> are <strong>d-dimensional</strong> (e.g., 50, 100, 768, 1024), real-valued vectors. They're much smaller than V and typically dense (all entries nonzero). The values are learned: we start with random initialization, then training adjusts them so that similar words end up close together.
+    </p>
+
+    <p>
+      If you projected words into only three dimensions for visualization, you might see something like a movie vector <code>[0.3, −0.4, 0.8]</code>, a film vector with nearby coordinates, and a zebra vector pointing somewhere else entirely — not because a human hand-set those numbers, but because optimization nudges synonyms toward shared geometry. Quantitatively, <strong>cosine similarity</strong> (or dot products after normalization) between movie and film should be large, while movie–zebra and film–zebra similarities should be small. Those geometric tests are how you verify that the space is doing useful work.
+    </p>
+
+    <div class="formula">
+      Training starts from a random embedding for every vocabulary type → forward pass produces next-word predictions → loss measures error → backward pass updates every parameter, including all embedding vectors → repeated until similar words migrate toward one another in ℝ<sup>d</sup>.
+    </div>
+
+    <p>
+      Prior knowledge (e.g., dictionaries) can initialize embeddings — before roughly <strong>2015–2017</strong>, researchers experimented with lexicon-informed initializations. In the current era of web-scale pre-training, random initialization plus enough data usually washes out those hand-crafted starts: the model infers synonymy, syntax, and topical structure directly from co-occurrence statistics, and pipelines minimize human curation during the pre-training stage.
+    </p>
+
+    <h3 style="margin-top:28px;">Polysemy</h3>
+    <p>
+      What about "bank" (financial vs. river)? It gets <strong>one embedding</strong>. The neural network disambiguates from context when producing the next-word distribution. The context — the prefix — determines which sense is intended.
+    </p>
+
+    <p>
+      There are not two vocabulary rows for the two senses of <strong>bank</strong>; tokenization maps the surface form to a single type, and the embedding lookup returns that single vector. The composition layers above the embedding must condition on the surrounding tokens to steer predictions toward riverbanks versus investment banks. You will see how that becomes possible once we discuss how sequences of embeddings are merged into a contextual prefix representation.
+    </p>
+
+    <p>
+      Embeddings are trained with the <strong>same self-supervised next-token objective</strong> as the rest of the language model. There is no independent embedding-only loss: the embedding table is another set of parameters that back-propagation updates whenever the model guesses the wrong continuation. Clustering of synonyms emerges because sharing subspaces reduces predictive loss across many contexts.
+    </p>
+
+    <p>
+      Embeddings are trained as part of the language model — same data, same objective, self-supervised. No separate embedding training step.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>One-Hot vs. Dense Embeddings</h3>
+      <p>Compare how "movie," "film," and "zebra" are represented. One-hot: orthogonal (dot product = 0). Dense: similar words have high dot product.</p>
+
+      <div class="btn-group">
+        <button class="btn active" onclick="setEmbedView('onehot')">One-Hot</button>
+        <button class="btn" onclick="setEmbedView('dense')">Dense</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;" id="embedComparison">
+        <div class="card">
+          <h4 style="font-size:0.9rem; margin-bottom:8px;">movie</h4>
+          <div id="embedMovie" class="token-row"></div>
+        </div>
+        <div class="card">
+          <h4 style="font-size:0.9rem; margin-bottom:8px;">film</h4>
+          <div id="embedFilm" class="token-row"></div>
+        </div>
+        <div class="card">
+          <h4 style="font-size:0.9rem; margin-bottom:8px;">zebra</h4>
+          <div id="embedZebra" class="token-row"></div>
+        </div>
+      </div>
+      <div id="embedDot" style="margin-top:12px; font-family:var(--mono); font-size:0.9rem; color:var(--text);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 6: COMPOSITION ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>The Composition Process</h2>
+
+    <p>
+      Given a sequence of word embeddings, we need a single vector — the <strong>prefix vector</strong> — that encodes everything relevant for next-word prediction. The neural network (Transformer, RNN, CNN, etc.) does this composition. The architecture varies; the role is the same.
+    </p>
+
+    <p>
+      Take the running example <strong>"my favorite LLM is"</strong>. After embedding lookup you hold four distinct vectors — one per token — each living in ℝ<sup>d</sup> (think of them as four different color-coded columns in a sketch). The network's job is to fold that entire list into <strong>one</strong> summary vector that captures semantics, syntax, and any other regularities the parameters have learned, <em>specifically in service of predicting the next token</em>. Suppose the true next token is <strong>Gemini</strong>; the composed vector should concentrate evidence that makes the softmax layer assign Gemini high probability. Whatever information is irrelevant to that predictive task can, in principle, be washed out by the layers.
+    </p>
+
+    <h3 style="margin-top:28px;">Full Pipeline</h3>
+    <p>
+      Input text → embeddings → neural network → prefix vector → softmax → probability distribution over vocabulary. The prefix vector is what we pass to the softmax layer to get the next-word distribution.
+    </p>
+
+    <div class="callout">
+      <p><strong>Forward propagation, in two acts:</strong> (Act I) <strong>Composition</strong> — map a sequence of token embeddings to one prefix vector. (Act II) <strong>Output projection + softmax</strong> — map that prefix vector to a legitimate probability vector over |V| types. Training later adds <strong>back-propagation</strong> and optimizers such as <strong>gradient descent</strong> to adjust every parameter involved in both acts; n-gram models never needed that loop because there were no tunable continuous weights — only tables of counts.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Composition Flow</h3>
+      <p>Click each step to highlight it. The full forward propagation from input to distribution.</p>
+
+      <div class="flow" id="compositionFlow">
+        <div class="flow-step" data-step="0">Input text: "my favorite LLM is"</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" data-step="1">Embeddings (one per token)</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" data-step="2">Neural network (Transformer / RNN / CNN)</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" data-step="3">Prefix vector (d-dimensional)</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" data-step="4">Softmax layer</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" data-step="5">Probability distribution over V</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 7: SOFTMAX ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>The Softmax Layer</h2>
+
+    <p>
+      The goal: convert a <strong>d-dimensional prefix vector</strong> into a <strong>V-dimensional probability distribution</strong>. The softmax layer does this in two steps.
+    </p>
+
+    <p>
+      Formalize the shapes. Let <strong>x ∈ ℝ<sup>d</sup></strong> be the composed prefix representation and require a vector of probabilities <strong>p ∈ ℝ<sup>V</sup></strong> with <strong>p<sub>j</sub> ≥ 0</strong> and <strong>Σ<sub>j</sub> p<sub>j</sub> = 1</strong>. Those inequalities are what separate a valid categorical distribution from an arbitrary list of logits.
+    </p>
+
+    <h3 style="margin-top:28px;">Step 1: Linear Projection (Weight Matrix)</h3>
+    <p>
+      We use a <strong>weight matrix W</strong> of size V×d. Each number in W is a parameter updated during training. The matrix-vector product <strong>Wx</strong> produces a V-dimensional vector of <strong>logits</strong>. Each row of W contains feature weights for a particular vocabulary word; each dimension of x encodes a latent feature of the prefix.
+    </p>
+
+    <p>
+      Intuition for the rows and columns: you can imagine each coordinate of <strong>x</strong> as capturing an abstract property of the prefix — perhaps something correlated with length, stylistic formality, or syntactic expectations about the upcoming token — even though we cannot read those axes directly. Each <strong>row</strong> of <strong>W</strong> then answers, "How much does vocabulary item <em>j</em> care about each latent feature?" Maybe the row aligned with <strong>Gemini</strong> places large positive weight on the first latent dimension while the row for <strong>Claude</strong> does not. During the multiply-add that forms the first logit, you take the dot product of row 1 with <strong>x</strong>: multiply each weight by the corresponding feature activation and sum. Shift down one row and repeat for the next vocabulary entry. Every scalar in <strong>W</strong> is a learnable knob; after a gradient update the entire matrix may look different even though the architecture is unchanged.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Precision about valid probabilities.</strong> Raw logits can be negative, positive, huge, or tiny; nothing in <strong>Wx</strong> alone enforces non-negativity or unit sum. A proper distribution requires <strong>non-negative</strong> entries that add to one — not merely "non-zero" entries. Softmax supplies both properties.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Step 2: Softmax</h3>
+    <p>
+      Apply softmax to the logit vector <strong>z = Wx</strong>. For each vocabulary index <em>j</em>,
+    </p>
+
+    <div class="formula">
+      softmax(z)<sub>j</sub> = exp(z<sub>j</sub>) / Σ<sub>k</sub> exp(z<sub>k</sub>)
+    </div>
+
+    <p>
+      Exponentiation forces every numerator positive; dividing by the partition function Σ<sub>k</sub> exp(z<sub>k</sub>) forces the outputs to sum to 1. Together those two effects turn unconstrained logits into a legitimate categorical distribution.
+    </p>
+
+    <h3 style="margin-top:28px;">Worked micro-example (V = 4, d = 3)</h3>
+    <p>
+      Restrict the vocabulary temporarily to four types — <strong>ChatGPT</strong>, <strong>Claude</strong>, <strong>Gemini</strong>, <strong>Llama</strong> — so <strong>V = 4</strong>. Suppose the composed prefix vector is <strong>x = [−2, 3.9, 5.4]<sup>⊤</sup></strong>, so <strong>d = 3</strong>. Learned weights form a <strong>4 × 3</strong> matrix <strong>W</strong>; multiplying gives logits <strong>z = Wx ≈ [1.8, 11.9, 12.9, −8.9]<sup>⊤</sup></strong>. Those numbers are still not probabilities — the negatives already violate the probability axioms.
+    </p>
+
+    <p>
+      Feeding <strong>z</strong> through softmax yields approximately:
+    </p>
+
+    <div class="formula">
+      P(ChatGPT | prefix) ≈ 10<sup>−5</sup>, &nbsp; P(Claude | prefix) ≈ 10<sup>−1</sup>, &nbsp; P(Gemini | prefix) ≈ 0.999984, &nbsp; P(Llama | prefix) ≈ 3.4 × 10<sup>−10</sup>
+    </div>
+
+    <p>
+      Now each entry is interpretable as a conditional probability for the corresponding name, and you could either sample stochastically or apply greedy decoding by taking <strong>Gemini</strong>. The logits were chosen for pedagogy, not for realism, but the pipeline — <strong>prefix → linear map → softmax → distribution</strong> — is exactly what large-scale models implement at the output layer.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Matrix-Vector Multiplication</h3>
+      <p>Hover over a row of W to see how that logit is computed.</p>
+
+      <div id="matvecDemo" style="margin: 20px 0;"></div>
+      <div id="matvecExpl" style="font-size:0.85rem; color:var(--text-dim); min-height:40px;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Softmax Calculator</h3>
+      <p>Adjust the logits with sliders. See how the probability distribution changes.</p>
+
+      <div id="softmaxSliders"></div>
+      <div class="bar-chart" id="softmaxBars" style="height:180px; margin-top:16px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 8: PLAYGROUND ===== -->
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Playground</h2>
+    <p>
+      Experiment with softmax, temperature, and embedding similarity. All running live in your browser.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Temperature Explorer</h3>
+      <p>Divide logits by temperature T before softmax. Lower T = sharper distribution; higher T = flatter.</p>
+      <div class="slider-container">
+        <label>Temperature T: <span class="slider-value" id="tempVal">1.0</span></label>
+        <input type="range" id="tempSlider" min="0.1" max="5" value="1" step="0.1">
+      </div>
+      <div class="bar-chart" id="tempChart" style="height:200px;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Embedding Similarity</h3>
+      <p>Type two words. See simulated cosine similarity (pretend embeddings from a small set).</p>
+      <div class="two-col">
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Word 1</label>
+          <input type="text" class="text-input" id="simWord1" value="movie" oninput="updateSim()">
+        </div>
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Word 2</label>
+          <input type="text" class="text-input" id="simWord2" value="film" oninput="updateSim()">
+        </div>
+      </div>
+      <div id="simResult" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>
+    Inside Neural Language Models — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+function toggleHint(id) {
+  const box = document.getElementById(id + '-hint');
+  const btn = document.querySelector('#' + id + ' .hint-btn');
+  box.classList.toggle('open');
+  btn.textContent = box.classList.contains('open') ? 'Hide Hint' : 'Hint';
+}
+function reveal(id) {
+  const answer = document.getElementById(id + '-answer');
+  const btn = document.querySelector('#' + id + ' .reveal-btn');
+  if (answer.classList.contains('open')) { answer.classList.remove('open'); btn.textContent = 'Show Answer'; }
+  else { answer.classList.add('open'); btn.textContent = 'Hide Answer'; }
+}
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+
+function softmax(arr, temp = 1) {
+  const scaled = arr.map(x => x / temp);
+  const max = Math.max(...scaled);
+  const exps = scaled.map(x => Math.exp(x - max));
+  const sum = exps.reduce((a, b) => a + b, 0);
+  return exps.map(e => e / sum);
+}
+
+function cosineSim(a, b) {
+  const dot = a.reduce((s, x, i) => s + x * b[i], 0);
+  const na = Math.sqrt(a.reduce((s, x) => s + x * x, 0));
+  const nb = Math.sqrt(b.reduce((s, x) => s + x * x, 0));
+  return na * nb > 0 ? dot / (na * nb) : 0;
+}
+
+// ============================================================
+// SECTION 1: PERPLEXITY CHART
+// ============================================================
+
+const pplSlider = document.getElementById('pplSlider');
+const pplStepVal = document.getElementById('pplStepVal');
+const pplCanvas = document.getElementById('pplCanvas');
+const pplCtx = pplCanvas.getContext('2d');
+
+function drawPerplexity(steps) {
+  const W = pplCanvas.width;
+  const H = pplCanvas.height;
+  const pad = { top: 20, right: 20, bottom: 40, left: 50 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  pplCtx.clearRect(0, 0, W, H);
+
+  pplCtx.strokeStyle = 'rgba(255,255,255,0.05)';
+  pplCtx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + (plotH / 5) * i;
+    pplCtx.beginPath();
+    pplCtx.moveTo(pad.left, y);
+    pplCtx.lineTo(W - pad.right, y);
+    pplCtx.stroke();
+  }
+
+  pplCtx.fillStyle = '#8888a0';
+  pplCtx.font = '11px SF Mono, monospace';
+  pplCtx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const val = 200 - i * 40;
+    const y = pad.top + (plotH / 5) * i;
+    pplCtx.fillText(val.toString(), pad.left - 8, y + 4);
+  }
+  pplCtx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const s = Math.round((200 / 4) * i);
+    const x = pad.left + (plotW / 4) * i;
+    pplCtx.fillText(s.toString(), x, H - pad.bottom + 20);
+  }
+  pplCtx.fillText('Training Steps', W / 2, H - 4);
+
+  const overfitStep = 100;
+  if (steps >= overfitStep) {
+    const ox = pad.left + (overfitStep / 200) * plotW;
+    pplCtx.strokeStyle = 'rgba(255,255,255,0.1)';
+    pplCtx.setLineDash([4, 4]);
+    pplCtx.beginPath();
+    pplCtx.moveTo(ox, pad.top);
+    pplCtx.lineTo(ox, pad.top + plotH);
+    pplCtx.stroke();
+    pplCtx.setLineDash([]);
+    pplCtx.fillStyle = '#8888a0';
+    pplCtx.font = '10px SF Mono, monospace';
+    pplCtx.fillText('overfit', ox, pad.top - 4);
+  }
+
+  function trainPPL(s) { return 180 * Math.exp(-s / 60) + 15; }
+  function testPPL(s) {
+    if (s <= overfitStep) return 190 * Math.exp(-s / 70) + 25;
+    const base = 190 * Math.exp(-overfitStep / 70) + 25;
+    return base + (s - overfitStep) * 0.6;
+  }
+  function yPos(ppl) { return pad.top + plotH - ((ppl - 0) / 200) * plotH; }
+  function xPos(s) { return pad.left + (s / 200) * plotW; }
+
+  pplCtx.strokeStyle = '#6c8cff';
+  pplCtx.lineWidth = 2.5;
+  pplCtx.beginPath();
+  for (let s = 0; s <= steps; s++) {
+    const x = xPos(s); const y = yPos(trainPPL(s));
+    s === 0 ? pplCtx.moveTo(x, y) : pplCtx.lineTo(x, y);
+  }
+  pplCtx.stroke();
+
+  pplCtx.strokeStyle = '#f87171';
+  pplCtx.lineWidth = 2.5;
+  pplCtx.beginPath();
+  for (let s = 0; s <= steps; s++) {
+    const x = xPos(s); const y = yPos(testPPL(s));
+    s === 0 ? pplCtx.moveTo(x, y) : pplCtx.lineTo(x, y);
+  }
+  pplCtx.stroke();
+
+  const cx = xPos(steps);
+  [[trainPPL(steps), '#6c8cff'], [testPPL(steps), '#f87171']].forEach(([ppl, color]) => {
+    pplCtx.fillStyle = color;
+    pplCtx.beginPath();
+    pplCtx.arc(cx, yPos(ppl), 5, 0, Math.PI * 2);
+    pplCtx.fill();
+  });
+}
+
+pplSlider.addEventListener('input', () => {
+  const v = parseInt(pplSlider.value);
+  pplStepVal.textContent = v;
+  drawPerplexity(v);
+});
+drawPerplexity(50);
+
+// ============================================================
+// SECTION 2: DECODING COMPARISON
+// ============================================================
+
+const decodeProbs = [0.05, 0.20, 0.10, 0.40, 0.25];
+const decodeLabels = ['ChatGPT', 'Claude', 'Gemini', 'Llama', 'other'];
+let decodeMode = 'greedy';
+
+function setDecodeMode(m) {
+  decodeMode = m;
+  document.querySelectorAll('#s2 .btn-group .btn').forEach(b => {
+    const t = b.textContent.trim();
+    if (t === 'Greedy') b.classList.toggle('active', m === 'greedy');
+    if (t === 'Sampling') b.classList.toggle('active', m === 'sampling');
+  });
+  renderDecodeChart();
+}
+
+function runDecodeSample() {
+  if (decodeMode !== 'sampling') return;
+  const r = Math.random();
+  let cum = 0;
+  let idx = 0;
+  for (let i = 0; i < decodeProbs.length; i++) {
+    cum += decodeProbs[i];
+    if (r <= cum) { idx = i; break; }
+  }
+  document.getElementById('decodeResult').textContent = `Sampled: "${decodeLabels[idx]}" (${(decodeProbs[idx]*100).toFixed(0)}% chance)`;
+}
+
+function renderDecodeChart() {
+  const chart = document.getElementById('decodeChart');
+  chart.innerHTML = '';
+  const maxP = Math.max(...decodeProbs);
+  decodeProbs.forEach((p, i) => {
+    const w = document.createElement('div');
+    w.className = 'bar-wrapper';
+    const val = document.createElement('div');
+    val.className = 'bar-value';
+    val.textContent = (p * 100).toFixed(0) + '%';
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (p / maxP * 100) + '%';
+    bar.style.background = decodeMode === 'greedy' && p === maxP ? '#34d399' : '#6c8cff';
+    const lab = document.createElement('div');
+    lab.className = 'bar-label';
+    lab.textContent = decodeLabels[i];
+    w.appendChild(val);
+    w.appendChild(bar);
+    w.appendChild(lab);
+    chart.appendChild(w);
+  });
+}
+
+renderDecodeChart();
+
+// ============================================================
+// SECTION 3: AUTOREGRESSIVE GENERATION
+// ============================================================
+
+let arPrefix = ['my', 'favorite', 'LLM', 'is'];
+const arDistributions = {
+  'my favorite LLM is': { ChatGPT: 0.05, Claude: 0.20, Gemini: 0.10, Llama: 0.40, '.': 0.15, ',': 0.10 },
+  'my favorite LLM is ChatGPT': { '.': 0.45, ',': 0.25, 'but': 0.15, 'and': 0.10, 'which': 0.05 },
+  'my favorite LLM is ChatGPT .': { '': 0.99 }
+};
+let arInterval = null;
+
+function arGetDist() {
+  const key = arPrefix.join(' ');
+  if (arDistributions[key]) return arDistributions[key];
+  const keys = Object.keys(arDistributions);
+  for (const k of keys) {
+    if (key.startsWith(k) || k.startsWith(key)) return arDistributions[k] || arDistributions[keys[0]];
+  }
+  return arDistributions['my favorite LLM is'];
+}
+
+function arSample(dist) {
+  const entries = Object.entries(dist);
+  const r = Math.random();
+  let cum = 0;
+  for (const [w, p] of entries) {
+    cum += p;
+    if (r <= cum) return w;
+  }
+  return entries[entries.length - 1][0];
+}
+
+function arNextToken() {
+  if (arPrefix[arPrefix.length - 1] === 'EOS') return;
+  const dist = arGetDist();
+  const chosen = arSample(dist);
+  if (chosen === '') {
+    arPrefix.push('EOS');
+    arRender();
+    return;
+  }
+  arPrefix.push(chosen);
+  arRender();
+}
+
+function arAutoPlay() {
+  if (arInterval) {
+    clearInterval(arInterval);
+    arInterval = null;
+    return;
+  }
+  arInterval = setInterval(() => {
+    if (arPrefix[arPrefix.length - 1] === 'EOS') {
+      clearInterval(arInterval);
+      arInterval = null;
+      return;
+    }
+    arNextToken();
+  }, 800);
+}
+
+function arReset() {
+  arPrefix = ['my', 'favorite', 'LLM', 'is'];
+  if (arInterval) clearInterval(arInterval);
+  arInterval = null;
+  arRender();
+}
+
+function arRender() {
+  const tokensDiv = document.getElementById('arTokens');
+  tokensDiv.innerHTML = '';
+  arPrefix.forEach((token, i) => {
+    const t = document.createElement('span');
+    if (token === 'EOS') t.className = 'token token-special';
+    else if (i < 4) t.className = 'token token-word';
+    else t.className = 'token token-new';
+    t.textContent = token;
+    tokensDiv.appendChild(t);
+  });
+  const dist = arGetDist();
+  const distStr = Object.entries(dist).slice(0, 5).map(([w, p]) => `${w}: ${(p*100).toFixed(0)}%`).join(' | ');
+  document.getElementById('arDist').textContent = 'Next-word distribution: ' + distStr;
+}
+
+arRender();
+
+// ============================================================
+// SECTION 5: ONE-HOT VS DENSE EMBEDDINGS
+// ============================================================
+
+const embedData = {
+  onehot: {
+    movie: [0, 1, 0, 0, 0],
+    film: [1, 0, 0, 0, 0],
+    zebra: [0, 0, 0, 0, 1]
+  },
+  dense: {
+    movie: [0.3, -0.4, 0.8],
+    film: [0.28, -0.38, 0.82],
+    zebra: [-0.9, 0.6, -0.2]
+  }
+};
+
+let embedView = 'onehot';
+
+function setEmbedView(v) {
+  embedView = v;
+  document.querySelectorAll('#s5 .btn-group .btn').forEach(b => {
+    b.classList.toggle('active', (b.textContent.trim() === 'One-Hot' && v === 'onehot') || (b.textContent.trim() === 'Dense' && v === 'dense'));
+  });
+  renderEmbed();
+}
+
+function renderEmbed() {
+  const d = embedData[embedView];
+  const fmt = (v) => typeof v === 'number' && Math.abs(v) < 1 && v !== 0 ? v.toFixed(2) : String(v);
+  const cell = (v) => {
+    const bg = (embedView === 'onehot' && v !== 0) || (embedView === 'dense') ? 'rgba(108,140,255,0.3)' : 'var(--bg-card-alt)';
+    return `<span class="token" style="background:${bg}; border:1px solid var(--border); font-size:0.9rem;">${fmt(v)}</span>`;
+  };
+  document.getElementById('embedMovie').innerHTML = d.movie.map(cell).join('');
+  document.getElementById('embedFilm').innerHTML = d.film.map(cell).join('');
+  document.getElementById('embedZebra').innerHTML = d.zebra.map(cell).join('');
+  const dotMF = d.movie.reduce((s, x, i) => s + x * d.film[i], 0);
+  const dotMZ = d.movie.reduce((s, x, i) => s + x * d.zebra[i], 0);
+  const dotFZ = d.film.reduce((s, x, i) => s + x * d.zebra[i], 0);
+  document.getElementById('embedDot').innerHTML = `movie·film = ${dotMF.toFixed(2)} &nbsp;|&nbsp; movie·zebra = ${dotMZ.toFixed(2)} &nbsp;|&nbsp; film·zebra = ${dotFZ.toFixed(2)}`;
+}
+
+document.querySelectorAll('#s5 .btn-group .btn')[0]?.addEventListener('click', () => setEmbedView('onehot'));
+document.querySelectorAll('#s5 .btn-group .btn')[1]?.addEventListener('click', () => setEmbedView('dense'));
+renderEmbed();
+
+// ============================================================
+// SECTION 6: COMPOSITION FLOW
+// ============================================================
+
+document.querySelectorAll('#compositionFlow .flow-step').forEach(step => {
+  step.addEventListener('click', () => {
+    document.querySelectorAll('#compositionFlow .flow-step').forEach(s => s.classList.remove('active'));
+    step.classList.add('active');
+  });
+});
+
+// ============================================================
+// SECTION 7: MATRIX-VECTOR MULTIPLICATION
+// ============================================================
+
+const W = [[1.2, -1.3, 0.5], [0.8, 0.2, -0.4], [-0.9, 1.1, 0.3], [0.1, -0.5, 0.7]];
+const x = [-2, 3.9, 5.4];
+const rowLabels = ['ChatGPT', 'Claude', 'Gemini', 'Llama'];
+
+function matvecRender() {
+  const container = document.getElementById('matvecDemo');
+  container.innerHTML = '';
+
+  const label = document.createElement('div');
+  label.style.fontSize = '0.75rem';
+  label.style.color = 'var(--text-dim)';
+  label.style.marginBottom = '8px';
+  label.textContent = 'W (4×3) — hover a row to see logit computation';
+  container.appendChild(label);
+
+  const grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
+  grid.style.gap = '4px';
+  grid.style.marginTop = '8px';
+
+  W.forEach((row, ri) => {
+    row.forEach((val, ci) => {
+      const cell = document.createElement('div');
+      cell.className = 'matrix-cell';
+      cell.textContent = val;
+      cell.dataset.row = ri;
+      cell.dataset.col = ci;
+      cell.addEventListener('mouseenter', () => {
+        document.querySelectorAll('#matvecDemo .matrix-cell').forEach(c => c.classList.remove('highlight'));
+        document.querySelectorAll(`#matvecDemo .matrix-cell[data-row="${ri}"]`).forEach(c => c.classList.add('highlight'));
+        const logit = row.reduce((s, v, j) => s + v * x[j], 0);
+        document.getElementById('matvecExpl').innerHTML = `logit for ${rowLabels[ri]} = ${row.map((v, j) => `${v}×${x[j]}`).join(' + ')} = <strong>${logit.toFixed(2)}</strong>`;
+      });
+      cell.addEventListener('mouseleave', () => {
+        document.querySelectorAll('#matvecDemo .matrix-cell').forEach(c => c.classList.remove('highlight'));
+        document.getElementById('matvecExpl').innerHTML = '';
+      });
+      grid.appendChild(cell);
+    });
+  });
+
+  container.appendChild(grid);
+}
+
+matvecRender();
+
+// ============================================================
+// SECTION 7: SOFTMAX CALCULATOR
+// ============================================================
+
+let softmaxLogits = [1.8, 11.9, 12.9, -8.9];
+const softmaxLabels = ['ChatGPT', 'Claude', 'Gemini', 'Llama'];
+
+function softmaxRender() {
+  const sliders = document.getElementById('softmaxSliders');
+  sliders.innerHTML = '';
+  softmaxLogits.forEach((v, i) => {
+    const div = document.createElement('div');
+    div.className = 'slider-container';
+    div.innerHTML = `<label>${softmaxLabels[i]}: <span class="slider-value" id="sm${i}">${v.toFixed(1)}</span></label>
+      <input type="range" id="smSlider${i}" min="-20" max="20" value="${v}" step="0.5">`;
+    sliders.appendChild(div);
+    const inp = div.querySelector('input');
+    const sp = div.querySelector('.slider-value');
+    inp.addEventListener('input', () => {
+      softmaxLogits[i] = parseFloat(inp.value);
+      sp.textContent = softmaxLogits[i].toFixed(1);
+      softmaxBarsRender();
+    });
+  });
+  softmaxBarsRender();
+}
+
+function softmaxBarsRender() {
+  const probs = softmax(softmaxLogits);
+  const chart = document.getElementById('softmaxBars');
+  chart.innerHTML = '';
+  const maxP = Math.max(...probs);
+  probs.forEach((p, i) => {
+    const w = document.createElement('div');
+    w.className = 'bar-wrapper';
+    const val = document.createElement('div');
+    val.className = 'bar-value';
+    val.textContent = (p * 100).toFixed(1) + '%';
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (p / maxP * 100) + '%';
+    bar.style.background = ['#6c8cff', '#a78bfa', '#34d399', '#fbbf24'][i];
+    const lab = document.createElement('div');
+    lab.className = 'bar-label';
+    lab.textContent = softmaxLabels[i];
+    w.appendChild(val);
+    w.appendChild(bar);
+    w.appendChild(lab);
+    chart.appendChild(w);
+  });
+}
+
+softmaxRender();
+
+// ============================================================
+// SECTION 8: TEMPERATURE EXPLORER
+// ============================================================
+
+const baseLogits = [2, 2.5, 3, 1.5, 0.5];
+const tempLabels = ['A', 'B', 'C', 'D', 'E'];
+
+function tempRender() {
+  const T = parseFloat(document.getElementById('tempSlider').value);
+  document.getElementById('tempVal').textContent = T.toFixed(1);
+  const probs = softmax(baseLogits, T);
+  const chart = document.getElementById('tempChart');
+  chart.innerHTML = '';
+  const maxP = Math.max(...probs);
+  probs.forEach((p, i) => {
+    const w = document.createElement('div');
+    w.className = 'bar-wrapper';
+    const val = document.createElement('div');
+    val.className = 'bar-value';
+    val.textContent = (p * 100).toFixed(1) + '%';
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (p / maxP * 100) + '%';
+    bar.style.background = ['#6c8cff', '#a78bfa', '#34d399', '#fbbf24', '#f472b6'][i];
+    const lab = document.createElement('div');
+    lab.className = 'bar-label';
+    lab.textContent = tempLabels[i];
+    w.appendChild(val);
+    w.appendChild(bar);
+    w.appendChild(lab);
+    chart.appendChild(w);
+  });
+}
+
+document.getElementById('tempSlider').addEventListener('input', tempRender);
+tempRender();
+
+// ============================================================
+// SECTION 8: EMBEDDING SIMILARITY
+// ============================================================
+
+const simEmbeddings = {
+  movie: [0.3, -0.4, 0.8],
+  film: [0.28, -0.38, 0.82],
+  zebra: [-0.9, 0.6, -0.2],
+  cat: [-0.5, 0.3, 0.1],
+  dog: [-0.4, 0.35, 0.15],
+  bank: [0.1, 0.2, -0.3],
+  river: [-0.2, 0.5, 0.4]
+};
+
+function getEmbedding(word) {
+  const w = word.toLowerCase().trim();
+  if (simEmbeddings[w]) return simEmbeddings[w];
+  return [Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1];
+}
+
+function updateSim() {
+  const w1 = document.getElementById('simWord1').value;
+  const w2 = document.getElementById('simWord2').value;
+  const e1 = getEmbedding(w1);
+  const e2 = getEmbedding(w2);
+  const sim = cosineSim(e1, e2);
+  const result = document.getElementById('simResult');
+  result.innerHTML = `
+    <div class="card card-alt">
+      <p style="margin-bottom:8px;">Cosine similarity: <strong style="color:var(--accent);">${sim.toFixed(3)}</strong></p>
+      <p style="margin-bottom:0; font-size:0.85rem;">${sim > 0.7 ? 'High similarity — words are semantically close.' : sim > 0.3 ? 'Moderate similarity.' : sim > -0.3 ? 'Low similarity.' : 'Negative — words are dissimilar.'}</p>
+    </div>
+  `;
+}
+
+updateSim();
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+</body>
+</html>

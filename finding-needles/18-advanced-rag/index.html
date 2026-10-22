@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Advanced RAG — Self-RAG, Corrective RAG &amp; Extractive QA | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 96px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    @media (max-width: 640px) {
+      .main-nav.collapsed { display: none; }
+    }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover, .main-nav a.active { color: var(--accent); }
+    .nav-toggle {
+      display: none;
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    @media (max-width: 640px) {
+      .nav-toggle { display: block; }
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(167, 139, 250, 0.14), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(34, 211, 238, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(244, 114, 182, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.55rem, 4vw, 2.65rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 22px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .callout.warn { border-left-color: var(--accent5); }
+    .callout.ok { border-left-color: var(--accent3); }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 22px 0; }
+    @media (max-width: 900px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      font-size: 0.92rem;
+      color: var(--text-dim);
+    }
+    .comparison > div h4 { margin: 0 0 10px; color: var(--text); font-size: 0.95rem; }
+    .demo {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .demo h4 { margin: 0 0 14px; color: var(--text); font-size: 1rem; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    button.btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    button.btn:hover { border-color: var(--accent); color: var(--accent); }
+    button.btn.primary { background: rgba(34, 211, 238, 0.12); border-color: var(--accent); color: var(--accent); }
+    button.btn.active { background: rgba(167, 139, 250, 0.2); border-color: var(--accent2); color: var(--accent2); }
+    .pipeline-flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin: 16px 0;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+    }
+    .pipe-step {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+    }
+    .pipe-step.on { border-color: var(--accent3); color: var(--accent3); }
+    .pipe-arrow { color: var(--text-dim); }
+    .tree {
+      margin: 16px 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    .tree li { margin: 8px 0; padding-left: 20px; border-left: 2px solid var(--border); }
+    .tree .node { color: var(--accent2); font-family: var(--mono); font-size: 0.85rem; }
+    .meter-wrap { margin: 16px 0; }
+    .meter-bar {
+      height: 22px;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent3), var(--accent));
+      transition: width 0.35s ease;
+    }
+    .flare-log {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 12px;
+      color: var(--text-dim);
+    }
+    .flare-log .evt-ret { color: var(--accent5); }
+    .flare-log .evt-gen { color: var(--query); }
+    .passage {
+      line-height: 1.8;
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      margin: 12px 0;
+    }
+    .passage .hl { background: rgba(52, 211, 153, 0.35); color: var(--text); border-radius: 4px; padding: 0 2px; }
+    .passage .pick { cursor: pointer; border-bottom: 2px dashed var(--border); }
+    .passage .pick:hover { border-color: var(--accent); }
+    .passage .pick.sel-s { border-color: var(--accent3); background: rgba(52, 211, 153, 0.15); }
+    .passage .pick.sel-e { border-color: var(--accent4); background: rgba(244, 114, 182, 0.15); }
+    select.inp, textarea.inp, input.inp {
+      width: 100%;
+      max-width: 100%;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      margin: 8px 0;
+    }
+    textarea.inp { min-height: 80px; resize: vertical; }
+    .playground-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 768px) { .playground-grid { grid-template-columns: 1fr; } }
+    .log-box {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 220px;
+      white-space: pre-wrap;
+      color: var(--text-dim);
+    }
+    .token-chip {
+      display: inline-block;
+      margin: 4px 4px 0 0;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--accent5);
+    }
+    .crag-outcome { font-weight: 600; margin-top: 8px; }
+    .crag-correct { color: var(--accent3); }
+    .crag-ambig { color: var(--accent5); }
+    .crag-wrong { color: var(--danger); }
+    footer.site-footer {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../index.html">Learning Blogs</a><span class="bc-sep">›</span>
+    <a href="../index.html">Search Zero to Hero</a><span class="bc-sep">›</span>
+    <span class="bc-current">Advanced RAG</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="true" aria-controls="mainNav">Sections</button>
+  <nav class="main-nav" id="mainNav" aria-label="Page sections">
+    <a href="#s0">00 · Beyond naive</a>
+    <a href="#s1">01 · Self-RAG</a>
+    <a href="#s2">02 · CRAG</a>
+    <a href="#s3">03 · Adaptive</a>
+    <a href="#s4">04 · FLARE</a>
+    <a href="#s5">05 · Retriever–reader</a>
+    <a href="#s6">06 · Fine-tuning</a>
+    <a href="#s7">07 · Compression</a>
+    <a href="#s8">08 · Playground</a>
+  </nav>
+
+  <header class="hero">
+    <span class="chapter-badge">Chapter 18 of 26</span>
+    <h1>Advanced RAG — Self-RAG, Corrective RAG &amp; Extractive QA</h1>
+    <p class="subtitle">
+      Move from a rigid <code>retrieve → generate</code> loop to systems that decide <em>when</em> to retrieve,
+      <em>whether</em> evidence supports an answer, and <em>how</em> to recover when local knowledge fails.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">8</div><div class="lbl">Core sections</div></div>
+      <div class="hero-stat"><div class="val">5+</div><div class="lbl">Live demos</div></div>
+      <div class="hero-stat"><div class="val">1</div><div class="lbl">Pipeline lab</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>00 · Beyond naive RAG</h2>
+    <p>
+      Naive RAG always fetches a fixed number of chunks, stuffs them into a prompt, and generates. Two problems follow:
+      <strong>retrieval is not always necessary</strong> (many questions need only parametric knowledge, and redundant retrieval adds latency and cost),
+      and <strong>retrieval is not always trustworthy</strong> (noisy passages pollute the context and encourage citation-backed hallucination).
+    </p>
+    <p>
+      <strong>Advanced RAG</strong> adds <em>decision points</em> at runtime: skip retrieval, validate evidence, fall back to another source,
+      or regenerate when support is weak. These patterns sit one step before fully agentic RAG—interpretable controllers with better precision and cost than always-on retrieval.
+    </p>
+    <div class="comparison">
+      <div>
+        <h4>Naive RAG</h4>
+        Fixed <code>k</code> chunks, single pass. Fast to ship, brittle under mismatch between query and index.
+      </div>
+      <div>
+        <h4>Advanced RAG</h4>
+        Adaptive retrieval, critique, refinement, optional rerouting. More moving parts, clearer failure modes.
+      </div>
+      <div>
+        <h4>Agentic RAG</h4>
+        Multi-step plans, tools, state. Powerful; needs guardrails, tracing, and evaluation harnesses.
+      </div>
+    </div>
+    <div class="demo" id="demoEvo">
+      <h4>Interactive · Three generations of RAG stacks</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Select a generation to highlight its typical control flow. This is a conceptual map, not a deployment blueprint.</p>
+      <div class="btn-row">
+        <button type="button" class="btn active" data-gen="naive">Naive</button>
+        <button type="button" class="btn" data-gen="adv">Advanced</button>
+        <button type="button" class="btn" data-gen="agent">Agentic</button>
+      </div>
+      <div class="pipeline-flow" id="evoFlow" aria-live="polite"></div>
+      <p id="evoBlurb" style="font-size:0.9rem;color:var(--text-dim);margin-bottom:0;"></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>01 · Self-RAG</h2>
+    <p>
+      <strong>Self-RAG</strong> trains or prompts the model to emit <em>critique tokens</em>—<code>[Retrieve]</code>, <code>[IsRelevant]</code>,
+      <code>[IsSupportive]</code>, <code>[IsUseful]</code>—that structure its own use of retrieval. At inference, the model decides whether to fetch,
+      scores passages against the draft answer, and can regenerate when support is missing.
+    </p>
+    <p>
+      Retrieval becomes <strong>on-demand</strong> rather than always-on. A typical trace: emit <code>[Retrieve]</code>, ingest top passages,
+      label each with <code>[IsRelevant]</code>, produce an answer segment, mark whether evidence is <code>[IsSupportive]</code>, and retry retrieval
+      or revise the answer when support fails—tightening the coupling between <em>what was retrieved</em> and <em>what was said</em>.
+    </p>
+    <h3>Training and inference</h3>
+    <p>
+      Training uses supervised fine-tuning on trajectories that include critique tokens as targets, sometimes augmented with reward modeling.
+      At inference, parse the stream and branch orchestration: on <code>[Retrieve]</code>, call the retriever; on negative <code>[IsSupportive]</code>,
+      retry retrieval or roll back part of the completion.
+    </p>
+    <div class="demo" id="demoSelfRag">
+      <h4>Interactive · Critique token trace simulator</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Pick a scenario. The panel shows a stylized token sequence and what the runtime controller would do.</p>
+      <div class="btn-row">
+        <button type="button" class="btn primary" data-self="trivia">Trivia (no retrieve)</button>
+        <button type="button" class="btn" data-self="doc">Doc-grounded</button>
+        <button type="button" class="btn" data-self="retry">Weak support → retry</button>
+      </div>
+      <div id="selfTokens" style="margin-top:12px;"></div>
+      <pre class="log-box" id="selfLog" style="min-height:120px;margin-top:12px;"></pre>
+    </div>
+    <div class="callout warn">
+      <strong>Caution.</strong> Critique tokens are only as honest as the training distribution. Evaluate on held-out domains and adversarial
+      retrieval (near-duplicates, wrong-version docs) before trusting self-judgments in production.
+    </div>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>02 · Corrective RAG (CRAG)</h2>
+    <p>
+      <strong>Corrective RAG</strong> inserts a <em>quality gate</em> after retrieval. A lightweight evaluator (classifier, cross-encoder, or prompted mini-model)
+      assigns each batch to <strong>CORRECT</strong> (use as-is), <strong>AMBIGUOUS</strong> (refine), or <strong>INCORRECT</strong> (escalate).
+    </p>
+    <p>
+      On ambiguous verdicts, <strong>knowledge refinement</strong> keeps only sentences that pass a relevance or entailment filter.
+      On incorrect verdicts, <strong>web search fallback</strong> pulls fresh evidence and reruns the gate. The retriever stays simple;
+      a small, testable module owns the decision to trust, compress, or replace evidence.
+    </p>
+    <div class="demo" id="demoCrag">
+      <h4>Interactive · CRAG decision tree</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Choose an example query. The tree shows evaluator outcome and the action path.</p>
+      <label for="cragQuery" class="sr-only">Example query</label>
+      <select id="cragQuery" class="inp">
+        <option value="exact">“What is our SLA uptime target?” (answer in KB)</option>
+        <option value="stale">“Who is the current VP of Sales?” (stale internal doc)</option>
+        <option value="none">“What was the weather on Mars in 1850?” (no local support)</option>
+      </select>
+      <ul class="tree" id="cragTree"></ul>
+      <p class="crag-outcome" id="cragOutcome"></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>03 · Adaptive RAG</h2>
+    <p>
+      <strong>Adaptive RAG</strong> classifies questions by <em>complexity</em> or <em>need for external knowledge</em>, then routes to different pipelines:
+      direct LLM for simple queries, single-step RAG for focused lookups, multi-step RAG for multi-hop questions.
+    </p>
+    <p>
+      The router can be a few-shot classifier, fine-tuned encoder, or small LLM judge. A large share of traffic—often
+      <strong>sixty to seventy percent</strong> in production logs—does not benefit from retrieval at all, so adaptive routing cuts cost as well as latency.
+    </p>
+    <div class="demo" id="demoAdaptive">
+      <h4>Interactive · Query complexity router</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Click a query prototype. The demo uses a toy rule-based classifier for illustration; replace with your own model scores.</p>
+      <div class="btn-row" id="adaptButtons"></div>
+      <pre class="log-box" id="adaptLog"></pre>
+    </div>
+    <div class="callout">
+      <strong>Evaluation tip.</strong> Slice metrics by router bucket. If “no retrieval” answers drift downward on fresh data, your complexity
+      classifier is systematically under-calling the retriever.
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>04 · FLARE — forward-looking active retrieval</h2>
+    <p>
+      <strong>FLARE</strong> (forward-looking active retrieval) interleaves generation with retrieval based on <em>uncertainty</em>, not a single upfront query.
+      When a running confidence estimate drops below a threshold, the system pauses, uses the <strong>uncertain continuation</strong> as the retrieval query,
+      fetches grounding passages, and <strong>replaces</strong> the low-confidence segment with evidence-backed text.
+    </p>
+    <p>
+      Compared with Self-RAG’s discrete critique tokens, FLARE uses <strong>continuous signals</strong> from token probabilities or a small verifier.
+      Engineering challenges: latency from many short generations, threshold tuning, and keeping replacements coherent.
+    </p>
+    <div class="demo" id="demoFlare">
+      <h4>Interactive · Confidence-triggered retrieval</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Adjust the confidence threshold, then run a simulated generation. Low-confidence spans trigger retrieval and replacement.</p>
+      <label for="flareThresh">Confidence threshold (0–1)</label>
+      <input type="range" id="flareThresh" class="inp" min="0.35" max="0.95" step="0.05" value="0.65" />
+      <div class="meter-wrap">
+        <div class="meter-bar"><div class="meter-fill" id="flareMeter"></div></div>
+        <div style="font-size:0.8rem;color:var(--text-dim);margin-top:6px;">Live confidence (simulated)</div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="flareRun">Run generation sweep</button>
+        <button type="button" class="btn" id="flareReset">Reset</button>
+      </div>
+      <div class="flare-log" id="flareLog"></div>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-bottom:0;">The log marks <span class="evt-ret">RETRIEVE</span> events and <span class="evt-gen">GENERATE</span> segments. Real systems use log-probs, entropy, or a calibrator—not this toy RNG.</p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>05 · The retriever–reader pattern (extractive QA)</h2>
+    <p>
+      The classic open-domain QA stack is <strong>retriever + reader</strong>: a retriever recalls candidate paragraphs; a <strong>reader</strong> model predicts
+      start and end token indices of an answer <em>span</em>. The output is an <strong>extractive</strong> substring—ideal for verbatim policy text, legal clauses, or log lines.
+    </p>
+    <p>
+      Modern systems often retrieve broadly, then either extract a span for precision or hand the passage to an LLM for synthesis.
+      Extraction is easier to audit; abstraction handles fusion and rephrasing.
+    </p>
+    <div class="demo" id="demoExtract">
+      <h4>Interactive · Pick an answer span</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Click a word to set <span style="color:var(--accent3)">start</span>, then another for <span style="color:var(--accent4)">end</span>. Compare your span to the oracle span.</p>
+      <p style="color:var(--text);font-size:0.95rem;"><strong>Q:</strong> What throughput limit applies to the batch API tier?</p>
+      <p class="passage" id="extractPassage"></p>
+      <div class="btn-row">
+        <button type="button" class="btn" id="extractClear">Clear selection</button>
+        <button type="button" class="btn primary" id="extractCheck">Check span</button>
+      </div>
+      <p id="extractResult" style="font-size:0.9rem;color:var(--text-dim);margin-bottom:0;"></p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>06 · Fine-tuning LLMs for domain-specific QA</h2>
+    <p>
+      Retrieval quality has diminishing returns if the generator mishandles domain vocabulary, citation norms, or reasoning templates.
+      <strong>Fine-tuning</strong> aligns the model to your task distribution—tone, safety constraints, structured outputs, and the mistakes your eval suite catches.
+    </p>
+    <p>
+      Error attribution drives the split: if the right passage never surfaces, fix indexing, chunking, and hybrid retrieval first.
+      If the right passage is retrieved but the conclusion is wrong, prioritize generator training.
+    </p>
+    <div class="card">
+      <h3 style="margin-top:0;color:var(--text);">When to fine-tune vs fix retrieval</h3>
+      <ul class="fancy">
+        <li><strong>Tune the generator</strong> when phrasing, format, or domain reasoning fails despite good recall.</li>
+        <li><strong>Fix retrieval</strong> when recall@k is low, chunks are misaligned, or metadata filters drop relevant docs.</li>
+        <li><strong>Do both iteratively</strong> with a frozen eval set so improvements do not chase leaderboard noise.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>07 · Context compression and optimization</h2>
+    <p>
+      Long retrieved contexts inflate latency and cost. <strong>Context compression</strong> preserves task-relevant information while shrinking tokens:
+      sentence extraction (related to CRAG refinement but optimized for brevity), <strong>LLMLingua</strong>-style token pruning, and
+      <strong>selective context</strong> reranking within each chunk.
+    </p>
+    <p>
+      Aggressive pruning can delete negation or qualifiers—pair compressors with regression tests on safety-critical prompts.
+      <strong>Semantic caching</strong> on embedding similarity avoids both retrieval and long prompts for repeated questions.
+    </p>
+    <div class="demo" id="demoCompress">
+      <h4>Interactive · Sentence relevance filter</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Slide the keep-top-<code>n</code> control. Sentences below the cutoff are struck through—analogous to a cheap relevance ranker before the LLM call.</p>
+      <label for="compN">Sentences to keep (by mock score)</label>
+      <input type="range" id="compN" class="inp" min="1" max="6" step="1" value="3" />
+      <div id="compOut" style="margin-top:12px;font-size:0.92rem;color:var(--text-dim);line-height:1.7;"></div>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0;">Scores are fabricated for illustration; plug in your cross-encoder or embedding cosine ranks.</p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s8">
+    <h2>08 · Playground — advanced RAG pipeline simulator</h2>
+    <p>
+      Compare <strong>naive RAG</strong>, <strong>Self-RAG</strong>, <strong>CRAG</strong>, and <strong>adaptive RAG</strong> on the same inputs.
+      The simulator uses keyword heuristics over your pasted knowledge base—replace with production retriever, evaluator, and classifiers for real traffic.
+    </p>
+    <div class="demo" id="playground">
+      <h4>Pipeline lab</h4>
+      <label for="pgKb">Knowledge base (one fact per line)</label>
+      <textarea id="pgKb" class="inp">Our batch API allows 1000 requests per minute per key.
+The enterprise tier raises the limit to 10000 RPM.
+Support hours are 09:00–17:00 UTC Monday–Friday.</textarea>
+      <label for="pgQ">Question</label>
+      <input id="pgQ" class="inp" type="text" value="What is the RPM limit for enterprise tier?" />
+      <label for="pgPipe">Pipeline</label>
+      <select id="pgPipe" class="inp">
+        <option value="naive">Naive RAG</option>
+        <option value="self">Self-RAG (on-demand)</option>
+        <option value="crag">CRAG</option>
+        <option value="adapt">Adaptive RAG</option>
+      </select>
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="pgRun">Run simulation</button>
+      </div>
+      <div class="playground-grid" style="margin-top:16px;">
+        <div>
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px;">Decision trace</div>
+          <pre class="log-box" id="pgTrace"></pre>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px;">Answer (illustrative)</div>
+          <pre class="log-box" id="pgAns"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    Chapter 18 · Advanced RAG — Self-RAG, corrective routing, adaptive pipelines, FLARE, extractive reading, fine-tuning tradeoffs, and context compression.
+  </footer>
+
+  <script>
+(function () {
+  var nav = document.getElementById('mainNav');
+  var toggle = document.getElementById('navToggle');
+  if (toggle && nav) {
+    toggle.addEventListener('click', function () {
+      var collapsed = nav.classList.toggle('collapsed');
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+    nav.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        if (window.matchMedia('(max-width: 640px)').matches) {
+          nav.classList.add('collapsed');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    });
+  }
+
+  var sections = document.querySelectorAll('section.fade-in');
+  var navLinks = document.querySelectorAll('.main-nav a');
+  if ('IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) en.target.classList.add('visible');
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    sections.forEach(function (s) { obs.observe(s); });
+  } else {
+    sections.forEach(function (s) { s.classList.add('visible'); });
+  }
+
+  function setActiveNav() {
+    var y = window.scrollY || 0;
+    var id = '';
+    sections.forEach(function (s) {
+      var r = s.getBoundingClientRect();
+      if (r.top <= 120) id = s.id;
+    });
+    navLinks.forEach(function (a) {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+    });
+  }
+  window.addEventListener('scroll', setActiveNav, { passive: true });
+  setActiveNav();
+
+  var evoFlow = document.getElementById('evoFlow');
+  var evoBlurb = document.getElementById('evoBlurb');
+  var GEN = {
+    naive: {
+      steps: ['User query', 'Retrieve k', 'Stuff prompt', 'Generate'],
+      on: [true, true, true, true],
+      text: 'Always retrieves a fixed slice of the index. No mid-flight validation of evidence.'
+    },
+    adv: {
+      steps: ['User query', 'Route / critique', 'Retrieve?', 'Validate / refine', 'Generate / repair'],
+      on: [true, true, true, true, true],
+      text: 'Decision points adapt retrieval depth, run quality gates, and allow regeneration when support fails.'
+    },
+    agent: {
+      steps: ['User query', 'Plan', 'Tools (search, SQL, …)', 'Memory', 'Critique loop', 'Answer'],
+      on: [true, true, true, true, true, true],
+      text: 'Multi-step control with explicit tools and state. Requires tracing, budgets, and safety policies.'
+    }
+  };
+  function renderEvo(key) {
+    var g = GEN[key];
+    evoFlow.innerHTML = '';
+    g.steps.forEach(function (label, i) {
+      var sp = document.createElement('span');
+      sp.className = 'pipe-step on';
+      sp.textContent = label;
+      evoFlow.appendChild(sp);
+      if (i < g.steps.length - 1) {
+        var ar = document.createElement('span');
+        ar.className = 'pipe-arrow';
+        ar.textContent = '→';
+        evoFlow.appendChild(ar);
+      }
+    });
+    evoBlurb.textContent = g.text;
+  }
+  document.querySelectorAll('#demoEvo [data-gen]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#demoEvo [data-gen]').forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      renderEvo(b.getAttribute('data-gen'));
+    });
+  });
+  renderEvo('naive');
+
+  var selfTokens = document.getElementById('selfTokens');
+  var selfLog = document.getElementById('selfLog');
+  var SELF = {
+    trivia: {
+      chips: ['[NoRetrieve]', '[IsUseful]:yes'],
+      log: 'Model answers from parametric knowledge.\nController: skip vector store; log latency win.'
+    },
+    doc: {
+      chips: ['[Retrieve]', '[IsRelevant]:yes', '[IsSupportive]:yes', '[Answer]'],
+      log: 'Emit retrieval → fetch 3 chunks → mark supportive → finalize grounded answer.'
+    },
+    retry: {
+      chips: ['[Retrieve]', '[IsSupportive]:no', '[Retrieve:rewrite]', '[IsSupportive]:yes'],
+      log: 'First batch weak on entailment → rewrite query with entity focus → second batch supports answer.'
+    }
+  };
+  function renderSelf(key) {
+    var d = SELF[key];
+    selfTokens.innerHTML = '';
+    d.chips.forEach(function (c) {
+      var el = document.createElement('span');
+      el.className = 'token-chip';
+      el.textContent = c;
+      selfTokens.appendChild(el);
+    });
+    selfLog.textContent = d.log;
+  }
+  document.querySelectorAll('#demoSelfRag [data-self]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#demoSelfRag [data-self]').forEach(function (x) {
+        x.classList.remove('primary');
+      });
+      b.classList.add('primary');
+      renderSelf(b.getAttribute('data-self'));
+    });
+  });
+  renderSelf('trivia');
+
+  var cragQuery = document.getElementById('cragQuery');
+  var cragTree = document.getElementById('cragTree');
+  var cragOutcome = document.getElementById('cragOutcome');
+  var CRAG = {
+    exact: {
+      outcome: 'CORRECT',
+      cls: 'crag-correct',
+      lines: [
+        'Retrieve top-k from internal KB',
+        'Evaluator: passages entail SLA sentence',
+        'Action: pass chunks to generator as-is'
+      ]
+    },
+    stale: {
+      outcome: 'AMBIGUOUS',
+      cls: 'crag-ambig',
+      lines: [
+        'Retrieve org chart snapshot (6 months old)',
+        'Evaluator: partial match, low confidence',
+        'Action: sentence-level refinement + “as of” caveat'
+      ]
+    },
+    none: {
+      outcome: 'INCORRECT',
+      cls: 'crag-wrong',
+      lines: [
+        'Retrieve unrelated physics snippets',
+        'Evaluator: no entailment to question',
+        'Action: web search fallback → new evidence pack'
+      ]
+    }
+  };
+  function renderCrag() {
+    var v = cragQuery.value;
+    var c = CRAG[v];
+    cragTree.innerHTML = '';
+    c.lines.forEach(function (line) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span class="node">●</span> ' + line;
+      cragTree.appendChild(li);
+    });
+    cragOutcome.textContent = 'Outcome: ' + c.outcome;
+    cragOutcome.className = 'crag-outcome ' + c.cls;
+  }
+  cragQuery.addEventListener('change', renderCrag);
+  renderCrag();
+
+  var adaptButtons = document.getElementById('adaptButtons');
+  var adaptLog = document.getElementById('adaptLog');
+  var ADAPT = [
+    { q: 'Say hello in French', route: 'direct LLM', reason: 'No external KB required; complexity low.' },
+    { q: 'Summarize our refund policy from the handbook', route: 'single-step RAG', reason: 'Needs one focused retrieval pass.' },
+    { q: 'Compare Q2 and Q3 revenue drivers using filings and Slack', route: 'multi-step RAG', reason: 'Decompose, retrieve per facet, merge.' }
+  ];
+  ADAPT.forEach(function (item, idx) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn' + (idx === 0 ? ' primary' : '');
+    b.textContent = item.q.length > 42 ? item.q.slice(0, 40) + '…' : item.q;
+    b.setAttribute('data-idx', String(idx));
+    b.addEventListener('click', function () {
+      adaptButtons.querySelectorAll('button').forEach(function (x) { x.classList.remove('primary'); });
+      b.classList.add('primary');
+      adaptLog.textContent = 'Query:\n  ' + item.q + '\n\nRoute:\n  ' + item.route + '\n\nRationale:\n  ' + item.reason;
+    });
+    adaptButtons.appendChild(b);
+  });
+  adaptLog.textContent = 'Select a query prototype above.';
+
+  var flareThresh = document.getElementById('flareThresh');
+  var flareMeter = document.getElementById('flareMeter');
+  var flareLog = document.getElementById('flareLog');
+  var flareRun = document.getElementById('flareRun');
+  var flareReset = document.getElementById('flareReset');
+  function syncMeter() {
+    var t = parseFloat(flareThresh.value, 10);
+    flareMeter.style.width = Math.round(t * 100) + '%';
+  }
+  flareThresh.addEventListener('input', syncMeter);
+  syncMeter();
+
+  var flareTimer = null;
+  flareRun.addEventListener('click', function () {
+    if (flareTimer) clearInterval(flareTimer);
+    flareLog.innerHTML = '';
+    var thresh = parseFloat(flareThresh.value, 10);
+    var chunks = [
+      { text: 'The API uses OAuth2 client credentials.', conf: 0.88 },
+      { text: 'Rate limits depend on the subscribed tier.', conf: 0.72 },
+      { text: 'Enterprise RPM is 10000 as of the last pricing update.', conf: 0.52 },
+      { text: 'Webhook retries follow exponential backoff.', conf: 0.84 }
+    ];
+    var i = 0;
+    function logLine(cls, msg) {
+      var d = document.createElement('div');
+      d.className = cls;
+      d.textContent = msg;
+      flareLog.appendChild(d);
+      flareLog.scrollTop = flareLog.scrollHeight;
+    }
+    logLine('evt-gen', '[GENERATE] ' + chunks[0].text);
+    i = 1;
+    flareTimer = setInterval(function () {
+      if (i >= chunks.length) {
+        clearInterval(flareTimer);
+        flareTimer = null;
+        logLine('evt-gen', '[DONE]');
+        return;
+      }
+      var ch = chunks[i];
+      var sim = ch.conf + (Math.random() * 0.08 - 0.04);
+      sim = Math.max(0.2, Math.min(0.98, sim));
+      flareMeter.style.width = Math.round(sim * 100) + '%';
+      if (sim < thresh) {
+        logLine('evt-ret', '[RETRIEVE] query="' + ch.text.slice(0, 28) + '…" → grounding pack injected');
+      }
+      logLine('evt-gen', '[GENERATE] ' + ch.text);
+      i++;
+    }, 900);
+  });
+  flareReset.addEventListener('click', function () {
+    if (flareTimer) clearInterval(flareTimer);
+    flareTimer = null;
+    flareLog.innerHTML = '';
+    syncMeter();
+  });
+
+  var passageText = 'The batch API tier allows one thousand requests per minute. The enterprise tier raises this ceiling to ten thousand RPM. Overage returns HTTP 429 with a Retry-After header.';
+  var words = passageText.split(' ');
+  var extractPassage = document.getElementById('extractPassage');
+  var extractStart = null;
+  var extractEnd = null;
+  function renderPassage() {
+    extractPassage.innerHTML = '';
+    words.forEach(function (w, idx) {
+      var span = document.createElement('span');
+      span.className = 'pick';
+      span.textContent = w + ' ';
+      span.setAttribute('data-i', String(idx));
+      span.addEventListener('click', function () {
+        if (extractStart === null) {
+          extractStart = idx;
+          extractEnd = null;
+        } else if (extractEnd === null && idx >= extractStart) {
+          extractEnd = idx;
+        } else {
+          extractStart = idx;
+          extractEnd = null;
+        }
+        paintPick();
+      });
+      extractPassage.appendChild(span);
+    });
+  }
+  function paintPick() {
+    var spans = extractPassage.querySelectorAll('.pick');
+    spans.forEach(function (s, idx) {
+      s.classList.remove('sel-s', 'sel-e');
+      if (extractStart !== null && idx === extractStart) s.classList.add('sel-s');
+      if (extractEnd !== null && idx === extractEnd) s.classList.add('sel-e');
+    });
+  }
+  renderPassage();
+  document.getElementById('extractClear').addEventListener('click', function () {
+    extractStart = extractEnd = null;
+    paintPick();
+    document.getElementById('extractResult').textContent = '';
+  });
+  document.getElementById('extractCheck').addEventListener('click', function () {
+    var res = document.getElementById('extractResult');
+    if (extractStart === null || extractEnd === null) {
+      res.textContent = 'Select both start and end indices.';
+      return;
+    }
+    var oracleS = 17;
+    var oracleE = 19;
+    var ok = extractStart === oracleS && extractEnd === oracleE;
+    res.innerHTML = ok
+      ? '<span style="color:var(--accent3)">Exact match</span> — oracle span: “ten thousand RPM” (token positions illustrative).'
+      : '<span style="color:var(--danger)">Mismatch</span> — try highlighting from “ten” through “RPM”.';
+  });
+
+  var compN = document.getElementById('compN');
+  var compOut = document.getElementById('compOut');
+  var SENTS = [
+    { t: 'Batch tier throughput is 1000 RPM.', score: 0.92 },
+    { t: 'Enterprise customers may request a higher ceiling.', score: 0.81 },
+    { t: 'The dashboard shows usage per API key.', score: 0.45 },
+    { t: 'Legacy XML endpoints are deprecated.', score: 0.28 },
+    { t: 'Contact sales for custom contracts.', score: 0.66 },
+    { t: 'Webhook signing uses HMAC-SHA256.', score: 0.38 }
+  ];
+  function renderComp() {
+    var n = parseInt(compN.value, 10);
+    var ranked = SENTS.slice().sort(function (a, b) { return b.score - a.score; });
+    compOut.innerHTML = '';
+    ranked.forEach(function (s, i) {
+      var div = document.createElement('div');
+      var keep = i < n;
+      div.style.textDecoration = keep ? 'none' : 'line-through';
+      div.style.opacity = keep ? '1' : '0.45';
+      div.textContent = '[' + s.score.toFixed(2) + '] ' + s.t;
+      compOut.appendChild(div);
+    });
+  }
+  compN.addEventListener('input', renderComp);
+  renderComp();
+
+  function kbMatch(lines, q) {
+    var ql = q.toLowerCase();
+    var hits = [];
+    lines.forEach(function (line, i) {
+      var sc = 0;
+      ql.split(/\s+/).forEach(function (tok) {
+        if (tok.length > 2 && line.toLowerCase().indexOf(tok) !== -1) sc++;
+      });
+      hits.push({ line: line, sc: sc, i: i });
+    });
+    hits.sort(function (a, b) { return b.sc - a.sc; });
+    return hits;
+  }
+
+  var pgKb = document.getElementById('pgKb');
+  var pgQ = document.getElementById('pgQ');
+  var pgPipe = document.getElementById('pgPipe');
+  var pgTrace = document.getElementById('pgTrace');
+  var pgAns = document.getElementById('pgAns');
+
+  document.getElementById('pgRun').addEventListener('click', function () {
+    var lines = pgKb.value.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var q = pgQ.value.trim();
+    var pipe = pgPipe.value;
+    var trace = [];
+    var ans = '';
+
+    var trivial = q.split(/\s+/).length <= 4 && !/rpm|limit|tier|api|support/i.test(q);
+    if (pipe === 'adapt') {
+      if (trivial) {
+        trace.push('Adaptive router: complexity = LOW → direct answer path.');
+        trace.push('Retriever skipped (simulated 65% traffic savings on similar queries).');
+        ans = 'Illustrative direct answer: greeting or generic response without KB.';
+      } else if (/compare|and|vs/i.test(q)) {
+        trace.push('Adaptive router: complexity = HIGH → planned multi-step RAG.');
+        trace.push('Step A: decompose; Step B: retrieve per facet; Step C: merge.');
+        ans = 'Would synthesize across multiple retrieved facts (simulation).';
+      } else {
+        trace.push('Adaptive router: complexity = MEDIUM → single-step RAG.');
+        pipe = 'naive';
+      }
+    }
+
+    if (pipe === 'naive' || (pipe === 'adapt' && !trivial && !/compare|and|vs/i.test(q))) {
+      trace.push('Naive: retrieve top-2 lines by token overlap score.');
+      var h = kbMatch(lines, q).slice(0, 2);
+      h.forEach(function (x) {
+        trace.push('Chunk[' + x.i + '] score=' + x.sc + ' → ' + x.line);
+      });
+      ans = h[0] ? 'Draft answer grounded in: ' + h[0].line : 'No overlap — model would hallucinate risk.';
+    }
+
+    if (pipe === 'self') {
+      trace.push('Self-RAG: model emits [Retrieve] because query mentions policy numbers.');
+      var need = /rpm|limit|tier|enterprise|batch|support/i.test(q);
+      if (!need) {
+        trace.push('Heuristic: no retrieve — parametric path.');
+        ans = 'No retrieval call (on-demand skip).';
+      } else {
+        trace.push('Retriever fetches candidates…');
+        var hh = kbMatch(lines, q).slice(0, 2);
+        var supportive = hh[0] && hh[0].sc >= 2;
+        hh.forEach(function (x) {
+          trace.push('Chunk[' + x.i + '] score=' + x.sc);
+        });
+        trace.push('[IsSupportive]: ' + (supportive ? 'yes' : 'no'));
+        if (!supportive) {
+          trace.push('Regenerate with rewritten query: add keyword "enterprise".');
+          hh = kbMatch(lines, q + ' enterprise').slice(0, 2);
+        }
+        ans = hh[0] ? 'Final: ' + hh[0].line : 'Would escalate to human review.';
+      }
+    }
+
+    if (pipe === 'crag') {
+      trace.push('CRAG: retrieve then evaluate batch quality.');
+      var h2 = kbMatch(lines, q);
+      var top = h2[0];
+      var outcome = 'INCORRECT';
+      if (top && top.sc >= 3) outcome = 'CORRECT';
+      else if (top && top.sc === 2) outcome = 'AMBIGUOUS';
+      trace.push('Evaluator verdict: ' + outcome);
+      if (outcome === 'CORRECT') {
+        trace.push('Use passages as-is in prompt.');
+        ans = top.line;
+      } else if (outcome === 'AMBIGUOUS') {
+        trace.push('Knowledge refinement: keep high-scoring sentences only.');
+        ans = top ? top.line + ' (compressed)' : 'No snippet kept.';
+      } else {
+        trace.push('Web search fallback triggered (simulated).');
+        ans = 'Synthetic web answer would replace local KB output.';
+      }
+    }
+
+    pgTrace.textContent = trace.join('\n');
+    pgAns.textContent = ans;
+  });
+})();
+  </script>
+</body>
+</html>

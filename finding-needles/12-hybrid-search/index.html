@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hybrid Search — Sparse + Dense Fusion | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c8cff;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover { color: var(--accent); }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108, 140, 255, 0.14), transparent),
+        radial-gradient(ellipse 60% 40% at 0% 60%, rgba(244, 114, 182, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.75rem, 4.8vw, 2.85rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--accent3); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 22px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .callout.warn { border-left-color: var(--accent5); }
+    .callout.ok { border-left-color: var(--accent3); }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0; }
+    @media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .comparison h4 { margin: 0 0 10px; font-size: 0.95rem; color: var(--accent2); }
+    .interactive-panel {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel h4 { margin: 0 0 14px; font-size: 1rem; color: var(--text); }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: rgba(108, 140, 255, 0.15); border-color: var(--accent); color: var(--accent); }
+    label.lbl { display: block; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 6px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    input[type="text"], textarea, select {
+      width: 100%;
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    textarea { min-height: 88px; resize: vertical; font-family: var(--mono); font-size: 0.85rem; }
+    .rank-list { list-style: none; padding: 0; margin: 0; }
+    .rank-item {
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      gap: 10px;
+      align-items: start;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: var(--bg-card);
+      font-size: 0.88rem;
+    }
+    .rank-item .idx { font-family: var(--mono); color: var(--accent3); font-weight: 600; }
+    .rank-item .score { font-family: var(--mono); color: var(--accent5); font-size: 0.8rem; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.8rem; }
+    .bar-row .w-lbl { width: 140px; flex-shrink: 0; color: var(--text); font-family: var(--mono); font-size: 0.72rem; }
+    .bar-bg { flex: 1; height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; border: 1px solid var(--border); }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.35s ease; background: linear-gradient(90deg, var(--accent3), var(--accent)); }
+    .bar-fill.sparse { background: linear-gradient(90deg, var(--accent4), var(--accent2)); }
+    .cmp-table-wrap { overflow-x: auto; margin: 20px 0; }
+    table.cmp-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .cmp-table th, .cmp-table td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+    .cmp-table th { background: var(--bg-card); color: var(--accent); }
+    .cmp-table tr:nth-child(even) td { background: rgba(24, 24, 37, 0.5); }
+    footer.site-foot {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .rrf-step {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 8px 0;
+      white-space: pre-wrap;
+    }
+    .pipe-arch {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 10px;
+      justify-content: center;
+      margin: 16px 0;
+    }
+    .pipe-node {
+      flex: 1 1 120px;
+      max-width: 160px;
+      min-height: 72px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+      background: var(--bg-card);
+    }
+    .pipe-node:hover { border-color: var(--accent); }
+    .pipe-node.active {
+      border-color: var(--accent3);
+      box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+      color: var(--text);
+    }
+    .pipe-node strong { display: block; color: var(--accent2); margin-bottom: 4px; font-size: 0.82rem; }
+    .pipe-arrow { align-self: center; color: var(--text-dim); font-size: 1.2rem; }
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    @media (max-width: 860px) { .three-col { grid-template-columns: 1fr; } }
+    .mini-rank h5 { margin: 0 0 8px; font-size: 0.85rem; color: var(--accent); }
+    .beir-bars { margin: 16px 0; }
+    .beir-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 0.8rem; }
+    .beir-row .nm { width: 100px; flex-shrink: 0; color: var(--text); }
+    .beir-row .bar-bg { height: 14px; }
+    .beir-row .pct { width: 42px; text-align: right; font-family: var(--mono); color: var(--accent5); }
+    .norm-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }
+    @media (max-width: 720px) { .norm-grid { grid-template-columns: 1fr; } }
+    .norm-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 0.78rem; font-family: var(--mono); color: var(--text-dim); }
+    .norm-cell h5 { margin: 0 0 8px; font-family: var(--sans); font-size: 0.85rem; color: var(--accent2); }
+    .toggle-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+    .toggle-row label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-dim); cursor: pointer; }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Hybrid Search</span>
+  </nav>
+
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="Section navigation">
+    <a href="#s0">00 · Why Hybrid?</a>
+    <a href="#s1">01 · Fusion Problem</a>
+    <a href="#s2">02 · RRF</a>
+    <a href="#s3">03 · Normalization</a>
+    <a href="#s4">04 · Bayesian BM25</a>
+    <a href="#s5">05 · Learned Fusion</a>
+    <a href="#s6">06 · In Practice</a>
+    <a href="#s7">07 · Benchmarks</a>
+    <a href="#s8">08 · Playground</a>
+  </nav>
+
+  <header class="hero">
+    <span class="chapter-badge">Chapter 12 of 26 · Search Zero to Hero</span>
+    <h1>Hybrid Search — Fusing Sparse and Dense Retrieval</h1>
+    <p class="subtitle">
+      Production retrieval rarely commits to a single scoring philosophy. <code>BM25</code>-style sparse signals and dense embedding similarity solve different failure modes;
+      merging them—via <code>RRF</code>, normalized linear blends, or learned models—is how modern stacks recover both lexical precision and semantic breadth without pretending one score
+      is directly comparable to another.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">RRF</div><div class="lbl">Rank-only fusion</div></div>
+      <div class="hero-stat"><div class="val">k = 60</div><div class="lbl">Common RRF constant</div></div>
+      <div class="hero-stat"><div class="val">α</div><div class="lbl">Sparse / dense blend</div></div>
+      <div class="hero-stat"><div class="val">BEIR</div><div class="lbl">Hybrid often wins</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>00 · Why Hybrid?</h2>
+    <p>
+      <code>BM25</code> and related sparse retrievers are built for situations where the user’s language overlaps the document’s language: product SKUs, legal citations, error codes,
+      rare entity names, and exact phrases. The inverted index makes those matches cheap and interpretable. Where sparse methods struggle is <strong>paraphrase</strong> and
+      <strong>conceptual drift</strong>: a page that never says “laptop battery longevity” might still be the best answer for “how long does the battery last on this notebook,”
+      because the vocabulary does not align even when the intent does.
+    </p>
+    <p>
+      Dense retrieval—bi-encoder embeddings, approximate nearest neighbors, cosine or dot-product in a learned space—excels at that semantic glue. Similar meanings land near each other
+      even when tokens differ. The complementary weakness is <strong>literal fidelity</strong>. Embeddings can blur fine distinctions among SKUs, version numbers, homonyms, and domain jargon.
+      A query that hinges on “15 Pro Max” versus “15 Plus” is not something you want left entirely to a smooth semantic geometry unless your training data and chunking strategy are
+      exceptionally tight.
+    </p>
+    <p>
+      Consider <strong>“iPhone 15 Pro Max review”</strong>. The sparse channel rewards documents that contain those tokens (or very close variants) in title and body—exact model identity matters
+      to users comparing trims. The dense channel helps surface quality roundups that discuss display, battery, and camera in reviewer language without repeating the full product string in
+      every paragraph. A system that only does one side either buries the right review because it used alternative wording, or floats generically relevant smartphone content that is not
+      about the requested model. <strong>Neither signal alone is sufficient</strong> for the messy middle of real queries, which routinely mix entities, constraints, and open-ended intent.
+    </p>
+    <p>
+      Hybrid search is therefore not an exotic research curiosity; it is the architectural acknowledgment that <code>relevance</code> is multi-criterion. Your job as an engineer is to fuse
+      rankings without fooling yourself that raw scores from different scorers live on the same measuring tape—topics we unpack next.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>01 · The Fusion Problem</h2>
+    <p>
+      Suppose pipeline A returns document <code>d1</code> with <code>BM25 = 8.5</code> and pipeline B returns the same document with <code>cosine = 0.82</code>. A tempting but invalid move is
+      to add or average those numbers. The sparse score might commonly fall between <code>0</code> and <code>30</code> for your corpus while cosine similarity is bounded in <code>[-1, 1]</code>
+      (or <code>[0, 1]</code> if non-negative embeddings are used). Their <strong>distributions</strong> differ too: BM25 is sparse and heavy-tailed; cosines cluster once vectors are normalized.
+      Dominance goes to whichever channel has larger dynamic range unless you rescale deliberately.
+    </p>
+    <p>
+      Worse, the two lists are often <strong>incomplete intersections</strong> at top-<code>k</code>: dense search might retrieve a document the lexical index never surfaced, and vice versa.
+      Some documents carry a score in only one stream. Naïve linear combinations require you to invent missing values or ranks, which becomes a design choice with consequences.
+    </p>
+    <div class="formula">
+      Raw scores s<sub>sparse</sub>(d), s<sub>dense</sub>(d) are not calibrated to each other → Σ w<sub>i</sub> s<sub>i</sub>(d) is arbitrary without normalization or learning.
+    </div>
+    <p>
+      This is the <strong>core challenge of hybrid search</strong>: you must merge orderings (or calibrated probabilities) produced by models that do not share a likelihood scale, may not
+      cover the same candidate sets, and may shift behavior as corpora grow. The rest of this chapter presents battle-tested responses: rank-based fusion, normalization families,
+      probabilistic improvements to the sparse side, and learned fusion when labels exist.
+    </p>
+
+    <div class="interactive-panel" id="demoScales">
+      <h4>Interactive · Incomparable score scales</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+        Drag the sliders. Notice how a naive sum is dominated by whichever scale is numerically larger—exactly why raw hybrid addition is fragile.
+      </p>
+      <label class="lbl">Simulated <code>BM25</code> score: <span id="bm25Val">8.5</span></label>
+      <input type="range" id="rngBm25" min="0" max="300" value="85" />
+      <label class="lbl">Simulated dense cosine: <span id="cosVal">0.82</span></label>
+      <input type="range" id="rngCos" min="-100" max="100" value="82" />
+      <div class="bar-row"><span class="w-lbl">Naive sum</span><div class="bar-bg"><div class="bar-fill sparse" id="barNaiveSum" style="width:50%"></div></div></div>
+      <div class="bar-row"><span class="w-lbl">Min–max blend</span><div class="bar-bg"><div class="bar-fill" id="barMinMax" style="width:50%"></div></div></div>
+      <p style="font-size:0.82rem;margin:0;color:var(--text-dim);">
+        Naive sum = BM25/10 + cosine (demo). Min–max blend = 0.5·norm(BM25) + 0.5·norm(cosine) with per-slider normalization. Same information, different fusion story.
+      </p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>02 · Reciprocal Rank Fusion (RRF)</h2>
+    <p>
+      As introduced in Chapter 9, <code>RRF</code> fuses rank lists without calibrating raw scores—each document accumulates reciprocal-rank contributions across retrievers:
+    </p>
+    <div class="formula">
+      RRF(d) = Σ<sub>i</sub> 1 / (k + rank<sub>i</sub>(d)) &nbsp;&nbsp; (rank starts at 1; omit terms if d missing in list i)
+    </div>
+    <p>
+      The smoothing constant <code>k = 60</code> is a common default. Documents that rank highly in <strong>multiple</strong> lists accumulate larger totals; you can extend the sum to more than two retrievers.
+    </p>
+    <div class="callout warn">
+      <strong>Trade-off.</strong> Because RRF discards magnitudes, two documents adjacent in one engine’s scores but separated by ten ranks in another are treated purely by rank spacing.
+      When you <em>trust</em> calibrated confidences or need asymmetric weighting across channels, normalized linear blends or learned fusion (later sections) may outperform pure RRF.
+    </div>
+
+    <div class="interactive-panel" id="demoRrf">
+      <h4>Interactive · RRF step by step</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+        Enter document IDs (one per line) for List A (e.g., BM25) and List B (dense), in rank order from best to worst. Adjust <code>k</code> and watch contributions and the fused order recompute.
+      </p>
+      <label class="lbl" for="rrfK">RRF constant <code>k</code></label>
+      <input type="range" id="rrfK" min="1" max="120" value="60" />
+      <span id="rrfKDisp" style="font-family:var(--mono);color:var(--accent5);">60</span>
+      <div class="comparison">
+        <div>
+          <h4>List A (top first)</h4>
+          <textarea id="rrfListA" rows="6">d3
+d1
+d5
+d2</textarea>
+        </div>
+        <div>
+          <h4>List B (top first)</h4>
+          <textarea id="rrfListB" rows="6">d1
+d4
+d3
+d6</textarea>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button type="button" class="btn primary" id="rrfRun">Compute RRF</button>
+      </div>
+      <div id="rrfSteps" aria-live="polite"></div>
+      <h3 style="margin-top:20px;font-size:1rem;">Fused ranking</h3>
+      <ul class="rank-list" id="rrfOut"></ul>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>03 · Score Normalization Approaches</h2>
+    <p>
+      When you want <strong>weighted</strong> fusion—perhaps trusting dense retrieval twice as much as BM25 for long-form questions—you typically return to scores, but only after putting them on
+      comparable footing. <strong>Min–max normalization</strong> rescales each channel into <code>[0, 1]</code> using observed minima and maxima on the candidate set:
+      <code>(s - s<sub>min</sub>) / (s<sub>max</sub> - s<sub>min</sub>)</code>. It is simple and interpretable but brittle when outliers stretch the range or when a list has a single point.
+    </p>
+    <p>
+      <strong>Z-score normalization</strong> subtracts the batch mean and divides by standard deviation: <code>(s - μ) / σ</code>. This centers channels and expresses deviations in variability units,
+      which can help when score spreads differ. It still assumes roughly stable moments; heavy tails or multi-modal score clusters violate the implicit story.
+    </p>
+    <p>
+      <strong>Percentile normalization</strong> replaces scores with their empirical rank positions, turning each list into a quasi-uniform [0,1] map. It is robust to monotonic distortions but
+      destroys fine gradations within plateaus—two documents with nearly identical BM25 may become ties after coarse bucketing.
+    </p>
+    <div class="callout">
+      <strong>When normalization beats RRF.</strong> If you need <em>asymmetric</em> trust across retrievers, temperature-like scaling, or a smooth objective for downstream learning, normalized scores
+      provide knobs. The cost is maintenance: you must define the candidate pool on which statistics are computed (top-200 dense plus top-200 sparse is a common fusion set).
+    </div>
+
+    <div class="interactive-panel" id="demoNorm">
+      <h4>Interactive · Normalization on a toy candidate set</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+        Fixed sparse and dense scores for five documents. Compare min–max, z-score, and percentile mappings side by side.
+      </p>
+      <div class="norm-grid" id="normGrid"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>04 · Bayesian BM25</h2>
+    <p>
+      Classical <code>BM25</code> exposes tunable hyperparameters—most notably <code>k1</code> (term frequency saturation) and <code>b</code> (length normalization strength). Grid search on a
+      development set is the old faithful approach, but collections are heterogeneous: short tweets, long statutes, and tabular text fragments do not all benefit from the same length penalty.
+      <strong>Bayesian BM25</strong> places <em>priors</em> over those parameters (often per field or per collection segment) and infers <em>posterior</em> settings conditioned on observed term statistics
+      and, when available, relevance labels.
+    </p>
+    <p>
+      Concretely, instead of fixing <code>k1</code> and <code>b</code>, you treat them as latent variables drawn from distributions chosen to encode gentle regularization toward sensible defaults.
+      After observing query–document engagement patterns (clicks, human grades, or pseudo-labels from a cross-encoder), posterior means or MAP estimates adapt parameters toward regions that explain
+      the data. Query-specific variants go further: the posterior can depend on features of the query (length, idf profile, presence of entities), yielding a <strong>conditional sparse scorer</strong>
+      without abandoning the inverted index.
+    </p>
+    <p>
+      <strong>When it helps.</strong> Collections with <strong>heterogeneous document lengths</strong>, mixed genres, or shifting vocabulary benefit because a single global <code>(k1, b)</code> is a
+      compromise. Query streams that oscillate between navigational keyword lookups and exploratory semantic prompts are also candidates, especially if you can afford light online inference to select
+      a parameter draw per query.
+    </p>
+    <div class="callout ok">
+      <strong>Link to hybrid search.</strong> Fusion quality is limited by the weakest informative signal. Sharpening the sparse channel via better-calibrated BM25 variants raises the ceiling for
+      RRF and weighted hybrids alike: you are not only merging lists—you are ensuring the lexical list deserves its seat at the table.
+    </div>
+    <p>
+      Operational note: full Bayesian treatment adds engineering complexity (sampling or variational approximations, storage of hyperposteriors). Many teams approximate the idea with <em>hierarchical</em>
+      tuning: segment-level parameters learned offline, selected by a cheap query classifier online. The statistical story differs, but the motivation matches—stop pretending one global BM25 fits all text.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>05 · Learned Fusion</h2>
+    <p>
+      When labeled data exists—explicit relevance judgments, trustworthy clicks, or high-precision teacher models—you can <strong>learn</strong> how to combine channels. The simplest parametric family is a
+      convex blend of normalized scores:
+    </p>
+    <div class="formula">
+      s<sub>fuse</sub>(d) = α · s̃<sub>sparse</sub>(d) + (1 - α) · s̃<sub>dense</sub>(d)
+    </div>
+    <p>
+      Here <code>s̃</code> denotes per-channel normalization on the candidate pool. Empirically, <code>α</code> often lands between <code>0.3</code> and <code>0.7</code> depending on domain: legal and
+      biomedical retrieval frequently lean lexical; open-domain QA with paraphrased questions leans dense. The optimum is not universal—validate on <em>your</em> traffic.
+    </p>
+    <p>
+      Richer than a scalar <code>α</code>, <strong>learning-to-rank</strong> models consume sparse features (BM25, field boosts, proximity), dense features (cosine, margin to nearest neighbor cluster),
+      and interaction features (does the top sparse hit also appear in dense top-20?). Gradient boosted trees and shallow neural rankers are common workhorses here because they handle heterogeneous
+      feature scales well when fed enough examples.
+    </p>
+    <p>
+      Research systems such as <code>CLEAR</code> explore <strong>neural</strong> mechanisms that emit <em>query-dependent</em> fusion weights, acknowledging that the right balance between sparse and dense is
+      not a constant across the query distribution. The high-level lesson is uniform: when supervision is available, let data decide how much to trust each channel rather than hard-coding equality.
+    </p>
+
+    <div class="interactive-panel" id="demoAlpha">
+      <h4>Interactive · Scalar α fusion on normalized scores</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+        Five documents with fixed sparse and dense scores (pre-normalized to [0,1] for this toy). Move α toward sparse (1) or dense (0) and watch the fused ordering flip.
+      </p>
+      <label class="lbl">α (weight on <strong>sparse</strong>): <span id="alphaDisp">0.50</span></label>
+      <input type="range" id="rngAlpha" min="0" max="100" value="50" />
+      <ul class="rank-list" id="alphaRankOut"></ul>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>06 · Hybrid Search in Practice</h2>
+    <p>
+      Mature platforms expose hybrid retrieval as first-class APIs because the pattern is universal: <strong>execute retrievers in parallel</strong>, <strong>merge</strong> candidate lists with a documented
+      fusion rule, optionally <strong>deduplicate</strong> by primary key, then <strong>return</strong> top-<code>k</code> with provenance explaining which channel promoted each hit.
+    </p>
+    <ul style="color:var(--text-dim);margin:0 0 16px 1.1rem;">
+      <li><strong>Elasticsearch</strong> — combine <code>knn</code> vector queries with traditional lexical queries using <code>RRF</code> in modern versions; tune candidate sizes per branch.</li>
+      <li><strong>Weaviate</strong> — hybrid search endpoints expose an <code>alpha</code> knob interpolating between vector similarity and BM25-style scoring.</li>
+      <li><strong>Qdrant</strong> — supports fusion patterns over multiple vector spaces and sparse vectors; you can implement custom score merging in client layers as well.</li>
+      <li><strong>Pinecone</strong> — sparse-dense vectors let you store lexical weights alongside embeddings in one index for single-query hybrid retrieval.</li>
+      <li><strong>Vespa</strong> — integrates tensor/ANN search with lexical matching and configurable rank profiles, enabling expressive fusion logic close to the metal.</li>
+    </ul>
+    <p>
+      Regardless of vendor, the operational checklist repeats: cap per-branch <code>k</code> to control latency, log which branch supplied each id for debugging, and version your fusion parameters
+      alongside embedding model checkpoints so regressions are traceable.
+    </p>
+
+    <div class="interactive-panel" id="demoArch">
+      <h4>Interactive · Hybrid retrieval pipeline</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+        Click each stage for a concise description. This is the mental model behind production deployments.
+      </p>
+      <div class="pipe-arch" id="pipeArch">
+        <div class="pipe-node" data-detail="The query is tokenized for sparse retrieval and encoded into an embedding for ANN search. Both paths start here."><strong>Query</strong>parse + encode</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-node" data-detail="BM25 (or SPLADE-like sparse vectors) scans inverted structures; dense retrieval runs HNSW/IVF approximate search. Run in parallel for latency."><strong>Parallel</strong>sparse + dense</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-node" data-detail="Union candidate ids, attach ranks or scores, apply RRF or weighted fusion; dedupe on canonical document key."><strong>Fusion</strong>RRF / blend</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-node" data-detail="Optional cross-encoder or LTR model reranks top-k₀ (k₀ ≪ corpus size) for precision-critical surfaces."><strong>Rerank</strong>optional</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-node" data-detail="Return hits with scores and source tags (sparse/dense/both) for UI badges and offline evaluation joins."><strong>Response</strong>top-k + provenance</div>
+      </div>
+      <p id="pipeDetail" style="font-size:0.88rem;color:var(--accent3);min-height:3.2em;margin:12px 0 0;">Click a stage…</p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>07 · Benchmark Results</h2>
+    <p>
+      <code>BEIR</code> aggregates diverse retrieval tasks—news, Wikipedia subsets, scientific articles, FAQ-style sets—so no single inductive bias wins everywhere. Aggregated trends from published
+      baselines and strong neural hybrids show a recurring story: <strong>hybrid methods improve average nDCG and recall@k</strong> versus standalone BM25 or dense bi-encoders when systems are tuned honestly.
+      The margin is not magical; it reflects complementary error profiles.
+    </p>
+    <p>
+      <strong>When hybrid wins most clearly:</strong> out-of-domain transfer where training time corpora mismatch deployment corpora, and mixed queries where neither pure lexical overlap nor pure embedding
+      geometry is uniformly reliable. <strong>When BM25 alone stays competitive:</strong> keyword-heavy lookup tasks, some biomedical lexical benchmarks where precise terminology dominates, and tiny corpora
+      where embedding geometry is undertrained. <strong>When dense alone looks attractive:</strong> highly paraphrased questions against passages that rarely repeat query wording—though even then a lexical
+      safety net often still helps in production due to tail entities.
+    </p>
+    <div class="interactive-panel" id="demoBeir">
+      <h4>Interactive · Stylized BEIR-style outcome view</h4>
+      <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+        Illustrative relative strengths across archetypal dataset families (not one official leaderboard number—use this to build intuition). Select a scenario to highlight who leads.
+      </p>
+      <div class="toggle-row">
+        <label><input type="radio" name="beirScen" value="ood" checked /> Out-of-domain mixed</label>
+        <label><input type="radio" name="beirScen" value="lex" /> Keyword-heavy</label>
+        <label><input type="radio" name="beirScen" value="sem" /> Paraphrase-heavy</label>
+      </div>
+      <div class="beir-bars" id="beirBars"></div>
+      <p id="beirCaption" style="font-size:0.85rem;color:var(--text-dim);margin:0;"></p>
+    </div>
+
+    <div class="cmp-table-wrap">
+      <table class="cmp-table" aria-label="Qualitative benchmark summary">
+        <thead>
+          <tr><th>Regime</th><th>BM25 alone</th><th>Dense alone</th><th>Hybrid</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>18-dataset macro average (typical strong systems)</td><td>Solid floor</td><td>Competitive</td><td>Often best mean</td></tr>
+          <tr><td>Entity / SKU precision</td><td>Strong</td><td>Risk of blur</td><td>Lexical anchor helps</td></tr>
+          <tr><td>Semantic FAQ</td><td>Misses paraphrase</td><td>Strong</td><td>Dense-led + lex guard</td></tr>
+          <tr><td>Bio / medical lexical</td><td>Frequently tops</td><td>Variable</td><td>Tune α carefully</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s8">
+    <h2>08 · Playground — Hybrid Search Simulator</h2>
+    <p>
+      This sandbox uses a <strong>realistic-but-tiny</strong> <code>BM25</code> implementation plus deterministic dense vectors derived from text (hashing n-grams into a fixed-dimensional space).
+      It is not a production ranker, but it exhibits the <em>shape</em> of hybrid behavior: lexical hits bump sparse scores; paraphrases bump dense similarity; fusion rearranges the top.
+    </p>
+    <div class="interactive-panel" id="demoPlay">
+      <h4>Simulator</h4>
+      <label class="lbl" for="pgQuery">Query</label>
+      <input type="text" id="pgQuery" value="iPhone 15 Pro Max review battery" />
+      <label class="lbl" for="pgDocs">Documents (one per line)</label>
+      <textarea id="pgDocs" rows="10">iPhone 15 Pro Max review: battery life and camera compared to 15 Pro.
+Best smartphones 2024: generic flagship roundup without specific model names.
+Apple iPhone 15 Pro Max technical specifications and SKU list.
+User discussion: how long does the battery last on Apple's newest large phone.
+iPhone 15 Plus review focusing on display size and price.
+Repair guide: replacing batteries on various iPhone models including older generations.</textarea>
+      <div class="toggle-row">
+        <label>Fusion:</label>
+        <label><input type="radio" name="pgFusion" value="rrf" checked /> <code>RRF</code> (k=60)</label>
+        <label><input type="radio" name="pgFusion" value="weighted" /> Weighted normalized sum</label>
+      </div>
+      <label class="lbl">α for weighted mode (sparse weight): <span id="pgAlphaDisp">0.50</span></label>
+      <input type="range" id="pgAlpha" min="0" max="100" value="50" />
+      <div class="btn-group">
+        <button type="button" class="btn primary" id="pgRun">Run hybrid retrieval</button>
+      </div>
+      <div class="three-col">
+        <div class="mini-rank card" style="margin:0;">
+          <h5>Sparse (<code>BM25</code>)</h5>
+          <ul class="rank-list" id="pgSparse"></ul>
+        </div>
+        <div class="mini-rank card" style="margin:0;">
+          <h5>Dense (cosine)</h5>
+          <ul class="rank-list" id="pgDense"></ul>
+        </div>
+        <div class="mini-rank card" style="margin:0;">
+          <h5>Hybrid output</h5>
+          <ul class="rank-list" id="pgHybrid"></ul>
+        </div>
+      </div>
+      <p style="font-size:0.82rem;color:var(--text-dim);margin-top:16px;margin-bottom:0;">
+        Tip: switch fusion modes and move α to see reorderings. Compare where RRF disagrees with the weighted sum—those documents are rank-dominated in one channel but not the other.
+      </p>
+    </div>
+  </section>
+
+  <footer class="site-foot">
+    Hybrid search fuses complementary error modes. Calibrate when you can, default to robust rank fusion when you cannot—and keep improving the sparse channel itself.
+  </footer>
+
+  <script>
+(function () {
+  var navToggle = document.getElementById('navToggle');
+  var mainNav = document.getElementById('mainNav');
+  if (navToggle && mainNav) {
+    navToggle.addEventListener('click', function () {
+      var open = mainNav.classList.toggle('visible');
+      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
+
+  var fadeSections = document.querySelectorAll('section.fade-in');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    fadeSections.forEach(function (s) { io.observe(s); });
+  } else {
+    fadeSections.forEach(function (s) { s.classList.add('visible'); });
+  }
+
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+
+  /* --- Demo: incomparable scales --- */
+  (function () {
+    var rB = document.getElementById('rngBm25');
+    var rC = document.getElementById('rngCos');
+    if (!rB || !rC) return;
+    function upd() {
+      var bm = rB.value / 10;
+      var cos = rC.value / 100;
+      document.getElementById('bm25Val').textContent = bm.toFixed(1);
+      document.getElementById('cosVal').textContent = cos.toFixed(2);
+      var naive = bm + cos;
+      var nB = rB.value / 300;
+      var nC = (rC.value + 100) / 200;
+      var blend = 0.5 * nB + 0.5 * nC;
+      document.getElementById('barNaiveSum').style.width = clamp(naive / 35 * 100, 0, 100) + '%';
+      document.getElementById('barMinMax').style.width = clamp(blend * 100, 0, 100) + '%';
+    }
+    rB.addEventListener('input', upd);
+    rC.addEventListener('input', upd);
+    upd();
+  })();
+
+  /* --- RRF --- */
+  function parseIdList(text) {
+    return text.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+  }
+  function computeRRF(lists, k) {
+    var contrib = {};
+    lists.forEach(function (list, li) {
+      list.forEach(function (id, idx) {
+        var rank = idx + 1;
+        var c = 1 / (k + rank);
+        if (!contrib[id]) contrib[id] = { total: 0, parts: [] };
+        contrib[id].total += c;
+        contrib[id].parts.push({ list: li + 1, rank: rank, c: c });
+      });
+    });
+    return contrib;
+  }
+  (function () {
+    var kInput = document.getElementById('rrfK');
+    var kDisp = document.getElementById('rrfKDisp');
+    var btn = document.getElementById('rrfRun');
+    if (!kInput || !btn) return;
+    function run() {
+      var k = parseInt(kInput.value, 10) || 60;
+      kDisp.textContent = String(k);
+      var A = parseIdList(document.getElementById('rrfListA').value);
+      var B = parseIdList(document.getElementById('rrfListB').value);
+      var contrib = computeRRF([A, B], k);
+      var steps = document.getElementById('rrfSteps');
+      var out = document.getElementById('rrfOut');
+      steps.innerHTML = '';
+      Object.keys(contrib).sort().forEach(function (id) {
+        var o = contrib[id];
+        var lines = id + ': RRF = ' + o.total.toFixed(4) + '\n';
+        o.parts.forEach(function (p) {
+          lines += '  List ' + p.list + ' rank ' + p.rank + ' → 1/(' + k + '+' + p.rank + ') = ' + p.c.toFixed(4) + '\n';
+        });
+        var div = document.createElement('div');
+        div.className = 'rrf-step';
+        div.textContent = lines.trim();
+        steps.appendChild(div);
+      });
+      var ranked = Object.keys(contrib).sort(function (a, b) {
+        return contrib[b].total - contrib[a].total;
+      });
+      out.innerHTML = '';
+      ranked.forEach(function (id, i) {
+        var li = document.createElement('li');
+        li.className = 'rank-item';
+        li.innerHTML = '<span class="idx">' + (i + 1) + '</span><span>' + id + '</span><span class="score">RRF ' + contrib[id].total.toFixed(4) + '</span>';
+        out.appendChild(li);
+      });
+    }
+    kInput.addEventListener('input', run);
+    btn.addEventListener('click', run);
+    run();
+  })();
+
+  /* --- Normalization grid --- */
+  (function () {
+    var el = document.getElementById('normGrid');
+    if (!el) return;
+    var docs = ['d1', 'd2', 'd3', 'd4', 'd5'];
+    var sparse = [8.5, 12.1, 6.2, 22.0, 9.0];
+    var dense = [0.82, 0.71, 0.88, 0.45, 0.79];
+    function minMax(arr) {
+      var mn = Math.min.apply(null, arr);
+      var mx = Math.max.apply(null, arr);
+      var d = mx - mn || 1;
+      return arr.map(function (x) { return (x - mn) / d; });
+    }
+    function zscore(arr) {
+      var m = arr.reduce(function (a, b) { return a + b; }, 0) / arr.length;
+      var v = arr.reduce(function (a, b) { return a + Math.pow(b - m, 2); }, 0) / arr.length;
+      var sd = Math.sqrt(v) || 1;
+      return arr.map(function (x) { return (x - m) / sd; });
+    }
+    function percentile(arr) {
+      var sorted = arr.slice().sort(function (a, b) { return a - b; });
+      return arr.map(function (x) {
+        var below = sorted.filter(function (y) { return y < x; }).length;
+        var eq = sorted.filter(function (y) { return y === x; }).length;
+        return (below + 0.5 * eq) / arr.length;
+      });
+    }
+    function col(title, vals) {
+      var h = document.createElement('div');
+      h.className = 'norm-cell';
+      h.innerHTML = '<h5>' + title + '</h5>';
+      docs.forEach(function (d, i) {
+        var p = document.createElement('div');
+        p.textContent = d + ': ' + vals[i].toFixed(3);
+        h.appendChild(p);
+      });
+      return h;
+    }
+    el.appendChild(col('Min–max · sparse', minMax(sparse)));
+    el.appendChild(col('Z-score · sparse', zscore(sparse)));
+    el.appendChild(col('Percentile · sparse', percentile(sparse)));
+    el.appendChild(col('Min–max · dense', minMax(dense)));
+    el.appendChild(col('Z-score · dense', zscore(dense)));
+    el.appendChild(col('Percentile · dense', percentile(dense)));
+  })();
+
+  /* --- Alpha demo --- */
+  (function () {
+    var rng = document.getElementById('rngAlpha');
+    var out = document.getElementById('alphaRankOut');
+    var disp = document.getElementById('alphaDisp');
+    if (!rng || !out) return;
+    var items = [
+      { id: 'a', s: 0.9, d: 0.35 },
+      { id: 'b', s: 0.5, d: 0.92 },
+      { id: 'c', s: 0.7, d: 0.68 },
+      { id: 'd', s: 0.2, d: 0.85 },
+      { id: 'e', s: 0.85, d: 0.5 }
+    ];
+    function render() {
+      var a = rng.value / 100;
+      disp.textContent = a.toFixed(2);
+      var scored = items.map(function (it) {
+        return { id: it.id, f: a * it.s + (1 - a) * it.d };
+      }).sort(function (x, y) { return y.f - x.f; });
+      out.innerHTML = '';
+      scored.forEach(function (r, i) {
+        var li = document.createElement('li');
+        li.className = 'rank-item';
+        li.innerHTML = '<span class="idx">' + (i + 1) + '</span><span>' + r.id + '</span><span class="score">fuse ' + r.f.toFixed(3) + '</span>';
+        out.appendChild(li);
+      });
+    }
+    rng.addEventListener('input', render);
+    render();
+  })();
+
+  /* --- Architecture clicks --- */
+  (function () {
+    var nodes = document.querySelectorAll('#pipeArch .pipe-node');
+    var detail = document.getElementById('pipeDetail');
+    if (!nodes.length || !detail) return;
+    nodes.forEach(function (n) {
+      n.addEventListener('click', function () {
+        nodes.forEach(function (x) { x.classList.remove('active'); });
+        n.classList.add('active');
+        detail.textContent = n.getAttribute('data-detail') || '';
+      });
+    });
+  })();
+
+  /* --- BEIR bars --- */
+  (function () {
+    var scenarios = {
+      ood: {
+        hybrid: 92,
+        bm25: 68,
+        dense: 74,
+        cap: 'Out-of-domain mix: hybrid leverages both signals; neither mono dominates on average.'
+      },
+      lex: {
+        hybrid: 78,
+        bm25: 90,
+        dense: 62,
+        cap: 'Keyword-heavy: lexical methods lead; hybrid still recovers some semantic slack.'
+      },
+      sem: {
+        hybrid: 88,
+        bm25: 55,
+        dense: 86,
+        cap: 'Paraphrase-heavy: dense peaks; hybrid keeps lexical guardrails for entities and rare terms.'
+      }
+    };
+    var box = document.getElementById('beirBars');
+    var cap = document.getElementById('beirCaption');
+    function draw(key) {
+      var s = scenarios[key];
+      box.innerHTML = '';
+      [['Hybrid', s.hybrid, 'var(--accent3)'], ['BM25 alone', s.bm25, 'var(--accent4)'], ['Dense alone', s.dense, 'var(--accent)']].forEach(function (row) {
+        var wrap = document.createElement('div');
+        wrap.className = 'beir-row';
+        wrap.innerHTML = '<span class="nm">' + row[0] + '</span><div class="bar-bg"><div class="bar-fill" style="width:' + row[1] + '%;background:' + row[2] + '"></div></div><span class="pct">' + row[1] + '%</span>';
+        box.appendChild(wrap);
+      });
+      cap.textContent = s.cap + ' Values are illustrative relative bars, not official BEIR scores.';
+    }
+    document.querySelectorAll('input[name="beirScen"]').forEach(function (r) {
+      r.addEventListener('change', function () { if (r.checked) draw(r.value); });
+    });
+    draw('ood');
+  })();
+
+  /* --- Playground: tokenize, BM25, dense hash vectors, fusion --- */
+  function tokenize(s) {
+    return s.toLowerCase().match(/[a-z0-9]+/g) || [];
+  }
+  function buildCorpusStats(docs) {
+    var N = docs.length;
+    var df = {};
+    docs.forEach(function (d) {
+      var toks = tokenize(d);
+      var uniq = {};
+      toks.forEach(function (t) { uniq[t] = 1; });
+      Object.keys(uniq).forEach(function (t) {
+        df[t] = (df[t] || 0) + 1;
+      });
+    });
+    return { N: N, df: df };
+  }
+  function idf(t, stats) {
+    var dfi = stats.df[t] || 0;
+    return Math.log(1 + (stats.N - dfi + 0.5) / (dfi + 0.5));
+  }
+  function avgLen(docs) {
+    var t = docs.reduce(function (a, d) { return a + tokenize(d).length; }, 0);
+    return t / Math.max(docs.length, 1) || 1;
+  }
+  function bm25Score(query, doc, stats, avgdl) {
+    var k1 = 1.5;
+    var b = 0.75;
+    var qtok = tokenize(query);
+    var dtok = tokenize(doc);
+    var dl = dtok.length || 1;
+    var tf = {};
+    dtok.forEach(function (t) { tf[t] = (tf[t] || 0) + 1; });
+    var score = 0;
+    qtok.forEach(function (t) {
+      if (!tf[t]) return;
+      var f = tf[t];
+      var idfv = idf(t, stats);
+      score += idfv * (f * (k1 + 1)) / (f + k1 * (1 - b + b * (dl / avgdl)));
+    });
+    return score;
+  }
+  var HASH_DIM = 64;
+  function hashString(s) {
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function termVec(tok) {
+    var v = new Array(HASH_DIM).fill(0);
+    for (var i = 0; i < tok.length; i++) {
+      var h = hashString(tok.slice(0, i + 1) + '|' + tok);
+      var idx = h % HASH_DIM;
+      v[idx] += 1 + 0.01 * (h % 97);
+    }
+    return v;
+  }
+  function docVec(text) {
+    var toks = tokenize(text);
+    var acc = new Array(HASH_DIM).fill(0);
+    for (var i = 0; i < toks.length; i++) {
+      var tv = termVec(toks[i]);
+      for (var j = 0; j < HASH_DIM; j++) acc[j] += tv[j];
+    }
+    return acc;
+  }
+  function cosineVec(a, b) {
+    var dot = 0, na = 0, nb = 0;
+    for (var i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      na += a[i] * a[i];
+      nb += b[i] * b[i];
+    }
+    if (!na || !nb) return 0;
+    return dot / (Math.sqrt(na) * Math.sqrt(nb));
+  }
+  function minMaxMap(items, key) {
+    var vals = items.map(function (x) { return x[key]; });
+    var mn = Math.min.apply(null, vals);
+    var mx = Math.max.apply(null, vals);
+    var d = mx - mn || 1;
+    var m = {};
+    items.forEach(function (x) { m[x.id] = (x[key] - mn) / d; });
+    return m;
+  }
+  function rrfFuse(rankLists, k) {
+    var lists = rankLists.map(function (rl) { return rl.map(function (x) { return x.id; }); });
+    var c = computeRRF(lists, k);
+    return Object.keys(c).sort(function (a, b) { return c[b].total - c[a].total; }).map(function (idStr) {
+      return { id: parseInt(idStr, 10), score: c[idStr].total };
+    });
+  }
+  (function () {
+    var qEl = document.getElementById('pgQuery');
+    var dEl = document.getElementById('pgDocs');
+    var btn = document.getElementById('pgRun');
+    var outS = document.getElementById('pgSparse');
+    var outD = document.getElementById('pgDense');
+    var outH = document.getElementById('pgHybrid');
+    var aRng = document.getElementById('pgAlpha');
+    var aDisp = document.getElementById('pgAlphaDisp');
+    if (!btn) return;
+    function renderList(ul, arr, scoreKey) {
+      ul.innerHTML = '';
+      arr.forEach(function (r, i) {
+        var li = document.createElement('li');
+        li.className = 'rank-item';
+        var snip = r.text.length > 72 ? r.text.slice(0, 72) + '…' : r.text;
+        li.innerHTML = '<span class="idx">' + (i + 1) + '</span><span title="' + r.text.replace(/"/g, '&quot;') + '">' + snip + '</span><span class="score">' + r[scoreKey].toFixed(3) + '</span>';
+        ul.appendChild(li);
+      });
+    }
+    function run() {
+      var query = qEl.value.trim();
+      var docs = dEl.value.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+      if (!docs.length) return;
+      var stats = buildCorpusStats(docs);
+      var adl = avgLen(docs);
+      var qv = docVec(query);
+      var items = docs.map(function (t, i) {
+        return {
+          id: i,
+          text: t,
+          sparse: bm25Score(query, t, stats, adl),
+          dense: cosineVec(qv, docVec(t))
+        };
+      });
+      var sparseRank = items.slice().sort(function (a, b) { return b.sparse - a.sparse; });
+      var denseRank = items.slice().sort(function (a, b) { return b.dense - a.dense; });
+      renderList(outS, sparseRank, 'sparse');
+      renderList(outD, denseRank, 'dense');
+      var mode = (document.querySelector('input[name="pgFusion"]:checked') || {}).value || 'rrf';
+      var hybrid;
+      if (mode === 'rrf') {
+        hybrid = rrfFuse([sparseRank, denseRank], 60).map(function (h) {
+          var orig = items[h.id];
+          return { id: orig.id, text: orig.text, sparse: orig.sparse, dense: orig.dense, hybrid: h.score };
+        });
+        renderList(outH, hybrid, 'hybrid');
+      } else {
+        var a = (aRng.value / 100) || 0.5;
+        aDisp.textContent = a.toFixed(2);
+        var ms = minMaxMap(items, 'sparse');
+        var md = minMaxMap(items, 'dense');
+        hybrid = items.map(function (it) {
+          return {
+            id: it.id,
+            text: it.text,
+            sparse: it.sparse,
+            dense: it.dense,
+            hybrid: a * ms[it.id] + (1 - a) * md[it.id]
+          };
+        }).sort(function (x, y) { return y.hybrid - x.hybrid; });
+        renderList(outH, hybrid, 'hybrid');
+      }
+    }
+    btn.addEventListener('click', run);
+    aRng.addEventListener('input', run);
+    document.querySelectorAll('input[name="pgFusion"]').forEach(function (r) { r.addEventListener('change', run); });
+    run();
+  })();
+})();
+  </script>
+</body>
+</html>

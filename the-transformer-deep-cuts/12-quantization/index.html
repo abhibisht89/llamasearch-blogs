@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantization: PTQ, QAT &amp; Integer Math — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.75; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1, h2, h3 { font-weight: 700; line-height: 1.25; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2rem); margin-bottom: 20px; }
+h3 { font-size: 1.1rem; color: var(--accent); margin: 24px 0 12px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+ul, ol { margin: 0 0 1em 1.25em; color: var(--text-dim); }
+li { margin-bottom: 0.4em; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-family: var(--mono); font-size: 0.8rem; color: var(--accent2); letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 8px; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 100px 24px 80px; position: relative; }
+.hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(108, 140, 255, 0.12), transparent), radial-gradient(ellipse 60% 40% at 80% 60%, rgba(52, 211, 153, 0.08), transparent); pointer-events: none; }
+.hero .inner { position: relative; z-index: 1; }
+.subtitle { font-size: 1.12rem; color: var(--text-dim); max-width: 760px; margin: 0 auto 28px; }
+.stats { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 36px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.stat-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 18px 0; }
+.callout { border-left: 3px solid var(--accent3); padding: 14px 18px; margin: 20px 0; background: rgba(52, 211, 153, 0.06); border-radius: 0 var(--radius) var(--radius) 0; }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251, 191, 36, 0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52, 211, 153, 0.1); }
+.callout p:last-child { margin-bottom: 0; }
+.qa-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin: 22px 0; background: var(--bg-card); }
+.qa-box .q { font-weight: 700; color: var(--text); margin-bottom: 12px; font-size: 1.02rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin: 18px 0; font-family: var(--mono); font-size: 0.92rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: rgba(10, 10, 15, 0.94); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 20px; font-size: 0.82rem; transform: translateY(-100%); transition: transform 0.3s ease; }
+.nav.visible { transform: translateY(0); }
+.nav-back { font-weight: 700; color: var(--accent2); white-space: nowrap; }
+.nav-links { display: flex; gap: 12px; flex-wrap: wrap; overflow-x: auto; max-width: 70%; }
+.nav-links a { color: var(--text-dim); white-space: nowrap; font-size: 0.72rem; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.8rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108, 140, 255, 0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108, 140, 255, 0.15); color: var(--accent); }
+.btn-sm { font-size: 0.72rem; padding: 4px 10px; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 76px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.78rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.55; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; color: inherit; }
+.ln { display: inline-block; width: 34px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 12px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.08); border-left: 2px solid var(--accent); margin-left: -16px; padding-left: 14px; }
+.line.new { background: rgba(52, 211, 153, 0.08); border-left: 2px solid var(--accent3); margin-left: -16px; padding-left: 14px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.88; text-decoration: underline dotted; }
+.code-note { padding: 12px 16px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; min-height: 3.2em; }
+.code-note strong { color: var(--accent); }
+.code-progression { margin: 28px 0; }
+.step-caption { margin-top: 12px; font-size: 0.88rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 16px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 16px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.82rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+table.comp { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 16px 0; }
+table.comp th, table.comp td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+table.comp th { background: #16161f; color: var(--text); }
+.fade-in { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+footer { padding: 40px 24px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 22px 0; }
+.interactive-panel h4 { font-size: 1rem; color: var(--text); margin-bottom: 14px; font-family: var(--sans); }
+.demo-canvas-wrap { width: 100%; overflow-x: auto; margin: 12px 0; border-radius: var(--radius); border: 1px solid var(--border); background: #0e0e14; }
+canvas { display: block; max-width: 100%; }
+.slider-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 14px 0; font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); }
+.slider-row input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+.demo-btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+button.demo-btn { font-family: var(--mono); font-size: 0.78rem; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--accent); cursor: pointer; }
+button.demo-btn:hover, button.demo-btn.active { background: rgba(108, 140, 255, 0.15); border-color: var(--accent); }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 14px; }
+.stat-box { background: #16161f; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: var(--mono); font-size: 0.78rem; }
+.stat-box .label { color: var(--text-dim); display: block; margin-bottom: 4px; }
+.stat-box .value { color: var(--accent5); font-size: 1rem; }
+.pg-input { width: 100%; margin: 8px 0 14px; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: #16161f; color: var(--text); font-family: var(--mono); font-size: 0.85rem; }
+.pg-pre { margin-top: 14px; padding: 16px; background: #16161f; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); white-space: pre-wrap; }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } .nav-links { max-width: 55%; } }
+
+/* Discussion Notes — Session Q&A */
+.discussion-panel {
+  margin-top: 36px;
+  padding: 24px;
+  background: rgba(18,18,26,0.7);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.discussion-panel-title {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent5);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.discussion-panel-title::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent5);
+}
+.dq {
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+}
+.dq:last-child { margin-bottom: 0; }
+.dq-ai {
+  border-left: 3px solid var(--accent);
+  background: rgba(108,140,255,0.05);
+}
+.dq-user {
+  border-left: 3px solid var(--accent4);
+  background: rgba(244,114,182,0.05);
+}
+.dq-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.dq-ai .dq-label { color: var(--accent); }
+.dq-user .dq-label { color: var(--accent4); }
+.dq .dq-question {
+  color: var(--text);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.dq .dq-answer {
+  color: var(--text-dim);
+  margin-bottom: 0;
+}
+/* Deep Dive — Bonus Q&A */
+.dq-bonus {
+  border-left: 3px solid var(--accent3);
+  background: rgba(52,211,153,0.05);
+}
+.dq-bonus .dq-label { color: var(--accent3); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Quantization</span></nav>
+
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-back" style="text-decoration:none;color:inherit;">← Advanced NLP V2</a>
+  <div class="nav-links">
+    <a href="#s0">Why</a><a href="#s1">IEEE754</a><a href="#s2">Layer</a><a href="#s3">Affine</a><a href="#s4">Symmetry</a><a href="#s5">Granularity</a><a href="#s6">Calibration</a><a href="#s7">GEMM</a><a href="#s8">Progression</a><a href="#s9">PTQ</a><a href="#s10">QAT</a><a href="#s11">API</a><a href="#s12">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="inner container">
+    <h1>Quantization: Integer Weights, Real Networks</h1>
+    <p class="subtitle">Shrink <code>float32</code> tensors to <code>int8</code> grids with <code>scale</code> and <code>zero_point</code>, run faster <code>matmul</code> on hardware, then recover accuracy with calibration, <code>torch.ao.quantization</code>, post-training quantization (<code>PTQ</code>), and quantization-aware training (<code>QAT</code>) using fake quant and the straight-through estimator.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">8-bit</span><span class="stat-label">Weights</span></div>
+      <div class="stat"><span class="stat-val">PTQ</span><span class="stat-label">Observers</span></div>
+      <div class="stat"><span class="stat-val">QAT</span><span class="stat-label">STE</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:780px;margin:0 auto;">This chapter ties <code>IEEE 754</code> storage, affine maps <code>q = round(x/s)+Z</code>, per-channel ranges, <code>MinMaxObserver</code> statistics, <code>convert</code> to <code>QuantizedLinear</code>, and <code>FakeQuantize</code> modules—without treating quantization as naive rounding.</p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Why quantize: memory, speed, energy</h2>
+    <p>Large deep networks can hold <strong>billions</strong> of parameters. A concrete anchor: the smallest <strong>Llama&nbsp;2</strong> variant has on the order of <strong>7&nbsp;billion</strong> parameters; if every parameter were stored as <code>32</code> bits, weight storage alone is about <strong>28&nbsp;GB</strong> on disk—and at inference you must load those parameters into <code>RAM</code> (CPU) or <code>GPU</code> memory. That scale is why “big” checkpoints do not fit comfortably on a typical laptop, phone, or small embedded board.</p>
+    <p><strong>Quantization</strong> maps floating-point values to low-bit integers (often <code>uint8</code> or <code>int8</code>) using a <strong>reversible approximate</strong> affine map. It is <em>not</em> “round every float to the nearest whole number”; the <code>scale</code> <code>s</code> and <code>zero_point</code> <code>Z</code> stretch the tensor’s dynamic range across the integer lattice.</p>
+    <p>Integer multiply-accumulate is typically cheaper than full <code>fp32</code> pipelines on most hardware, and <code>int8</code> <code>GEMM</code> paths exist in CPU and GPU libraries—matrix work on integers is an attractive target once weights and activations live on a fixed grid.</p>
+    <p>Smaller activations and weights cut memory traffic and energy—important on battery-powered devices where you often run <code>batch</code> size one. On very small <strong>embedded</strong> hardware you may have <strong>no floating-point unit at all</strong>; integer-only paths are not merely faster there—they can be mandatory.</p>
+    <div class="callout ok"><p><strong>Prerequisites:</strong> Basic familiarity with neural networks (forward pass, loss, gradients) and high-school mathematics are enough to follow the formulas below.</p></div>
+    <div class="callout"><p><strong>Goal:</strong> Keep outputs of the quantized network close to the <code>fp32</code> baseline for the same inputs while shrinking model size and speeding up <code>Linear</code> / <code>Conv2d</code> core ops.</p></div>
+
+    <div class="discussion-panel" style="margin-top: 18px;">
+      <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">If int8 gives a 4× size reduction over float32, why not go further to int4 or even int2?</p>
+        <p class="dq-answer">Fewer bits means fewer representable values, so <strong>quantization error</strong> rises steeply. With only 4 bits you get 16 codes; with 2 bits just 4 codes. Additionally, most CPU/GPU hardware has <strong>fast paths for 8-bit</strong> but not for exotic widths like 4 or 2 — you may lose the speed benefit entirely. In practice, 4-bit quantization (e.g. GPTQ, AWQ) is used for LLMs with careful calibration, but going below that typically requires specialized methods.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">On hardware with no floating-point unit at all, is quantization optional or mandatory?</p>
+        <p class="dq-answer"><strong>Mandatory.</strong> Some embedded microcontrollers lack FP hardware entirely. Integer-only inference paths are the only way to run a neural network on those devices — quantization isn't just an optimization, it's a requirement.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Fixed-width bits, integers, and IEEE 754 float32</h2>
+    <p>Hardware stores numbers in <strong>fixed bit widths</strong>. An <code>n</code>-bit pattern represents at most <code>2**n</code> distinct values. With <strong>three bits</strong>, for example, you can represent <code>2³ = 8</code> distinct codes, conventionally the integers <strong>0</strong> through <strong>7</strong>, each with a binary expansion. You recover the decimal value by summing each bit multiplied by the corresponding power of two—same idea as base ten, but with base two weights.</p>
+    <p>Signed integers on most CPUs use <strong>two’s complement</strong>: the high bit is the sign (<code>0</code> positive, <code>1</code> negative); the remaining bits encode magnitude (or complement form for negatives). A practical payoff is a <strong>unique encoding for zero</strong>: <code>+0</code> and <code>-0</code> are not two different bit patterns, which simplifies arithmetic hardware.</p>
+    <div class="callout ok"><p><strong>Arbitrary-precision integers:</strong> CPython stores large integers as limb arrays (conceptually base <code>2**30</code>), so expressions like <code>2**9999</code> work in Python even though they exceed fixed 64-bit hardware integers. That is interpreter machinery, not native ALU width.</p></div>
+    <p>Separately, “decimal” real numbers in everyday notation are still positional: <strong>85.612</strong> means <code>8×10¹ + 5×10⁰ + 6×10⁻¹ + 1×10⁻² + 2×10⁻³</code>—integer powers for the whole part and <em>negative</em> powers for the fractional tail. <strong>IEEE&nbsp;754</strong> <code>float32</code> uses the same structural idea in binary: one sign bit, eight exponent bits (bias <code>127</code>), and 23 fraction bits. Assembling <code>(−1)^sign × 2^(e−127) × (1 + f)</code>, with <code>f</code> built from negative powers of two for the mantissa, lands on concrete values; a canonical textbook-style bit pattern decodes to <strong>0.15625</strong> in decimal—illustrating how a finite bit string pins down a representable real on the grid.</p>
+    <p>Narrower <code>float16</code> / <code>bfloat16</code> trade exponent and mantissa bits for half the footprint; you get fewer representable values between neighbors. <code>int8</code> quantization goes further: store <em>integers</em> plus small per-tensor metadata <code>s</code>, <code>Z</code>, and rehydrate to approximate <code>fp32</code> only when needed.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Inspect raw float bits in Python</h3>
+        <p>Seeing <code>hex</code> patterns connects “same real number, different bit layout” to why <code>quantization</code> uses separate <code>scale</code> instead of stuffing meaning only into <code>8</code> exponent bits.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">float_bits.py</span><span class="code-lines">1–9</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">import</span> struct</span></code>
+<code><span class="line"><span class="ln">2</span></span></code>
+<code><span class="line"><span class="ln">3</span><span class="kw">def</span> <span class="fn">float32_bits</span>(<span class="arg">x</span>: <span class="arg">float</span>) <span class="op">-&gt;</span> <span class="arg">int</span>:</span></code>
+<code><span class="line"><span class="ln">4</span>    <span class="kw">return</span> struct.<span class="fn">unpack</span>(<span class="str">"!I"</span>, struct.<span class="fn">pack</span>(<span class="str">"!f"</span>, x))[<span class="num">0</span>]</span></code>
+<code><span class="line"><span class="ln">5</span></span></code>
+<code><span class="line"><span class="ln">6</span>pi <span class="op">=</span> <span class="num">3.14159265</span></span></code>
+<code><span class="line"><span class="ln">7</span><span class="fn">print</span>(<span class="fn">bin</span>(float32_bits(pi)))  <span class="cmt"># sign | exp | mantissa</span></span></code>
+<code><span class="line"><span class="ln">8</span><span class="cmt"># Compare memory: 4 bytes float vs 1 byte int8 + float scale metadata</span></span></code>
+<code><span class="line"><span class="ln">9</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Quantization at a <code>Linear</code> layer</h2>
+    <p>A <code>torch.nn.Linear</code> computes <code>y = x @ W.T + b</code> with <code>fp32</code> (or <code>bf16</code>) tensors. The parameters are two tensors people usually call <strong>weight</strong> and <strong>bias</strong>, historically stored as floats. Quantization’s job is to represent <code>W</code>, <code>b</code>, and (when possible) <code>x</code> with <strong>integers</strong> so the core multiply-add runs as integer <code>matmul</code>, then <strong>dequantize</strong> the result so the <em>next</em> layer receives a float tensor as if nothing odd happened—the downstream module should not “see” quantization artifacts beyond small numerical drift.</p>
+    <p><strong>PTQ</strong> freezes <code>W</code> and <code>b</code> after training, estimates ranges, and stores <code>int8</code> weights plus <code>scale</code> / <code>zero_point</code>. <strong>Activations</strong> <code>x</code> change every forward pass. One approach is <strong>dynamic quantization</strong>: for each incoming batch you observe the min and max of <code>x</code> on the fly, compute <code>α</code> and <code>β</code>, quantize <code>x</code>, and run integer <code>matmul</code>. The <strong>output</strong> <code>Y</code> of that integer product is not yet on the original float scale of the unquantized network. <strong>Calibration</strong> means running representative inputs through the trained model, recording typical ranges of those outputs, and choosing <code>α</code>/<code>β</code> (hence <code>s</code> and <code>Z</code>) so you can dequantize <code>Y</code> back to a float that tracks the full-precision baseline. Static PTQ bakes those statistics with <code>observers</code> during a dedicated calibration pass.</p>
+    <p>After integer <code>matmul</code>, the partial sum is <strong>dequantized</strong> so the next layer still sees a float-like tensor. The pipeline is only useful if <code>dequant(requant(·))</code> approximates identity on typical activations.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Shapes and the quant round-trip</h3>
+        <p>Per-tensor <code>scale</code> <code>s</code> is a scalar (or shared vector broadcast). <code>q</code> holds <code>int8</code> codes; <code>x_hat = s * (q - Z)</code> for affine, or <code>x_hat = s * q</code> for symmetric. <code>MSE(x, x_hat)</code> measures <strong>quantization error</strong>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">linear_quant_shapes.md</span><span class="code-lines">1–7</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="cmt"># x: (N, in_features)   W: (out, in)   b: (out)</span></span></code>
+<code><span class="line"><span class="ln">2</span><span class="cmt"># Quantized matmul (concept): x_q @ W_q^T → int32 accum → rescale → y_fp</span></span></code>
+<code><span class="line"><span class="ln">3</span></span></code>
+<code><span class="line"><span class="ln">4</span><span class="cmt"># Per-tensor: one (s, Z) for all elements of W</span></span></code>
+<code><span class="line"><span class="ln">5</span><span class="cmt"># Per-channel: one (s_c, Z_c) per output channel c of W</span></span></code>
+<code><span class="line"><span class="ln">6</span></span></code>
+<code><span class="line"><span class="ln">7</span><span class="cmt"># Goal: y_quant ≈ y_fp32 for calibration / test inputs</span></span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Affine (asymmetric) quantization</h2>
+    <p>Let <code>α = max(x)</code>, <code>β = min(x)</code>, and <code>n</code> bits. For unsigned <code>q ∈ [0, 2**n - 1]</code>:</p>
+    <div class="formula">s = (α − β) / (2<sup>n</sup> − 1),&nbsp;&nbsp; Z = round(−β / s) &nbsp; (Z is an integer; s stays float)<br>q = clamp( round(x / s) + Z , 0 , 2<sup>n</sup> − 1 )&nbsp;&nbsp; where <code>n</code> is the bit width (e.g. <code>n = 8</code> → codes 0…255)<br>x̂ = s · (q − Z)</div>
+    <p>The inner <code>round</code> implements “round down or up to the nearest integer” before clamping. Any result below <code>0</code> clamps to <code>0</code>; any result above <code>2<sup>n</sup> − 1</code> clamps to <code>2<sup>n</sup> − 1</code>. After dequantization, the largest original value should map back to the top bin and the smallest to <code>0</code>; real zero should coincide with <code>Z</code> when the rounding aligns.</p>
+    <div class="formula">Symmetric signed grid: &nbsp; q<sub>max</sub> = 2<sup>n−1</sup> − 1, &nbsp; s = max(|tensor|) / q<sub>max</sub> &nbsp; (α = largest magnitude entry)<br>q = clamp( round(x / s), −q<sub>max</sub>, q<sub>max</sub> ), &nbsp;&nbsp; x̂ = s · q</div>
+    <p><code>Z</code> aligns real <code>0</code> with an integer bucket—critical for skewed tensors (mostly positive activations after <code>ReLU</code>). <strong>Clamping</strong> saturates outliers to <code>0</code> or <code>qmax</code>; the demo below visualizes that saturation on a number line.</p>
+    <p>Picture a hidden weight matrix as, say, <strong>5×5</strong> floats: today each entry might occupy <strong>four bytes</strong> (<code>fp32</code>). Quantization tries to cover the same dynamic range with <strong>eight bits</strong> per entry. Raw two’s-complement <code>int8</code> spans <code>−128</code>…<code>127</code>, but symmetric schemes often <strong>sacrifice the <code>−128</code> code</strong> so the quantized range stays symmetric around zero (e.g. <code>−127</code>…<code>127</code>). The forward map is still called <strong>quantization</strong>; the inverse is <strong>dequantization</strong>. After a round trip, some entries match the original float exactly; others land nearby but not identically—<em>quantization error</em> is unavoidable when you squeeze a wide <code>fp32</code> range into a coarse integer lattice.</p>
+    <div class="interactive-panel">
+      <h4>Interactive: float range → integer grid (number line)</h4>
+      <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;">Adjust <code>β</code>, <code>α</code> and toggle <strong>symmetric</strong> vs <strong>asymmetric</strong> to see how the <code>8</code>-bit lattice covers the interval.</p>
+      <div class="slider-row"><label>β (min)</label><input type="range" id="nlMin" min="-80" max="20" value="-45" step="1"><span id="nlMinVal"></span></div>
+      <div class="slider-row"><label>α (max)</label><input type="range" id="nlMax" min="-20" max="160" value="150" step="1"></div>
+      <div class="demo-btn-row">
+        <button type="button" class="demo-btn active" id="nlModeSym">Symmetric</button>
+        <button type="button" class="demo-btn" id="nlModeAsym">Asymmetric</button>
+      </div>
+      <div class="demo-canvas-wrap"><canvas id="canvasNumberLine" width="820" height="220"></canvas></div>
+    </div>
+
+    <div class="discussion-panel" style="margin-top: 18px;">
+      <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">Why is the zero point Z forced to be an integer rather than a float?</p>
+        <p class="dq-answer">Keeping <code>Z</code> as an integer guarantees that real <code>0.0</code> maps to an <strong>exact integer code</strong> with no rounding error. This matters because zero-valued activations (from ReLU, padding, masking) are extremely common in neural networks — exact zero representation avoids systematic bias in the quantized output.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">What happens to values that fall outside the [β, α] range after clamping?</p>
+        <p class="dq-answer">They <strong>saturate</strong> — values below β clamp to integer code <code>0</code>, values above α clamp to code <code>255</code> (for uint8). Those outlier values all reconstruct to the same boundary float, losing all distinction between them. This is why calibration range choice matters so much.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Symmetric vs asymmetric; range mapping</h2>
+    <p>Consider a <strong>ten-element</strong> tensor used pedagogically with extremes <code>β = −44.93</code> (minimum) and <code>α = 43.31</code> (maximum). <strong>Asymmetric</strong> <code>uint8</code> maps that float interval onto integers <strong>0…255</strong>. After the affine map, the <strong>largest</strong> float tends to land on <code>255</code>, the <strong>smallest</strong> on <code>0</code>, and the real <strong>zero</strong> lands on the integer <strong>zero-point</strong> <code>Z</code>—in one worked example <code>Z = 130</code> when you evaluate <code>round(−β/s)</code> with the corresponding scale. Every other value occupies some interior code between the ends.</p>
+    <p><strong>Symmetric</strong> signed <code>int8</code> often uses <code>q ∈ [-(2**(n-1)-1), 2**(n-1)-1]</code> (e.g. <code>-127…127</code>), with <code>s = max(|α|,|β|) / qmax</code> and <code>q = clamp(round(x/s), -qmax, qmax)</code>, <code>x̂ = s*q</code>. Real zero maps to <code>q=0</code>, which simplifies kernels. Dequantization is simply <code>x̂ = s · q</code>. The pedagogical tensor above is <em>not</em> symmetric around zero (<code>43.31</code> versus <code>44.93</code> in magnitude), yet symmetric quantization still allocates scale from <strong>absolute max</strong>—here the larger magnitude is <code>44.93</code>, so the implied symmetric float band is roughly <code>−44.93</code>…<code>44.93</code> even though your actual maximum is only <code>43.31</code>. Codes that would represent floats between about <code>43.31</code> and <code>44.93</code> are never used by data in that tensor, so part of the integer grid is <strong>wasted</strong>. A concrete round-trip symptom: the original value <strong>43.31</strong> may dequantize to about <strong>43.6</strong>—close, but not exact.</p>
+    <p>If the tensor is <em>not</em> symmetric around zero (e.g. <code>β=-50</code>, <code>α=150</code>), symmetric quantization wastes levels on an empty side and often raises <code>MSE</code> versus asymmetric packing. For a vector spanning <code>−50</code>…<code>150</code>, symmetric scale is driven by <code>max(|−50|, |150|) = 150</code>, so you effectively reserve room for <code>−150</code>…<code>150</code> even though no element actually occupies the negative tail down to <code>−150</code>. That mismatch inflates the scale <code>s</code>, makes every bin wider, and hurts reconstruction for the bulk of the values.</p>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">Asymmetric</h3><p>Uses full <code>0…255</code>; best when the distribution is skewed. <code>Z</code> encodes where <code>0.f</code> lands.</p></div>
+      <div class="card"><h3 style="color:var(--accent2);">Symmetric</h3><p><code>Z=0</code>; scale from <code>absmax</code>. Prefer when weights/activations are roughly zero-centered.</p></div>
+    </div>
+    <div class="interactive-panel">
+      <h4>Range mapping: same floats, two schemes</h4>
+      <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;">Dots: original floats; lower rows: dequantized <code>x̂</code> with <code>q</code> labels. Compare <code>MSE</code> for a skewed mini-tensor.</p>
+      <div class="demo-canvas-wrap"><canvas id="canvasSymAsym" width="820" height="280"></canvas></div>
+      <div class="stats-grid" id="symAsymStats"></div>
+    </div>
+
+    <div class="discussion-panel" style="margin-top: 18px;">
+      <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">After ReLU, activations are always ≥ 0. Which scheme wins and why?</p>
+        <p class="dq-answer"><strong>Asymmetric</strong>. ReLU outputs are non-negative — using symmetric would waste half the integer codes on negative values that never appear. Asymmetric packs the full 0…255 grid across the actual [0, max] range, giving much tighter bins and lower error.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">Why do symmetric kernels often sacrifice the −128 code in int8 (using −127…127 instead of −128…127)?</p>
+        <p class="dq-answer">Keeping the range symmetric around zero (<code>−127…127</code>) means the positive and negative sides have equal span. This simplifies hardware — the same scale applies identically in both directions, and you avoid edge-case behavior from the asymmetric two's-complement range. The cost is losing one representable value out of 256, which is negligible.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Per-tensor vs per-channel granularity</h2>
+    <p><strong>Per-tensor</strong> quantization shares one <code>(α, β)</code> (or <code>s, Z</code>) for the entire <code>W</code>: tiny metadata, simple kernels. <strong>Per-channel</strong> (per output channel of <code>Conv2d</code> / row of <code>Linear</code>) assigns separate scales when channels have different ranges—common in CNNs where filters specialize.</p>
+    <p>Convolution stacks illustrate the point. Different filters (kernels) often live on different numeric ranges—one might sit roughly in <strong>−5…+5</strong>, another in <strong>−10…+10</strong>, another in <strong>−6…+6</strong>. A single global <code>α</code>/<code>β</code> forces all of them to share one wide bucket; some channels then use only a thin slice of the available integer codes while others could have used a tighter scale. <strong>Channel-wise</strong> (per-kernel) quantization computes separate <code>α</code> and <code>β</code> per filter, improving code utilization and usually <strong>lowering precision loss</strong> for the same bit width.</p>
+    <div class="callout warn"><p><strong>Hardware alignment:</strong> CPUs expose fast paths for a few widths—typically <strong>8</strong>, <strong>16</strong>, <strong>32</strong>, and <strong>64</strong> bits. Picking an exotic width like <strong>11</strong> bits may save a little metadata in theory but often forfeits accelerated kernels; the practical compromise matches the integer types your stack actually vectorizes.</p></div>
+    <div class="interactive-panel">
+      <h4>Utilization: one global range vs per-channel rescale</h4>
+      <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;">Three channels with different numeric spreads. <code>Per-tensor</code> leaves dead zones; <code>per-channel</code> fills the bar.</p>
+      <div class="demo-btn-row">
+        <button type="button" class="demo-btn active" id="granTensor">Per-tensor</button>
+        <button type="button" class="demo-btn" id="granChannel">Per-channel</button>
+      </div>
+      <div class="demo-canvas-wrap"><canvas id="canvasGranularity" width="820" height="240"></canvas></div>
+    </div>
+
+    <div class="discussion-panel" style="margin-top: 18px;">
+      <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">Per-channel gives tighter fits — why not go even finer, like per-element scale?</p>
+        <p class="dq-answer">Per-element would mean storing one <code>float32</code> scale per weight — you'd end up using <strong>more metadata than you saved</strong> by quantizing. Per-channel is the sweet spot: typically a few hundred or thousand extra floats (one per output channel), which is negligible compared to millions of int8 weights. Going finer yields diminishing accuracy gains with disproportionate metadata and kernel complexity costs.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">Why is per-channel common for weights but per-tensor more common for activations?</p>
+        <p class="dq-answer">Weight ranges are <strong>fixed</strong> after training — you compute per-channel scales once and store them. Activations change every forward pass; computing per-channel stats on the fly would add latency to every inference call. Per-tensor keeps it to just one min/max observation per layer, which is fast enough for real-time use.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Calibration: min–max, percentiles, and outliers</h2>
+    <p><strong>Min–max</strong> (sometimes written <em>minmax</em>) sets <code>α</code> to the tensor maximum and <code>β</code> to the minimum—simple, deterministic, and sensitive to <strong>outliers</strong>. With values mostly between <code>−50</code> and <code>+50</code> but one spike at <code>1000</code>, that spike stretches <code>s</code>; after quantize–dequantize, ordinary entries drift—for example <strong>43.31</strong> reconstructing near <strong>45.8</strong>.</p>
+    <p><strong>Percentile</strong> strategies set <code>α</code> and <code>β</code> to high/low percentiles of the empirical distribution—e.g. the <strong>99th</strong> percentile tail, or in code experiments the <strong>99.99th</strong> percentile—instead of literal min/max. Values beyond the clipped range saturate, but the <strong>bulk</strong> of the tensor gets a finer step size. The outlier itself may reconstruct poorly, yet <strong>mean-squared error averaged over non-outlier entries</strong> often drops sharply compared with min–max.</p>
+    <p>Beyond min–max and percentiles, practitioners sometimes choose <code>α</code> and <code>β</code> by <strong>minimizing mean squared error</strong> between originals and their dequantized counterparts—often with a small <strong>grid search</strong> over candidate ranges because there is no closed form in general. For <strong>language-model heads</strong>, where the last <code>Linear</code> feeds a <code>softmax</code> and decoding uses <strong>greedy</strong> or <strong>top‑p</strong> sampling, what matters is less each logit’s absolute value than the <strong>ordering</strong> and <strong>shape</strong> of the probability mass. A <strong>cross-entropy</strong> objective between the full-precision distribution and the distribution induced after quantize–dequantize can therefore be a better calibration target than raw <code>MSE</code> on logits: you want the largest logit to stay largest and intermediate ratios to distort as little as possible.</p>
+    <p><strong>Calibration</strong> in PTQ: run unlabeled inputs through the model (you are measuring activation statistics, not updating weights), let <code>MinMaxObserver</code> (or <code>HistogramObserver</code>) record ranges per tensor, then bake <code>s, Z</code> into <code>convert()</code>’s quantized modules.</p>
+    <div class="interactive-panel">
+      <h4>Outlier sensitivity: min–max vs percentile</h4>
+      <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;"><code>10_000</code> samples in <code>[-50, 150]</code> plus one <code>1000</code> outlier. Toggle strategy; read <code>MSE</code> excluding the outlier.</p>
+      <div class="demo-btn-row">
+        <button type="button" class="demo-btn active" id="stratMinmax">Min–max</button>
+        <button type="button" class="demo-btn" id="stratPct">Percentile 99.99%</button>
+      </div>
+      <div class="stats-grid" id="outlierStats"></div>
+      <div class="demo-canvas-wrap"><canvas id="canvasOutlier" width="820" height="200"></canvas></div>
+    </div>
+    <div class="comparison">
+      <div class="card"><h3>Min–max range</h3><p><code>α = max(x)</code>, <code>β = min(x)</code>. Uses the full tensor span. One distant outlier expands <code>s</code> and raises error for everyone; dequantized bulk values can drift far (e.g. <code>43.31 → ~45.8</code> in pathological cases).</p></div>
+      <div class="card"><h3>Percentile range</h3><p><code>α</code>/<code>β</code> from high/low percentiles (e.g. <code>99.99</code>th). Outliers clip aggressively; only the tail suffers. Excluding the outlier from an <code>MSE</code> report usually shows a large win versus min–max on the main mass of the tensor.</p></div>
+    </div>
+
+    <div class="discussion-panel" style="margin-top: 18px;">
+      <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">If a single outlier at 1000 stretches your scale by 5×, what happens to the MSE of the other 9,999 values?</p>
+        <p class="dq-answer">It jumps dramatically. With min-max, <code>s ≈ 4.12</code> instead of <code>≈ 0.784</code> — each integer bin is 5× wider. A value like <code>43.31</code> that would normally reconstruct within ~0.4 error might now be off by ~2.5. The outlier is fine, but the <strong>bulk of the distribution pays the price</strong>. Percentile calibration (e.g. 99.99th) clips that spike and keeps bins tight for everyone else.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">Why might cross-entropy calibration be better than MSE for language model heads?</p>
+        <p class="dq-answer">The last Linear feeds a softmax — what matters isn't each logit's absolute value but the <strong>ordering and shape of the probability distribution</strong>. MSE might perfectly reconstruct a logit that doesn't affect the top token, while distorting one that does. Cross-entropy directly penalizes probability-distribution mismatch, keeping the largest logit largest and preserving sampling behavior.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Integer <code>matmul</code> and <code>int32</code> accumulators</h2>
+    <p>Each output element of <code>y = x @ W.T</code> is a sum of products. With <code>int8</code> operands, each product needs up to <code>16</code> bits; summing <code>k</code> terms needs a wider <strong>accumulator</strong>, typically <code>int32</code>. Biases are often folded in accumulator space before rescaling to the next layer’s <code>scale</code>.</p>
+    <p>At a micro-architectural level, think of a <strong>multiply–accumulate</strong> lane that loads short vectors from a row of <code>X</code> and a column of <code>W</code>—a toy picture uses length‑<strong>four</strong> chunks: multiply <code>x₁₁·w₁₁</code>, <code>x₁₂·w₁₂</code>, and so on, then add into an <strong>accumulator register</strong>. The operands are <code>int8</code> after quantization, but their products are wider; the accumulator therefore sits at <strong>32&nbsp;bits</strong>. The bias term is often injected by <strong>initializing the accumulator with the (appropriately scaled) bias</strong> so the same inner loop finishes the affine form <code>XWᵀ + b</code>. Thousands of such blocks run in parallel across rows and columns—this is the mental model behind accelerated <code>int8</code> <code>GEMM</code>.</p>
+    <p><code>GPU</code> kernels tile work into blocks; each thread maintains an accumulator register. Libraries like <code>cuBLASLt</code> expose mixed-precision <code>GEMM</code> with <code>int8</code> inputs and <code>int32</code> accumulation. For algorithmic detail on low-precision matrix multiply, see Google’s open-source <a href="https://github.com/google/gemmlowp" target="_blank" rel="noopener">https://github.com/google/gemmlowp</a> project—documentation and kernels walk through how reduced-width products widen into <code>int32</code> accumulators. Picking <code>8</code>/<code>16</code>/<code>32</code>-bit widths that match hardware beats arbitrary bit depths with no fast path.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Multiply-accumulate picture</h3>
+        <p>For row <code>i</code>, column <code>j</code>: <code>y_ij = Σ_k x_ik * W_jk</code> (layout-dependent). Quantized: <code>y_ij ≈ s_x s_w Σ_k x_q_ik * W_q_jk</code> plus bias handling—implementations fold scales into a single output <code>s_y</code>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">gemm_accumulator.md</span><span class="code-lines">1–6</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="cmt"># int8 x int8 → int16 product; many products → int32 sum</span></span></code>
+<code><span class="line"><span class="ln">2</span>acc <span class="op">=</span> <span class="fn">int32</span>(bias_q)  <span class="cmt"># often applied in wider dtype</span></span></code>
+<code><span class="line"><span class="ln">3</span><span class="kw">for</span> k <span class="kw">in</span> <span class="fn">range</span>(K):</span></code>
+<code><span class="line"><span class="ln">4</span>    acc <span class="op">+=</span> <span class="fn">int32</span>(x_q[i,k]) <span class="op">*</span> <span class="fn">int32</span>(w_q[j,k])</span></code>
+<code><span class="line"><span class="ln">5</span>y_fp <span class="op">=</span> (acc <span class="op">-</span> zp_terms) <span class="op">*</span> (s_x <span class="op">*</span> s_w)  <span class="cmt"># schematic</span></span></code>
+<code><span class="line"><span class="ln">6</span></span></code></pre>
+      </div>
+    </div>
+
+    <div class="discussion-panel" style="margin-top: 18px;">
+      <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">Why does the accumulator need to be int32 instead of staying int8?</p>
+        <p class="dq-answer">Each <code>int8 × int8</code> product can be up to 16 bits wide. When you sum hundreds or thousands of such products (one per element in the dot product), the total can easily exceed 16-bit range. <strong>int32 accumulators</strong> give enough headroom to sum many 16-bit products without overflow. The final result is then rescaled back to the output layer's scale.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">How is the bias typically handled in integer matmul?</p>
+        <p class="dq-answer">The bias is often <strong>folded into the accumulator</strong> — the int32 accumulator is initialized with a pre-scaled version of the bias before the multiply-accumulate loop begins. This way the same inner loop computes <code>XW^T + b</code> without a separate addition pass, and the bias stays in the wider int32 space where precision is fine.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Code progression: affine → symmetric → per-channel → fake quant → QAT</h2>
+    <p>Use the tabs to stack helpers the way you would in a teaching notebook: start with full <code>affine</code> <code>quantize</code>/<code>dequantize</code>, specialize to <code>symmetric</code>, add <code>axis</code> for <code>per_channel</code>, inject <code>round</code> noise with <code>detach</code> trick for STE, then wrap a <code>nn.Linear</code> for <code>QAT</code>.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">Notebook pattern · 20 floats in <code>[−50, 150]</code></span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="cmt"># Synthetic vector: force max at index 0, min at 1, exact 0 at 2</span></span></code>
+<code><span class="line"><span class="ln">2</span>x <span class="op">=</span> torch.<span class="fn">empty</span>(<span class="num">20</span>).<span class="fn">uniform_</span>(<span class="op">-</span><span class="num">50</span>, <span class="num">150</span>)</span></code>
+<code><span class="line"><span class="ln">3</span>x[<span class="num">0</span>] <span class="op">=</span> x.<span class="fn">max</span>(); x[<span class="num">1</span>] <span class="op">=</span> x.<span class="fn">min</span>(); x[<span class="num">2</span>] <span class="op">=</span> <span class="num">0</span></span></code>
+<code><span class="line"><span class="ln">4</span><span class="cmt"># Asymmetric 8-bit: max→255, min→0, real 0 lands on Z (e.g. Z≈61)</span></span></code>
+<code><span class="line"><span class="ln">5</span><span class="cmt"># Symmetric 8-bit: real 0 → q=0; compare MSE(x, dequant(q))</span></span></code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">What to notice</span><pre class="output-text">Asymmetric: largest → 255, smallest → 0, zero → Z (illustrative Z=61).
+Symmetric: third element stays 0 → q=0. MSE is often larger for symmetric
+when the float range is skewed (e.g. −50…150): symmetric scale uses |150|,
+wasting negative codes the data never visits.</pre></div>
+    </div>
+    <div class="code-progression">
+      <div class="btn-group" id="quantProgBtns">
+        <button type="button" class="btn btn-sm active" onclick="quantStep(this,'q1')">1 · Affine</button>
+        <button type="button" class="btn btn-sm" onclick="quantStep(this,'q2')">2 · Symmetric</button>
+        <button type="button" class="btn btn-sm" onclick="quantStep(this,'q3')">3 · Per-channel</button>
+        <button type="button" class="btn btn-sm" onclick="quantStep(this,'q4')">4 · Fake quant</button>
+        <button type="button" class="btn btn-sm" onclick="quantStep(this,'q5')">5 · QAT linear</button>
+      </div>
+      <p class="step-caption" id="quantCap">Step 1 of 5: general <code>s</code> and integer <code>Z</code> for unsigned <code>q</code>.</p>
+      <div class="code-panel" style="position:static;">
+        <div class="code-header"><span class="code-filename">quant_progression.py</span><span class="code-lines">steps 1–5 · illustrative</span></div>
+        <pre class="code-block" id="q1" style="display:block;"><code><span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">affine_quant</span>(<span class="arg">x</span>, <span class="arg">n_bits</span>):</span></code>
+<code><span class="line"><span class="ln">2</span>    qmax <span class="op">=</span> <span class="num">2</span><span class="op">**</span>n_bits <span class="op">-</span> <span class="num">1</span></span></code>
+<code><span class="line"><span class="ln">3</span>    alpha, beta <span class="op">=</span> x.<span class="fn">max</span>(), x.<span class="fn">min</span>()</span></code>
+<code><span class="line hl"><span class="ln">4</span>    s <span class="op">=</span> (alpha <span class="op">-</span> beta) <span class="op">/</span> qmax</span></code>
+<code><span class="line hl"><span class="ln">5</span>    Z <span class="op">=</span> torch.<span class="fn">round</span>(<span class="op">-</span>beta <span class="op">/</span> s).<span class="fn">clamp</span>(<span class="num">0</span>, qmax)</span></code>
+<code><span class="line"><span class="ln">6</span>    q <span class="op">=</span> torch.<span class="fn">round</span>(x <span class="op">/</span> s) <span class="op">+</span> Z</span></code>
+<code><span class="line"><span class="ln">7</span>    <span class="kw">return</span> q.<span class="fn">clamp</span>(<span class="num">0</span>, qmax), s, Z</span></code></pre>
+        <pre class="code-block" id="q2" style="display:none;"><code><span class="line new"><span class="ln">1</span><span class="kw">def</span> <span class="fn">symmetric_quant</span>(<span class="arg">x</span>, <span class="arg">n_bits</span>):</span></code>
+<code><span class="line"><span class="ln">2</span>    qmax <span class="op">=</span> <span class="num">2</span><span class="op">**</span>(n_bits<span class="op">-</span><span class="num">1</span>) <span class="op">-</span> <span class="num">1</span></span></code>
+<code><span class="line hl"><span class="ln">3</span>    s <span class="op">=</span> x.<span class="fn">abs</span>().<span class="fn">max</span>() <span class="op">/</span> qmax</span></code>
+<code><span class="line"><span class="ln">4</span>    q <span class="op">=</span> torch.<span class="fn">round</span>(x <span class="op">/</span> s).<span class="fn">clamp</span>(<span class="op">-</span>qmax, qmax)</span></code>
+<code><span class="line"><span class="ln">5</span>    <span class="kw">return</span> q, s  <span class="cmt"># Z = 0 implied</span></span></code></pre>
+        <pre class="code-block" id="q3" style="display:none;"><code><span class="line new"><span class="ln">1</span><span class="cmt"># Per-channel: independent (s_c, Z_c) along dim=0 (out channels)</span></span></code>
+<code><span class="line"><span class="ln">2</span><span class="kw">def</span> <span class="fn">per_channel_affine</span>(<span class="arg">W</span>, <span class="arg">n_bits</span>):  <span class="cmt"># W: (out, in)</span></span></code>
+<code><span class="line hl"><span class="ln">3</span>    alpha <span class="op">=</span> W.<span class="fn">max</span>(dim<span class="op">=</span><span class="num">1</span>).values</span></code>
+<code><span class="line hl"><span class="ln">4</span>    beta <span class="op">=</span> W.<span class="fn">min</span>(dim<span class="op">=</span><span class="num">1</span>).values</span></code>
+<code><span class="line"><span class="ln">5</span>    <span class="cmt"># vector s, Z → broadcast quant along in_features</span></span></code>
+<code><span class="line"><span class="ln">6</span>    <span class="op">...</span></span></code></pre>
+        <pre class="code-block" id="q4" style="display:none;"><code><span class="line new"><span class="ln">1</span><span class="kw">def</span> <span class="fn">fake_quant_affine</span>(<span class="arg">x</span>, <span class="arg">s</span>, <span class="arg">Z</span>, <span class="arg">qmax</span>):</span></code>
+<code><span class="line hl"><span class="ln">2</span>    q <span class="op">=</span> torch.<span class="fn">round</span>(x <span class="op">/</span> s) <span class="op">+</span> Z</span></code>
+<code><span class="line"><span class="ln">3</span>    q <span class="op">=</span> q.<span class="fn">clamp</span>(<span class="num">0</span>, qmax)</span></code>
+<code><span class="line hl"><span class="ln">4</span>    x_hat <span class="op">=</span> (q <span class="op">-</span> Z) <span class="op">*</span> s</span></code>
+<code><span class="line"><span class="ln">5</span>    <span class="kw">return</span> x <span class="op">+</span> (x_hat <span class="op">-</span> x).<span class="fn">detach</span>()  <span class="cmt"># STE forward</span></span></code></pre>
+        <pre class="code-block" id="q5" style="display:none;"><code><span class="line new"><span class="ln">1</span><span class="kw">class</span> <span class="fn">QATLinear</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">2</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, <span class="arg">x</span>):</span></code>
+<code><span class="line hl"><span class="ln">3</span>        x <span class="op">=</span> <span class="fn">fake_quant_affine</span>(x, <span class="arg">self</span>.s_x, <span class="arg">self</span>.Z_x, <span class="arg">self</span>.qmax)</span></code>
+<code><span class="line hl"><span class="ln">4</span>        w <span class="op">=</span> <span class="fn">fake_quant_affine</span>(<span class="arg">self</span>.weight, <span class="arg">self</span>.s_w, <span class="arg">self</span>.Z_w, <span class="arg">self</span>.qmax)</span></code>
+<code><span class="line"><span class="ln">5</span>        <span class="kw">return</span> F.<span class="fn">linear</span>(x, w, <span class="arg">self</span>.bias)</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Post-training quantization (<code>PTQ</code>) pipeline</h2>
+    <p>Train <code>fp32</code> <code>MNIST</code> MLP (or any small classifier), then <code>torch.quantization.quantize_dynamic</code> is a shortcut—but the full <code>torch.ao.quantization</code> story is: <code>QuantStub</code> at input, <code>DeQuantStub</code> before loss, <code>prepare</code> with <code>qconfig</code>, copy pretrained weights into the prepared skeleton, <code>calibrate</code> with a data loader (forward-only—no backward), then <code>convert</code> to <code>QuantizedLinear</code>. <code>QuantStub</code> and <code>DeQuantStub</code> bracket the region PyTorch rewrites; <strong>observers</strong> sit on activations (and weight hooks) recording running minima and maxima per layer.</p>
+    <p>A minimal three-layer <code>ReLU</code> MLP for MNIST might land near <strong>360&nbsp;KB</strong> serialized at full width (parameter bytes only land in the same ballpark as <code>368640</code> bytes when you tally <code>numel × element_size</code>). Train that baseline for several epochs (a reference notebook uses on the order of <strong>five</strong> epochs) before exporting weights. After static conversion, the same checkpoint often shrinks to on the order of <strong>94&nbsp;KB</strong> because weights become <code>int8</code> plus sidecar scale and zero-point metadata (PyTorch also stores auxiliary fields). That is roughly a <strong>fourfold</strong> reduction—not magic, just one byte per weight instead of four, with small overhead.</p>
+    <p>Test accuracy before quantization might sit near <strong>96&nbsp;%</strong> on such a toy model; after PTQ it can remain <strong>essentially unchanged</strong> on an overparameterized baseline—though on harder tasks you should expect some drop. The important engineering pattern is unchanged: observers first, <code>convert</code> second, then validate on your metric.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [1] · float model size &amp; accuracy</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>param_bytes <span class="op">=</span> <span class="fn">sum</span>(p.numel() <span class="op">*</span> p.element_size() <span class="kw">for</span> p <span class="kw">in</span> model.parameters())</span></code>
+<code><span class="line"><span class="ln">2</span>acc_fp32 <span class="op">=</span> <span class="fn">eval_accuracy</span>(model, test_loader)</span></code>
+<code><span class="line"><span class="ln">3</span><span class="fn">print</span>(<span class="str">f"fp32 bytes≈</span>{param_bytes}<span class="str"> acc=</span>{acc_fp32:<span class="str">.4f</span>}<span class="str">"</span>)</span></code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [1]</span><pre class="output-text">fp32 bytes≈368640  acc=0.9600
+(illustrative 3-layer MNIST MLP)</pre></div>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [2] · after <code>convert</code> (static PTQ)</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>qmodel <span class="op">=</span> torch.ao.quantization.<span class="fn">convert</span>(model_prepared, inplace<span class="op">=</span><span class="kw">False</span>)</span></code>
+<code><span class="line"><span class="ln">2</span>param_bytes_q <span class="op">=</span> <span class="fn">serialized_size</span>(qmodel)  <span class="cmt"># int8 weights + meta</span></span></code>
+<code><span class="line"><span class="ln">3</span>acc_int <span class="op">=</span> <span class="fn">eval_accuracy</span>(qmodel, test_loader)</span></code>
+<code><span class="line"><span class="ln">4</span><span class="fn">print</span>(<span class="str">f"quant bytes≈</span>{param_bytes_q}<span class="str"> acc=</span>{acc_int:<span class="str">.4f</span>}<span class="str">"</span>)</span></code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [2]</span><pre class="output-text">quant bytes≈94208  acc=0.9588
+~4× smaller weights; acc often within noise on simple CNN/MLP</pre></div>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Observers collect tensor ranges</h3>
+        <p>During <code>calibration</code>, forward-only passes update <code>activation_post_process</code> observers attached to each <code>Linear</code>. Those min/max (or histogram) stats define <code>s</code> and <code>Z</code> baked into <code>QuantizedLinear</code> at <code>convert</code> time.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">ptq_calibrate.py</span><span class="code-lines">12–28</span></div>
+        <pre class="code-block annotated" id="ann1"><code><span class="line"><span class="ln anno" data-note="Eager-mode fuse_modules optional before prepare; matches Conv+BN+ReLU patterns.">12</span>model_q <span class="op">=</span> <span class="fn">copy</span>.<span class="fn">deepcopy</span>(model_fp)</span></code>
+<code><span class="line"><span class="ln anno" data-note="Default qconfig picks observer dtype (quint8) and qscheme (per-tensor affine).">13</span>model_q.qconfig <span class="op">=</span> torch.ao.quantization.<span class="fn">get_default_qconfig</span>(<span class="str">'x86'</span>)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Inserts QuantStub, DeQuantStub, and FakeQuantize observers on activations/weights.">14</span>torch.ao.quantization.<span class="fn">prepare</span>(model_q, inplace<span class="op">=</span><span class="kw">True</span>)</span></code>
+<code><span class="line"><span class="ln">15</span>model_q.<span class="fn">load_state_dict</span>(model_fp.<span class="fn">state_dict</span>())</span></code>
+<code><span class="line"><span class="ln">16</span>model_q.<span class="fn">eval</span>()</span></code>
+<code><span class="line"><span class="ln anno" data-note="No backward; observers accumulate min/max over representative batches.">17</span><span class="kw">with</span> torch.<span class="fn">no_grad</span>():</span></code>
+<code><span class="line"><span class="ln">18</span>    <span class="kw">for</span> xb, _ <span class="kw">in</span> calib_loader:</span></code>
+<code><span class="line"><span class="ln">19</span>        model_q(xb)</span></code>
+<code><span class="line"><span class="ln">20</span></span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Swaps nn.Linear for QuantizedLinear with int weights + recorded scale/zero_point.">21</span>q_deploy <span class="op">=</span> torch.ao.quantization.<span class="fn">convert</span>(model_q, inplace<span class="op">=</span><span class="kw">False</span>)</span></code>
+<code><span class="line"><span class="ln">22</span><span class="cmt"># torch.save(q_deploy.state_dict(), 'mnist_int8.pt')</span></span></code></pre>
+        <div class="code-note" id="ann1Note"><strong>Tip:</strong> click a line number above.</div>
+      </div>
+    </div>
+    <div class="interactive-panel">
+      <h4>Bit width vs quantization error (and clamp band)</h4>
+      <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;">Synthetic weights in <code>[-1, 1]</code>; change <code>n</code> bits (symmetric). Orange shows <code>x̂</code> after clamped integer round-trip—values outside <code>±qmax*s</code> flatten.</p>
+      <div class="slider-row"><label>Bits <code>n</code></label><input type="range" id="errBits" min="2" max="8" value="4" step="1"><span id="errBitsVal"></span></div>
+      <div class="stats-grid" id="errStats"></div>
+      <div class="demo-canvas-wrap"><canvas id="canvasError" width="820" height="220"></canvas></div>
+    </div>
+    <div class="interactive-panel">
+      <h4>Clamp visualization: pre vs post saturation</h4>
+      <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;">Sweep a float <code>t</code>; bar height shows raw <code>t/s</code> (blue) and clamped <code>q</code> (orange) before dequant. Saturation is where error spikes.</p>
+      <div class="slider-row"><label>Float <code>t</code></label><input type="range" id="clampT" min="-200" max="200" value="120" step="1"><span id="clampTVal"></span></div>
+      <div class="demo-canvas-wrap"><canvas id="canvasClamp" width="820" height="200"></canvas></div>
+    </div>
+
+    <div class="discussion-panel" style="margin-top: 18px;">
+      <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">How many calibration samples are typically needed for good PTQ results?</p>
+        <p class="dq-answer">Surprisingly few — often <strong>100–1000 representative samples</strong> are enough for activation range statistics to stabilize. The observers are computing simple running min/max or histograms, not fitting complex models. More data rarely hurts but gives diminishing returns. The key is that samples are <strong>representative</strong> of real inference inputs.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">What's the difference between dynamic PTQ and static PTQ in terms of when quantization happens?</p>
+        <p class="dq-answer"><strong>Dynamic PTQ</strong>: weights are pre-quantized to int8, but activations are quantized <em>on the fly</em> each forward pass (compute min/max per batch, then quantize). <strong>Static PTQ</strong>: both weights and activations use pre-baked scales from calibration — no per-batch computation. Static is faster at inference; dynamic is simpler to set up and handles distribution shifts better.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Quantization-aware training (<code>QAT</code>) and <code>STE</code></h2>
+    <p><code>prepare_qat</code> inserts <code>FakeQuantize</code> / <code>weight_fake_quant</code> style modules that apply <strong>quantize → dequantize</strong> in the forward path while weights remain trainable floats. The rounding step is piecewise constant, so its derivative is zero almost everywhere—vanilla backprop would stall. Practitioners therefore use the <strong>straight-through estimator</strong> (<code>STE</code>): treat the forward as if quantization happened, but in the backward pass approximate <code>∂q/∂x</code> as <strong>1</strong> for values whose pre-activation sits <strong>strictly between</strong> the calibrated <code>β</code> and <code>α</code>, and as <strong>0</strong> outside that band (where clamping would have pinned the code). PyTorch’s fused kernels implement the same idea with careful numerics; didactic code often writes <code>x + (x_hat - x).detach()</code> so the residual is treated as constant during autograd.</p>
+    <p>Why should fake quantization help at all? Picture training without it: gradient descent finds a sharp minimum of the loss in weight space. PTQ then nudges every weight onto a coarse grid; a tiny move on the lattice can hop across a steep wall of the loss. <strong>Quantization-aware training</strong> exposes those jumps during optimization, nudging solutions toward <strong>wider, flatter basins</strong> where a small quantization displacement barely moves the loss. In a one-weight cartoon: float training might park <code>w</code> on a narrow cusp; after rounding, <code>w_q</code> sits on the wrong side and loss spikes. QAT encourages a basin where both neighbors on the grid stay cheap.</p>
+    <p>In a representative MNIST QAT run you might train only <strong>one epoch</strong> with <code>MinMaxObserver</code>s inserted up front; before any step their buffers read like <strong>±∞</strong> sentinels until forward passes populate extrema. After training plus <code>convert</code>, accuracy might land near <strong>0.952</strong>—not automatically better than PTQ on every architecture (simple models can look unchanged), but on harder networks QAT usually recovers more accuracy than aggressive PTQ alone.</p>
+    <p>After <code>QAT</code> epochs, call <code>convert</code> like PTQ; observers updated during training supply ranges. On difficult models, <code>QAT</code> typically beats raw <code>PTQ</code> when <code>PTQ</code> alone bleeds accuracy.</p>
+    <div class="comparison">
+      <div class="card"><h3>Post-training quantization</h3><p>Train in full precision, then attach observers, calibrate on unlabeled forwards, <code>convert</code>. Fast to apply; accuracy loss depends on how sharp the original minima were.</p></div>
+      <div class="card"><h3>Quantization-aware training</h3><p>Insert fake quant nodes, train with STE so the objective “sees” rounding noise, then <code>convert</code>. More work; often better robustness when PTQ is brittle.</p></div>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>detach()</code> trick = STE</h3>
+        <p>Forward uses <code>x_hat</code>; backward treats <code>x_hat - x</code> as constant so <code>∂L/∂x</code> flows as if <code>y = x</code>. PyTorch’s <code>torch.fake_quantize_per_tensor_affine</code> implements this in <code>C++</code>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">ste_fake_quant.py</span><span class="code-lines">1–12</span></div>
+        <pre class="code-block annotated" id="ann2"><code><span class="line"><span class="ln anno" data-note="Forward applies round+clamp+rescale; backward is identity (STE) in supported builds.">1</span><span class="kw">import</span> torch</span></code>
+<code><span class="line"><span class="ln">2</span></span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Matches deployment affine grid; observers update scale/Z during QAT.">3</span>x_q <span class="op">=</span> torch.<span class="fn">fake_quantize_per_tensor_affine</span>(</span></code>
+<code><span class="line"><span class="ln">4</span>    x, s, <span class="arg">Z</span>, quant_min<span class="op">=</span><span class="num">0</span>, quant_max<span class="op">=</span><span class="num">255</span>)</span></code>
+<code><span class="line"><span class="ln">5</span></span></code>
+<code><span class="line"><span class="ln anno" data-note="prepare_qat fuses pattern; training loop unchanged except model is QAT-wrapped.">6</span>model_qat <span class="op">=</span> torch.ao.quantization.<span class="fn">prepare_qat</span>(model, qconfig, inplace<span class="op">=</span><span class="kw">False</span>)</span></code>
+<code><span class="line"><span class="ln">7</span><span class="cmt"># train ... then:</span></span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Same convert as PTQ; weights become integer tensors with metadata.">8</span>model_int8 <span class="op">=</span> torch.ao.quantization.<span class="fn">convert</span>(model_qat.<span class="fn">eval</span>(), inplace<span class="op">=</span><span class="kw">False</span>)</span></code></pre>
+        <div class="code-note" id="ann2Note"><strong>Tip:</strong> click a line number above.</div>
+      </div>
+    </div>
+    <div class="interactive-panel">
+      <h4>Loss landscape: sharp vs wide minima under rounding</h4>
+      <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;">Toy 1D loss. Green: float <code>w</code>; orange: <code>w</code> snapped to a coarse grid—<code>QAT</code> seeks basins where that jump stays cheap.</p>
+      <div class="slider-row"><label>Weight <code>w</code></label><input type="range" id="landW" min="-100" max="100" value="-35" step="1"><span id="landWVal"></span></div>
+      <div class="demo-canvas-wrap"><canvas id="canvasLandscape" width="820" height="260"></canvas></div>
+    </div>
+
+    <div class="discussion-panel" style="margin-top: 18px;">
+      <div class="discussion-panel-title" style="color: var(--accent3);">Deep Dive — Bonus Q&amp;A</div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">The STE approximates ∂round/∂x as 1 inside [β, α] and 0 outside. Why 0 outside?</p>
+        <p class="dq-answer">Values outside <code>[β, α]</code> are <strong>clamped</strong> — they saturate at the boundary integer code regardless of how much the input changes. Since the clamped output is constant w.r.t. the input, the true gradient <em>is</em> zero there. The STE is actually exact at the boundaries; the approximation is only in the interior where it replaces the staircase derivative with <code>1</code>.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">Does QAT always beat PTQ?</p>
+        <p class="dq-answer"><strong>Not always.</strong> On simple, overparameterized models (like a small MNIST MLP), PTQ can maintain accuracy with zero drop — the loss landscape is already flat enough. QAT shines on <strong>harder tasks and tighter models</strong> where PTQ causes noticeable degradation. QAT also costs more: you need to retrain (or fine-tune) with fake-quant nodes, which adds engineering effort and compute.</p>
+      </div>
+      <div class="dq dq-bonus">
+        <div class="dq-label">Bonus Question</div>
+        <p class="dq-question">During QAT, are the observers updating their ranges throughout training or fixed from the start?</p>
+        <p class="dq-answer">They <strong>update throughout training</strong>. As weights shift during backprop, activation ranges change too. The observers track running statistics so that <code>s</code> and <code>Z</code> adapt. At <code>convert</code> time, the final observer states are frozen into the deployed int8 model.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2><code>torch.ao.quantization</code> building blocks</h2>
+    <p>Key symbols: <code>QuantStub</code>, <code>DeQuantStub</code>, <code>default_qat_qconfig</code>, <code>MinMaxObserver</code>, <code>HistogramObserver</code>, <code>FuseModules</code>, <code>quantize_dynamic</code> (weights-only shortcut). The older import path <code>torch.quantization</code> re-exports <code>torch.ao.quantization</code> for compatibility. <code>BackendConfig</code> and <code>fx</code> / <code>pt2e</code> paths exist for graph capture; this page stays with the classic eager <code>nn.Module</code> pattern.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Minimal quantized <code>Net</code> skeleton</h3>
+        <p>Subclass must call <code>super().__init__()</code>, define <code>self.quant</code> / <code>self.dequant</code>, and wrap the body between them so activations entering and leaving the quantized region are observed.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">quant_net.py</span><span class="code-lines">30–52</span></div>
+        <pre class="code-block annotated" id="ann3"><code><span class="line"><span class="ln anno" data-note="QuantStub converts float input to quint8 scale inside the traced region.">30</span><span class="kw">class</span> <span class="fn">SmallQNet</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">31</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>):</span></code>
+<code><span class="line"><span class="ln">32</span>        <span class="fn">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Stubs bracket the subgraph PyTorch will convert to quantized ops.">33</span>        <span class="arg">self</span>.quant <span class="op">=</span> torch.ao.quantization.<span class="fn">QuantStub</span>()</span></code>
+<code><span class="line"><span class="ln">34</span>        <span class="arg">self</span>.fc1 <span class="op">=</span> nn.<span class="fn">Linear</span>(<span class="num">784</span>, <span class="num">128</span>)</span></code>
+<code><span class="line"><span class="ln">35</span>        <span class="arg">self</span>.fc2 <span class="op">=</span> nn.<span class="fn">Linear</span>(<span class="num">128</span>, <span class="num">10</span>)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Output dequantized to float for cross_entropy / softmax outside graph.">36</span>        <span class="arg">self</span>.dequant <span class="op">=</span> torch.ao.quantization.<span class="fn">DeQuantStub</span>()</span></code>
+<code><span class="line"><span class="ln">37</span></span></code>
+<code><span class="line"><span class="ln anno" data-note="Forward order must hit every linear inside quant/dequant sandwich.">38</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, <span class="arg">x</span>):</span></code>
+<code><span class="line"><span class="ln">39</span>        x <span class="op">=</span> <span class="arg">self</span>.quant(x.<span class="fn">view</span>(x.size(<span class="num">0</span>), <span class="op">-</span><span class="num">1</span>))</span></code>
+<code><span class="line"><span class="ln">40</span>        x <span class="op">=</span> F.<span class="fn">relu</span>(<span class="arg">self</span>.fc1(x))</span></code>
+<code><span class="line"><span class="ln">41</span>        x <span class="op">=</span> <span class="arg">self</span>.dequant(<span class="arg">self</span>.fc2(x))</span></code>
+<code><span class="line"><span class="ln">42</span>        <span class="kw">return</span> x</span></code></pre>
+        <div class="code-note" id="ann3Note"><strong>Tip:</strong> click a line number above.</div>
+      </div>
+    </div>
+    <table class="comp">
+      <thead><tr><th>API</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>get_default_qconfig</code></td><td>Observer + dtype for static PTQ</td></tr>
+        <tr><td><code>get_default_qat_qconfig</code></td><td>Fake quant + weight/activation observers</td></tr>
+        <tr><td><code>prepare</code> / <code>prepare_qat</code></td><td>Rewrite graph with observers / fake quant</td></tr>
+        <tr><td><code>convert</code></td><td>Freeze int weights + scales for inference</td></tr>
+        <tr><td><code>quantize_dynamic</code></td><td>Weights-only <code>int8</code> linears, float activations</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Tensor playground &amp; precision checklist</h2>
+    <p>Edit comma-separated floats, pick <code>symmetric</code> or <code>asymmetric</code>, sweep bit width, and read <code>q</code>, <code>s</code>, <code>Z</code>, and <code>MSE</code>. Use it to sanity-check <code>per-tensor</code> formulas before trusting a full <code>torch</code> pipeline.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [3] · <code>dtype</code> footprint (illustrative)</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">for</span> dt <span class="kw">in</span> (torch.float32, torch.int8, torch.qint8):</span></code>
+<code><span class="line"><span class="ln">2</span>    t <span class="op">=</span> torch.<span class="fn">zeros</span>(<span class="num">1_000_000</span>, dtype<span class="op">=</span>dt)</span></code>
+<code><span class="line"><span class="ln">3</span>    <span class="fn">print</span>(dt, t.element_size())</span></code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [3]</span><pre class="output-text">torch.float32 4
+torch.int8 1
+torch.qint8 1  (+ sidecar scale per channel in quantized modules)</pre></div>
+    </div>
+    <div class="interactive-panel">
+      <h4>Tensor sandbox</h4>
+      <label style="color:var(--text-dim);font-size:0.9rem;">Comma-separated floats</label>
+      <input id="pgInput" class="pg-input" type="text" value="-44.93,0,43.31,-10,22.5,5.2">
+      <div class="slider-row"><label>Bits</label><input type="range" id="pgBits" min="3" max="8" value="8" step="1"><span id="pgBitsVal"></span></div>
+      <div class="demo-btn-row">
+        <button type="button" class="demo-btn active" id="pgSym">Symmetric</button>
+        <button type="button" class="demo-btn" id="pgAsym">Asymmetric</button>
+      </div>
+      <button type="button" class="demo-btn" id="pgRun" style="margin-top:12px;">Recompute</button>
+      <div class="stats-grid" id="pgStats" style="margin-top:16px;"></div>
+      <pre id="pgOut" class="pg-pre"></pre>
+    </div>
+    <div class="callout"><p><strong>Summary:</strong> <code>fp32</code> → affine or symmetric <code>q</code> with <code>clamp</code>; pick ranges via min–max, percentiles, <code>MSE</code> grid search, or (for softmax heads) cross-entropy-aware calibration; <code>PTQ</code> runs observers on unlabeled forwards then <code>convert</code>; <code>QAT</code> interleaves <code>fake_quant</code> with <code>STE</code> (<code>∂≈1</code> inside <code>[β,α]</code>, <code>∂≈0</code> outside) to favor wide minima; integer <code>matmul</code> widens into <code>int32</code> accumulators; <code>per-channel</code> scales rescue CNN filters on mismatched ranges. Weight-only post-training methods such as <code>GPTQ</code> and <code>AWQ</code> are natural next reading beyond this chapter.</p></div>
+  </div>
+</section>
+
+<footer>
+  <p>Advanced NLP V2 · Chapter 12 · Quantization · PTQ, QAT, PyTorch <code>torch.ao.quantization</code></p>
+</footer>
+
+<script>
+function toggleOut(btn) {
+  const cell = btn.closest('.jupyter-cell');
+  const out = cell.querySelector('.cell-output');
+  const on = out.style.display !== 'block';
+  out.style.display = on ? 'block' : 'none';
+  btn.textContent = on ? 'Hide Output ▲' : 'Show Output ▼';
+}
+
+function quantStep(btn, id) {
+  const root = btn.closest('.code-progression');
+  root.querySelectorAll('.code-block').forEach(e => { e.style.display = 'none'; });
+  root.querySelector('#' + id).style.display = 'block';
+  root.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const caps = {
+    q1: 'Step 1 of 5: affine unsigned grid with scale s and integer zero-point Z.',
+    q2: 'Step 2 of 5: symmetric signed grid; s = absmax/qmax; real 0 maps to q=0.',
+    q3: 'Step 3 of 5: per-channel α,β along out dim — separate s,Z per filter row.',
+    q4: 'Step 4 of 5: fake quant forward; STE via x + (x_hat - x).detach().',
+    q5: 'Step 5 of 5: QAT linear fake-quantizes activations and weights each forward.'
+  };
+  document.getElementById('quantCap').textContent = caps[id] || '';
+}
+
+(function () {
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('visible', window.scrollY > 320);
+  }, { passive: true });
+  const obs = new IntersectionObserver((es) => {
+    es.forEach((e) => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.fade-in').forEach((el) => obs.observe(el));
+})();
+
+function wireAnnotations(preId, noteId) {
+  const pre = document.getElementById(preId);
+  const note = document.getElementById(noteId);
+  if (!pre || !note) return;
+  pre.querySelectorAll('.ln.anno').forEach((ln) => {
+    ln.addEventListener('click', () => {
+      const t = ln.getAttribute('data-note') || '';
+      note.innerHTML = '<strong>Line ' + ln.textContent.trim() + ':</strong> ' + t;
+    });
+  });
+}
+wireAnnotations('ann1', 'ann1Note');
+wireAnnotations('ann2', 'ann2Note');
+wireAnnotations('ann3', 'ann3Note');
+
+(function () {
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function round(x) { return Math.sign(x) * Math.round(Math.abs(x)); }
+
+  function quantSymmetric(arr, n) {
+    var qmax = Math.pow(2, n - 1) - 1;
+    var absmax = 0;
+    for (var i = 0; i < arr.length; i++) absmax = Math.max(absmax, Math.abs(arr[i]));
+    if (absmax < 1e-12) absmax = 1e-12;
+    var s = absmax / qmax;
+    var q = [], xh = [];
+    for (var j = 0; j < arr.length; j++) {
+      var qv = clamp(round(arr[j] / s), -qmax, qmax);
+      q.push(qv); xh.push(qv * s);
+    }
+    return { q: q, s: s, Z: 0, xh: xh, qmax: qmax, unsigned: false };
+  }
+
+  function quantAsymmetric(arr, n) {
+    var qmax = Math.pow(2, n) - 1;
+    var beta = Math.min.apply(null, arr);
+    var alpha = Math.max.apply(null, arr);
+    var span = alpha - beta;
+    if (span < 1e-12) span = 1e-12;
+    var s = span / qmax;
+    var Z = clamp(round(-beta / s), 0, qmax);
+    var q = [], xh = [];
+    for (var i = 0; i < arr.length; i++) {
+      var qv = clamp(round(arr[i] / s) + Z, 0, qmax);
+      q.push(qv); xh.push(s * (qv - Z));
+    }
+    return { q: q, s: s, Z: Z, xh: xh, qmax: qmax, unsigned: true };
+  }
+
+  function mse(a, b) {
+    var t = 0;
+    for (var i = 0; i < a.length; i++) { var d = a[i] - b[i]; t += d * d; }
+    return t / a.length;
+  }
+
+  var nlMin = document.getElementById('nlMin');
+  var nlMinVal = document.getElementById('nlMinVal');
+  var nlMax = document.getElementById('nlMax');
+  var nlModeSym = document.getElementById('nlModeSym');
+  var nlModeAsym = document.getElementById('nlModeAsym');
+  var cNL = document.getElementById('canvasNumberLine');
+  var ctxNL = cNL.getContext('2d');
+  var nlSymmetric = true;
+
+  function drawNumberLine() {
+    var nBits = 8;
+    var beta = parseFloat(nlMin.value);
+    var alpha = parseFloat(nlMax.value);
+    if (alpha <= beta) alpha = beta + 1;
+    nlMinVal.textContent = 'β=' + beta.toFixed(0) + '  α=' + alpha.toFixed(0);
+    var W = cNL.width, H = cNL.height;
+    ctxNL.fillStyle = '#0e0e14';
+    ctxNL.fillRect(0, 0, W, H);
+    var pad = 50, x0 = pad, x1 = W - pad, midY = H * 0.45;
+    ctxNL.strokeStyle = '#2a2a3a';
+    ctxNL.lineWidth = 2;
+    ctxNL.beginPath();
+    ctxNL.moveTo(x0, midY);
+    ctxNL.lineTo(x1, midY);
+    ctxNL.stroke();
+    var n = 8, ticks = 9;
+    for (var t = 0; t < ticks; t++) {
+      var tx = x0 + (t / (ticks - 1)) * (x1 - x0);
+      ctxNL.beginPath();
+      ctxNL.moveTo(tx, midY - 6);
+      ctxNL.lineTo(tx, midY + 6);
+      ctxNL.strokeStyle = '#44445a';
+      ctxNL.stroke();
+    }
+    function floatToX(v) { return x0 + ((v - beta) / (alpha - beta)) * (x1 - x0); }
+    ctxNL.fillStyle = '#8888a0';
+    ctxNL.font = '12px system-ui,sans-serif';
+    ctxNL.fillText('Float range [β, α]', x0, midY - 28);
+    [beta, 0, alpha, (alpha + beta) / 2].forEach(function (fv) {
+      if (fv < beta || fv > alpha) return;
+      var px = floatToX(fv);
+      ctxNL.fillStyle = '#6c8cff';
+      ctxNL.beginPath();
+      ctxNL.arc(px, midY, 5, 0, Math.PI * 2);
+      ctxNL.fill();
+    });
+    var lowY = H * 0.72;
+    ctxNL.strokeStyle = '#34d399';
+    ctxNL.beginPath();
+    ctxNL.moveTo(x0, lowY);
+    ctxNL.lineTo(x1, lowY);
+    ctxNL.stroke();
+    ctxNL.fillStyle = '#8888a0';
+    ctxNL.fillText(nlSymmetric ? 'Symmetric int grid (signed)' : 'Asymmetric int grid [0, 255]', x0, lowY - 22);
+    var qmaxS = Math.pow(2, nBits - 1) - 1;
+    var qmaxA = Math.pow(2, nBits) - 1;
+    var kStep = nlSymmetric ? Math.max(1, Math.ceil(qmaxS / 4)) : 32;
+    for (var k = 0; k <= (nlSymmetric ? 2 * qmaxS : qmaxA); k += kStep) {
+      var qv = nlSymmetric ? -qmaxS + k : k;
+      if (nlSymmetric && qv > qmaxS) continue;
+      var frac = nlSymmetric ? (qv + qmaxS) / (2 * qmaxS) : qv / qmaxA;
+      var qx = x0 + frac * (x1 - x0);
+      ctxNL.fillStyle = qv === 0 ? '#fbbf24' : '#a78bfa';
+      ctxNL.fillRect(qx - 1, lowY - 4, 2, 8);
+    }
+  }
+  nlMin.addEventListener('input', drawNumberLine);
+  nlMax.addEventListener('input', drawNumberLine);
+  nlModeSym.addEventListener('click', function () {
+    nlSymmetric = true;
+    nlModeSym.classList.add('active');
+    nlModeAsym.classList.remove('active');
+    drawNumberLine();
+  });
+  nlModeAsym.addEventListener('click', function () {
+    nlSymmetric = false;
+    nlModeAsym.classList.add('active');
+    nlModeSym.classList.remove('active');
+    drawNumberLine();
+  });
+  drawNumberLine();
+
+  var cSA = document.getElementById('canvasSymAsym');
+  var ctxSA = cSA.getContext('2d');
+  var demoVals = [-44.93, 0, 43.31, -10, 15.2, 30];
+  function drawSymAsym() {
+    var n = 8;
+    var rs = quantSymmetric(demoVals, n);
+    var ra = quantAsymmetric(demoVals, n);
+    var W = cSA.width, H = cSA.height;
+    ctxSA.fillStyle = '#0e0e14';
+    ctxSA.fillRect(0, 0, W, H);
+    var rowH = 36, baseY = 40;
+    ctxSA.font = '13px system-ui,sans-serif';
+    ctxSA.fillStyle = '#a78bfa';
+    ctxSA.fillText('Original float', 12, 22);
+    ctxSA.fillText('Symmetric q + x̂', 12, baseY + rowH * 2.5);
+    ctxSA.fillText('Asymmetric q + x̂', 12, baseY + rowH * 5.2);
+    var minV = Math.min.apply(null, demoVals.concat(rs.xh, ra.xh)) - 5;
+    var maxV = Math.max.apply(null, demoVals.concat(rs.xh, ra.xh)) + 5;
+    var x0 = 140, x1 = W - 24;
+    function vx(v) { return x0 + (v - minV) / (maxV - minV) * (x1 - x0); }
+    for (var i = 0; i < demoVals.length; i++) {
+      ctxSA.fillStyle = '#6c8cff';
+      ctxSA.fillRect(vx(demoVals[i]) - 3, baseY + i * 8, 6, 6);
+    }
+    for (var j = 0; j < demoVals.length; j++) {
+      var y2 = baseY + rowH * 2.8 + j * 8;
+      ctxSA.fillStyle = '#f472b6';
+      ctxSA.fillRect(vx(rs.xh[j]) - 3, y2, 6, 6);
+      ctxSA.fillStyle = '#8888a0';
+      ctxSA.font = '10px monospace';
+      ctxSA.fillText(String(rs.q[j]), vx(rs.xh[j]) + 8, y2 + 4);
+    }
+    for (var k = 0; k < demoVals.length; k++) {
+      var y3 = baseY + rowH * 5.5 + k * 8;
+      ctxSA.fillStyle = '#34d399';
+      ctxSA.fillRect(vx(ra.xh[k]) - 3, y3, 6, 6);
+      ctxSA.fillStyle = '#8888a0';
+      ctxSA.fillText(String(ra.q[k]), vx(ra.xh[k]) + 8, y3 + 4);
+    }
+    document.getElementById('symAsymStats').innerHTML =
+      '<div class="stat-box"><span class="label">MSE symmetric</span><span class="value">' + mse(demoVals, rs.xh).toFixed(4) + '</span></div>' +
+      '<div class="stat-box"><span class="label">MSE asymmetric</span><span class="value">' + mse(demoVals, ra.xh).toFixed(4) + '</span></div>' +
+      '<div class="stat-box"><span class="label">Scale s (sym)</span><span class="value">' + rs.s.toFixed(4) + '</span></div>' +
+      '<div class="stat-box"><span class="label">Z (asym)</span><span class="value">' + ra.Z + '</span></div>';
+  }
+  drawSymAsym();
+
+  var granTensor = document.getElementById('granTensor');
+  var granChannel = document.getElementById('granChannel');
+  var cGr = document.getElementById('canvasGranularity');
+  var ctxGr = cGr.getContext('2d');
+  var perChannel = false;
+  var chData = [{ lo: -5, hi: 5, name: 'Ch A' }, { lo: -10, hi: 10, name: 'Ch B' }, { lo: -6, hi: 6, name: 'Ch C' }];
+  function drawGran() {
+    var W = cGr.width, H = cGr.height;
+    ctxGr.fillStyle = '#0e0e14';
+    ctxGr.fillRect(0, 0, W, H);
+    var loG = Math.min(chData[0].lo, chData[1].lo, chData[2].lo);
+    var hiG = Math.max(chData[0].hi, chData[1].hi, chData[2].hi);
+    var x0 = 100, x1 = W - 30, band = 50;
+    function mapX(v, lo, hi) { return x0 + (v - lo) / (hi - lo) * (x1 - x0); }
+    chData.forEach(function (ch, idx) {
+      var y = 30 + idx * band;
+      ctxGr.fillStyle = '#8888a0';
+      ctxGr.font = '12px system-ui,sans-serif';
+      ctxGr.fillText(ch.name, 12, y + 22);
+      var lo = perChannel ? ch.lo : loG;
+      var hi = perChannel ? ch.hi : hiG;
+      ctxGr.strokeStyle = '#2a2a3a';
+      ctxGr.strokeRect(x0, y, x1 - x0, 28);
+      var usedLo = ch.lo, usedHi = ch.hi;
+      var u0 = mapX(usedLo, lo, hi);
+      var u1 = mapX(usedHi, lo, hi);
+      ctxGr.fillStyle = perChannel ? '#34d399' : '#f87171';
+      ctxGr.globalAlpha = 0.45;
+      ctxGr.fillRect(u0, y + 2, Math.max(4, u1 - u0), 24);
+      ctxGr.globalAlpha = 1;
+      ctxGr.fillStyle = '#6c8cff';
+      ctxGr.fillRect(mapX(ch.lo, lo, hi) - 2, y + 10, 4, 10);
+      ctxGr.fillRect(mapX(ch.hi, lo, hi) - 2, y + 10, 4, 10);
+    });
+    ctxGr.fillStyle = '#e0e0e8';
+    ctxGr.font = '11px system-ui,sans-serif';
+    ctxGr.fillText(perChannel ? 'Per-channel: each strip uses full width' : 'Per-tensor: unused grid in narrower channels', x0, H - 12);
+  }
+  granTensor.addEventListener('click', function () {
+    perChannel = false;
+    granTensor.classList.add('active');
+    granChannel.classList.remove('active');
+    drawGran();
+  });
+  granChannel.addEventListener('click', function () {
+    perChannel = true;
+    granChannel.classList.add('active');
+    granTensor.classList.remove('active');
+    drawGran();
+  });
+  drawGran();
+
+  var stratMinmax = document.getElementById('stratMinmax');
+  var stratPct = document.getElementById('stratPct');
+  var cOut = document.getElementById('canvasOutlier');
+  var ctxOut = cOut.getContext('2d');
+  var usePct = false;
+  function buildOutlierData() {
+    var arr = [];
+    for (var i = 0; i < 10000; i++) arr.push(-50 + Math.random() * 200);
+    arr.push(1000);
+    return arr;
+  }
+  var bigArr = buildOutlierData();
+  function percentile(arr, p) {
+    var s = arr.slice().sort(function (a, b) { return a - b; });
+    var idx = clamp(Math.floor((p / 100) * (s.length - 1)), 0, s.length - 1);
+    return s[idx];
+  }
+  function drawOutlier() {
+    var beta, alpha;
+    if (!usePct) {
+      beta = Math.min.apply(null, bigArr);
+      alpha = Math.max.apply(null, bigArr);
+    } else {
+      alpha = percentile(bigArr, 99.99);
+      beta = percentile(bigArr, 100 - 99.99);
+    }
+    var n = 8, qmax = Math.pow(2, n) - 1;
+    var span = Math.max(alpha - beta, 1e-8);
+    var s = span / qmax;
+    var Z = clamp(round(-beta / s), 0, qmax);
+    function deq(qv) { return s * (qv - Z); }
+    var mseAll = 0, mseBody = 0, cntBody = 0;
+    for (var i = 0; i < bigArr.length; i++) {
+      var qv = clamp(round(bigArr[i] / s) + Z, 0, qmax);
+      var err = bigArr[i] - deq(qv);
+      mseAll += err * err;
+      if (i < bigArr.length - 1) { mseBody += err * err; cntBody++; }
+    }
+    mseAll /= bigArr.length;
+    mseBody /= cntBody;
+    document.getElementById('outlierStats').innerHTML =
+      '<div class="stat-box"><span class="label">α used</span><span class="value">' + alpha.toFixed(2) + '</span></div>' +
+      '<div class="stat-box"><span class="label">β used</span><span class="value">' + beta.toFixed(2) + '</span></div>' +
+      '<div class="stat-box"><span class="label">MSE all</span><span class="value">' + mseAll.toFixed(6) + '</span></div>' +
+      '<div class="stat-box"><span class="label">MSE excl. outlier</span><span class="value">' + mseBody.toFixed(6) + '</span></div>';
+    var W = cOut.width, H = cOut.height;
+    ctxOut.fillStyle = '#0e0e14';
+    ctxOut.fillRect(0, 0, W, H);
+    ctxOut.fillStyle = '#8888a0';
+    ctxOut.font = '12px system-ui,sans-serif';
+    ctxOut.fillText('Histogram (100 bins, x clipped to [-60, 200])', 12, 18);
+    var bins = 100, hist = new Array(bins).fill(0);
+    var xmin = -60, xmax = 200;
+    for (var j = 0; j < bigArr.length; j++) {
+      var v = clamp(bigArr[j], xmin, xmax);
+      var b = Math.floor((v - xmin) / (xmax - xmin) * (bins - 1));
+      hist[b]++;
+    }
+    var maxh = Math.max.apply(null, hist);
+    var base = H - 24;
+    for (var b = 0; b < bins; b++) {
+      var bh = (hist[b] / maxh) * (H - 50);
+      ctxOut.fillStyle = usePct ? '#34d399' : '#f472b6';
+      ctxOut.fillRect(10 + b * 8, base - bh, 6, bh);
+    }
+  }
+  stratMinmax.addEventListener('click', function () {
+    usePct = false;
+    stratMinmax.classList.add('active');
+    stratPct.classList.remove('active');
+    drawOutlier();
+  });
+  stratPct.addEventListener('click', function () {
+    usePct = true;
+    stratPct.classList.add('active');
+    stratMinmax.classList.remove('active');
+    drawOutlier();
+  });
+  drawOutlier();
+
+  var errBits = document.getElementById('errBits');
+  var errBitsVal = document.getElementById('errBitsVal');
+  var cErr = document.getElementById('canvasError');
+  var ctxErr = cErr.getContext('2d');
+  function drawErrBits() {
+    var n = parseInt(errBits.value, 10);
+    errBitsVal.textContent = String(n) + ' bits (signed symmetric)';
+    var vals = [];
+    for (var i = 0; i < 200; i++) vals.push(-1 + Math.random() * 2);
+    var qmax = Math.pow(2, n - 1) - 1;
+    var absmax = Math.max.apply(null, vals.map(Math.abs));
+    if (absmax < 1e-8) absmax = 1e-8;
+    var s = absmax / qmax;
+    var xh = vals.map(function (v) {
+      var qv = clamp(round(v / s), -qmax, qmax);
+      return qv * s;
+    });
+    var err = mse(vals, xh);
+    document.getElementById('errStats').innerHTML =
+      '<div class="stat-box"><span class="label">MSE</span><span class="value">' + err.toExponential(3) + '</span></div>' +
+      '<div class="stat-box"><span class="label">Scale s</span><span class="value">' + s.toFixed(6) + '</span></div>' +
+      '<div class="stat-box"><span class="label">qmax</span><span class="value">' + qmax + '</span></div>';
+    var W = cErr.width, H = cErr.height;
+    ctxErr.fillStyle = '#0e0e14';
+    ctxErr.fillRect(0, 0, W, H);
+    var x0 = 40, x1 = W - 20, y0 = H - 30, y1 = 20;
+    ctxErr.strokeStyle = '#2a2a3a';
+    ctxErr.beginPath();
+    ctxErr.moveTo(x0, y0);
+    ctxErr.lineTo(x1, y0);
+    ctxErr.moveTo(x0, y0);
+    ctxErr.lineTo(x0, y1);
+    ctxErr.stroke();
+    for (var k = 0; k < vals.length; k++) {
+      var px = x0 + (k / (vals.length - 1)) * (x1 - x0);
+      ctxErr.fillStyle = '#6c8cff';
+      ctxErr.fillRect(px, y0 - (vals[k] + 1) / 2 * (y0 - y1) - 2, 2, 4);
+      ctxErr.fillStyle = '#fbbf24';
+      ctxErr.fillRect(px, y0 - (xh[k] + 1) / 2 * (y0 - y1) - 2, 2, 4);
+    }
+    ctxErr.fillStyle = '#8888a0';
+    ctxErr.font = '11px system-ui,sans-serif';
+    ctxErr.fillText('blue: float  orange: dequantized (clamped q)', x0, 14);
+  }
+  errBits.addEventListener('input', drawErrBits);
+  drawErrBits();
+
+  var clampT = document.getElementById('clampT');
+  var clampTVal = document.getElementById('clampTVal');
+  var cCl = document.getElementById('canvasClamp');
+  var ctxCl = cCl.getContext('2d');
+  function drawClamp() {
+    var t = parseFloat(clampT.value);
+    clampTVal.textContent = 't=' + t.toFixed(0);
+    var n = 8, qmax = Math.pow(2, n) - 1;
+    var beta = -50, alpha = 150;
+    var s = (alpha - beta) / qmax;
+    var Z = clamp(round(-beta / s), 0, qmax);
+    var rq = t / s + Z;
+    var q = clamp(round(rq), 0, qmax);
+    var Wc = cCl.width, Hc = cCl.height;
+    ctxCl.fillStyle = '#0e0e14';
+    ctxCl.fillRect(0, 0, Wc, Hc);
+    var barX = 80, barW = Wc - 160, baseY = Hc - 50;
+    ctxCl.fillStyle = '#2a2a3a';
+    ctxCl.fillRect(barX, baseY, barW, 14);
+    var fracRaw = clamp((rq - 0) / qmax, 0, 1.2);
+    var fracQ = q / qmax;
+    ctxCl.fillStyle = '#6c8cff';
+    ctxCl.fillRect(barX, baseY - 28, Math.min(barW, fracRaw * barW), 12);
+    ctxCl.fillStyle = '#fbbf24';
+    ctxCl.fillRect(barX, baseY + 22, fracQ * barW, 12);
+    ctxCl.fillStyle = '#8888a0';
+    ctxCl.font = '12px system-ui,sans-serif';
+    ctxCl.fillText('Blue: raw t/s+Z before clamp   Orange: clamped integer q', barX, baseY - 36);
+    ctxCl.fillText('s=' + s.toFixed(3) + '  Z=' + Z + '  q=' + q + '  x̂=' + (s * (q - Z)).toFixed(2), barX, 24);
+    if (round(rq) !== q) {
+      ctxCl.fillStyle = '#f87171';
+      ctxCl.fillText('Saturated (round would exceed [0, qmax])', barX, 44);
+    }
+  }
+  clampT.addEventListener('input', drawClamp);
+  drawClamp();
+
+  var landW = document.getElementById('landW');
+  var landWVal = document.getElementById('landWVal');
+  var cLand = document.getElementById('canvasLandscape');
+  var ctxLand = cLand.getContext('2d');
+  function lossFn(w) {
+    return 0.0008 * (w + 35) * (w + 35) + 0.00002 * (w - 40) * (w - 40) + 0.02;
+  }
+  function drawLand() {
+    var w = parseFloat(landW.value);
+    landWVal.textContent = 'w = ' + w.toFixed(1);
+    var grid = 4;
+    var wq = round(w / grid) * grid;
+    var L = lossFn(w);
+    var Lq = lossFn(wq);
+    var Wc = cLand.width, Hc = cLand.height;
+    ctxLand.fillStyle = '#0e0e14';
+    ctxLand.fillRect(0, 0, Wc, Hc);
+    var x0 = 50, x1 = Wc - 40, y0 = Hc - 40, y1 = 30;
+    var wmin = -100, wmax = 100;
+    var maxL = 0.35;
+    ctxLand.strokeStyle = '#2a2a3a';
+    ctxLand.beginPath();
+    for (var xi = x0; xi <= x1; xi += 5) {
+      ctxLand.moveTo(xi, y0);
+      ctxLand.lineTo(xi, y1);
+    }
+    ctxLand.stroke();
+    ctxLand.strokeStyle = '#6c8cff';
+    ctxLand.lineWidth = 2;
+    ctxLand.beginPath();
+    for (var px = x0; px <= x1; px++) {
+      var wi = wmin + (px - x0) / (x1 - x0) * (wmax - wmin);
+      var py = y0 - (lossFn(wi) / maxL) * (y0 - y1);
+      if (px === x0) ctxLand.moveTo(px, py);
+      else ctxLand.lineTo(px, py);
+    }
+    ctxLand.stroke();
+    ctxLand.lineWidth = 1;
+    var pxw = x0 + (w - wmin) / (wmax - wmin) * (x1 - x0);
+    var pyw = y0 - (L / maxL) * (y0 - y1);
+    ctxLand.fillStyle = '#34d399';
+    ctxLand.beginPath();
+    ctxLand.arc(pxw, pyw, 8, 0, Math.PI * 2);
+    ctxLand.fill();
+    var pxq = x0 + (wq - wmin) / (wmax - wmin) * (x1 - x0);
+    var pyq = y0 - (Lq / maxL) * (y0 - y1);
+    ctxLand.fillStyle = '#fbbf24';
+    ctxLand.beginPath();
+    ctxLand.arc(pxq, pyq, 8, 0, Math.PI * 2);
+    ctxLand.fill();
+    ctxLand.fillStyle = '#8888a0';
+    ctxLand.font = '12px system-ui,sans-serif';
+    ctxLand.fillText('Loss L(w)  ·  green: float w   ·  orange: quantized w', x0, 20);
+    ctxLand.fillText('L(w)=' + L.toFixed(4) + '   L(w_q)=' + Lq.toFixed(4), x0, Hc - 12);
+  }
+  landW.addEventListener('input', drawLand);
+  drawLand();
+
+  var pgInput = document.getElementById('pgInput');
+  var pgBits = document.getElementById('pgBits');
+  var pgBitsVal = document.getElementById('pgBitsVal');
+  var pgSym = document.getElementById('pgSym');
+  var pgAsym = document.getElementById('pgAsym');
+  var pgRun = document.getElementById('pgRun');
+  var pgModeSym = true;
+  function runPg() {
+    var raw = pgInput.value.split(',').map(function (s) { return parseFloat(s.trim()); }).filter(function (x) { return !isNaN(x); });
+    var n = parseInt(pgBits.value, 10);
+    pgBitsVal.textContent = String(n) + ' bits';
+    if (raw.length === 0) raw = [0];
+    var res = pgModeSym ? quantSymmetric(raw, n) : quantAsymmetric(raw, n);
+    var err = mse(raw, res.xh);
+    document.getElementById('pgStats').innerHTML =
+      '<div class="stat-box"><span class="label">Scale s</span><span class="value">' + res.s.toFixed(6) + '</span></div>' +
+      '<div class="stat-box"><span class="label">Zero-point Z</span><span class="value">' + (pgModeSym ? '0' : String(res.Z)) + '</span></div>' +
+      '<div class="stat-box"><span class="label">MSE</span><span class="value">' + err.toExponential(3) + '</span></div>' +
+      '<div class="stat-box"><span class="label">q range</span><span class="value">' + (pgModeSym ? '±' + res.qmax : '0…' + res.qmax) + '</span></div>';
+    document.getElementById('pgOut').textContent =
+      'x     = [' + raw.map(function (v) { return v.toFixed(3); }).join(', ') + ']\n' +
+      'q     = [' + res.q.join(', ') + ']\n' +
+      'x_hat = [' + res.xh.map(function (v) { return v.toFixed(4); }).join(', ') + ']';
+  }
+  pgBits.addEventListener('input', runPg);
+  pgSym.addEventListener('click', function () {
+    pgModeSym = true;
+    pgSym.classList.add('active');
+    pgAsym.classList.remove('active');
+    runPg();
+  });
+  pgAsym.addEventListener('click', function () {
+    pgModeSym = false;
+    pgAsym.classList.add('active');
+    pgSym.classList.remove('active');
+    runPg();
+  });
+  pgRun.addEventListener('click', runPg);
+  pgInput.addEventListener('change', runPg);
+  runPg();
+})();
+</script>
+</body>
+</html>

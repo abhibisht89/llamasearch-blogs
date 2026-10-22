@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activations, Gradients &amp; BatchNorm — Neural Networks: Zero to Hero</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.12) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.btn-sm { font-size: 0.75rem; padding: 4px 10px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; max-width: 340px; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.callout.danger { border-left-color: var(--danger); background: rgba(248,113,113,0.08); }
+.qa-box { border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin: 24px 0; background: var(--bg-card); }
+.qa-box .q { font-weight: 700; color: var(--text); margin-bottom: 0.75em; }
+.qa-box p { margin-bottom: 0.85em; }
+.qa-box p:last-child { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 80px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; }
+.ln { display: inline-block; width: 32px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 14px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.08); border-left: 2px solid var(--accent); margin-left: -16px; padding-left: 14px; }
+.line.new { background: rgba(52, 211, 153, 0.08); border-left: 2px solid var(--accent3); margin-left: -16px; padding-left: 14px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.85; text-decoration: underline dotted; }
+.ln.anno:hover { opacity: 1; }
+.code-note { padding: 12px 16px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; display: none; }
+.code-note strong { color: var(--accent); }
+.code-progression { margin: 28px 0; }
+.step-caption { margin-top: 12px; font-size: 0.9rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 16px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 16px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+canvas { border-radius: var(--radius); display: block; max-width: 100%; height: auto; background: var(--bg-card-alt); border: 1px solid var(--border); }
+.graph-wrap { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; min-height: 200px; position: relative; }
+.heatmap-grid { display: grid; gap: 2px; font-family: var(--mono); font-size: 0.65rem; }
+.heatmap-cell { border-radius: 2px; min-height: 10px; }
+.bn-pipeline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.8rem; margin: 16px 0; }
+.bn-box { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-alt); }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+.mini-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-dim); margin-top: 8px; }
+.mini-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+ul.tight { margin: 0 0 1em 1.2em; color: var(--text-dim); }
+ul.tight li { margin-bottom: 0.4em; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">NN Zero to Hero</a><span class="bc-sep">›</span><span class="bc-current">Activations, Gradients &amp; BatchNorm</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Neural Networks: Zero to Hero</a>
+  <div class="nav-links">
+    <a href="#s0">Recap</a><a href="#s1">Why now</a><a href="#s2">Forward</a><a href="#s3">Tanh</a><a href="#s4">Histograms</a>
+    <a href="#s5">Init</a><a href="#s6">BatchNorm</a><a href="#s7">γ β</a><a href="#s8">Train/Inf</a><a href="#s9">Why BN</a>
+    <a href="#s10">Gradients</a><a href="#s11">Xavier/Kaiming</a><a href="#s12">Residuals</a><a href="#s13">Together</a><a href="#s14">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Activations, Gradients &amp; BatchNorm</h1>
+    <p class="subtitle">A code-centered tour of hidden-layer statistics, <code>tanh</code> saturation, principled weight initialization, and batch normalization — the machinery that keeps deep nets trainable before we stack recurrence on top.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">14</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">7</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:760px;margin:0 auto;">
+      You will connect the Bengio-style character <code>MLP</code> to the real problems that appear in deeper models: logits that are “confidently wrong,” <code>tanh</code> tails that zero out gradients, <code>fan_in</code> scaling, <code>torch.nn.init.kaiming_normal_</code>, and <code>BatchNorm</code> with running statistics — plus a forward-looking hint at residual shortcuts.
+    </p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Recap: Bengio-style MLP, ~11K parameters, loss near 2.16</h2>
+    <p>We continue the same <strong>character-level</strong> Bengio-style <code>MLP</code> from the previous chapter (~11K parameters, validation loss near <code>~2.16</code>) — a tiny model that already exposes the scale and saturation problems this chapter fixes.</p>
+    <div class="callout">
+      <p><strong>Sanity check:</strong> at initialization, if logits are well behaved, the <strong>negative log-likelihood</strong> should be close to <code>-log(1/27) ≈ 3.30</code>, not <code>27</code> or <code>∞</code>. Giant initial loss usually means the softmax is <em>confidently wrong</em>, not that the task is harder.</p>
+    </div>
+    <div class="formula">𝔼[ NLL at uniform guesses ] = −log(1/V) &nbsp; (V = vocabulary size, e.g. 27)</div>
+    <p>The running example uses on the order of <strong>32,000</strong> name-like strings; the notebook prints a handful (eight) as a sanity preview. Optimization can run for <strong>200,000</strong> update steps with <strong>batch size 32</strong> — shallow enough that sloppy initialization still “eventually works,” but noisy enough that the early loss curve tells a story.</p>
+    <p>On iteration zero, a badly scaled head can report a loss on the order of <strong>27</strong> for a 27-way problem. That is not “the task got harder”; it is almost always <strong>confident wrongness</strong> in the softmax. The target for a near-uniform predictive distribution is <code>−log(1/27) ≈ 3.29</code> (tiny differences from <code>3.30</code> are rounding). Shrinking <code>W2</code> pulls logits toward zero: scaling by <strong>0.1</strong> might still leave you around <strong>4.2</strong> NLL on the first step, while <strong>0.01</strong> lands near <strong>3.32</strong> — close enough that training spends its budget on the model rather than on squashing logits.</p>
+    <div class="callout ok">
+      <p><strong>Uniform softmax without all-zero logits:</strong> if every logit is the <em>same</em> constant (e.g. all ones), softmax still returns a uniform distribution because only <em>differences</em> matter. By symmetry we still initialize near <strong>zero</strong> for convenience. Setting <code>W2</code> exactly to zero would give a perfectly flat start but removes diversity; a tiny random break in scale keeps symmetry breaking live.</p>
+    </div>
+    <p>In a toy vocabulary of <strong>four</strong> symbols, logits near zero give a perfectly diffuse softmax; the NLL for <em>any</em> label index is <strong>1.38</strong> — the same number whether the true class is 0, 1, 2, or 3. Push logits to more extreme values and one bucket tends to dominate incorrectly, inflating loss; push them toward infinity and numerical issues can blow up to effectively infinite loss at initialization.</p>
+    <p>After fixing the head, train and validation loss in the reference run often sit near <strong>2.16</strong>. The loss curve’s <strong>hockey stick</strong> — a steep early drop followed by slower progress — is the telltale signature of the optimizer first crushing overconfident logits before it rearranges predictions to fit the data. Removing that pathology reallocates steps to “real” learning.</p>
+    <p>Wrapping evaluation in <code>@torch.no_grad()</code> (or <code>with torch.no_grad():</code>) tells PyTorch not to build the autograd graph for that code path — faster, less memory, appropriate whenever you are only measuring loss or sampling.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Why study activations and gradients before RNNs?</h2>
+    <p><strong>Recurrent models</strong> (and their gated relatives) are staggeringly expressive: in principle they are <strong>universal approximators</strong>. The painful part is not representational power but <strong>optimization</strong> — first-order methods such as SGD and Adam wander a landscape shaped by repeated composition, repeated nonlinearities, and long credit-assignment paths.</p>
+    <p>If you do not know what <em>hidden pre-activations</em> look like, what <em>saturated</em> <code>tanh</code> does to backward signals, or why <code>fan_in</code> appears under a square root, RNN training will feel like arbitrary wizardry. The shallow <code>MLP</code> is the cleanest microscope: all the same mechanisms appear — just with fewer places for error to compound.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Expressivity</h3>
+        <p>RNNs can represent complex temporal maps; depth-through-time stacks many nonlinear layers when unrolled.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--danger);">Optimization</h3>
+        <p>Gradients can vanish or explode across time steps; activation statistics drift; careful init and normalization become essential.</p>
+      </div>
+    </div>
+    <p>Historically, practitioners had to babysit activations and gradients with almost painful care — histograms, gains, and nonlinearity-specific scaling. <strong>Residual connections</strong>, <strong>normalization layers</strong> (batch, layer, group, instance), and optimizers beyond vanilla SGD — <strong>RMSprop</strong>, <strong>Adam</strong>, and their descendants — greatly widened the basin of “good enough” initialization. None of that removes the value of the shallow <code>MLP</code> microscope: the same failure modes still exist; they simply compound when depth and recurrence enter the picture.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>First forward pass: what hides inside <code>h</code>?</h2>
+    <p>Flattened embeddings feed a linear map <code>h_preact = embcat @ W1 + b1</code>, then <code>h = torch.tanh(h_preact)</code>. The <strong>loss</strong> only talks to the head, but <strong>learning in <code>W1</code></strong> must backpropagate through <code>tanh</code>. If <code>h</code> is mostly pinned to <code>±1</code>, most hidden units sit in flat regions where small input changes barely move the output — and backward signals shrink accordingly.</p>
+    <p>Concrete shapes from the reference setup: with batch size <strong>32</strong> and <strong>200</strong> hidden units, <code>h</code> is a <strong>32×200</strong> tensor. Histograms are easier to read after <code>h.reshape(-1)</code> (or equivalent) to a single vector of <code>32 × 200 = 6,400</code> scalars, then <code>tolist()</code> for Matplotlib. The pre-activation tensor has the same shape before the nonlinearity squashes each element into <code>(−1, 1)</code>.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Instrumenting activations</h3>
+        <p>After the first forward on a batch, reshape <code>h</code> to a 1-D list of scalars and histogram it. Compare that histogram to the distribution of <code>h_preact</code>: broad pre-activations predict a <strong>saturated</strong> post-<code>tanh</code> histogram.</p>
+        <div class="jupyter-cell">
+          <div class="cell-header">
+            <span class="cell-label">Inspect</span>
+            <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+          </div>
+          <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="cmt"># shapes: h is (batch, n_hidden)</span></code>
+<code><span class="line"><span class="ln">2</span>flat = h.<span class="fn">reshape</span>(<span class="op">-</span><span class="num">1</span>).<span class="fn">tolist</span>()</code>
+<code><span class="line hl"><span class="ln">3</span>plt.<span class="fn">hist</span>(flat, bins=<span class="num">50</span>); plt.<span class="fn">title</span>(<span class="str">'h after tanh'</span>)</code></pre>
+          <div class="cell-output" style="display:none;">
+            <span class="cell-label out-label">Typical</span>
+            <pre class="output-text">mass piles up near -1 and +1 when pre_tanh spread is wide</pre>
+          </div>
+        </div>
+      </div>
+      <div class="code-panel">
+        <div class="code-header">
+          <span class="code-filename">makemore_mlp.py</span>
+          <span class="code-lines">L112–128 / ~220</span>
+        </div>
+        <pre class="code-block annotated"><code><span class="line" data-note="Concatenate embedded characters for the context window."><span class="ln anno" title="Click for explanation">112</span>emb_cat = torch.<span class="fn">cat</span>([emb[i] <span class="kw">for</span> i <span class="kw">in</span> ix], dim=<span class="num">1</span>)</code>
+<code><span class="line" data-note="Linear pre-activation into the hidden layer."><span class="ln anno" title="Click for explanation">115</span>h_preact = emb_cat <span class="op">@</span> W1 <span class="op">+</span> b1</code>
+<code><span class="line hl" data-note="Elementwise squashing — where saturation bites."><span class="ln anno" title="Click for explanation">116</span>h = torch.<span class="fn">tanh</span>(h_preact)</code>
+<code><span class="line" data-note="Logits for next-character prediction."><span class="ln anno" title="Click for explanation">118</span>logits = h <span class="op">@</span> W2 <span class="op">+</span> b2</code></pre>
+        <div class="code-note" id="codeNoteS2"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2><code>tanh</code> saturation and “dead” behavior</h2>
+    <p>For output <code>t = tanh(x)</code>, the local derivative is <code>1 − t²</code>. When <code>t → ±1</code>, that factor <strong>→ 0</strong>: upstream gradients are multiplied by nearly zero, so updates to earlier weights slow dramatically. Intuitively, in the tail the curve is flat — nudging inputs barely moves outputs, so the loss is locally insensitive.</p>
+    <p>Tracing the chain rule the way we did for micrograd-style autodiff: backward through <code>tanh</code> multiplies the incoming adjoint by <code>1 − t²</code> where <code>t</code> is the forward output. If <code>t = 1</code> or <code>t = −1</code>, the local Jacobian is <strong>zero</strong> and no upstream signal reaches <code>x</code>, no matter how large <code>∂L/∂t</code> might be. At <code>t = 0</code>, the local factor is <strong>one</strong>, so the gradient passes through unchanged — the unit is in its most “active” region. Between those extremes, the factor is always <strong>at most</strong> one; moving deeper into the tails monotonically <em>attenuates</em> backward flow, with the attenuation growing like the square of how close <code>|t|</code> is to one.</p>
+    <div class="formula">d/dx tanh(x) = 1 − tanh²(x) &nbsp;&nbsp; (chain rule multiplies this into ∂L/∂x)</div>
+    <div class="callout danger">
+      <p><strong>Dead neurons (informal):</strong> a unit is effectively “dead” if it never leaves a bad region — for <code>tanh</code>, stuck in saturation; for <code>ReLU</code>, never activating so the slope is identically zero. If an entire column across the batch saturates the same way, that feature may never receive useful credit assignment.</p>
+    </div>
+    <p>Picture the boolean mask as a <strong>32×200</strong> grid: rows are examples, columns are hidden units — <strong>white</strong> for saturated positions, <strong>black</strong> for steep ones. A column that is white for every row is pathological: that neuron presents zero slope to the backward pass for the whole batch.</p>
+    <p>The same “killed backward signal” story applies to <strong>sigmoid</strong> tails for the same geometric reason: squashing onto a bounded interval creates flat regions. For <strong>ReLU</strong>, the dead region is not a tail but the entire negative half-line, where the derivative is <strong>exactly zero</strong> rather than merely tiny. A ReLU that never fires for any training input never receives gradients — weights and bias for that unit freeze. That can happen at init by bad luck, or <strong>during</strong> training if a large update “knocks” a unit off the data manifold so nothing ever activates it again — sometimes described informally as a form of permanent damage to a slice of the network. <strong>Leaky ReLU</strong>-style nonlinearities leak a small slope on the negative side, so you almost always get <em>some</em> gradient; <strong>ELU</strong> can still have flat pieces worth watching.</p>
+    <p>A useful diagnostic masks positions where <code>|h| &gt; 0.99</code>. Lots of white pixels means many examples sit on the flat tails. The network may still train if every neuron occasionally lands in the active region, but learning is slower and noisier than necessary.</p>
+    <div class="interactive-panel">
+      <h3>Tanh saturation visualizer</h3>
+      <p>Drag <code>x</code>. The curve shows <code>tanh(x)</code>; the bar indicates local derivative <code>1−tanh²(x)</code> (scaled for visibility).</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="color:var(--text-dim);">x =</label>
+        <input type="range" id="tanhSatSlider" min="-500" max="500" value="0" aria-label="tanh input">
+        <span class="slider-value" id="tanhSatX">0.00</span>
+      </div>
+      <canvas id="tanhSatCanvas" width="640" height="240"></canvas>
+      <p class="step-caption" id="tanhSatCaption"></p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Histograms: seeing the distribution, not just the tensor</h2>
+    <p>Raw tensor printouts hide structure. A <strong>histogram</strong> of <code>h</code> reveals whether mass clusters at the rails. Matching plots for <code>h_preact</code> explain <em>why</em>: if pre-activations span a wide range (say −5 to 15), <code>tanh</code> has already decided most signs and magnitudes.</p>
+    <p>In the unfixed reference run, pre-activations commonly land in a band like <strong>about −5 to about +15</strong> while post-<code>tanh</code> values pile up near <strong>−1</strong> and <strong>+1</strong>. Hand-scaling <code>W1</code> (and shrinking <code>b1</code>) pulls that cloud inward: after multiplying weights by <strong>0.1</strong>, a typical batch might show pre-activations roughly in <strong>[−1.5, 1.5]</strong>, the saturation mask can go <strong>completely dark</strong> (no <code>|h| &gt; 0.99</code>), and optimization becomes materially more efficient. Tweaking toward <strong>0.2</strong> by eye trades off a bit more spread against still-reasonable tail mass.</p>
+    <div class="callout warn">
+      <p><strong>Deeper stacks use stricter saturation metrics too:</strong> when you instrument many <code>tanh</code> layers in a single forward pass, tracking the fraction with <code>|t| &gt; 0.97</code> (instead of <code>0.99</code>) can better match how quickly derivatives die in the shoulders of the curve. The qualitative story is unchanged: you want most mass away from the rails so both forward dynamics and backward Jacobians stay informative.</p>
+    </div>
+    <div class="interactive-panel">
+      <h3>Activation histogram explorer</h3>
+      <p>We synthesize pre-activations as <code>z = gain * ε</code> with <code>ε ~ Normal(0,1)</code>, then plot <code>tanh(z)</code>. Raise <code>gain</code> to watch the post-<code>tanh</code> histogram sharpen into two spikes.</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="color:var(--text-dim);">gain =</label>
+        <input type="range" id="histGainSlider" min="5" max="300" value="100" aria-label="gain">
+        <span class="slider-value" id="histGainVal">1.00</span>
+      </div>
+      <canvas id="histCanvas" width="640" height="260"></canvas>
+      <p class="step-caption">Higher gain ⇒ wider pre-tanh Gaussian ⇒ more saturation mass near ±1.</p>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">Stats</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>sat = h.<span class="fn">abs</span>() <span class="op">&gt;</span> <span class="num">0.99</span></code>
+<code><span class="line hl"><span class="ln">2</span><span class="fn">print</span>(<span class="str">"fraction saturated:"</span>, sat.<span class="fn">float</span>().<span class="fn">mean</span>().<span class="fn">item</span>())</code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out</span>
+        <pre class="output-text">fraction saturated: 0.41  # example — depends on init</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Weight initialization: <code>fan_in</code> and Kaiming scaling</h2>
+    <p><strong>Fan-in</strong> is the number of inputs contributing to each neuron’s dot product — for <code>W1</code>, that is <code>block_size * n_embd</code> (e.g., 3×10 = 30), not just <code>n_embd</code>. Each output is a sum of <code>fan_in</code> weighted inputs; variances add, so without scaling the <strong>standard deviation grows</strong> roughly with <code>√fan_in</code>.</p>
+    <p>A minimal linear algebra experiment makes the scaling visceral. Take <code>X ∈ ℝ^{1000×10}</code> with entries drawn from a standard normal, and <code>W</code> with the same shape convention as a single linear map so each of the <strong>200</strong> hidden neurons looks at <strong>10</strong> inputs (the demo’s toy fan-in). If entries of <code>W</code> are also standard normal, the <strong>per-neuron</strong> pre-activations (dot products) need not stay <code>𝒩(0,1)</code>: empirically the standard deviation of those scalars <strong>inflates</strong> from input scale <strong>1</strong> to output scale about <strong>3</strong> before any correction. Multiplying <code>W</code> by <strong>5</strong> pushes variation harder (roughly <strong>15</strong> in that demonstration); scaling by <strong>0.2</strong> shrinks it (roughly <strong>0.6</strong>). The variance-preserving choice for this linear map is to divide by <strong>√fan_in</strong>; with <code>fan_in = 10</code>, that means scaling by <code>1/√10 = 10^{-0.5}</code>, which lands the empirical standard deviation back near <strong>one</strong>.</p>
+    <p>To keep pre-activations near unit scale, draw weights from a zero-mean distribution whose standard deviation is proportional to <code>1/√fan_in</code>. <strong>Kaiming He</strong> and co-authors analyze this deeply in <cite>Delving Deep into Rectifiers</cite>, focusing on <strong>ReLU</strong> / PReLU families in convolutional stacks. Their forward-pass analysis motivates initializing Gaussian weights with standard deviation <code>√(2/fan_in)</code> for ReLU — the extra factor of <strong>2</strong> compensates for zeroing half the pre-activation mass. They also study backward propagation and find that a careful forward scaling keeps backward statistics in a sane regime up to modest depth-dependent constants; empirically the exact fan-in versus fan-out choice matters less than getting the order of magnitude right.</p>
+    <p>PyTorch’s <code>kaiming_normal_</code> encodes this story: <code>nonlinearity='relu'</code> uses gain <code>√2</code>; <code>'linear'</code> uses gain <strong>1</strong>; <code>'tanh'</code> uses gain <strong>5/3</strong>. Intuitively, <code>tanh</code> is <strong>contractive</strong>: like ReLU clipping negatives, it squeezes tails toward the interior of <code>(−1,1)</code>. The gain <strong>boosts</strong> linear pre-activations slightly so that, <em>after</em> the squashing, activations still occupy a Gaussian-ish operating range rather than collapsing toward zero variance.</p>
+    <div class="formula">σ ≈ gain / √(fan_in) &nbsp;&nbsp; (Kaiming normal, fan-in mode)</div>
+    <p>For the character <code>MLP</code>, <code>fan_in</code> on <code>W1</code> is <strong>30</strong> (three embedded characters, each of dimension <strong>10</strong>), not <strong>10</strong>. Hand tuning by staring at histograms might land near scaling <code>W1</code> by about <strong>0.2</strong>; the Kaiming formula <code>(5/3)/√30</code> is in the same ballpark (≈<strong>0.30</strong>) without eyeballing plots. Training with that principled scale reaches essentially the same validation loss (about <strong>2.10</strong>) as the hand-picked scalar — the win is <em>portability</em> to wider and deeper nets.</p>
+    <p>Depth magnifies small mistakes: a <strong>fifty-layer</strong> feedforward network can fail outright when each layer multiplies Jacobian norms the wrong way, even though shallow nets forgive sloppy scales. Residual wiring, batch or layer normalization, and adaptive optimizers widened what “works,” but pre-activation variance, local derivatives, and how they compound still explain <em>why</em> those fixes help.</p>
+    <div class="interactive-panel">
+      <h3>Initialization comparison (simulated linear layer)</h3>
+      <p>Input <code>x ∈ ℝ^{1000×10}</code> with standard normal entries. Compare output std after <code>y = x @ Wᵀ</code> for random <code>W</code> with different per-entry scales.</p>
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="setInitMode(this,'random')">Too large</button>
+        <button type="button" class="btn" onclick="setInitMode(this,'xavier')">1/√fan_in</button>
+        <button type="button" class="btn" onclick="setInitMode(this,'kaiming')">Kaiming tanh</button>
+      </div>
+      <pre class="output-text" id="initStatsOut" style="margin-top:12px;background:var(--bg-card);padding:12px;border-radius:8px;border:1px solid var(--border);"></pre>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Applying Kaiming init in practice</h3>
+        <p>After allocating <code>W1</code>, <code>W2</code>, call <code>kaiming_normal_</code> with the nonlinearity that follows each matrix multiply. Keep output logits from starting “confidently wrong” by also scaling down <code>W2</code> (or zeroing <code>b2</code>) so initial logits sit near zero.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header">
+          <span class="code-filename">weights.py</span>
+          <span class="code-lines">L8–22 / 40</span>
+        </div>
+        <pre class="code-block annotated"><code><span class="line"><span class="ln">8</span><span class="kw">import</span> torch.nn <span class="kw">as</span> nn</code>
+<code><span class="line hl" data-note="Matches the following tanh — PyTorch uses gain ≈ 5/3 for tanh in Kaiming init."><span class="ln anno" title="Click for explanation">9</span>torch.nn.init.<span class="fn">kaiming_normal_</span>(W1, mode=<span class="str">'fan_in'</span>, nonlinearity=<span class="str">'tanh'</span>)</code>
+<code><span class="line"><span class="ln">10</span>torch.nn.init.<span class="fn">kaiming_normal_</span>(W2, mode=<span class="str">'fan_in'</span>, nonlinearity=<span class="str">'linear'</span>)</code>
+<code><span class="line hl" data-note="Shrinks logits so softmax starts near uniform — avoids huge initial NLL."><span class="ln anno" title="Click for explanation">11</span>W2.<span class="fn">data</span> <span class="op">*=</span> <span class="num">0.01</span>  <span class="cmt"># keep initial logits near 0</span></code>
+<code><span class="line"><span class="ln">12</span>b1.<span class="fn">data</span> <span class="op">*=</span> <span class="num">0.01</span>; b2.<span class="fn">data</span> <span class="op">*=</span> <span class="num">0</span></code></pre>
+        <div class="code-note" id="codeNoteS5"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Batch Normalization (Ioffe &amp; Szegedy, 2015)</h2>
+    <p><strong>BatchNorm</strong> entered practice from a <strong>2015</strong> Google research effort (Sergey Ioffe and Christian Szegedy) and quickly became one of the most reliable tools for training <em>deep</em> convolutional and feedforward models. The core empirical observation is easy to state: many networks benefit if hidden activations behave like well-scaled, approximately Gaussian signals — not so tiny that nonlinearities are inert, not so huge that saturating squashing kills gradients.</p>
+    <div class="callout">
+      <p>Ioffe and Szegedy write: <em>“We refer to this phenomenon as <strong>internal covariate shift</strong>, and address the problem by normalizing layer inputs.”</em> The preceding sentences in the same passage emphasize that, during training, each layer sees inputs whose distribution moves as earlier layers change — which tends to demand smaller learning rates, careful initialization, and makes saturating nonlinearities harder to optimize. Batch normalization targets that moving distribution directly.</p>
+    </div>
+    <p><strong>BatchNorm</strong> standardizes activations using statistics computed <em>across the batch</em> (for each feature channel), then applies learnable <strong>scale</strong> and <strong>shift</strong>. The operation is differentiable end-to-end, so gradients tune not only weights but also how aggressively each unit re-centers and rescales its inputs.</p>
+    <p>The “mind-blown” implementation detail is that <strong>standardizing activations is a smooth, differentiable transformation</strong> of tensors. You are allowed to subtract a batch mean and divide by a batch standard deviation inside a model trained with backprop — nothing here is a discrete decision rule. The subtlety is that <em>always</em> enforcing exact unit Gaussian behavior would rob the network of representational freedom; that is why the paper pairs normalization with <strong>scale and shift</strong> parameters.</p>
+    <div class="formula">x̂ᵢ = (xᵢ − μ<sub>B</sub>) / √(σ²<sub>B</sub> + ε) &nbsp;&nbsp; yᵢ = γ x̂ᵢ + β</div>
+    <p>Here <code>μ<sub>B</sub></code> and <code>σ²<sub>B</sub></code> are the batch mean and <strong>variance</strong> (per neuron). The reference implementation follows the paper’s convention of tracking <strong>running variance</strong>, not running standard deviation, under the hood — squaring and square-root relate the two, but the buffer semantics match the variance form. <code>γ</code> (<code>weight</code> in PyTorch <code>BatchNorm1d</code>) and <code>β</code> (<code>bias</code>) start near <code>1</code> and <code>0</code> so the layer begins life close to pure standardization.</p>
+    <p>Worked on paper for a batch of shape <strong>32×200</strong>: for each of the <strong>200</strong> neurons, compute the mean across the <strong>32</strong> examples — a vector shaped <strong>1×200</strong> if you use <code>keepdim=True</code> along dimension <strong>0</strong>. Compute the variance the same way (conceptually, average squared deviations from that mean). After normalization, <em>within this batch</em>, each neuron’s <strong>32</strong> values have zero mean and unit variance before <code>γ, β</code>. That per-batch constraint is why the method carries the word <strong>batch</strong> in its name.</p>
+    <div class="interactive-panel">
+      <h3>BatchNorm live pipeline</h3>
+      <p>Adjust synthetic batch values (three scalars per feature). Watch <strong>normalize → γ·x̂+β</strong>.</p>
+      <div class="two-col" style="margin-top:12px;">
+        <div>
+          <label class="text-dim" style="color:var(--text-dim);font-size:0.85rem;">x₁</label>
+          <input type="range" id="bnx1" min="-300" max="300" value="50" oninput="renderBNPipe()">
+        </div>
+        <div>
+          <label class="text-dim" style="color:var(--text-dim);font-size:0.85rem;">x₂</label>
+          <input type="range" id="bnx2" min="-300" max="300" value="-80" oninput="renderBNPipe()">
+        </div>
+        <div>
+          <label class="text-dim" style="color:var(--text-dim);font-size:0.85rem;">x₃</label>
+          <input type="range" id="bnx3" min="-300" max="300" value="120" oninput="renderBNPipe()">
+        </div>
+        <div>
+          <label class="text-dim" style="color:var(--text-dim);font-size:0.85rem;">γ</label>
+          <input type="range" id="bng" min="50" max="250" value="100" oninput="renderBNPipe()">
+        </div>
+        <div>
+          <label class="text-dim" style="color:var(--text-dim);font-size:0.85rem;">β</label>
+          <input type="range" id="bnb" min="-200" max="200" value="0" oninput="renderBNPipe()">
+        </div>
+      </div>
+      <div class="bn-pipeline" id="bnPipeline"></div>
+      <pre class="output-text" id="bnMathOut" style="margin-top:8px;background:var(--bg-card-alt);padding:12px;border-radius:8px;border:1px solid var(--border);"></pre>
+    </div>
+    <p><strong>Where to sit BatchNorm in the block:</strong> the most common pattern is <code>Linear → BatchNorm → tanh</code> (or <code>Conv → BatchNorm → ReLU</code> in vision). Practitioners have also experimented with normalization <em>after</em> the nonlinearity with similar empirical success in some settings; the lesson is that the invariant is <strong>controlled scale entering the next affine map</strong>, not a religious rule about which side of the squashing nonlinearity must host the statistics.</p>
+    <p>On the single-hidden-layer name model, validation loss with manual batch normalization lands around <strong>2.10</strong>, essentially matching a well-tuned initialization without BN — expected, because you can still analytically set one layer’s scales. The payoff appears when depth, residual wiring, and heterogeneous blocks make closed-form scaling intractable; then “sprinkling” normalization after every matmul-like op is engineering time better spent than chasing per-tensor magic numbers.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Normalize, then scale (<code>γ</code>) and shift (<code>β</code>)</h2>
+    <p>Pure standardization would force every neuron’s batch statistics to <code>mean=0</code>, <code>var=1</code> — too rigid. The network may need a different operating point. Trainable <code>γ</code> and <code>β</code> restore <strong>expressivity</strong>: the layer can undo or reshape normalization when that helps the loss.</p>
+    <p>Optimization may want a sharper or more diffuse firing pattern for some units — some hidden features “trigger-happy,” others reluctant — even if the pre-normalized batch statistics drift. The affine parameters let SGD discover that: <code>γ</code> rescales the normalized channel; <code>β</code> recenters it. Include <code>bn_gain</code> and <code>bn_bias</code> in the parameter list passed to the optimizer alongside weights; they receive gradients every bit as legitimate as entries of <code>W1</code>.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Manual BatchNorm snippet</h3>
+        <p>Along dim <code>0</code> (batch), compute mean and variance, normalize, then combine with broadcast <code>γ, β</code> shaped <code>(1, n_hidden)</code>.</p>
+        <div class="callout warn">
+          <p><strong>ε</strong> stabilizes division when variance hits zero (rare with real data, possible in tiny batches).</p>
+        </div>
+      </div>
+      <div class="code-panel">
+        <div class="code-header">
+          <span class="code-filename">batchnorm_manual.py</span>
+          <span class="code-lines">L20–36 / 60</span>
+        </div>
+        <pre class="code-block annotated"><code><span class="line" data-note="Mean across batch for each hidden unit."><span class="ln anno" title="Click for explanation">20</span>mean = h_preact.<span class="fn">mean</span>(<span class="num">0</span>, keepdim=<span class="kw">True</span>)</code>
+<code><span class="line" data-note="Variance across batch — PyTorch uses unbiased Bessel correction in training BN modules; manual demos often use simple batch variance."><span class="ln anno" title="Click for explanation">21</span>var = h_preact.<span class="fn">var</span>(<span class="num">0</span>, keepdim=<span class="kw">True</span>)</code>
+<code><span class="line hl" data-note="Standardize to ~zero mean, unit variance per column."><span class="ln anno" title="Click for explanation">22</span>h_norm = (h_preact <span class="op">-</span> mean) <span class="op">/</span> torch.<span class="fn">sqrt</span>(var <span class="op">+</span> <span class="num">1e-5</span>)</code>
+<code><span class="line" data-note="Learnable affine — restores representational freedom."><span class="ln anno" title="Click for explanation">23</span>out = bn_gain <span class="op">*</span> h_norm <span class="op">+</span> bn_bias</code></pre>
+        <div class="code-note" id="codeNoteS7"></div>
+      </div>
+    </div>
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Before BN</h3>
+        <p>Pre-activations drift with depth; <code>tanh</code> may saturate; gradients attenuate unpredictably.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent);">After BN</h3>
+        <p>Per-batch statistics pinned (then relaxed by <code>γ,β</code>); activations stay in a <code>tanh</code>-friendly range; training deep stacks becomes feasible.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Training vs inference: batch stats vs running averages</h2>
+    <p><strong>Training:</strong> use the current minibatch mean and variance — fast, noisy, couples examples in the same forward pass. <strong>Inference:</strong> you often want a deterministic map for a single example. The standard fix maintains <strong>running</strong> estimates of mean and variance updated during training (exponential moving average), then swaps them in when <code>model.eval()</code> is set.</p>
+    <div class="formula">running ← (1−m)·running + m·batch_stat</div>
+    <p>PyTorch’s <code>momentum</code> argument relates to how aggressively each step replaces the running estimate; tiny batches sometimes need gentler updates than large ones because batch statistics are high-variance.</p>
+    <p>A conceptually clean two-stage approach — train, then <strong>calibrate</strong> by scanning the entire training set once under <code>torch.no_grad()</code>, collecting per-neuron means and variances of pre-activations, and freezing those numbers for deployment — matches the story on paper. Almost nobody wants a separate calibration pass in production pipelines, which motivated <strong>online</strong> trackers. A manual EMA might look like <code>running ← 0.99 · running + 0.001 · batch_stat</code>: almost all mass on the old estimate, a tiny nudge from each new minibatch. Those buffers are <strong>not</strong> optimized with gradient descent; wrap their updates in <code>no_grad</code> so PyTorch does not build gigantic graphs for bookkeeping tensors that never receive a backward signal.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>PyTorch default <code>momentum ≈ 0.1</code></h3>
+        <p>Works well when batch statistics are already low-variance — for example, <strong>large</strong> minibatches where mean and variance estimates do not thrash step to step.</p>
+      </div>
+      <div class="card">
+        <h3>Small batches (e.g. 32)</h3>
+        <p>Noisier batch moments may need a <strong>smaller</strong> effective step on the running buffers (closer to the <code>0.001</code> illustration) so the EMA converges toward dataset-level statistics instead of chasing sampling noise.</p>
+      </div>
+    </div>
+    <p>Initialize running mean near <strong>zero</strong> and running variance near <strong>one</strong> when earlier layers already produce roughly unit-variance Gaussians at startup — that matches the typical default story and avoids a cold-start bias.</p>
+    <p><code>eps</code> defaults to about <strong>1e-5</strong> — the same small constant added inside the square root so division never sees a hard zero variance. <code>affine=True</code> keeps the trainable <code>γ, β</code>; turning it off is rare. <code>track_running_stats=True</code> enables the running buffers updated during training; set it <code>False</code> only if you intentionally plan to estimate population moments in a separate calibration pass and do not want the module to maintain EMA state you will discard.</p>
+    <div class="code-progression">
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="showStep(this,'bnStep1')">Train mode</button>
+        <button type="button" class="btn" onclick="showStep(this,'bnStep2')">Running buffers</button>
+        <button type="button" class="btn" onclick="showStep(this,'bnStep3')">Eval mode</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header">
+          <span class="code-filename">bn_modes.py</span>
+          <span class="code-lines" id="bnStepLines">Step 1 of 3</span>
+        </div>
+        <pre class="code-block" id="bnStep1"><code><span class="line"><span class="ln">1</span><span class="kw">if</span> training:</code>
+<code><span class="line hl"><span class="ln">2</span>    μ, σ² = batch_mean_var(x)</code>
+<code><span class="line"><span class="ln">3</span>    x̂ = (x <span class="op">-</span> μ) <span class="op">/</span> sqrt(σ² <span class="op">+</span> ε)</code></pre>
+        <pre class="code-block" id="bnStep2" style="display:none"><code><span class="line"><span class="ln">4</span>    running_mean <span class="op">←</span> (<span class="num">1</span><span class="op">-</span>m)<span class="op">*</span>running_mean <span class="op">+</span> m<span class="op">*</span>μ</code>
+<code><span class="line hl new"><span class="ln">5</span>    running_var <span class="op">←</span> (<span class="num">1</span><span class="op">-</span>m)<span class="op">*</span>running_var <span class="op">+</span> m<span class="op">*</span>σ²</code></pre>
+        <pre class="code-block" id="bnStep3" style="display:none"><code><span class="line"><span class="ln">6</span><span class="kw">else</span>:  <span class="cmt"># inference / eval</span></code>
+<code><span class="line hl"><span class="ln">7</span>    x̂ = (x <span class="op">-</span> running_mean) <span class="op">/</span> sqrt(running_var <span class="op">+</span> ε)</code>
+<code><span class="line"><span class="ln">8</span>y = γ <span class="op">*</span> x̂ <span class="op">+</span> β</code></pre>
+      </div>
+      <p class="step-caption" id="bnStepCaption">Training uses live batch moments; eval freezes running statistics for single-example forwards.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Why BatchNorm helps optimization</h2>
+    <p>By keeping intermediate activations near a <strong>Gaussian-ish</strong> operating region, BN reduces internal covariate shift — the tendency of layer inputs to drift as earlier parameters move. Nonlinearities like <code>tanh</code> behave more predictably when inputs sit near their steepest slopes rather than deep in the tails.</p>
+    <p>For a <strong>shallow</strong> net you can sometimes hand-tune <code>1/√fan_in</code> scaling so BN adds little marginal gain. For <strong>deep</strong> stacks mixing convolutions, skip connections, and heterogeneous blocks, sprinkling normalization after affine layers is far easier than a global closed-form scale for every tensor.</p>
+    <p>Before batch normalization, a minibatch was just a parallelization trick: each example could have been processed independently. With BN, the normalized values for example <em>i</em> depend on which other indices landed in the same minibatch — re-sample the batch and the logits <strong>jitter</strong> slightly even when example <em>i</em> is unchanged, because the mean and variance estimators move. That batch coupling often acts like mild implicit <strong>regularization</strong>, which is one reason alternatives (<strong>layer norm</strong>, <strong>instance norm</strong>, <strong>group norm</strong>) exist for settings where decoupled per-example dynamics matter more.</p>
+    <div class="callout warn">
+      <p><strong>Biases before BN:</strong> a linear bias added immediately before mean-centering is often <em>redundant</em> — subtracting the batch mean cancels constant offsets. Common pattern: <code>Linear(..., bias=False)</code> followed by <code>BatchNorm</code>, letting <code>β</code> handle shifts.</p>
+    </div>
+    <p>In a bare manual implementation, if you keep <code>b1</code> in <code>h_preact = x @ W1 + b1</code> and then subtract the per-column batch mean, the constant bias cancels identically from the centered activations. <code>b1.grad</code> can sit at <strong>zero</strong> forever — not catastrophic, but wasteful. Prefer moving “where should this feature sit?” into <code>β</code> (and deleting the linear bias) when a BN block follows immediately.</p>
+    <p>The coupling is entangled with <em>why</em> BN helped historically: stabilization <strong>plus</strong> implicit regularization made it stubbornly strong on convnets. Modern research often prefers decoupled norms for small batches or sequence models, but the BN trade-off — mathematical ugliness versus reliable depth — shaped a decade of engineering defaults.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Gradient flow: too small, too large, and depth</h2>
+    <p>Backward mode multiplies Jacobians along the path from loss to parameters. Factors repeatedly below <code>1</code> <strong>shrink</strong> signals (vanishing); factors above <code>1</code> <strong>amplify</strong> them (exploding). Saturated <code>tanh</code> supplies tiny local derivatives; poorly scaled matrices can magnify variance layer-to-layer.</p>
+    <div class="callout danger">
+      <p><strong>Vanishing gradients:</strong> early layers receive negligible updates — the model “stops listening” to distant supervision. <strong>Exploding gradients:</strong> updates overshoot; loss spikes unless you clip, reduce learning rate, or fix scaling.</p>
+    </div>
+    <div class="interactive-panel">
+      <h3>Gradient flow heatmap (toy)</h3>
+      <p>Synthetic <code>10×10</code> “layers”: each cell shows <code>log₁₀|∂h⁽ˡ⁾/∂h⁽⁰⁾|</code> magnitude after repeated random Jacobian-style multipliers. Residual-style mixing (preview) reduces extremal decay.</p>
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="setHeatMode(this,'plain')">Plain stack</button>
+        <button type="button" class="btn" onclick="setHeatMode(this,'residual')">+ residual mix</button>
+      </div>
+      <div class="graph-wrap" style="padding:8px;">
+        <div class="heatmap-grid" id="heatGrid" style="grid-template-columns:repeat(10,1fr);"></div>
+      </div>
+      <p class="step-caption" id="heatCaption"></p>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">Grad norms</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">for</span> p <span class="kw">in</span> parameters:</code>
+<code><span class="line hl"><span class="ln">2</span>    <span class="fn">print</span>(p.grad.<span class="fn">norm</span>().<span class="fn">item</span>())</code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out</span>
+        <pre class="output-text">W1.grad.norm(): 0.042
+W2.grad.norm(): 0.318</pre>
+      </div>
+    </div>
+    <h3>Diagnostics beyond a single scalar norm</h3>
+    <p>When you stack multiple <code>Linear → (BatchNorm) → tanh</code> blocks into a <strong>six-layer</strong> network with on the order of <strong>46,000</strong> parameters, it pays to plot <strong>histograms of forward activations</strong> at every <code>tanh</code> output, <strong>histograms of backward gradients</strong> flowing into those tensors, and finally histograms of the <strong>weight tensors</strong> themselves. Color-code layers so you can see whether deeper blocks shrink toward zero, explode outward, or develop asymmetric tails.</p>
+    <p>For each <code>tanh</code> output <code>T</code>, track <strong>mean</strong>, <strong>standard deviation</strong>, and a <strong>saturation rate</strong> defined as the fraction of entries with <code>|T| &gt; 0.97</code> (a slightly looser threshold than the <code>0.99</code> mask used earlier, tuned for reading depth-stacked behavior). With Kaiming-style gain <code>5/3</code> on the linear maps, a typical picture is: the <strong>first</strong> <code>tanh</code> still shows visible tails (on the order of <strong>20%</strong> “saturated” by the <code>0.97</code> rule), then deeper layers settle to a steadier Gaussian-ish bulk with standard deviation near <strong>0.65</strong> and saturation near <strong>5%</strong> — a comfortable operating zone.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>Gain too small (e.g. 1.0 without compensation)</h3>
+        <p>Activations <strong>shrink</strong> toward zero layer by layer; backward gradients can develop an odd <strong>expanding</strong> shape — neither forward nor backward statistics match across depth.</p>
+      </div>
+      <div class="card">
+        <h3>Gain too large (e.g. 3.0)</h3>
+        <p>Saturation percentages blow up; gradients show <strong>asymmetry</strong> across layers as some blocks live almost entirely in flat <code>tanh</code> tails.</p>
+      </div>
+    </div>
+    <p>Remove every <code>tanh</code> but keep an inflated gain like <code>5/3</code> and you are left with a deep <strong>purely linear</strong> sandwich. The forward map still collapses to a <em>single</em> effective linear transformation — arbitrarily many <code>Wx + b</code> compositions re-express as one matrix multiply plus one bias — so representational power does not grow with depth. Interestingly, <strong>training dynamics</strong> need not match a one-layer network with the same forward map: the parameterization and chain rule carve different optimization trajectories; there is active literature on linear networks with exotic depth. Nonlinearities exist precisely to break that collapse.</p>
+    <p>Also inspect <strong>gradient magnitude versus parameter magnitude</strong>. A useful raw ratio is <code>std(grad) / std(weight)</code>. In a well-scaled run, gradient entries can be on the order of <strong>1/1000</strong> of the corresponding weight entries for many layers — except the <strong>last</strong> linear layer, which often shows gradients roughly <strong>ten times larger</strong> than the earlier hidden matrices at initialization because the head was deliberately shrunk (<code>W2 *= 0.01</code>) to keep softmax diffuse. That mismatch means vanilla SGD would update the head roughly <strong>10×</strong> faster than the trunk unless you compensate with parameter-wise learning rates or a fancier optimizer.</p>
+    <p>More predictive than gradient-to-data alone is <strong>update-to-data</strong>: for each tensor, compare the standard deviation of the <em>proposed SGD step</em> <code>−η · grad</code> to the standard deviation of the tensor values. Track <code>log₁₀</code> of that ratio across iterations. A coarse target is around <strong>10⁻³</strong> — parameter steps whose scale is roughly a thousandth of the existing parameter scale. If the log curve hovers near <strong>−2.5</strong>, updates are a bit aggressive but can still stabilize; if you drop the learning rate to <strong>0.001</strong> in an illustrative experiment, the same plot screams <strong>under-training</strong> — updates become ~<strong>1/10000</strong> of the parameter scale. Forget <code>1/√fan_in</code> scaling entirely and the activation, gradient, weight, and update panels all go haywire: saturation spikes, asymmetric depth profiles, and update ratios orders of magnitude away from the <code>10⁻³</code> heuristic (values like <strong>1.0–1.5</strong> on the log scale appear).</p>
+    <div class="callout ok">
+      <p><strong>BatchNorm as a robustness knob (deep stacks):</strong> insert <code>BatchNorm1d</code> between each linear map and its <code>tanh</code>, set <code>bias=False</code> on the linear layers, and forward activations become homogeneous by construction — standard deviation ~<strong>0.65</strong>, saturation ~<strong>2–5%</strong> at every depth. You can even crank linear gains to values like <strong>2.0</strong> that would have been absurd without normalization: the normalized pre-<code>tanh</code> cloud barely moves, while <em>update</em> statistics still shift because BN’s backward pass rescales gradients. Removing <code>fan_in</code> scaling entirely under BN can still yield sane forward/backward histograms but often drives update ratios far below the <code>10⁻³</code> band — a sign you should <strong>raise the learning rate</strong> (sometimes by ~<strong>10×</strong>) rather than celebrate a free lunch.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Xavier / Glorot vs Kaiming in one glance</h2>
+    <p><strong>Xavier/Glorot</strong> initialization targets variance preservation for linear activations (or symmetric saturating nonlinearities under certain assumptions), often using <code>fan_avg = (fan_in + fan_out)/2</code> in the denominator. <strong>Kaiming/He</strong> initialization explicitly models <code>ReLU</code>-style half-wave rectification and uses <code>fan_in</code> with a nonlinearity-dependent <code>gain</code>.</p>
+    <div class="formula">Xavier uniform: U[−a, a], &nbsp; a = √(6 / (fan_in + fan_out))</div>
+    <div class="formula">Kaiming normal: W ~ 𝒩(0, σ²), &nbsp; σ = gain / √(fan_in)</div>
+    <ul class="tight">
+      <li><code>gain(ReLU) = √2</code>, <code>gain(tanh) = 5/3</code>, <code>gain(linear) = 1</code> in PyTorch’s lookup table.</li>
+      <li>Default <code>nn.Linear</code> uses a uniform scheme scaled like <code>1/√fan_in</code> — same spirit, different constants.</li>
+    </ul>
+    <p>PyTorch’s built-in <code>nn.Linear</code> initializes weights uniformly in <code>[−1/√k, +1/√k]</code> with <code>k = fan_in</code> — Gaussian versus uniform is not the important part; the <code>1/√fan_in</code> width is. There is <strong>no</strong> automatic <code>5/3</code> boost in that default: you add Kaiming initialization explicitly when the following nonlinearity is contractive. The origin of the <code>5/3</code> constant for <code>tanh</code> is easy to take on faith from PyTorch’s tables; empirically it balances a repeated <code>linear → tanh</code> tower, but it is not as transparently derivable as the ReLU factor of <strong>2</strong> inside <code>√(2/fan_in)</code>.</p>
+    <div class="formula">nn.Linear default (uniform): &nbsp; W<sub>ij</sub> ~ U(−1/√fan_in, +1/√fan_in)</div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Residual connections (preview)</h2>
+    <p>Very deep feedforward stacks suffer from optimization friction: each layer must learn to approximate small perturbations to an identity map. <strong>Residual</strong> networks add skip connections so layers learn <em>residuals</em> <code>f(x)</code> atop <code>x</code>, easing gradient highways and softening vanishing effects.</p>
+    <div class="formula">y = x + F(x) &nbsp; (shape-compatible skip + block output)</div>
+    <p>Modern CNN templates (e.g., Conv → BatchNorm → ReLU, repeated) mirror the MLP pattern: <strong>affine → normalize → nonlinearity</strong>, now with shortcuts threading depth. We will unpack convolutions and full residual blocks later; for now, view skips as complementary to good init and BN.</p>
+    <p>Open-source <strong>ResNet</strong> implementations (search “ResNet PyTorch torchvision”) show the same motif in production code: a convolution, a <code>BatchNorm2d</code>, a ReLU, another convolution, another batch norm, another ReLU, and only then the residual add. Convolution is “structured” linear algebra — still a weighted sum of inputs with learnable coefficients, but shared across spatial patches. Notice <code>bias=False</code> on those convolutions whenever batch norm follows: the affine shift lives in BN’s <code>β</code> instead of duplicating a bias that mean-centering would erase.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Putting it together</h2>
+    <p>Stable training is rarely one trick. It is <strong>consistent scales</strong> at initialization (so softmax is not absurdly confident), <strong>nonlinearity-aware</strong> variance scaling via <code>fan_in</code>, and — when depth demands it — <strong>normalization</strong> that keeps tensors in a benign statistical regime. Together they prevent wasted early iterations on “squashing logits” and keep backward signals informative.</p>
+    <p>Concrete validation anchors from the same experimental thread: starting from about <strong>2.17</strong> before fixes, shrinking the output head and taming logits lands near <strong>2.13</strong>; fixing hidden-layer saturation (hand scale or Kaiming) lands near <strong>2.10</strong>; adding batch normalization to the shallow model returns essentially the same <strong>2.10</strong> ballpark because the network was never optimization-limited — the bottleneck is representational (context length three predicting the fourth character), not gradient noise. Pushing perplexity further requires richer models (recurrence, attention, longer context), not another normalization layer on this tiny MLP.</p>
+    <div class="callout warn">
+      <p><strong>Optional BN placement at the output:</strong> some pipelines place batch norm <em>after</em> the final linear map and before the loss. Then the “softmax temperature” role played by shrinking <code>W2</code> can migrate into the BN scale parameter <code>γ</code> instead of the raw weights — same idea, different knob.</p>
+    </div>
+    <div class="interactive-panel">
+      <h3>Loss curve comparison (schematic)</h3>
+      <p>Qualitative training traces: “bad init” shows a sharp early drop (easy logit rescaling) then slower real learning; “init + BN” starts calmer and often finishes slightly lower on small MLPs because more steps are productive.</p>
+      <canvas id="lossCompareCanvas" width="640" height="260"></canvas>
+      <div class="mini-legend">
+        <span><span class="mini-swatch" style="background:#f87171;"></span>bad init (hockey stick)</span>
+        <span><span class="mini-swatch" style="background:#6c8cff;"></span>scaled logits + good hidden scale</span>
+        <span><span class="mini-swatch" style="background:#34d399;"></span>+ BatchNorm in deeper setting</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s14">
+  <div class="container">
+    <span class="section-num">14</span>
+    <h2>Playground</h2>
+    <p>Experiment freely: combine gain, “depth,” and residual mixing. This sandbox does not train a real language model — it visualizes the <strong>mechanisms</strong> discussed above.</p>
+    <p>In a full training codebase, pair this toy with the real diagnostics: forward <code>tanh</code> histograms, backward histograms on the same tensors, weight histograms, gradient-to-data ratios, and update-to-data ratios tracked over time. None of these plots replaces a principled learning-rate search, but they surface miscalibrations in minutes instead of days.</p>
+    <div class="interactive-panel">
+      <h3>Composite explorer</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;">
+        <label style="color:var(--text-dim);">pre-tanh gain</label>
+        <input type="range" id="pgGain" min="20" max="250" value="100" oninput="playgroundRender()">
+        <label style="color:var(--text-dim);">linear depth</label>
+        <input type="range" id="pgDepth" min="1" max="12" value="6" oninput="playgroundRender()">
+        <label style="color:var(--text-dim);"><input type="checkbox" id="pgRes" onchange="playgroundRender()"> residual mix</label>
+      </div>
+      <canvas id="playCanvas" width="640" height="220" style="margin-top:16px;"></canvas>
+      <pre class="output-text" id="playReadout" style="margin-top:12px;"></pre>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Single-file tutorial · <code>tanh</code> · <code>fan_in</code> · Kaiming · BatchNorm · built for the Zero to Hero track</p>
+</footer>
+
+<script>
+// ============================================================
+// Helpers
+// ============================================================
+function toggleOut(btn) {
+  const cell = btn.closest('.jupyter-cell');
+  const out = cell.querySelector('.cell-output');
+  const open = out.style.display === 'none' || !out.style.display;
+  out.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? 'Hide Output ▲' : 'Show Output ▼';
+}
+function showStep(btn, stepId) {
+  const parent = btn.closest('.code-progression');
+  parent.querySelectorAll('.code-block').forEach(el => { el.style.display = 'none'; });
+  parent.querySelector('#' + stepId).style.display = 'block';
+  parent.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const cap = parent.querySelector('#bnStepCaption');
+  const lines = parent.querySelector('#bnStepLines');
+  if (stepId === 'bnStep1') { lines.textContent = 'Step 1 of 3'; cap.textContent = 'Training: compute batch μ and σ², normalize.'; }
+  if (stepId === 'bnStep2') { lines.textContent = 'Step 2 of 3'; cap.textContent = 'EMA running buffers track dataset-level statistics.'; }
+  if (stepId === 'bnStep3') { lines.textContent = 'Step 3 of 3'; cap.textContent = 'Eval: freeze running mean/variance for deterministic forwards.'; }
+}
+function seededRand(seed) {
+  let s = seed % 2147483647; if (s <= 0) s += 2147483646;
+  return function() { return (s = s * 16807 % 2147483647) / 2147483647; };
+}
+
+// ============================================================
+// Annotated code clicks (sections 02 & 07)
+// ============================================================
+document.querySelectorAll('.annotated .ln.anno').forEach(ln => {
+  ln.addEventListener('click', () => {
+    const line = ln.closest('.line');
+    const note = line.dataset.note;
+    const panel = ln.closest('.code-panel');
+    const box = panel.querySelector('.code-note');
+    if (box) {
+      box.innerHTML = '<strong>Line ' + ln.textContent.trim() + ':</strong> ' + note;
+      box.style.display = 'block';
+    }
+  });
+});
+
+// ============================================================
+// Tanh saturation canvas
+// ============================================================
+(function tanhSat() {
+  const slider = document.getElementById('tanhSatSlider');
+  const cv = document.getElementById('tanhSatCanvas');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const cap = document.getElementById('tanhSatCaption');
+  const xval = document.getElementById('tanhSatX');
+  function draw() {
+    const W = cv.width, H = cv.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, W, H);
+    const x = slider.value / 100;
+    xval.textContent = x.toFixed(2);
+    const t = Math.tanh(x);
+    const deriv = 1 - t * t;
+    const pad = 40;
+    const plotW = W - 2 * pad, plotH = H - 2 * pad;
+    ctx.strokeStyle = '#2a2a3a';
+    for (let i = 0; i <= 10; i++) {
+      const gx = pad + (i / 10) * plotW;
+      ctx.beginPath(); ctx.moveTo(gx, pad); ctx.lineTo(gx, H - pad); ctx.stroke();
+    }
+    ctx.strokeStyle = '#6c8cff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let px = 0; px <= plotW; px++) {
+      const xx = (px / plotW) * 8 - 4;
+      const yy = Math.tanh(xx);
+      const py = pad + plotH / 2 - (yy * plotH * 0.4);
+      if (px === 0) ctx.moveTo(pad + px, py); else ctx.lineTo(pad + px, py);
+    }
+    ctx.stroke();
+    const pxX = pad + ((x + 4) / 8) * plotW;
+    const pyT = pad + plotH / 2 - (t * plotH * 0.4);
+    ctx.fillStyle = '#f472b6';
+    ctx.beginPath(); ctx.arc(pxX, pyT, 6, 0, Math.PI * 2); ctx.fill();
+    const barW = Math.min(deriv, 1) * plotW * 0.45;
+    ctx.fillStyle = 'rgba(52,211,153,0.35)';
+    ctx.fillRect(pad, H - 28, barW, 10);
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText('local deriv 1−tanh² = ' + deriv.toFixed(4), pad, H - 10);
+    cap.textContent = Math.abs(t) > 0.95
+      ? 'Saturated: derivative nearly zero — backward signal mostly blocked.'
+      : 'Active region: derivative closer to 1 — gradients flow more freely.';
+  }
+  slider.addEventListener('input', draw);
+  draw();
+})();
+
+// ============================================================
+// Histogram explorer
+// ============================================================
+(function histExplorer() {
+  const slider = document.getElementById('histGainSlider');
+  const cv = document.getElementById('histCanvas');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const lab = document.getElementById('histGainVal');
+  const rand = seededRand(42);
+  const bins = 40;
+  const samples = 8000;
+  function draw() {
+    const gain = slider.value / 100;
+    lab.textContent = gain.toFixed(2);
+    const counts = new Array(bins).fill(0);
+    for (let i = 0; i < samples; i++) {
+      const z = gain * (rand() * 2 - 1 + rand() * 2 - 1 + rand() * 2 - 1) * 0.58;
+      const y = Math.tanh(z);
+      const b = Math.floor((y + 1) / 2 * (bins - 1e-9));
+      counts[Math.max(0, Math.min(bins - 1, b))]++;
+    }
+    const W = cv.width, H = cv.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, W, H);
+    const maxC = Math.max(...counts, 1);
+    const barW = (W - 80) / bins;
+    for (let b = 0; b < bins; b++) {
+      const h = (counts[b] / maxC) * (H - 60);
+      ctx.fillStyle = '#6c8cff';
+      ctx.fillRect(40 + b * barW, H - 40 - h, barW - 1, h);
+    }
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px monospace';
+    ctx.fillText('post-tanh histogram', 40, 20);
+  }
+  slider.addEventListener('input', draw);
+  draw();
+})();
+
+// ============================================================
+// Init comparison
+// ============================================================
+let initMode = 'random';
+function setInitMode(btn, mode) {
+  initMode = mode;
+  btn.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  runInitSim();
+}
+function runInitSim() {
+  const out = document.getElementById('initStatsOut');
+  if (!out) return;
+  const B = 2000;
+  const fin = 10;
+  const rand = seededRand(99);
+  let stdW = 1;
+  if (initMode === 'random') stdW = 1;
+  if (initMode === 'xavier') stdW = 1 / Math.sqrt(fin);
+  if (initMode === 'kaiming') stdW = (5 / 3) / Math.sqrt(fin);
+  let sum = 0;
+  let sumsq = 0;
+  for (let i = 0; i < B; i++) {
+    let acc = 0;
+    for (let j = 0; j < fin; j++) {
+      const x = rand() * 2 - 1;
+      const w = (rand() * 2 - 1) * stdW;
+      acc += x * w;
+    }
+    sum += acc;
+    sumsq += acc * acc;
+  }
+  const mean = sum / B;
+  const varr = sumsq / B - mean * mean;
+  const std = Math.sqrt(Math.max(varr, 1e-12));
+  out.textContent = 'fan_in = ' + fin + ', per-weight scale (uniform [-s,s], s=' + stdW.toFixed(4) + ')\n' +
+    'empirical std of one neuron pre-activation (n=' + B + ' draws): ' + std.toFixed(4) + '\n' +
+    (initMode === 'random'
+      ? 'Too large: linear combinations blow up — expect saturated tanh downstream.'
+      : initMode === 'xavier'
+        ? 'Closer to unit variance per neuron when inputs are O(1).'
+        : 'Kaiming/tanh-style scale — compensates for contractive nonlinearity.');
+}
+runInitSim();
+
+// ============================================================
+// BatchNorm pipeline UI
+// ============================================================
+function renderBNPipe() {
+  const x1 = document.getElementById('bnx1').value / 100;
+  const x2 = document.getElementById('bnx2').value / 100;
+  const x3 = document.getElementById('bnx3').value / 100;
+  const g = document.getElementById('bng').value / 100;
+  const b = document.getElementById('bnb').value / 100;
+  const xs = [x1, x2, x3];
+  const mu = (x1 + x2 + x3) / 3;
+  const v = ((x1 - mu) ** 2 + (x2 - mu) ** 2 + (x3 - mu) ** 2) / 3;
+  const s = Math.sqrt(v + 1e-5);
+  const xh = xs.map(x => (x - mu) / s);
+  const y = xh.map(xh => g * xh + b);
+  const el = document.getElementById('bnPipeline');
+  const out = document.getElementById('bnMathOut');
+  if (!el) return;
+  el.innerHTML = '<span class="bn-box">x = [' + xs.map(t => t.toFixed(2)).join(', ') + ']</span>' +
+    '<span style="color:var(--text-dim);">→</span><span class="bn-box">x̂ normalize</span>' +
+    '<span style="color:var(--text-dim);">→</span><span class="bn-box">γ=' + g.toFixed(2) + ', β=' + b.toFixed(2) + '</span>' +
+    '<span style="color:var(--text-dim);">→</span><span class="bn-box">y = [' + y.map(t => t.toFixed(2)).join(', ') + ']</span>';
+  out.textContent = 'μ=' + mu.toFixed(3) + '  σ=' + s.toFixed(3) + '  x̂=' + xh.map(t => t.toFixed(3)).join(', ');
+}
+renderBNPipe();
+
+// ============================================================
+// Heatmap
+// ============================================================
+let heatMode = 'plain';
+function setHeatMode(btn, mode) {
+  heatMode = mode;
+  btn.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  drawHeat();
+}
+function drawHeat() {
+  const grid = document.getElementById('heatGrid');
+  const cap = document.getElementById('heatCaption');
+  if (!grid) return;
+  const rand = seededRand(heatMode === 'plain' ? 1 : 7);
+  const L = 10;
+  grid.innerHTML = '';
+  grid.style.gridTemplateColumns = 'repeat(' + L + ',1fr)';
+  for (let r = 0; r < L; r++) {
+    for (let c = 0; c < L; c++) {
+      let mag = 0;
+      if (heatMode === 'plain') {
+        let p = 1;
+        for (let k = 0; k < c + 1; k++) p *= (rand() * 0.4 + 0.85);
+        mag = Math.log10(Math.max(p, 1e-8));
+      } else {
+        let p = 1;
+        for (let k = 0; k < c + 1; k++) {
+          const skip = 0.5 + rand() * 0.5;
+          p *= (rand() * 0.35 + 0.9) * skip + (1 - skip) * 1.0;
+        }
+        mag = Math.log10(Math.max(p, 1e-8));
+      }
+      const t = (mag + 8) / 8;
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
+      const g = Math.floor(40 + t * 180);
+      cell.style.background = 'rgb(' + g + ',' + Math.floor(100 + (1 - t) * 80) + ',' + Math.floor(200 - t * 120) + ')';
+      grid.appendChild(cell);
+    }
+  }
+  cap.textContent = heatMode === 'plain'
+    ? 'Plain depth: magnitudes tend to shrink (blue) along columns — vanishing tendency.'
+    : 'Residual-style mixing keeps some paths closer to unit gain (brighter).';
+}
+drawHeat();
+
+// ============================================================
+// Loss comparison canvas
+// ============================================================
+(function lossCompare() {
+  const cv = document.getElementById('lossCompareCanvas');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0, 0, W, H);
+  function series(style, pts) {
+    ctx.strokeStyle = style;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      const x = 40 + (i / (pts.length - 1)) * (W - 80);
+      const y = H - 40 - (p - 1.8) / 1.8 * (H - 80);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+  const steps = 60;
+  const bad = [], good = [], bn = [];
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    bad.push(3.25 - 1.1 * Math.pow(t, 0.35) + 0.05 * Math.sin(i * 0.4));
+    good.push(3.15 - 1.05 * Math.pow(t, 0.55) + 0.02 * Math.sin(i * 0.3));
+    bn.push(3.05 - 1.12 * Math.pow(t, 0.58) + 0.015 * Math.sin(i * 0.25));
+  }
+  series('#f87171', bad);
+  series('#6c8cff', good);
+  series('#34d399', bn);
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '12px monospace';
+  ctx.fillText('loss (illustrative)', 40, 20);
+})();
+
+// ============================================================
+// Playground
+// ============================================================
+function playgroundRender() {
+  const cv = document.getElementById('playCanvas');
+  const ro = document.getElementById('playReadout');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const gain = document.getElementById('pgGain').value / 100;
+  const depth = +document.getElementById('pgDepth').value;
+  const res = document.getElementById('pgRes').checked;
+  const rand = seededRand(123);
+  let mag = 1;
+  for (let l = 0; l < depth; l++) {
+    const s = (rand() * 0.4 + 0.85) * gain;
+    mag *= s;
+    if (res) mag = mag * 0.5 + 0.5;
+  }
+  const sat = Math.tanh(mag);
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#6c8cff';
+  const w = (cv.width - 80) * Math.min(1, Math.abs(sat));
+  ctx.fillRect(40, 80, w, 40);
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = '13px monospace';
+  ctx.fillText('effective post-stack |tanh(mag)| ≈ ' + Math.abs(sat).toFixed(4), 40, 60);
+  ro.textContent = 'gain=' + gain.toFixed(2) + ' depth=' + depth + ' residual=' + res + '  raw_mag=' + mag.toFixed(3);
+}
+playgroundRender();
+
+// ============================================================
+// Scroll: nav + fade-in
+// ============================================================
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 120);
+}, { passive: true });
+const obs = new IntersectionObserver((ents) => {
+  ents.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.08 });
+document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+</script>
+
+</body>
+</html>

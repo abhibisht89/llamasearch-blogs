@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic Search — LLMs That Search for Themselves</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg-deep: #0a0c10;
+      --bg-panel: #12151c;
+      --bg-elevated: #1a1f2a;
+      --border: #2a3142;
+      --text: #e8ecf4;
+      --text-muted: #8b95ab;
+      --accent: #5eead4;
+      --accent-dim: #2dd4bf33;
+      --warning: #fbbf24;
+      --danger: #f87171;
+      --success: #4ade80;
+      --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-serif: "Source Serif 4", Georgia, serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+      --radius: 10px;
+      --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+      --nav-h: 56px;
+      --maxw: 72ch;
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: 1.05rem;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg-deep);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, #1e3a5f55, transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, #134e4a22, transparent);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      background: var(--bg-elevated);
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .breadcrumb {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+    .breadcrumb a { color: var(--text-muted); }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb span.sep { margin: 0 0.4em; opacity: 0.5; }
+
+    nav.site-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.75rem;
+      padding: 0.5rem 1rem;
+      background: rgba(10, 12, 16, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav.site-nav a {
+      font-size: 0.78rem;
+      padding: 0.35rem 0.6rem;
+      border-radius: 6px;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+    }
+    nav.site-nav a:hover {
+      color: var(--text);
+      background: var(--bg-elevated);
+      border-color: var(--border);
+      text-decoration: none;
+    }
+
+    .hero {
+      padding: 3rem 1.5rem 4rem;
+      text-align: center;
+      max-width: 52rem;
+      margin: 0 auto;
+    }
+    .hero h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.85rem, 4vw, 2.75rem);
+      font-weight: 600;
+      line-height: 1.15;
+      margin: 0 0 1rem;
+      letter-spacing: -0.02em;
+    }
+    .hero .lede {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      max-width: 42ch;
+      margin: 0 auto 1.5rem;
+    }
+    .hero .meta {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    main { padding: 0 1.25rem 5rem; max-width: 900px; margin: 0 auto; }
+
+    section.chapter-section {
+      margin-bottom: 3.5rem;
+      padding: 1.75rem;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+    }
+    section.chapter-section.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    section.chapter-section h2 {
+      font-family: var(--font-serif);
+      font-size: 1.55rem;
+      margin: 0 0 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    section.chapter-section h3 {
+      font-size: 1.05rem;
+      margin: 1.75rem 0 0.65rem;
+      color: var(--accent);
+    }
+    section.chapter-section p { margin: 0 0 1rem; max-width: var(--maxw); }
+    section.chapter-section ul {
+      margin: 0 0 1rem;
+      padding-left: 1.25rem;
+      max-width: var(--maxw);
+    }
+    section.chapter-section li { margin-bottom: 0.4rem; }
+
+    .demo-card {
+      margin: 1.5rem 0;
+      padding: 1.25rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .demo-card h4 {
+      margin: 0 0 0.75rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .demo-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    button.btn, .btn-like {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    button.btn:hover, .btn-like:hover {
+      background: var(--bg-elevated);
+      border-color: var(--accent);
+    }
+    button.btn.primary {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    button.btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .react-step, .loop-step, .hop-node {
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      border-left: 3px solid var(--border);
+      border-radius: 0 6px 6px 0;
+      background: var(--bg-deep);
+      font-size: 0.9rem;
+    }
+    .react-step.thought { border-left-color: #818cf8; }
+    .react-step.action { border-left-color: var(--accent); }
+    .react-step.observation { border-left-color: var(--warning); }
+    .react-step .label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 640px) {
+      .compare-grid { grid-template-columns: 1fr; }
+    }
+    .compare-col {
+      padding: 1rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+    .compare-col.human { background: #1e1b4b22; }
+    .compare-col.agent { background: #134e4a22; }
+
+    .playground {
+      display: grid;
+      gap: 1rem;
+    }
+    .playground textarea {
+      width: 100%;
+      min-height: 88px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      background: var(--bg-deep);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      resize: vertical;
+    }
+    .playground .log {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 1rem;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .playground .log .phase { color: var(--accent); }
+    .playground .log .tool { color: var(--warning); }
+    .playground .log .ctx { color: var(--text-muted); }
+
+    .toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      margin: 0.75rem 0;
+    }
+    .switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.88rem;
+    }
+    .switch input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
+
+    .stepper-bar {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .stepper-bar button {
+      font-size: 0.72rem;
+      padding: 0.35rem 0.55rem;
+    }
+
+    .architecture-diagram {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      line-height: 1.5;
+      padding: 1rem;
+      background: var(--bg-deep);
+      border-radius: 8px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .callout {
+      margin: 1.25rem 0;
+      padding: 1rem 1.1rem;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      font-size: 0.95rem;
+    }
+
+    footer.page-foot {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <div class="breadcrumb">
+    <a href="#">Learning Blogs</a><span class="sep">›</span>
+    <a href="#">Search Zero to Hero</a><span class="sep">›</span>
+    <span>Agentic Search</span>
+  </div>
+
+  <nav class="site-nav" aria-label="Chapter sections">
+    <a href="#s0">Paradigm</a>
+    <a href="#s1">Tool use</a>
+    <a href="#s2">Multi-hop</a>
+    <a href="#s3">Query understanding</a>
+    <a href="#s4">Architectures</a>
+    <a href="#s5">Humans vs agents</a>
+    <a href="#s6">Future</a>
+    <a href="#s7">Playground</a>
+  </nav>
+
+  <header class="hero">
+    <h1>Agentic Search — LLMs That Search for Themselves</h1>
+    <p class="lede">
+      When the model does not merely answer from memory but actively retrieves, rewrites, and re-queries until evidence is sufficient, search becomes a closed loop inside the model’s reasoning process.
+    </p>
+    <p class="meta">Chapter 25 · Search Zero to Hero</p>
+  </header>
+
+  <main>
+    <section id="s0" class="chapter-section" data-section>
+      <h2>00 · The Paradigm Shift</h2>
+      <p>
+        Classic search is linear: a person types a query, the system returns a ranked list, and the person reads and synthesizes.
+        <code>Retrieval</code> and <code>interpretation</code> are separate steps—the engine finds candidates; the human assigns meaning.
+      </p>
+      <p>
+        <code>Agentic search</code> closes that loop inside the model stack. The model consumes retrieved text, writes follow-up queries, judges result
+        quality, and decides when to stop: <code>query → retrieve → read → decide → (maybe) query again</code>. Agency migrates from the end user to the
+        model, or is shared between them.
+      </p>
+      <p>
+        In practice the agent chooses <em>what</em> to search, <em>how</em> to read noisy snippets, and <em>when</em> to stop—decisions classical IR
+        systems leave to the caller. A search engine scores documents; an agent must sometimes treat evidence as sufficient, insufficient, or in need of
+        corroboration.
+      </p>
+      <p>
+        The primary consumer of search APIs may no longer be a human skimming blue links. The same inverted index can serve both audiences, but
+        <code>evaluation metrics</code> diverge: click-through and dwell time versus grounding fidelity, citation coverage, and hallucination rate on
+        multi-hop tasks.
+      </p>
+      <h3>Search for humans versus search for agents</h3>
+      <p>
+        Humans tolerate ambiguous UI copy; agents need <code>explicit structure</code>—source IDs, timestamps, licensing hints, and clear boundaries between
+        quoted evidence and paraphrase. Latency expectations differ too: sub-second feedback for exploratory typing versus multi-second tool rounds when an
+        autonomous job prioritizes answer quality. Oversight moves to policy, logging, and trace review rather than per-query formulation.
+      </p>
+      <p>
+        <code>Accountability</code> shifts with synthesized answers. Agent prose reads authorial even when derivative, so <code>provenance</code> and
+        <code>replayable traces</code> become requirements for anyone who must explain why a claim appeared—not only for engineers debugging failures.
+      </p>
+      <p>
+        <code>Throughput</code> scales differently as well. A batch agent may fire thousands of queries per minute on one API key. Rate limits, caching,
+        deduplication, and fair-share scheduling must treat orchestrators as first-class traffic, not only individual keyboard users.
+      </p>
+    </section>
+
+    <section id="s1" class="chapter-section" data-section>
+      <h2>01 · The Tool-Use Paradigm</h2>
+      <p>
+        Modern assistants expose <code>tools</code> to the model: <code>web search</code>, SQL, vector retrieval, HTTP to internal services, or sandboxed
+        code. The weights need not store every fact if the model can invoke the right tool with validated arguments.
+      </p>
+      <p>
+        The <code>ReAct</code> pattern iterates <strong>Reason</strong> (trace intent), <strong>Act</strong> (structured tool call),
+        <strong>Observe</strong> (ingest tool output), then repeat. Observations differentiate tool use from a single-shot prompt; each one updates context
+        for the next step.
+      </p>
+      <p>
+        Implementers typically <code>define tools</code> with JSON schemas or vendor-specific descriptors: function name, argument types, and human-readable descriptions the model uses as its “menu.” At runtime, the host application <code>parses</code> model output, validates it against the schema, executes the side effect, and <code>returns</code> a string or structured payload back into the chat. Vendors label this differently—<code>function calling</code> (OpenAI-style), <code>tool use</code> (Anthropic-style), or open pipelines where the model emits code that a runner executes—but the abstract contract is stable: the model proposes; the runtime disposes.
+      </p>
+
+      <div class="demo-card" id="demo-react">
+        <h4>Interactive demo · ReAct loop (thought → action → observation)</h4>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-top:0">
+          Step through a toy research task. Each step appends to the trace; reset to run again from the start.
+        </p>
+        <div class="demo-controls">
+          <button type="button" class="btn primary" id="react-next">Next step</button>
+          <button type="button" class="btn" id="react-reset">Reset</button>
+        </div>
+        <div id="react-trace" aria-live="polite"></div>
+      </div>
+
+      <p>
+        Robust systems cap tool calls per turn, allowlist hosts, redact secrets from observations, and enforce timeouts. Validation layers must treat
+        every tool call as untrusted input—even from the local model.
+      </p>
+      <p>
+        Two details often decide production success: <code>observation serialization</code> (raw HTML, cleaned text, JSON, or capped windows) and
+        <code>error surfaces</code> (how timeouts and failures are returned to the model). Opaque failures invite hallucinated filler for empty observations.
+      </p>
+      <p>
+        Open-source stacks sometimes let the model emit executable code instead of rigid function JSON. That increases expressiveness for multi-step data wrangling but complicates sandboxing and determinism. Hybrid designs expose a small set of audited primitives to code (safe query builders, HTTP GET to allowlisted domains) rather than arbitrary system calls. The principle is unchanged: constrain the <code>act</code> channel so the <code>observe</code> channel remains trustworthy.
+      </p>
+    </section>
+
+    <section id="s2" class="chapter-section" data-section>
+      <h2>02 · Multi-Hop Retrieval</h2>
+      <p>
+        Some information needs are <code>single-hop</code>: one well-formed query retrieves a definition, a date, or a canonical name. Others are irreducibly <code>multi-hop</code>: answering requires chaining entities and constraints that no single document states outright. Compare “What is <code>BM25</code>?” with “Compare GDP growth for countries that joined the EU after 2004.” The second forces membership resolution, temporal alignment of statistics, and a fair comparison axis—none of which reliably appear in one snippet.
+      </p>
+      <p>
+        A common strategy is <code>query decomposition</code>: ask the model to emit a checklist of sub-questions, answer each via retrieval, then <code>synthesize</code> with explicit stitching logic (or another model pass). An alternative is <code>chain-of-search</code>, where each retrieval informs the phrasing of the next query, without a fully enumerated plan up front. Decomposition favors transparency and parallelization; chaining favors adaptability when the space of needed evidence is unknown until partial results arrive.
+      </p>
+      <p>
+        Without a budget, models spiral—rephrasing endlessly or repeating failed queries. Production stacks use step caps, duplicate-query detection,
+        confidence heuristics, and sufficiency rubrics from a verifier pass. Most deployments rely on simple, auditable rules over learned stopping policies.
+      </p>
+
+      <div class="demo-card" id="demo-multihop">
+        <h4>Interactive demo · Multi-hop chain visualization</h4>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-top:0">
+          Watch how sub-queries fan out and converge. Use the control to advance the narrative one hop at a time.
+        </p>
+        <div class="demo-controls">
+          <button type="button" class="btn primary" id="hop-advance">Advance hop</button>
+          <button type="button" class="btn" id="hop-reset">Reset chain</button>
+        </div>
+        <div id="hop-display" aria-live="polite"></div>
+      </div>
+
+      <p>
+        Evaluation for multi-hop setups often combines <code>precision of intermediate facts</code> with <code>end-to-end answer correctness</code>. A system can ace the final string while silently baking in a wrong middle hop; trace logging and intermediate supervision catch that failure mode earlier than aggregate accuracy alone.
+      </p>
+      <p>
+        Parallel decomposition is not always safe. Sub-questions may share hidden dependencies—resolving an entity in hop A changes the interpretation of hop B. Agents mitigate this with <code>sequential gating</code> (run B only after A’s entities are fixed) or with <code>consistency checks</code> that compare merged graphs of entities before synthesis. These checks resemble database normalization for natural language: redundant paths should agree, or the agent should fetch another source rather than averaging contradictions.
+      </p>
+      <p>
+        When corpora are proprietary, multi-hop retrieval also raises <code>access control</code> issues. Different hops might touch documents with different clearance levels. A responsible orchestrator propagates authorization context into each tool invocation and prunes observations before they ever enter the general context window. Agentic convenience must not become an accidental privilege-escalation path across siloed indexes.
+      </p>
+    </section>
+
+    <section id="s3" class="chapter-section" data-section>
+      <h2>03 · LLM Query Understanding</h2>
+      <p>
+        The retriever rarely sees the user's raw string. An agent runs <code>query understanding</code> first: intent classification, contextual expansion,
+        decomposition into searchable units, and <code>routing</code> to the right index or tool—aligning natural language with how the corpus was chunked,
+        stemmed, or embedded.
+      </p>
+      <p>
+        <code>Query classification</code> might distinguish navigational, definitional, transactional, or evidence-seeking requests—each implying different retrieval depth and snippet length. <code>Query expansion</code> adds synonyms, entity aliases, or temporal qualifiers inferred from dialogue state. <code>Query decomposition</code> splits a compound request into parallel retrievals that reduce cross-talk in dense vector spaces. <code>Query routing</code> sends legal clauses to a clause index, product specs to a structured catalog, and open-web background to a web search connector.
+      </p>
+      <p>
+        After retrieval, agents often perform <code>context self-editing</code>: discard redundant passages, down-rank off-topic paragraphs, or quote only spans that survive a salience model. If results are poor, the agent can <code>retry</code> with a narrower technical term, a different language, an explicit site restriction, or a pivot from keyword to vector retrieval. That feedback loop turns search from a single forward pass into a control system regulated by observations.
+      </p>
+      <p>
+        Query understanding is also where <code>grounding contracts</code> get negotiated. If the user’s utterance is underspecified, the agent might ask a clarifying question—or silently pick a disambiguation path and document it in the trace. Silent disambiguation is faster but riskier; explicit clarification is slower but auditable. Products differ on which default to privilege, and the right choice often depends on domain (medical, legal, and financial settings lean toward explicitness).
+      </p>
+      <p>
+        Multilingual queries add another layer. The agent may translate for retrieval, retrieve in the source language, or run cross-lingual embeddings. Each strategy changes error modes: translation drift versus tokenization mismatches versus culturally divergent snippets. A mature agentic stack records which path was taken so downstream grading knows whether to trust a translated span literally or only paraphrastically.
+      </p>
+
+      <div class="demo-card" id="demo-query-rewrite">
+        <h4>Interactive demo · Query rewrite &amp; route</h4>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-top:0">
+          Pick a messy user phrase. The panel shows a stylized classification, expanded query, routed tool, and a retry after a “bad” first retrieval.
+        </p>
+        <div class="demo-controls">
+          <label for="rewrite-select" class="sr-only">Example query</label>
+          <select id="rewrite-select" class="btn-like" style="padding:0.45rem 0.75rem;">
+            <option value="0">“that paper about neural retrieval from 2023 with the tree icon”</option>
+            <option value="1">“error 503 only on checkout, started Thursday, EU region”</option>
+            <option value="2">“compare lithium vs sodium ion energy density for grid storage”</option>
+          </select>
+          <button type="button" class="btn primary" id="rewrite-run">Apply pipeline</button>
+        </div>
+        <pre id="rewrite-output" class="architecture-diagram" style="white-space:pre-wrap;min-height:140px;"></pre>
+      </div>
+    </section>
+
+    <section id="s4" class="chapter-section" data-section>
+      <h2>04 · Agentic Search Architectures</h2>
+      <p>
+        Industry stacks increasingly expose retrieval surfaces tuned for <code>LLM consumption</code>—context packaged for grounding rather than pages
+        optimized for browsing. The pattern is stable: evidence in machine-friendly slices with stable IDs and reproducible fetches.
+      </p>
+      <p>
+        A canonical <code>retrieval-agent loop</code> looks like this: the user asks a question; the agent plans a search strategy (tools, order, stopping criteria); it executes one or more searches; it evaluates sufficiency; if evidence is thin, it refines queries and retrieves again; if evidence is adequate, it synthesizes an answer with explicit citations tying claims to sources. That loop can be monolithic (one model doing all roles) or modular (planner, retriever, grader, writer as separate prompts or services).
+      </p>
+
+      <div class="architecture-diagram" style="margin:1rem 0 1.5rem;">
+┌──────────────┐    plan     ┌─────────────┐    tools    ┌──────────────┐
+│ User request │ ─────────► │ Agent core  │ ─────────► │ Search layer │
+└──────────────┘            └──────┬──────┘            └──────┬───────┘
+                                   │ observe                  │
+                                   │◄─────────────────────────┘
+                                   ▼
+                          ┌────────────────┐
+                          │ Grade / prune  │
+                          │ retrieved ctx  │
+                          └────────┬───────┘
+                                   │ sufficient?
+                    no ────────────┤
+                    yes            ▼
+                          ┌────────────────┐
+                          │ Answer + cites │
+                          └────────────────┘
+      </div>
+
+      <p>
+        <code>Multi-agent search</code> partitions responsibilities: a “scout” agent hits broad web search, a “analyst” agent queries structured internal SQL, a “librarian” agent maintains citation formatting, and an “editor” agent enforces tone policy. Coordination introduces latency and handoff bugs but can improve specialization—smaller prompts, narrower tool sets, and clearer failure attribution when a sub-agent misbehaves.
+      </p>
+
+      <div class="demo-card" id="demo-arch-loop">
+        <h4>Interactive demo · Step through the retrieval-agent loop</h4>
+        <div class="stepper-bar" id="arch-step-buttons"></div>
+        <div id="arch-step-body" class="react-step" style="border-left-color:var(--accent);"></div>
+      </div>
+    </section>
+
+    <section id="s5" class="chapter-section" data-section>
+      <h2>05 · Search for Humans vs Search for Agents</h2>
+      <p>
+        Human-facing search optimizes for <code>ten blue links</code>, snippets, and visual diversity. Agent-facing search prefers
+        <code>structured payloads</code>—URLs, titles, timestamps, extracted entities, calibrated scores—fields a model can copy or compare without visual
+        heuristics.
+      </p>
+      <p>
+        APIs reflect the split: HTML and incremental rendering for people; <code>JSON</code> or <code>protobuf</code> with stable schemas for agents.
+        Human SERPs sometimes surface opposing viewpoints; grounding tasks may prefer authoritative redundancy over editorial breadth.
+      </p>
+
+      <div class="demo-card" id="demo-human-agent">
+        <h4>Interactive demo · Human SERP vs agent payload</h4>
+        <p style="font-size:0.9rem;color:var(--text-muted);margin-top:0">
+          Toggle the view. The same underlying “documents” are rendered for skimming versus machine consumption.
+        </p>
+        <div class="toggle-row">
+          <label class="switch"><input type="radio" name="ha-view" value="human" checked /> Human-oriented result card</label>
+          <label class="switch"><input type="radio" name="ha-view" value="agent" /> Agent-oriented structured hit</label>
+        </div>
+        <div class="compare-grid" id="ha-compare"></div>
+      </div>
+
+      <div class="callout">
+        The phrase <code>search as infrastructure</code> captures a product shift: retrieval becomes a metered platform capability—ranking, filtering, freshness, and compliance—consumed by applications where the end user may never see raw results, only an answer audited through citations.
+      </div>
+    </section>
+
+    <section id="s6" class="chapter-section" data-section>
+      <h2>06 · The Future of Search</h2>
+      <p>
+        Research explores end-to-end differentiable retrieval. <code>Differentiable Search Indexes (DSI)</code> and
+        <code>generative retrieval</code> (models emitting <code>document identifiers</code> directly) blur the line between weights and indexes;
+        updatability and provenance remain open engineering problems.
+      </p>
+      <p>
+        Conversational agents may hide retrieval mechanics behind answers, shifting UX investment toward trace viewers, citation inspectors, and
+        governance consoles rather than public SERPs.
+      </p>
+      <p>
+        <code>Continuous learning</code> and <code>privacy-preserving</code> retrieval (federated indexes, on-device search, encrypted matching) add
+        policy constraints alongside personalization. Human roles persist in curation, evaluation, and red-teaming—the open question is which loops require
+        supervision when generation and retrieval fuse.
+      </p>
+      <p>
+        Traditional search engines may become invisible for task-oriented queries embedded in agents, while discovery-oriented browsing (shopping, local
+        exploration) keeps list-based interfaces. The stack splits: interfaces for people, structured APIs for machines, and shared compliance layers
+        between them.
+      </p>
+    </section>
+
+    <section id="s7" class="chapter-section" data-section>
+      <h2>07 · Playground · Agentic Search Simulator</h2>
+      <p>
+        The sandbox below is a deterministic <em>toy</em>—no live models or open web. It steps through planning, retrieval, grading, optional
+        refinement, and synthesis. Use <strong>Next agent step</strong>; toggle <code>single-hop</code> or <code>multi-hop</code> mode; at decision points,
+        choose <code>Auto</code> or a manual <code>override</code> to branch the trace.
+      </p>
+
+      <div class="demo-card playground">
+        <h4>Simulator controls</h4>
+        <label for="pg-question" style="display:block;margin-bottom:0.35rem;font-size:0.9rem;">Complex question</label>
+        <textarea id="pg-question" placeholder="Ask something that would require planning and multiple lookups…">How do sparse lexical methods and dense vector retrieval differ in failure modes when queries use rare technical jargon?</textarea>
+        <div class="toggle-row">
+          <label class="switch"><input type="checkbox" id="pg-multihop" checked /> Multi-hop mode (decompose + merge)</label>
+        </div>
+        <div class="demo-controls">
+          <button type="button" class="btn primary" id="pg-run">Next agent step</button>
+          <button type="button" class="btn" id="pg-clear">Clear trace</button>
+        </div>
+        <p id="pg-step-hint" style="font-size:0.85rem;color:var(--warning);margin:0 0 0.5rem"></p>
+        <h4 style="margin-top:1.25rem">Manual override (next step)</h4>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 0.5rem">
+          When the simulator pauses for a decision, choose an override or leave on <code>Auto</code> and click <strong>Next agent step</strong> again.
+        </p>
+        <select id="pg-override" class="btn-like" style="padding:0.45rem 0.75rem; margin-bottom:0.75rem;">
+          <option value="auto">Auto (follow agent policy)</option>
+          <option value="refine">Force: refine query &amp; search again</option>
+          <option value="stop">Force: stop early &amp; synthesize now</option>
+          <option value="extra">Force: add extra corroboration search</option>
+        </select>
+        <h4>Trace</h4>
+        <div id="pg-log" class="log" aria-live="polite"></div>
+        <h4 style="margin-top:1rem">Final answer (simulated)</h4>
+        <div id="pg-answer" class="react-step" style="border-left-color:var(--success);"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-foot">
+    Single-file tutorial · Agentic Search · Dark theme · Vanilla JS
+  </footer>
+
+  <script>
+(function () {
+  "use strict";
+
+  /* ---- Fade-in on scroll ---- */
+  var sections = document.querySelectorAll("[data-section]");
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) e.target.classList.add("visible");
+        });
+      },
+      { rootMargin: "0px 0px -8% 0px", threshold: 0.08 }
+    );
+    sections.forEach(function (s) { io.observe(s); });
+  } else {
+    sections.forEach(function (s) { s.classList.add("visible"); });
+  }
+
+  /* ---- Demo 1: ReAct ---- */
+  var reactSteps = [
+    { type: "thought", text: "I need a precise definition plus one contrast example; I should search the web corpus first." },
+    { type: "action", text: "tool: web_search(query=\"differentiable search index DSI definition contrast with BM25\")" },
+    { type: "observation", text: "Top hits mention parametric retrieval, end-to-end training versus inverted indexes; snippets partially overlap." },
+    { type: "thought", text: "Snippets conflate training objectives; I need a second pass focused on updatability and provenance." },
+    { type: "action", text: "tool: web_search(query=\"DSI differentiable search index updatability provenance issues\")" },
+    { type: "observation", text: "Results highlight tension between fast corpus edits and frozen neural memory; good for synthesis." },
+    { type: "thought", text: "Sufficient corroboration; I will answer with two claims and cite both result clusters." }
+  ];
+  var reactIdx = 0;
+  var reactTrace = document.getElementById("react-trace");
+  function renderReact() {
+    reactTrace.innerHTML = "";
+    for (var i = 0; i < reactIdx; i++) {
+      var s = reactSteps[i];
+      var div = document.createElement("div");
+      div.className = "react-step " + (s.type === "thought" ? "thought" : s.type === "action" ? "action" : "observation");
+      div.innerHTML = "<div class=\"label\">" + s.type + "</div>" + escapeHtml(s.text);
+      reactTrace.appendChild(div);
+    }
+    document.getElementById("react-next").disabled = reactIdx >= reactSteps.length;
+  }
+  document.getElementById("react-next").addEventListener("click", function () {
+    if (reactIdx < reactSteps.length) reactIdx++;
+    renderReact();
+  });
+  document.getElementById("react-reset").addEventListener("click", function () {
+    reactIdx = 0;
+    renderReact();
+  });
+  renderReact();
+
+  /* ---- Demo 2: Multi-hop ---- */
+  var hopStages = [
+    { title: "Q0 — Decompose", lines: ["SubQ1: Which countries joined the EU after 2004?", "SubQ2: GDP growth series per country (consistent year range)", "SubQ3: Normalization — per capita vs nominal? choose nominal YoY for demo"] },
+    { title: "Hop 1 — Membership", lines: ["search(membership, post-2004 accessions)", "Observation: set = {BG, RO} in 2007; HR 2013; others later (simulated subset)."] },
+    { title: "Hop 2 — Statistics", lines: ["search(GDP growth, BG, RO, HR, 2010–2023)", "Observation: retrieved tables disagree on revision years; mark uncertainty."] },
+    { title: "Hop 3 — Align & compare", lines: ["rewrite query with IMF/World Bank keywords", "Observation: converged on single authoritative table slice."] },
+    { title: "Hop 4 — Stop / synthesize", lines: ["Grade: coverage OK for demo subset; contradictions flagged in footnotes.", "Output: comparative summary + explicit caveat on revisions."] }
+  ];
+  var hopI = 0;
+  var hopDisplay = document.getElementById("hop-display");
+  function renderHop() {
+    hopDisplay.innerHTML = "";
+    for (var j = 0; j < hopI; j++) {
+      var st = hopStages[j];
+      var wrap = document.createElement("div");
+      wrap.className = "hop-node";
+      wrap.innerHTML = "<strong>" + escapeHtml(st.title) + "</strong><ul style=\"margin:0.4rem 0 0 1rem;padding:0\">" +
+        st.lines.map(function (L) { return "<li>" + escapeHtml(L) + "</li>"; }).join("") + "</ul>";
+      hopDisplay.appendChild(wrap);
+    }
+    document.getElementById("hop-advance").disabled = hopI >= hopStages.length;
+  }
+  document.getElementById("hop-advance").addEventListener("click", function () {
+    if (hopI < hopStages.length) hopI++;
+    renderHop();
+  });
+  document.getElementById("hop-reset").addEventListener("click", function () {
+    hopI = 0;
+    renderHop();
+  });
+  renderHop();
+
+  /* ---- Demo 3: Query rewrite ---- */
+  var rewritePresets = [
+    {
+      cls: "evidence-seeking / vague reference",
+      expand: "neural retrieval survey 2023 tree figure icon paper (ColBERT / ANCE era)",
+      route: "tool: hybrid_search(index=\"papers\", modality=\"keyword+vector\")",
+      retry: "Poor hit rate → retry with explicit venue keywords + arXiv id pattern"
+    },
+    {
+      cls: "incident triage / operational",
+      expand: "HTTP 503 checkout EU region since Thursday; dependencies: payment gateway, CDN, regional pods",
+      route: "tool: log_index(\"trace_ids\") + tool: status_page_api",
+      retry: "Sparse logs → retry with trace_id from cart service + widen time window"
+    },
+    {
+      cls: "comparative technical",
+      expand: "lithium-ion vs sodium-ion battery energy density grid storage use-case constraints",
+      route: "tool: structured_specs(db=\"chem_cells\") + tool: web_search(citations)",
+      retry: "Conflicting numbers → retry with lab vs commercial packaging disambiguation"
+    }
+  ];
+  function runRewrite() {
+    var sel = document.getElementById("rewrite-select");
+    var p = rewritePresets[parseInt(sel.value, 10)] || rewritePresets[0];
+    var out = [
+      "classification: " + p.cls,
+      "expanded_query: " + p.expand,
+      "routed_tool: " + p.route,
+      "first_pass: weak_snippets=true",
+      "retry_policy: " + p.retry
+    ].join("\n");
+    document.getElementById("rewrite-output").textContent = out;
+  }
+  document.getElementById("rewrite-run").addEventListener("click", runRewrite);
+  runRewrite();
+
+  /* ---- Demo 4: Architecture stepper ---- */
+  var archSteps = [
+    { title: "1 · User question received", body: "Normalize intent, attach session memory, detect safety constraints before any retrieval." },
+    { title: "2 · Plan search strategy", body: "Choose tools: vector store for internal memos, web for fresh facts, SQL for sales aggregates. Set max_steps=4." },
+    { title: "3 · Execute searches", body: "Batch parallel queries where independent; serialize when later queries depend on entity resolution." },
+    { title: "4 · Evaluate results", body: "Check coverage rubric: every numeric claim needs a source; flag empty fields." },
+    { title: "5 · Refine or stop", body: "If gaps: rewrite queries using observed entity IDs. If OK: proceed to synthesis with citation anchors." },
+    { title: "6 · Synthesize with citations", body: "Generate answer; verifier pass ensures each bullet maps to a retrieved span ID." }
+  ];
+  var archIdx = 0;
+  var archBody = document.getElementById("arch-step-body");
+  var archBar = document.getElementById("arch-step-buttons");
+  function renderArch() {
+    archBar.innerHTML = "";
+    archSteps.forEach(function (_, k) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn";
+      b.textContent = String(k + 1);
+      b.addEventListener("click", function () {
+        archIdx = k;
+        paintArch();
+      });
+      archBar.appendChild(b);
+    });
+    paintArch();
+  }
+  function paintArch() {
+    var st = archSteps[archIdx];
+    archBody.innerHTML = "<div class=\"label\">" + escapeHtml(st.title) + "</div>" + escapeHtml(st.body);
+  }
+  renderArch();
+
+  /* ---- Demo 5: Human vs agent ---- */
+  var haData = {
+    title: "Solid-state battery pilot manufacturing timeline",
+    url: "https://example.org/news/ssb-pilot-2026",
+    snippet: "Factory pilot line announced for Q3; energy density targets 400 Wh/kg at pack level; partners include…",
+    score: 0.82,
+    published: "2026-03-12",
+    entities: ["solid-state battery", "pilot line", "Q3 2026"]
+  };
+  var haCompare = document.getElementById("ha-compare");
+  function renderHA(mode) {
+    haCompare.innerHTML = "";
+    var human = document.createElement("div");
+    human.className = "compare-col human";
+    human.innerHTML = "<strong>Human-oriented</strong><p style=\"margin:0.5rem 0 0;font-size:0.9rem;color:var(--text-muted)\">" +
+      "Card layout, snippet teaser, site breadcrumb.</p><hr style=\"border-color:var(--border)\"/>" +
+      "<a href=\"#\" style=\"color:var(--accent);font-size:1rem\">" + escapeHtml(haData.title) + "</a>" +
+      "<p style=\"font-size:0.85rem;color:var(--text-muted)\">example.org › industry › batteries</p>" +
+      "<p style=\"font-size:0.92rem\">" + escapeHtml(haData.snippet) + "</p>";
+
+    var agent = document.createElement("div");
+    agent.className = "compare-col agent";
+    var json = JSON.stringify({
+      doc_id: "news:ssb-pilot-2026",
+      url: haData.url,
+      published_at: haData.published,
+      retrieval_score: haData.score,
+      snippet: haData.snippet,
+      entities: haData.entities,
+      license_hint: "editorial",
+      quote_spans: [{ start: 0, end: 56, text: haData.snippet.slice(0, 56) }]
+    }, null, 2);
+    agent.innerHTML = "<strong>Agent-oriented</strong><p style=\"margin:0.5rem 0 0;font-size:0.9rem;color:var(--text-muted)\">Structured hit for grounding.</p><hr style=\"border-color:var(--border)\"/><pre style=\"margin:0;font-size:0.72rem;overflow:auto\">" + escapeHtml(json) + "</pre>";
+
+    if (mode === "human") {
+      human.style.outline = "2px solid var(--accent)";
+      agent.style.outline = "none";
+    } else {
+      agent.style.outline = "2px solid var(--accent)";
+      human.style.outline = "none";
+    }
+    haCompare.appendChild(human);
+    haCompare.appendChild(agent);
+  }
+  document.querySelectorAll('input[name="ha-view"]').forEach(function (r) {
+    r.addEventListener("change", function () {
+      renderHA(r.value);
+    });
+  });
+  renderHA("human");
+
+  /* ---- Playground simulator (multi-step + overrides) ---- */
+  var pgState = { stage: "idle", multihop: true, question: "" };
+  var pgLog = document.getElementById("pg-log");
+  var pgAnswer = document.getElementById("pg-answer");
+  var pgHint = document.getElementById("pg-step-hint");
+
+  function escapeHtml(t) {
+    return String(t)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function logLine(cls, msg) {
+    var span = document.createElement("div");
+    span.className = cls;
+    span.textContent = msg;
+    pgLog.appendChild(span);
+    pgLog.scrollTop = pgLog.scrollHeight;
+  }
+
+  function buildPlan(q, multi) {
+    var base = [
+      { phase: "plan", text: "Plan: classify question as comparative technical; set evidence bar = high." },
+      { phase: "plan", text: "Tools: internal glossary + simulated web corpus; parallel OK after entity extraction." }
+    ];
+    if (multi) {
+      base.push({ phase: "plan", text: "Decomposition: (A) define sparse vs dense, (B) collect failure anecdotes, (C) merge with citations." });
+    }
+    return base;
+  }
+
+  function synthAnswer(q) {
+    return "Simulated synthesis for: \"" + q.slice(0, 120) + (q.length > 120 ? "…" : "") + "\"\n\n" +
+      "Sparse lexical methods (e.g., BM25-style) tend to fail when jargon is rare or polysemous: the term matches the wrong sense or misses paraphrases. Dense vector retrieval fails when the query lies off-manifold relative to training data, or when fine-grained discrimination needs exact tokens (SKUs, legal citations). A pragmatic agentic stack alternates both, uses query rewriting after weak snippets, and stops when corroborating sources agree on the failure mode boundaries.\n\n" +
+      "[simulated citations: doc#lex-12, doc#vec-07]";
+  }
+
+  function setHint(t) {
+    pgHint.textContent = t || "";
+  }
+
+  document.getElementById("pg-run").addEventListener("click", function () {
+    var q = document.getElementById("pg-question").value.trim() || "(empty question)";
+    var multi = document.getElementById("pg-multihop").checked;
+    var ov = document.getElementById("pg-override").value;
+
+    if (pgState.stage === "idle") {
+      pgLog.innerHTML = "";
+      pgAnswer.textContent = "";
+      pgState = { stage: "after_plan", multihop: multi, question: q };
+      logLine("phase", "── Start trace ──");
+      buildPlan(q, multi).forEach(function (L) {
+        logLine("phase", "[plan] " + L.text);
+      });
+      if (multi) {
+        logLine("phase", "[decompose] Sub-query A: define sparse vs dense retrieval");
+        logLine("phase", "[decompose] Sub-query B: catalog typical failure triggers");
+        logLine("phase", "[decompose] Sub-query C: merge with citation policy");
+      }
+      setHint("Step 1 done (planning). Click again to execute primary search, or adjust multi-hop toggle first (clear to restart).");
+      return;
+    }
+
+    if (pgState.stage === "after_plan") {
+      logLine("tool", "[search] primary query=\"" + q.slice(0, 80).replace(/\s+/g, " ") + (q.length > 80 ? "…" : "") + "\"");
+      logLine("ctx", "[context] retrieved: 3 snippets (simulated); novelty medium; lexical overlap 0.41");
+      pgState.stage = "after_search1";
+      setHint("Step 2 done (retrieve). Set override for the NEXT action, then click to evaluate.");
+      return;
+    }
+
+    if (pgState.stage === "after_search1") {
+      logLine("phase", "[evaluate] Sufficiency check: partial — jargon sense ambiguity not fully resolved.");
+      pgState.stage = "decide1";
+      setHint("Step 3 — DECISION POINT. Choose Auto / refine / extra / stop, then click Next agent step.");
+      return;
+    }
+
+    if (pgState.stage === "decide1") {
+      var action = ov === "auto" ? (pgState.multihop ? "extra" : "stop") : ov;
+      logLine("phase", "[decision] Applied policy: " + action + (ov === "auto" ? " (auto)" : " (manual override)"));
+      if (action === "refine") {
+        logLine("tool", "[search] refined_query=\"sparse BM25 OOV jargon failure + dense embedding collapse case study\"");
+        logLine("ctx", "[context] +2 snippets; duplicate detection: no");
+      } else if (action === "extra") {
+        logLine("tool", "[search] corroboration_query=\"evaluation benchmarks lexical vs dense hard negatives\"");
+        logLine("ctx", "[context] +1 snippet; marginal gain flagged");
+      } else if (action === "stop") {
+        logLine("phase", "[early_stop] Forced synthesis before full corroboration cycle.");
+      }
+      pgState.stage = "after_followup";
+      setHint("Step 4 done (follow-up retrieval if any). Set override for grading bias, then click to grade.");
+      return;
+    }
+
+    if (pgState.stage === "after_followup") {
+      var g = document.getElementById("pg-override").value;
+      if (g === "stop") {
+        logLine("phase", "[grade] Strictness: low (early stop) — will surface uncertainty in answer.");
+      } else if (g === "refine") {
+        logLine("phase", "[grade] Strictness: high — demand dual-source agreement on claims.");
+      } else {
+        logLine("phase", "[grade] Strictness: standard — coverage OK; contradictions: low (simulated).");
+      }
+      pgState.stage = "decide2";
+      setHint("Step 5 — optional second override affects strictness message above. Click once more to synthesize.");
+      return;
+    }
+
+    if (pgState.stage === "decide2") {
+      pgAnswer.textContent = synthAnswer(pgState.question);
+      logLine("phase", "[synthesize] Draft answer materialized with span anchors (simulated).");
+      logLine("phase", "── End trace ──");
+      pgState.stage = "done";
+      setHint("Complete. Clear trace to run another question.");
+      return;
+    }
+
+    if (pgState.stage === "done") {
+      logLine("phase", "(Trace finished — press Clear trace to reset.)");
+    }
+  });
+
+  document.getElementById("pg-clear").addEventListener("click", function () {
+    pgLog.innerHTML = "";
+    pgAnswer.textContent = "";
+    pgState = { stage: "idle", multihop: true, question: "" };
+    setHint("");
+  });
+})();
+  </script>
+</body>
+</html>

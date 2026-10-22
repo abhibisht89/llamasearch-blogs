@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coding LLaMA 2 from Scratch — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.75; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent5); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.1rem; color: var(--accent); margin: 20px 0 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.8rem; font-family: var(--mono); color: var(--accent2); letter-spacing: 2px; margin-bottom: 10px; display: block; text-transform: uppercase; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 80px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108,140,255,0.16), transparent), radial-gradient(ellipse 50% 40% at 100% 40%, rgba(52,211,153,0.08), transparent); pointer-events: none; }
+.hero .container { position: relative; z-index: 1; }
+.hero h1 { margin-bottom: 16px; }
+.subtitle { font-size: 1.08rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 28px; }
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pill { font-size: 0.72rem; font-family: var(--mono); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim); }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 18px 0; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+@media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin: 16px 0; font-family: var(--mono); font-size: 0.9rem; text-align: center; color: var(--accent3); overflow-x: auto; }
+.callout { background: rgba(108,140,255,0.07); border-left: 3px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 20px 0; font-size: 0.92rem; }
+.callout p:last-child { margin-bottom: 0; color: var(--text-dim); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.06); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.06); }
+.callout.danger { border-left-color: var(--danger); background: rgba(248,113,113,0.06); }
+ul.tight { margin: 0 0 1em 1.2em; color: var(--text-dim); }
+ul.tight li { margin-bottom: 0.45em; }
+table.scale { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 16px 0; font-family: var(--mono); }
+table.scale th, table.scale td { border: 1px solid var(--border); padding: 10px 8px; text-align: left; }
+table.scale th { background: var(--bg-card-alt); color: var(--accent); }
+.fade-in { opacity: 0; transform: translateY(24px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; transform: translateY(-100%); transition: transform 0.3s ease; }
+.nav.visible { transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.88rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 68%; }
+.nav-links a { font-size: 0.68rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.82rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.14); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.btn-sm { font-size: 0.72rem; padding: 4px 10px; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 76px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.78rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.55; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; color: inherit; }
+.ln { display: inline-block; width: 32px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 12px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.08); border-left: 2px solid var(--accent); margin-left: -16px; padding-left: 14px; }
+.line.new { background: rgba(52, 211, 153, 0.08); border-left: 2px solid var(--accent3); margin-left: -16px; padding-left: 14px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.88; text-decoration: underline dotted; }
+.code-note { padding: 12px 16px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.84rem; color: var(--text-dim); line-height: 1.5; min-height: 2.5em; }
+.code-note strong { color: var(--accent); }
+.code-progression { margin: 28px 0; }
+.step-caption { margin-top: 12px; font-size: 0.88rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 18px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.74rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 16px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.82rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 24px 0; }
+.interactive-panel h4 { font-size: 0.95rem; color: var(--text); margin-bottom: 12px; font-family: var(--mono); }
+canvas.demo-canvas { display: block; width: 100%; max-width: 100%; height: auto; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+label.ctrl { display: block; font-size: 0.8rem; color: var(--text-dim); margin: 12px 0 4px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.output-readout { font-family: var(--mono); font-size: 0.84rem; color: var(--accent4); margin-top: 10px; padding: 10px; background: var(--bg); border-radius: 8px; }
+.playground-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.qa-box { margin: 16px 0; padding: 16px; border-radius: var(--radius); border: 1px dashed var(--border); background: rgba(167,139,250,0.05); }
+.qa-box .q { color: var(--accent2); font-weight: 600; font-size: 0.88rem; margin-bottom: 8px; }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Coding LLaMA 2 from Scratch</span></nav>
+
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Advanced NLP V2</a>
+  <div class="nav-links">
+    <a href="#s00">Roadmap</a><a href="#s01">LM</a><a href="#s02">Args</a><a href="#s03">Skeleton</a><a href="#s04">RoPE</a><a href="#s05">RMSNorm</a><a href="#s06">Block</a><a href="#s07">KV</a><a href="#s08">GQA</a><a href="#s09">Attn</a><a href="#s10">FFN</a><a href="#s11">Weights</a><a href="#s12">Decode</a><a href="#s13">Infer</a><a href="#play">Play</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Coding LLaMA 2 from Scratch in PyTorch</h1>
+    <p class="subtitle">
+      Skeleton-first: wire <code>Transformer</code>, <code>ModelArgs</code>, and tensor shapes end-to-end, then fill <code>RMSNorm</code>, rotary embeddings (<code>precompute_freqs_cis</code>, <code>apply_rotary_emb</code>),
+      grouped-query attention with <code>repeat_kv</code> and a <code>KV cache</code>, <code>SwiGLU</code> feed-forward, official checkpoint loading, and <code>top_p</code> sampling inside <code>text_completion</code>.
+    </p>
+    <div class="pill-row">
+      <span class="pill">PyTorch</span><span class="pill">Decoder-only</span><span class="pill">RoPE</span><span class="pill">RMSNorm</span>
+      <span class="pill">GQA</span><span class="pill">KV cache</span><span class="pill">SwiGLU</span><span class="pill">Meta weights</span>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00</span>
+  <h2>Skeleton-first: see the stack before the lemmas</h2>
+  <p>
+    A practical way to own LLaMA-style code is to instantiate the <strong>outer</strong> <code>Transformer</code> first: <code>tok_embeddings</code>, a <code>ModuleList</code> of identical <code>TransformerBlock</code> modules,
+    final <code>RMSNorm</code>, and an <code>output</code> linear that maps hidden states to <code>vocab_size</code> logits. Each inner block is “pre-norm” attention plus residual, then pre-norm <code>FeedForward</code> plus residual.
+    Only after that shell exists do you implement <code>precompute_freqs_cis</code>, <code>Attention</code> with <code>start_pos</code>, and the three-matrix <code>w1</code>/<code>w3</code>/<code>w2</code> MLP.
+  </p>
+  <p>
+    This matches how inference code is read in the wild: the <code>forward</code> you care about is short, while <code>apply_rotary_emb</code> and cache indexing are where bugs hide.
+    Training would disable the cache and allow <code>seqlen &gt; 1</code>; the path below targets <strong>loading pretrained weights</strong> and <code>torch.inference_mode()</code> generation.
+  </p>
+  <div class="callout warn">
+    <p><strong>Inference contract.</strong> With a populated KV cache, each step passes a batch of shape <code>(B, 1)</code> token ids. <code>start_pos</code> is the absolute index of that token in the full prefix so RoPE rows and cache writes stay aligned.</p>
+  </div>
+  <p>
+    A practical stack for reproducing official behavior pairs this module code with a <strong>SentencePiece</strong>-style tokenizer (BPE / byte-pair style subwords): tokens are rarely whole words—they can be affixes, fragments, whitespace runs, or digits. The embedding table maps each vocabulary index to a learned vector (4096-wide in the 7B-style configuration cited in releases, not the original Transformer’s 512).
+  </p>
+  <p>
+    The chapter follows a top-down read order: outer <code>Transformer</code> first, then RoPE, GQA, and cache details—the same path inference code takes in reference implementations.
+  </p>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01</span>
+  <h2>Decoder-only language modeling</h2>
+  <p>
+    LLaMA 2 is a <strong>causal</strong> model: position <code>t</code> may attend only to positions <code>≤ t</code>. The objective is next-token prediction: model a conditional <code>P(x_{t+1} | x_{≤t})</code> and sample or argmax at decode time.
+    Unlike encoder–decoder stacks, there is no cross-attention stream—only <code>self.attention</code> over the residual hidden state <code>h</code>.
+  </p>
+  <div class="comparison">
+    <div class="card"><h3 style="color:var(--accent3);">Training view</h3><p>Usually pack a chunk of length <code>T</code>, mask future positions, and compute logits for every offset in one forward (no KV cache).</p></div>
+    <div class="card"><h3 style="color:var(--accent2);">Inference view</h3><p>After a prompt warm-up, feed one new <code>token_id</code> per step; reuse stored <code>k_cache</code> and <code>v_cache</code> so you do not re-project old tokens.</p></div>
+  </div>
+  <div class="formula">P(x_{1:L}) = ∏_{t=0}^{L-1} P(x_{t+1} | x_{≤t})</div>
+  <p>
+    Training packs a length-<code>T</code> chunk with targets shifted one step: position <code>t</code> predicts token <code>t+1</code> from prefix <code>x_{≤t}</code>, and the causal mask hides future positions. Inference reuses the same conditional—one new token per forward after the prompt is cached.
+  </p>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02</span>
+  <h2><code>ModelArgs</code>: one dataclass, every dimension</h2>
+  <p>
+    Hyperparameters that must agree across modules live in a <code>@dataclass</code> (here <code>ModelArgs</code>): <code>dim</code> (model width), <code>n_layers</code>, <code>n_heads</code> (query heads), <code>n_kv_heads</code> (key/value heads for GQA),
+    <code>vocab_size</code>, <code>ffn_dim_multiplier</code>, <code>multiple_of</code> for rounding the SwiGLU interior, <code>norm_eps</code>, and cache bounds <code>max_batch_size</code>, <code>max_seq_len</code>.
+    Head width is <code>head_dim = dim // n_heads</code>; GQA requires <code>n_heads % n_kv_heads == 0</code> for the simple <code>repeat_kv</code> layout.
+  </p>
+  <div class="callout">
+    <p>
+      When researchers shrink the number of KV heads for speed, they often <strong>widen the feed-forward block</strong> (via <code>ffn_dim_multiplier</code> and related knobs) so total parameter count stays comparable to an older “full MHA” baseline. That way comparisons isolate architectural choices instead of model size.
+    </p>
+  </div>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3>Why centralize?</h3>
+      <p>Constructor signatures stay small: every submodule reads <code>args.dim</code>, <code>args.n_heads</code>, etc. When you parse <code>params.json</code> from a release directory, you fill this object once and call <code>Transformer(args)</code>.</p>
+      <p>Official checkpoints name tensors like <code>layers.{i}.attention.wq.weight</code>; mirroring those attribute paths avoids a brittle rename map.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L1–28</span></div>
+      <pre class="code-block annotated" id="annArgs"><code><span class="line"><span class="ln">1</span><span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass</span></code>
+<code><span class="line"><span class="ln">2</span><span class="kw">from</span> typing <span class="kw">import</span> Optional</span></code>
+<code><span class="line"><span class="ln">3</span><span class="kw">import</span> torch</span></code>
+<code><span class="line"><span class="ln">4</span><span class="kw">import</span> torch.nn <span class="kw">as</span> nn</span></code>
+<code><span class="line"><span class="ln">5</span></span></code>
+<code><span class="line hl"><span class="ln">6</span><span class="kw">@dataclass</span></span></code>
+<code><span class="line hl"><span class="ln">7</span><span class="kw">class</span> <span class="fn">ModelArgs</span>:</span></code>
+<code><span class="line"><span class="ln">8</span>    dim: <span class="fn">int</span> = <span class="num">4096</span></span></code>
+<code><span class="line"><span class="ln">9</span>    n_layers: <span class="fn">int</span> = <span class="num">32</span></span></code>
+<code><span class="line"><span class="ln">10</span>    n_heads: <span class="fn">int</span> = <span class="num">32</span></span></code>
+<code><span class="line"><span class="ln">11</span>    n_kv_heads: Optional[<span class="fn">int</span>] = <span class="kw">None</span></span></code>
+<code><span class="line"><span class="ln">12</span>    vocab_size: <span class="fn">int</span> = -<span class="num">1</span></span></code>
+<code><span class="line"><span class="ln">13</span>    multiple_of: <span class="fn">int</span> = <span class="num">256</span></span></code>
+<code><span class="line"><span class="ln">14</span>    ffn_dim_multiplier: Optional[<span class="fn">float</span>] = <span class="kw">None</span></span></code>
+<code><span class="line"><span class="ln">15</span>    norm_eps: <span class="fn">float</span> = <span class="num">1e-5</span></span></code>
+<code><span class="line"><span class="ln">16</span>    max_batch_size: <span class="fn">int</span> = <span class="num">32</span></span></code>
+<code><span class="line"><span class="ln">17</span>    max_seq_len: <span class="fn">int</span> = <span class="num">2048</span></span></code>
+<code><span class="line"><span class="ln">18</span></span></code>
+<code><span class="line"><span class="ln">19</span>    <span class="kw">def</span> <span class="fn">__post_init__</span>(<span class="arg">self</span>):</span></code>
+<code><span class="line hl"><span class="ln">20</span>        <span class="kw">if</span> <span class="arg">self</span>.n_kv_heads <span class="kw">is</span> <span class="kw">None</span>:</span></code>
+<code><span class="line"><span class="ln">21</span>            <span class="arg">self</span>.n_kv_heads = <span class="arg">self</span>.n_heads</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="GQA needs an integer repeat factor n_rep = n_heads / n_kv_heads so repeat_kv can tile KV heads across queries.">22</span>        <span class="kw">assert</span> <span class="arg">self</span>.n_heads % <span class="arg">self</span>.n_kv_heads == <span class="num">0</span></span></code>
+</pre>
+      <div class="code-note" id="noteArgs">Click a line number in the panel above.</div>
+    </div>
+  </div>
+  <div class="jupyter-cell">
+    <div class="cell-header"><span class="cell-label">In [1]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+    <div class="code-header"><span class="code-filename">notebook.ipynb</span><span class="code-lines">L1–4</span></div>
+    <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">import</span> json</span></code>
+<code><span class="line"><span class="ln">2</span><span class="kw">with</span> <span class="fn">open</span>(<span class="str">"params.json"</span>) <span class="kw">as</span> f:</span></code>
+<code><span class="line"><span class="ln">3</span>    raw = json.<span class="fn">load</span>(f)</span></code>
+<code><span class="line"><span class="ln">4</span>args = <span class="fn">ModelArgs</span>(**{k: raw[k] <span class="kw">for</span> k <span class="kw">in</span> raw <span class="kw">if</span> k <span class="kw">in</span> <span class="fn">ModelArgs</span>.__dataclass_fields__})</span></code>
+</pre>
+    <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [1]</span><pre class="output-text">ModelArgs(dim=4096, n_layers=32, n_heads=32, n_kv_heads=32, vocab_size=32000, …)
+head_dim = dim // n_heads  →  128</pre></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03</span>
+  <h2><code>Transformer</code> outline and RoPE table</h2>
+  <p>
+    The top-level module holds <code>tok_embeddings</code>, <code>layers</code>, <code>norm</code>, <code>output</code>, and a buffer <code>freqs_cis</code> from <code>precompute_freqs_cis</code>.
+    <code>forward(tokens, start_pos)</code> embeds ids, slices <code>freqs_cis[start_pos:start_pos+seqlen]</code>, runs each <code>TransformerBlock</code>, applies <code>RMSNorm</code>, then <code>output</code>.
+    For cached inference you typically <code>assert seqlen == 1</code> after the prompt phase so tensor shapes stay trivial.
+  </p>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3>Tabbed build order</h3>
+      <p>Use the tabs to watch <code>Transformer.__init__</code> and <code>forward</code> accrete: bare <code>ModelArgs</code> fields first, then embedding and repeated <code>TransformerBlock</code>, then shared <code>freqs_cis</code>, then the attention/FFN call graph, and finally the full forward that threads <code>start_pos</code> into every layer.</p>
+      <p>Green <span class="line new" style="display:inline;padding:0 4px;margin:0;">new</span> lines in steps 2–5 mark what the previous tab did not show.</p>
+    </div>
+    <div class="code-progression" style="margin:0;">
+    <div class="btn-group">
+      <button type="button" class="btn active" onclick="llamaProg(this,'lp1')">1 · Args</button>
+      <button type="button" class="btn" onclick="llamaProg(this,'lp2')">2 · +RMSNorm</button>
+      <button type="button" class="btn" onclick="llamaProg(this,'lp3')">3 · +RoPE</button>
+      <button type="button" class="btn" onclick="llamaProg(this,'lp4')">4 · +Attention</button>
+      <button type="button" class="btn" onclick="llamaProg(this,'lp5')">5 · Full</button>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines" id="llamaProgLabel">Step 1 of 5</span></div>
+      <pre class="code-block" id="lp1"><code><span class="line"><span class="ln">30</span><span class="kw">class</span> <span class="fn">Transformer</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">31</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, params: <span class="fn">ModelArgs</span>):</span></code>
+<code><span class="line"><span class="ln">32</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">33</span>        <span class="arg">self</span>.params = params</span></code>
+<code><span class="line hl"><span class="ln">34</span>        <span class="arg">self</span>.vocab_size = params.vocab_size</span></code>
+<code><span class="line hl"><span class="ln">35</span>        <span class="arg">self</span>.n_layers = params.n_layers</span></code>
+<code><span class="line"><span class="ln">36</span>        <span class="cmt"># embeddings, blocks, norm, output — next tabs</span></span></code>
+</pre>
+      <pre class="code-block" id="lp2" style="display:none"><code><span class="line new"><span class="ln">37</span>        <span class="arg">self</span>.tok_embeddings = nn.<span class="fn">Embedding</span>(params.vocab_size, params.dim)</span></code>
+<code><span class="line new"><span class="ln">38</span>        <span class="arg">self</span>.layers = torch.nn.<span class="fn">ModuleList</span>()</span></code>
+<code><span class="line new"><span class="ln">39</span>        <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(params.n_layers):</span></code>
+<code><span class="line new"><span class="ln">40</span>            <span class="arg">self</span>.layers.<span class="fn">append</span>(<span class="fn">TransformerBlock</span>(params))</span></code>
+<code><span class="line new"><span class="ln">41</span>        <span class="arg">self</span>.norm = <span class="fn">RMSNorm</span>(params.dim, eps=params.norm_eps)</span></code>
+<code><span class="line new"><span class="ln">42</span>        <span class="arg">self</span>.output = nn.<span class="fn">Linear</span>(params.dim, params.vocab_size, bias=<span class="kw">False</span>)</span></code>
+</pre>
+      <pre class="code-block" id="lp3" style="display:none"><code><span class="line new"><span class="ln">43</span>        <span class="arg">self</span>.freqs_cis = <span class="fn">precompute_freqs_cis</span>(</span></code>
+<code><span class="line new"><span class="ln">44</span>            params.dim <span class="op">//</span> params.n_heads,</span></code>
+<code><span class="line new"><span class="ln">45</span>            params.max_seq_len <span class="op">*</span> <span class="num">2</span>,</span></code>
+<code><span class="line new"><span class="ln">46</span>        )</span></code>
+<code><span class="line"><span class="cmt"># Complex tensor (max_len*2, head_dim/2) on CPU; move with .to(x) in forward</span></span></code>
+</pre>
+      <pre class="code-block" id="lp4" style="display:none"><code><span class="line"><span class="cmt"># Each TransformerBlock.forward(h, start_pos, freqs_cis) runs:</span></span></code>
+<code><span class="line new"><span class="ln">48</span>        <span class="cmt"># h = h + Attention(RMSNorm_1(h), …)</span></span></code>
+<code><span class="line new"><span class="ln">49</span>        <span class="cmt"># h = h + FeedForward(RMSNorm_2(h))</span></span></code>
+<code><span class="line"><span class="cmt"># Attention writes (k,v) rows into layer-local cache[start_pos]</span></span></code>
+</pre>
+      <pre class="code-block" id="lp5" style="display:none"><code><span class="line new"><span class="ln">51</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, tokens: torch.Tensor, start_pos: <span class="fn">int</span>):</span></code>
+<code><span class="line new"><span class="ln">52</span>        _bsz, seqlen = tokens.shape</span></code>
+<code><span class="line new"><span class="ln">53</span>        h = <span class="arg">self</span>.tok_embeddings(tokens)</span></code>
+<code><span class="line new"><span class="ln">54</span>        freqs = <span class="arg">self</span>.freqs_cis[start_pos : start_pos <span class="op">+</span> seqlen]</span></code>
+<code><span class="line new"><span class="ln">55</span>        <span class="kw">for</span> layer <span class="kw">in</span> <span class="arg">self</span>.layers:</span></code>
+<code><span class="line new"><span class="ln">56</span>            h = layer(h, start_pos, freqs)</span></code>
+<code><span class="line new"><span class="ln">57</span>        h = <span class="arg">self</span>.norm(h)</span></code>
+<code><span class="line new"><span class="ln">58</span>        <span class="kw">return</span> <span class="arg">self</span>.output(h).<span class="fn">float</span>()</span></code>
+</pre>
+    </div>
+    <p class="step-caption" id="llamaCap">Grow from configuration fields to a full forward that threads <code>freqs_cis</code> into every block.</p>
+    </div>
+  </div>
+  <div class="callout danger">
+    <p><strong>Checkpoint names.</strong> Keep <code>attention.wq</code>, <code>wk</code>, <code>wv</code>, <code>wo</code> and <code>feed_forward.w1/w2/w3</code> aligned with the release so <code>load_state_dict(strict=True)</code> succeeds without a custom map.</p>
+  </div>
+  <p>
+    The reference repeats a depth of identical blocks (32× in 7B-class configs): token embeddings, the stack, final <code>RMSNorm</code>, then the vocabulary projection. Naming matches the public checkpoint so tensors land in the right attributes—rename only when you also carry a map.
+  </p>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04</span>
+  <h2>RoPE: <code>precompute_freqs_cis</code> and <code>apply_rotary_emb</code></h2>
+  <p>
+    RoPE rotates adjacent pairs in <code>q</code> and <code>k</code> by position-dependent angles; <code>v</code> stays unrotated. Chapter 04 derives the math (relative offsets via composed rotations, complex phasors, frequency schedule). Here the implementation task is wiring the table into the forward pass: <code>precompute_freqs_cis</code> builds <code>e^{i m \theta_i}</code> with <code>torch.polar</code>, and <code>apply_rotary_emb</code> packs pairs as complex, multiplies by the slice <code>freqs_cis[start_pos:start_pos+seqlen]</code>, and flattens back.
+  </p>
+  <div class="callout warn">
+    <p>RoPE requires an <strong>even</strong> head dimension <code>d_h</code>. The reference uses base <code>θ = 10000</code> and often precomputes <code>2 × max_seq_len</code> rows for long prompts.</p>
+  </div>
+  <div class="formula">θ_i = 10000^{-2i/d_h}, &nbsp; i = 0, …, d_h/2 − 1</div>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3>Complex multiply = fused rotation</h3>
+      <p><code>torch.view_as_complex(x.float().reshape(…, 2))</code> packs pairs; multiplying by unit-magnitude complexes applies cos/sin mixing without huge sparse matrices.</p>
+      <p>RoPE touches <strong>only</strong> <code>q</code> and <code>k</code> after projections; <code>v</code> stays unrotated.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L60–95</span></div>
+      <pre class="code-block annotated" id="annRope"><code><span class="line"><span class="ln">60</span><span class="kw">def</span> <span class="fn">precompute_freqs_cis</span>(<span class="arg">dim</span>: <span class="fn">int</span>, end: <span class="fn">int</span>, theta: <span class="fn">float</span> = <span class="num">10000.0</span>):</span></code>
+<code><span class="line"><span class="ln">61</span>    freqs = <span class="num">1.0</span> <span class="op">/</span> (theta <span class="op">**</span> (torch.<span class="fn">arange</span>(<span class="num">0</span>, dim, <span class="num">2</span>)[: (dim <span class="op">//</span> <span class="num">2</span>)].<span class="fn">float</span>() <span class="op">/</span> dim))</span></code>
+<code><span class="line"><span class="ln">62</span>    t = torch.<span class="fn">arange</span>(end, device=freqs.device, dtype=torch.float32)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Outer product: every position m times every base frequency θ_i — shape (end, dim//2).">63</span>    freqs = torch.<span class="fn">outer</span>(t, freqs).<span class="fn">float</span>()</span></code>
+<code><span class="line"><span class="ln anno" data-note="Unit complex numbers: cos(mθ)+i sin(mθ) without separate sin/cos tables.">64</span>    freqs_cis = torch.<span class="fn">polar</span>(torch.<span class="fn">ones_like</span>(freqs), freqs)</span></code>
+<code><span class="line"><span class="ln">65</span>    <span class="kw">return</span> freqs_cis</span></code>
+<code><span class="line"><span class="ln">66</span></span></code>
+<code><span class="line"><span class="ln">67</span><span class="kw">def</span> <span class="fn">reshape_for_broadcast</span>(<span class="arg">freqs_cis</span>, x):</span></code>
+<code><span class="line"><span class="ln">68</span>    ndim = x.ndim</span></code>
+<code><span class="line"><span class="ln">69</span>    <span class="kw">assert</span> <span class="num">0</span> <span class="op">&lt;=</span> <span class="num">1</span> <span class="op">&lt;</span> ndim</span></code>
+<code><span class="line"><span class="ln">70</span>    shape = [d <span class="kw">if</span> i <span class="op">==</span> <span class="num">1</span> <span class="kw">or</span> i <span class="op">==</span> ndim <span class="op">-</span> <span class="num">1</span> <span class="kw">else</span> <span class="num">1</span> <span class="kw">for</span> i, d <span class="kw">in</span> <span class="fn">enumerate</span>(x.shape)]</span></code>
+<code><span class="line"><span class="ln">71</span>    <span class="kw">return</span> freqs_cis.<span class="fn">view</span>(*shape)</span></code>
+<code><span class="line"><span class="ln">72</span></span></code>
+<code><span class="line"><span class="ln">73</span><span class="kw">def</span> <span class="fn">apply_rotary_emb</span>(<span class="arg">xq</span>, <span class="arg">xk</span>, <span class="arg">freqs_cis</span>):</span></code>
+<code><span class="line"><span class="ln">74</span>    xq_ = torch.<span class="fn">view_as_complex</span>(xq.<span class="fn">float</span>().<span class="fn">reshape</span>(*xq.shape[:-<span class="num">1</span>], -<span class="num">1</span>, <span class="num">2</span>))</span></code>
+<code><span class="line"><span class="ln">75</span>    xk_ = torch.<span class="fn">view_as_complex</span>(xk.<span class="fn">float</span>().<span class="fn">reshape</span>(*xk.shape[:-<span class="num">1</span>], -<span class="num">1</span>, <span class="num">2</span>))</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Broadcast freqs across batch and heads; dtype/device must match after .to(xq).">76</span>    freqs = <span class="fn">reshape_for_broadcast</span>(freqs_cis, xq_)</span></code>
+<code><span class="line hl"><span class="ln">77</span>    xq_out = torch.<span class="fn">view_as_real</span>(xq_ <span class="op">*</span> freqs).<span class="fn">flatten</span>(<span class="num">3</span>)</span></code>
+<code><span class="line"><span class="ln">78</span>    xk_out = torch.<span class="fn">view_as_real</span>(xk_ <span class="op">*</span> freqs).<span class="fn">flatten</span>(<span class="num">3</span>)</span></code>
+<code><span class="line"><span class="ln">79</span>    <span class="kw">return</span> xq_out.<span class="fn">type_as</span>(xq), xk_out.<span class="fn">type_as</span>(xk)</span></code>
+</pre>
+      <div class="code-note" id="noteRope">Click a highlighted line number for RoPE notes.</div>
+    </div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: one pair rotated by m·θ</h4>
+    <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.88rem;">Matches the real/imaginary expansion of <code>(x₁ + i x₂) · e^{i m θ}</code>.</p>
+    <canvas class="demo-canvas" id="ropeCanvas" width="640" height="260"></canvas>
+    <label class="ctrl" for="ropeM">Position index m</label>
+    <input type="range" id="ropeM" min="0" max="64" value="8">
+    <label class="ctrl" for="ropeTheta">Frequency scale θ (rad/step)</label>
+    <input type="range" id="ropeTheta" min="1" max="100" value="25">
+    <div class="output-readout" id="ropeOut"></div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: θ<sub>i</sub> schedule vs pair index</h4>
+    <canvas class="demo-canvas" id="thetaCanvas" width="640" height="220"></canvas>
+    <label class="ctrl" for="thetaDim">Head dimension d_h (even)</label>
+    <input type="range" id="thetaDim" min="32" max="256" step="32" value="128">
+    <div class="output-readout" id="thetaOut"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05</span>
+  <h2><code>RMSNorm</code></h2>
+  <p>
+    <code>RMSNorm</code> scales each token vector by the reciprocal root-mean-square of its features—no per-token mean subtraction (unlike <code>LayerNorm</code>).
+    A learnable vector <code>weight</code> (often called γ) rescales after normalization; <code>eps</code> inside the sqrt avoids divide-by-zero.
+  </p>
+  <div class="formula">RMS(x) = √(mean(x²) + ε) &nbsp;&nbsp;·&nbsp;&nbsp; RMSNorm(x) = (x / RMS(x)) ⊙ γ</div>
+  <p>
+    Layer normalization, as in the original Transformer, imagines a batch of tokens where <strong>each row</strong> is one token and columns are features—say ten tokens with three features <code>(a_1,a_2,a_3)</code> per row. It computes a mean <code>\mu</code> and variance <code>\sigma^2</code> along the feature axis for each row, then standardizes: <code>(x-\mu)/\sigma</code>, giving approximately zero mean and unit variance per row before the learnable affine <code>\gamma,\beta</code>. The variance formula <code>\frac{1}{n}\sum (x_i-\mu)^2</code> explicitly needs <code>\mu</code>.
+  </p>
+  <p>
+    RMSNorm (Zhang &amp; Sennrich, 2019) keeps the <strong>scaling</strong> story but drops recentering: the RMS statistic uses raw squares, so no mean is subtracted. The authors write: <em>“In this paper we hypothesize that the rescaling invariance is the reason for success of layer Norm, rather than the re-centering invariance.”</em> Operationally you divide by <code>\mathrm{RMS}(x)=\sqrt{\mathrm{mean}(x^2)+\varepsilon}</code> and multiply by a learnable <code>\gamma</code> (called <code>weight</code> in code)—same gain path, less work than full LayerNorm.
+  </p>
+  <div class="callout ok">
+    <p>
+      <code>torch.rsqrt</code> computes <code>1/\sqrt{\cdot}</code> in one fused step—what the reference uses inside <code>_norm</code> before the elementwise multiply with <code>weight</code>.
+    </p>
+  </div>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3><code>rsqrt</code> for one fused inverse</h3>
+      <p><code>torch.rsqrt</code> computes <code>1/√·</code> in a single op—standard in reference implementations. Output dtype follows <code>x</code> after the cast from stats in float32 if you stabilize in full precision.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L96–110</span></div>
+      <pre class="code-block annotated"><code><span class="line"><span class="ln">96</span><span class="kw">class</span> <span class="fn">RMSNorm</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">97</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, dim: <span class="fn">int</span>, eps: <span class="fn">float</span> = <span class="num">1e-6</span>):</span></code>
+<code><span class="line"><span class="ln">98</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">99</span>        <span class="arg">self</span>.eps = eps</span></code>
+<code><span class="line hl"><span class="ln">100</span>        <span class="arg">self</span>.weight = nn.<span class="fn">Parameter</span>(torch.<span class="fn">ones</span>(dim))</span></code>
+<code><span class="line"><span class="ln">101</span></span></code>
+<code><span class="line"><span class="ln">102</span>    <span class="kw">def</span> <span class="fn">_norm</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">103</span>        <span class="kw">return</span> x <span class="op">*</span> torch.<span class="fn">rsqrt</span>(x.<span class="fn">pow</span>(<span class="num">2</span>).<span class="fn">mean</span>(-<span class="num">1</span>, keepdim=<span class="kw">True</span>) <span class="op">+</span> <span class="arg">self</span>.eps)</span></code>
+<code><span class="line"><span class="ln">104</span></span></code>
+<code><span class="line"><span class="ln">105</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line"><span class="ln">106</span>        output = <span class="arg">self</span>.<span class="fn">_norm</span>(x.<span class="fn">float</span>()).<span class="fn">type_as</span>(x)</span></code>
+<code><span class="line hl"><span class="ln">107</span>        <span class="kw">return</span> output <span class="op">*</span> <span class="arg">self</span>.weight</span></code>
+</pre>
+      <div class="code-note" data-panel="rms"></div>
+    </div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: RMSNorm on a toy vector</h4>
+    <input type="text" id="rmsVec" value="3,-1,0.5,2" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:var(--mono);font-size:0.84rem;">
+    <label class="ctrl" for="rmsGamma">γ</label>
+    <input type="range" id="rmsGamma" min="10" max="200" value="100">
+    <label class="ctrl" for="rmsEps">ε ×10⁴</label>
+    <input type="range" id="rmsEps" min="1" max="500" value="10">
+    <div class="output-readout" id="rmsOut"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06</span>
+  <h2><code>TransformerBlock</code> (pre-norm)</h2>
+  <p>
+    Each block stores two <code>RMSNorm</code> layers and submodules <code>attention</code> and <code>feed_forward</code>. The residual stream is <code>h</code>; attention and FFN never change width—they return tensors shaped like <code>h</code>.
+    Both sublayers receive the rotary slice <code>freqs_cis</code> only where needed (attention); the FFN is position-agnostic.
+  </p>
+  <p>
+    With <code>dim = 4096</code> and <code>n_heads = 32</code>, each head sees <code>head\_dim = 4096/32 = 128</code> features from every token—still “full sentence” along sequence, but only a slice of the per-token embedding per head.
+  </p>
+  <p>
+    Decoder-only blocks use <strong>self-attention</strong> only—<code>q</code>, <code>k</code>, and <code>v</code> all come from the same residual stream. Cross-attention (queries from one stream, keys/values from another) appears in encoder–decoder models, not here.
+  </p>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3>Residual ordering</h3>
+      <p><code>h = h + submodule(norm(h))</code> is the LLaMA pattern (pre-norm). Deep stacks train more stably than post-norm variants at large depth.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L200–220</span></div>
+      <pre class="code-block annotated"><code><span class="line"><span class="ln">200</span><span class="kw">class</span> <span class="fn">TransformerBlock</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">201</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, args: <span class="fn">ModelArgs</span>):</span></code>
+<code><span class="line"><span class="ln">202</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">203</span>        <span class="arg">self</span>.n_heads = args.n_heads</span></code>
+<code><span class="line hl"><span class="ln">204</span>        <span class="arg">self</span>.dim = args.dim</span></code>
+<code><span class="line"><span class="ln">205</span>        <span class="arg">self</span>.head_dim = args.dim <span class="op">//</span> args.n_heads</span></code>
+<code><span class="line"><span class="ln">206</span>        <span class="arg">self</span>.attention = <span class="fn">Attention</span>(args)</span></code>
+<code><span class="line"><span class="ln">207</span>        <span class="arg">self</span>.feed_forward = <span class="fn">FeedForward</span>(</span></code>
+<code><span class="line"><span class="ln">208</span>            dim=args.dim, hidden_dim=<span class="num">4</span> <span class="op">*</span> args.dim, multiple_of=args.multiple_of,</span></code>
+<code><span class="line"><span class="ln">209</span>            ffn_dim_multiplier=args.ffn_dim_multiplier,</span></code>
+<code><span class="line"><span class="ln">210</span>        )</span></code>
+<code><span class="line"><span class="ln">211</span>        <span class="arg">self</span>.attention_norm = <span class="fn">RMSNorm</span>(args.dim, eps=args.norm_eps)</span></code>
+<code><span class="line"><span class="ln">212</span>        <span class="arg">self</span>.ffn_norm = <span class="fn">RMSNorm</span>(args.dim, eps=args.norm_eps)</span></code>
+<code><span class="line"><span class="ln">213</span></span></code>
+<code><span class="line"><span class="ln">214</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x, start_pos, freqs_cis):</span></code>
+<code><span class="line hl"><span class="ln">215</span>        h = x <span class="op">+</span> <span class="arg">self</span>.attention.<span class="fn">forward</span>(<span class="arg">self</span>.attention_norm.<span class="fn">forward</span>(x), start_pos, freqs_cis)</span></code>
+<code><span class="line hl"><span class="ln">216</span>        out = h <span class="op">+</span> <span class="arg">self</span>.feed_forward.<span class="fn">forward</span>(<span class="arg">self</span>.ffn_norm.<span class="fn">forward</span>(h))</span></code>
+<code><span class="line"><span class="ln">217</span>        <span class="kw">return</span> out</span></code>
+</pre>
+      <div class="code-note" data-panel="block"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07</span>
+  <h2>KV cache: store keys and values, query only the new row</h2>
+  <p>
+    Without a cache, each decode step would recompute <code>k</code> and <code>v</code> for the entire prefix. Instead, allocate <code>cache_k</code> and <code>cache_v</code> with shape <code>(max_batch, max_seq, n_kv_heads, head_dim)</code> per layer,
+    write into index <code>start_pos</code> on every forward, and read the prefix <code>0 : start_pos + 1</code> when building attention scores. The incoming <code>x</code> still has <code>seqlen == 1</code> for incremental generation after priming.
+  </p>
+  <div class="callout ok">
+    <p><strong>Memory trade.</strong> Cache size scales with <code>layers × batch × seq × n_kv_heads × head_dim × 2</code> (K and V) × dtype bytes. GQA shrinks <code>n_kv_heads</code> versus full multi-head KV.</p>
+  </div>
+  <p>
+    Picture autoregressive decoding on a memorized line: training packs the full prefix with a causal mask; a naïve rollout that refeeds the entire prefix each step recomputes old query rows even though only the <strong>last</strong> query row is new—on the order of <code>1+2+3+4 = 10</code> row-length dot products’ worth of redundant work versus <code>4</code> fresh dots when past keys and values are cached.
+  </p>
+  <div class="comparison">
+    <div class="card"><h3>Without KV cache</h3><p>Each step grows the query tensor with all prior tokens; <code>QK^T</code> revisits old query rows even though only the newest next-token logit matters. Many violet cells in the score matrix are recomputed from scratch.</p></div>
+    <div class="card"><h3>With KV cache</h3><p>Queries are just the <strong>latest</strong> token projection; <code>k</code> and <code>v</code> tensors append that token’s rows. Attention becomes one new query row against <strong>all</strong> cached keys—output width stays one token. At step 4, you do on the order of <strong>four</strong> key dot products instead of sixteen if you counted a full 4×4 rebuild each time.</p></div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: redundant score blocks without caching</h4>
+    <canvas class="demo-canvas" id="kvCanvas" width="640" height="320"></canvas>
+    <label class="ctrl" for="kvStep">Decode step t</label>
+    <input type="range" id="kvStep" min="1" max="8" value="4">
+    <div class="output-readout" id="kvOut"></div>
+  </div>
+  <div class="jupyter-cell">
+    <div class="cell-header"><span class="cell-label">In [2]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+    <div class="code-header"><span class="code-filename">notebook.ipynb</span><span class="code-lines">L1–3</span></div>
+    <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="cmt"># After processing T tokens, per layer:</span></span></code>
+<code><span class="line"><span class="ln">2</span>cache_k.shape == (B, T, n_kv_heads, head_dim)</span></code>
+<code><span class="line"><span class="ln">3</span>scores.shape == (B, n_heads, <span class="num">1</span>, T)  <span class="cmt"># one new query row vs all past keys</span></span></code>
+</pre>
+    <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [2]</span><pre class="output-text">vs naive full recompute: would build (B, n_heads, T, T) every step — O(T³) aggregate matmul volume across steps.</pre></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s08">
+  <span class="section-num">08</span>
+  <h2>GQA and <code>repeat_kv</code></h2>
+  <p>
+    <code>n_kv_heads</code> can be smaller than <code>n_heads</code>. Each KV head is shared by <code>n_rep = n_heads // n_kv_heads</code> query heads.
+    After projecting <code>k</code> and <code>v</code> with <code>wk</code> and <code>wv</code>, expand heads with <code>repeat_kv</code>: reshape to <code>(B, n_kv, 1, seqlen, dim)</code>, tile <code>n_rep</code> times on the head axis, flatten back to <code>(B, n_heads, seqlen, dim)</code> for the batched <code>QK^T</code>.
+  </p>
+  <table class="scale">
+    <tr><th>Variant</th><th>Query heads</th><th>KV heads</th><th>Note</th></tr>
+    <tr><td>MHA</td><td><code>H</code></td><td><code>H</code></td><td>Baseline bandwidth to KV.</td></tr>
+    <tr><td>GQA</td><td><code>H</code></td><td><code>H_kv &lt; H</code></td><td>LLaMA 2 70B-style compromise.</td></tr>
+    <tr><td>MQA</td><td><code>H</code></td><td><code>1</code></td><td>Minimum KV footprint.</td></tr>
+  </table>
+  <p>
+    GQA trades a modest quality hit for much lower KV-cache bandwidth (Chapter 04 covers MHA → GQA → MQA). LLaMA 2 checkpoints store fewer <code>wk</code>/<code>wv</code> heads than <code>wq</code>; <code>repeat_kv</code> expands them at runtime so batched matmuls still see <code>n_heads</code> aligned heads.
+  </p>
+  <div class="callout warn">
+    <p>
+      Reference LLaMA code often implements GQA by <strong>expanding</strong> each KV head with <code>repeat_kv</code> to match <code>n_heads</code>, then running a standard batched matmul. That is not the most bandwidth-optimal fused kernel, but it matches checkpoints and is easy to verify; a fused path would skip materializing repeated heads.
+    </p>
+  </div>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3>Why repeat instead of wider <code>wk</code>?</h3>
+      <p>Checkpoints store <code>wk</code> with <code>out_features = n_kv_heads * head_dim</code>. Repeating is the straightforward way to match <code>wq</code>'s <code>n_heads</code> split without duplicating learned weights on disk.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L120–128</span></div>
+      <pre class="code-block annotated"><code><span class="line"><span class="ln">120</span><span class="kw">def</span> <span class="fn">repeat_kv</span>(<span class="arg">x</span>: torch.Tensor, n_rep: <span class="fn">int</span>) -&gt; torch.Tensor:</span></code>
+<code><span class="line"><span class="ln">121</span>    <span class="kw">if</span> n_rep == <span class="num">1</span>:</span></code>
+<code><span class="line"><span class="ln">122</span>        <span class="kw">return</span> x</span></code>
+<code><span class="line hl"><span class="ln">123</span>    bs, n_kv, slen, head_dim = x.shape</span></code>
+<code><span class="line hl"><span class="ln">124</span>    <span class="kw">return</span> (</span></code>
+<code><span class="line"><span class="ln">125</span>        x[:, :, <span class="kw">None</span>, :, :]</span></code>
+<code><span class="line"><span class="ln">126</span>        .<span class="fn">expand</span>(bs, n_kv, n_rep, slen, head_dim)</span></code>
+<code><span class="line"><span class="ln">127</span>        .<span class="fn">reshape</span>(bs, n_kv <span class="op">*</span> n_rep, slen, head_dim)</span></code>
+<code><span class="line"><span class="ln">128</span>    )</span></code>
+</pre>
+      <div class="code-note" data-panel="gqa"></div>
+    </div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: grouping query heads under repeated KV</h4>
+    <canvas class="demo-canvas" id="gqaCanvas" width="640" height="200"></canvas>
+    <label class="ctrl" for="gqaHq">Query heads H_q</label>
+    <input type="range" id="gqaHq" min="4" max="32" step="4" value="8">
+    <label class="ctrl" for="gqaHkv">KV heads H_kv</label>
+    <input type="range" id="gqaHkv" min="1" max="8" value="2">
+    <div class="output-readout" id="gqaOut"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s09">
+  <span class="section-num">09</span>
+  <h2><code>Attention</code> forward: RoPE, cache, softmax, <code>wo</code></h2>
+  <p>
+    Linear maps <code>wq</code>, <code>wk</code>, <code>wv</code> (no bias) produce <code>q</code>, <code>k</code>, <code>v</code>. View as <code>(B, n_*_heads, seqlen, head_dim)</code>, apply <code>apply_rotary_emb</code> to <code>q</code> and <code>k</code>, convert <code>freqs_cis</code> dtype/device to match.
+    Scatter the new <code>k</code>, <code>v</code> into <code>cache_k</code>/<code>cache_v</code>, concatenate past via slicing, <code>repeat_kv</code> if needed, scale scores by <code>1/√head_dim</code>, apply causal mask (including padding past length), softmax, matmul <code>v</code>, merge heads, <code>wo</code> projection.
+  </p>
+  <div class="formula">Attention(Q,K,V) = softmax(QK^T / √d_h + \text{mask}) V</div>
+  <p>
+    After <code>wq/wk/wv</code>, a useful shape story for incremental decode is: <code>xq</code> becomes <code>(B,\,1,\,n_\text{heads},\,d_h)</code> then transposes to <code>(B,\,n_\text{heads},\,1,\,d_h)</code>; cached keys gather to <code>(B,\,n_\text{kv},\,T,\,d_h)</code> before <code>repeat_kv</code> aligns heads. Scores are <code>(B,\,n_\text{heads},\,1,\,T)</code>—one live query row against the whole prefix—then softmax and <code>values</code> yield a single updated contextual vector per batch row.
+  </p>
+  <p>
+    The cache write at <code>cache_k[start_pos:start_pos+seqlen]</code> stores this step’s keys and values; the slice <code>[:start_pos+seqlen]</code> then gathers the full valid prefix including the row just written. <code>start_pos</code> is the absolute token index so RoPE slices and cache indices stay aligned across layers.
+  </p>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3>Score layout</h3>
+      <p>With <code>seqlen_q = 1</code>, scores are a row vector per head. The mask must allow positions <code>≤ start_pos + seqlen - 1</code> and block the rest up to <code>max_seq_len</code> if you pad cache.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L130–198</span></div>
+      <pre class="code-block annotated" id="annAttn"><code><span class="line"><span class="ln">150</span>        xq, xk, xv = <span class="arg">self</span>.wq(x), <span class="arg">self</span>.wk(x), <span class="arg">self</span>.wv(x)</span></code>
+<code><span class="line"><span class="ln">151</span>        xq = xq.<span class="fn">view</span>(bs, seqlen, <span class="arg">self</span>.n_local_heads, <span class="arg">self</span>.head_dim)</span></code>
+<code><span class="line"><span class="ln">152</span>        xk = xk.<span class="fn">view</span>(bs, seqlen, <span class="arg">self</span>.n_local_kv_heads, <span class="arg">self</span>.head_dim)</span></code>
+<code><span class="line"><span class="ln">153</span>        xv = xv.<span class="fn">view</span>(bs, seqlen, <span class="arg">self</span>.n_local_kv_heads, <span class="arg">self</span>.head_dim)</span></code>
+<code><span class="line"><span class="ln">154</span>        xq, xk = <span class="fn">apply_rotary_emb</span>(xq, xk, freqs_cis=freqs_cis)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Write this step’s keys/values into the preallocated cache at start_pos — avoids recomputing earlier tokens.">155</span>        <span class="arg">self</span>.cache_k[:bs, start_pos : start_pos <span class="op">+</span> seqlen] = xk</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="cache_v mirrors cache_k shape; both grow logically to start_pos+seqlen along seq axis.">156</span>        <span class="arg">self</span>.cache_v[:bs, start_pos : start_pos <span class="op">+</span> seqlen] = xv</span></code>
+<code><span class="line"><span class="ln">157</span>        keys = <span class="arg">self</span>.cache_k[:bs, : start_pos <span class="op">+</span> seqlen]</span></code>
+<code><span class="line"><span class="ln">158</span>        values = <span class="arg">self</span>.cache_v[:bs, : start_pos <span class="op">+</span> seqlen]</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Broadcast each KV head to cover n_rep query heads before QK^T.">159</span>        keys = <span class="fn">repeat_kv</span>(keys, <span class="arg">self</span>.n_rep)</span></code>
+<code><span class="line"><span class="ln">160</span>        values = <span class="fn">repeat_kv</span>(values, <span class="arg">self</span>.n_rep)</span></code>
+<code><span class="line"><span class="ln">161</span>        xq = xq.<span class="fn">transpose</span>(<span class="num">1</span>, <span class="num">2</span>)</span></code>
+<code><span class="line"><span class="ln">162</span>        keys = keys.<span class="fn">transpose</span>(<span class="num">1</span>, <span class="num">2</span>)</span></code>
+<code><span class="line"><span class="ln">163</span>        values = values.<span class="fn">transpose</span>(<span class="num">1</span>, <span class="num">2</span>)</span></code>
+<code><span class="line"><span class="ln">164</span>        scores = torch.<span class="fn">matmul</span>(xq, keys.<span class="fn">transpose</span>(<span class="num">2</span>, <span class="num">3</span>)) <span class="op">/</span> math.<span class="fn">sqrt</span>(<span class="arg">self</span>.head_dim)</span></code>
+<code><span class="line"><span class="ln">165</span>        scores = scores <span class="op">+</span> mask  <span class="cmt"># -inf past valid cache</span></span></code>
+<code><span class="line"><span class="ln">166</span>        scores = torch.<span class="fn">softmax</span>(scores.<span class="fn">float</span>(), dim=-<span class="num">1</span>).<span class="fn">type_as</span>(xq)</span></code>
+<code><span class="line"><span class="ln">167</span>        output = torch.<span class="fn">matmul</span>(scores, values)</span></code>
+<code><span class="line"><span class="ln">168</span>        output = output.<span class="fn">transpose</span>(<span class="num">1</span>, <span class="num">2</span>).<span class="fn">contiguous</span>().<span class="fn">view</span>(bs, seqlen, -<span class="num">1</span>)</span></code>
+<code><span class="line hl"><span class="ln">169</span>        <span class="kw">return</span> <span class="arg">self</span>.wo(output)</span></code>
+</pre>
+      <div class="code-note" id="noteAttn">Click a highlighted line number for cache / GQA notes.</div>
+    </div>
+  </div>
+  <div class="jupyter-cell">
+    <div class="cell-header"><span class="cell-label">In [3]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+    <div class="code-header"><span class="code-filename">notebook.ipynb</span><span class="code-lines">L1–3</span></div>
+    <pre class="code-block"><code><span class="line"><span class="ln">1</span>wq.weight.shape  <span class="cmt"># (n_heads * head_dim, dim)</span></span></code>
+<code><span class="line"><span class="ln">2</span>wk.weight.shape  <span class="cmt"># (n_kv_heads * head_dim, dim)</span></span></code>
+<code><span class="line"><span class="ln">3</span>wo.weight.shape  <span class="cmt"># (dim, n_heads * head_dim)</span></span></code>
+</pre>
+    <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [3]</span><pre class="output-text">torch.Size([4096, 4096])  # wq example at 7B-style widths
+torch.Size([1024, 4096])  # if n_kv_heads = 8, head_dim 128
+torch.Size([4096, 4096])  # wo</pre></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <span class="section-num">10</span>
+  <h2>SwiGLU <code>FeedForward</code></h2>
+  <p>
+    Three matrices: <code>w1</code> and <code>w3</code> map <code>dim → hidden_dim</code>, <code>w2</code> maps <code>hidden_dim → dim</code>. Forward: <code>silu(x @ w1) * (x @ w3)</code> then <code>@ w2</code>.
+    Hidden width is often <code>≈ 2/3 × 4 × dim</code> times optional <code>ffn_dim_multiplier</code>, then rounded <strong>up</strong> to <code>multiple_of</code> (commonly 256) for tensor-core alignment.
+  </p>
+  <div class="formula">FFN(x) = W_2 · (SiLU(x W_1) ⊙ (x W_3))</div>
+  <p>
+    The gating nonlinearity is <strong>SiLU</strong>, also called <strong>Swish</strong> with <code>β = 1</code> (same functional form as the “sigmoid-weighted linear unit”). Three weight matrices are used—<code>w1</code>, <code>w3</code> up-project, <code>w2</code> down-project—whereas the vanilla Transformer ReLU block used two matrices; the <code>2/3</code> shrink plus rounding keeps total parameter budgets comparable when researchers swap attention mechanisms.
+  </p>
+  <div class="callout">
+    <p>
+      <strong>Rounding example.</strong> Suppose the raw hidden width computes to <strong>7</strong> but tensor cores want multiples of <strong>5</strong>. Integer ceiling via <code>multiple_of * ((hidden + multiple_of - 1) // multiple_of)</code> does: <code>7 + 4 = 11</code>, <code>11 // 5 = 2</code>, <code>2 × 5 = 10</code>—the least multiple of 5 not less than 7. LLaMA uses large multiples (often 256) for the same reason.
+    </p>
+  </div>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3>Where the 2/3 comes from</h3>
+      <p>SwiGLU uses <strong>two</strong> up-projections (<code>w1</code>, <code>w3</code>) into the same bottleneck. To keep parameter count near the old <code>4d</code> ReLU FFN, LLaMA shrinks <code>hidden_dim</code> by about <code>2/3</code> so <code>2 × (d × h) + (h × d)</code> stays in family with <code>2 × (4d × d)</code> at comparable scale.</p>
+      <p>When scaling SwiGLU and related MLP tweaks, practitioners often lean on empirics over theory—paraphrasing a line that appears in discussions of very large LMs: <em>“we offer no explanation as to why these architectures seem to work we attribute their success as all else to Divine benevolence.”</em> The point stands: SiLU-gated FFNs are adopted because they work in practice, not because we have a crisp first-principles proof.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L222–235</span></div>
+      <pre class="code-block annotated"><code><span class="line"><span class="ln">222</span><span class="kw">class</span> <span class="fn">FeedForward</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">223</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, dim, hidden_dim, multiple_of, ffn_dim_multiplier):</span></code>
+<code><span class="line"><span class="ln">224</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">225</span>        hidden_dim = <span class="fn">int</span>(<span class="num">2</span> <span class="op">*</span> hidden_dim <span class="op">/</span> <span class="num">3</span>)</span></code>
+<code><span class="line"><span class="ln">226</span>        <span class="kw">if</span> ffn_dim_multiplier <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span>:</span></code>
+<code><span class="line"><span class="ln">227</span>            hidden_dim = <span class="fn">int</span>(ffn_dim_multiplier <span class="op">*</span> hidden_dim)</span></code>
+<code><span class="line hl"><span class="ln">228</span>        hidden_dim = multiple_of <span class="op">*</span> ((hidden_dim <span class="op">+</span> multiple_of <span class="op">-</span> <span class="num">1</span>) <span class="op">//</span> multiple_of)</span></code>
+<code><span class="line"><span class="ln">229</span>        <span class="arg">self</span>.w1 = nn.<span class="fn">Linear</span>(dim, hidden_dim, bias=<span class="kw">False</span>)</span></code>
+<code><span class="line"><span class="ln">230</span>        <span class="arg">self</span>.w2 = nn.<span class="fn">Linear</span>(hidden_dim, dim, bias=<span class="kw">False</span>)</span></code>
+<code><span class="line"><span class="ln">231</span>        <span class="arg">self</span>.w3 = nn.<span class="fn">Linear</span>(dim, hidden_dim, bias=<span class="kw">False</span>)</span></code>
+<code><span class="line"><span class="ln">232</span></span></code>
+<code><span class="line"><span class="ln">233</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">234</span>        <span class="kw">return</span> <span class="arg">self</span>.w2(torch.nn.functional.<span class="fn">silu</span>(<span class="arg">self</span>.w1(x)) <span class="op">*</span> <span class="arg">self</span>.w3(x))</span></code>
+</pre>
+      <div class="code-note" data-panel="ffn"></div>
+    </div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: SiLU gate vs value path</h4>
+    <canvas class="demo-canvas" id="swiCanvas" width="640" height="240"></canvas>
+    <label class="ctrl" for="swiGate">Gate scale (x W₃ analogue)</label>
+    <input type="range" id="swiGate" min="5" max="200" value="100">
+    <div class="output-readout" id="swiOut"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <span class="section-num">11</span>
+  <h2>Loading official Meta checkpoints</h2>
+  <p>
+    Sharded <code>consolidated.*.pth</code> or multi-part <code>.pth</code> files concatenate into one state dict. Read <code>params.json</code> for <code>dim</code>, <code>n_layers</code>, <code>n_heads</code>, <code>n_kv_heads</code>, <code>vocab_size</code>, etc.
+    Before <code>load_state_dict</code>, drop keys you recompute—commonly <code>rope.freqs</code> if your <code>Transformer</code> builds <code>freqs_cis</code> in <code>__init__</code> and does not register them as persistent buffers matching the file.
+  </p>
+  <p>
+    Official releases pair these tensors with a <strong>SentencePiece</strong> tokenizer (Google’s library). On a laptop CPU, loading sharded checkpoints often lands in the <strong>10–20 second</strong> range—mostly disk IO and deserialization—before the first forward pass. Weight directories are usually obtained through the project’s published download script (plus an accepted license), not checked into source.
+  </p>
+  <div class="callout warn">
+    <p>
+      Match checkpoint dtype to hardware intent: reference code often sets a default CUDA half dtype for inference. CPU-only runs should keep tensors on <code>float32</code> or a supported CPU half path to avoid silent dtype/device mismatches.
+    </p>
+  </div>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3>Strict loading</h3>
+      <p><code>model.load_state_dict(new_sd, strict=True)</code> fails fast on renames. If you only removed <code>rope.freqs</code>, delete that key from the checkpoint dict, not from the module.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">load.py</span><span class="code-lines">L1–24</span></div>
+      <pre class="code-block annotated"><code><span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">load_checkpoint</span>(ckpt_dir, model, tokenizer_path):</span></code>
+<code><span class="line"><span class="ln">2</span>    checkpoints = <span class="fn">sorted</span>(Path(ckpt_dir).<span class="fn">glob</span>(<span class="str">"consolidated.*.pth"</span>))</span></code>
+<code><span class="line"><span class="ln">3</span>    sd = {}</span></code>
+<code><span class="line"><span class="ln">4</span>    <span class="kw">for</span> p <span class="kw">in</span> checkpoints:</span></code>
+<code><span class="line"><span class="ln">5</span>        sd.<span class="fn">update</span>(torch.<span class="fn">load</span>(p, map_location=<span class="str">"cpu"</span>))</span></code>
+<code><span class="line hl"><span class="ln">6</span>    sd.<span class="fn">pop</span>(<span class="str">"rope.freqs"</span>, <span class="kw">None</span>)</span></code>
+<code><span class="line"><span class="ln">7</span>    model.<span class="fn">load_state_dict</span>(sd, strict=<span class="kw">True</span>)</span></code>
+<code><span class="line"><span class="ln">8</span>    <span class="kw">return</span> model</span></code>
+</pre>
+      <div class="code-note" data-panel="load"></div>
+    </div>
+  </div>
+  <div class="jupyter-cell">
+    <div class="cell-header"><span class="cell-label">In [4]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+    <div class="code-header"><span class="code-filename">notebook.ipynb</span><span class="code-lines">L1–2</span></div>
+    <pre class="code-block"><code><span class="line"><span class="ln">1</span>sd = torch.<span class="fn">load</span>(<span class="str">"consolidated.00.pth"</span>, map_location=<span class="str">"cpu"</span>)</span></code>
+<code><span class="line"><span class="ln">2</span><span class="fn">print</span>(<span class="fn">sorted</span>([k <span class="kw">for</span> k <span class="kw">in</span> sd <span class="kw">if</span> k.<span class="fn">startswith</span>(<span class="str">"layers.0."</span>)])[:<span class="num">6</span>])</span></code>
+</pre>
+    <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [4]</span><pre class="output-text">['layers.0.attention_norm.weight', 'layers.0.attention.wk.weight', …,
+ 'layers.0.attention.wo.weight', 'layers.0.attention.wq.weight', …]</pre></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <span class="section-num">12</span>
+  <h2>Temperature, top-<code>p</code>, and sampling</h2>
+  <p>
+    Logits from <code>output(h)</code> become a distribution after softmax. <code>temperature</code> divides logits before softmax; <code>top_p</code> (nucleus) keeps the smallest set of highest-probability tokens whose cumulative mass reaches <code>p</code>, then renormalizes and samples.
+    Reference code often sorts once, applies cumulative mass logic, zeros the tail, and draws with <code>torch.multinomial</code>.
+  </p>
+  <div class="comparison">
+    <div class="card"><h3>Greedy argmax</h3><p>Always pick the highest-probability token. Example: after <em>“Cecilia, you’re breaking my heart / You’re shaking my…”</em> the intended lyric is <strong>confidence</strong>; greedy takes the argmax each step, then <strong>daily</strong> next if that’s the peak—fine when the model’s peaks align with the text. If step 1 wrongly peaks on an absurd word (say <em>liver</em>), the continuation rarely recovers because the context is corrupted.</p></div>
+    <div class="card"><h3>Beam search (width k)</h3><p>Keep the top-<code>k</code> partial hypotheses each step. Example: if step 1 keeps both <em>pizza</em> (40%) and <em>confidence</em> (20%), step 2 scores continuations for both; cumulative products like <code>0.40 × 0.01</code> for <em>pizza→margherita</em> can lose to <code>0.20 × 0.8</code> for <em>confidence→daily</em> even when the greedy first pick was wrong. Costs ~<code>k</code>× more forwards per depth.</p></div>
+  </div>
+  <p>
+    <strong>Temperature</strong> scales logits before softmax: low temperature (e.g. <code>0.4</code>) sharpens the distribution—an 80% peak can jump toward <strong>98%</strong>; high temperature flattens masses so unlikely tokens gain probability. It composes with sampling variants below.
+  </p>
+  <p>
+    Pure multinomial sampling respects the full softmax—including tiny tails—so a low-mass junk token (think a absurd tail word with 10% mass in a sloppy distribution) occasionally wins. <strong>Top-<code>k</code></strong> trims everything outside the <code>k</code> largest logits, then renormalizes. That fixes some tails but behaves oddly on <em>flat</em> versus <em>peaked</em> distributions: the same <code>k</code> may keep many nearly-equal tokens in the flat case yet still admit mediocre continuations in the peaked case because the cutoff is count-based, not mass-based.
+  </p>
+  <p>
+    <strong>Top-<code>p</code> (nucleus)</strong> keeps the smallest prefix of sorted probabilities whose cumulative mass reaches <code>p</code>. If one token already carries <strong>0.9</strong> mass and <code>p=0.5</code>, you stop at that single token—long tail never enters. If masses are spread, more tokens join the nucleus, preserving diversity when the model is uncertain.
+  </p>
+  <div class="callout ok">
+    <p>
+      Reference <code>text_completion</code> often defaults near <strong>temperature = 0.6</strong> (slightly sharper than 1.0) and <strong>top_p = 0.9</strong> (90% nucleus). Greedy is the <code>temperature → 0</code> limit in spirit; nucleus sampling is the production compromise between diversity and tail risk.
+    </p>
+  </div>
+  <div class="formula">\text{sorted masses e.g. } 0.44,\,0.40,\,0.06,\,0.04,\,0.03,\ldots \quad\Rightarrow\quad \text{cum: } 0.44,\,0.84,\,0.90,\,0.94,\ldots</div>
+  <p>
+    The mask <code>cumsum - sorted &gt; p</code> implements “include the token that pushes cumulative mass over the threshold.” With <code>p = 0.9</code>, cumulative hits <strong>0.84</strong> after two tokens, <strong>0.90</strong> after the third—so the third mass (<code>0.06</code>) is kept even though the running sum minus its own share dipped below the cutoff logic; subtracting <code>sorted</code> shifts inclusion correctly so the boundary token is not dropped. Zeros are applied to the tail, masses renormalized, then <code>multinomial</code> draws; <code>gather</code> maps sorted indices back to vocabulary ids.
+  </p>
+  <p>
+    Logits are unnormalized scores—one per vocabulary entry from the final linear layer. Softmax turns them into a probability simplex; temperature, top-<code>k</code>, and top-<code>p</code> only change how that distribution is sampled or truncated.
+  </p>
+  <div class="interactive-panel">
+    <h4>Demo: temperature on fixed logits</h4>
+    <canvas class="demo-canvas" id="tempCanvas" width="640" height="220"></canvas>
+    <label class="ctrl" for="tempSlider">Temperature T</label>
+    <input type="range" id="tempSlider" min="5" max="200" value="80">
+    <div class="output-readout" id="tempOut"></div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: nucleus (top-p) truncation</h4>
+    <canvas class="demo-canvas" id="toppCanvas" width="640" height="260"></canvas>
+    <label class="ctrl" for="toppSlider">Top-p mass</label>
+    <input type="range" id="toppSlider" min="50" max="100" value="90">
+    <div class="output-readout" id="toppOut"></div>
+  </div>
+  <div class="code-section">
+    <div class="code-explanation">
+      <h3><code>sample_top_p</code> sketch</h3>
+      <p>Sort probabilities descending. Mask tokens outside the nucleus. Renormalize remaining mass so the conditional is still a proper distribution.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">generation.py</span><span class="code-lines">L10–28</span></div>
+      <pre class="code-block annotated"><code><span class="line"><span class="ln">10</span><span class="kw">def</span> <span class="fn">sample_top_p</span>(probs, p):</span></code>
+<code><span class="line"><span class="ln">11</span>    probs_sort, probs_idx = torch.<span class="fn">sort</span>(probs, dim=-<span class="num">1</span>, descending=<span class="kw">True</span>)</span></code>
+<code><span class="line"><span class="ln">12</span>    probs_sum = torch.<span class="fn">cumsum</span>(probs_sort, dim=-<span class="num">1</span>)</span></code>
+<code><span class="line hl"><span class="ln">13</span>    mask = probs_sum <span class="op">-</span> probs_sort <span class="op">&gt;</span> p</span></code>
+<code><span class="line"><span class="ln">14</span>    probs_sort.<span class="fn">masked_fill_</span>(mask, <span class="num">0.0</span>)</span></code>
+<code><span class="line"><span class="ln">15</span>    probs_sort.<span class="fn">div_</span>(probs_sort.<span class="fn">sum</span>(dim=-<span class="num">1</span>, keepdim=<span class="kw">True</span>))</span></code>
+<code><span class="line"><span class="ln">16</span>    next_token = torch.<span class="fn">multinomial</span>(probs_sort, num_samples=<span class="num">1</span>)</span></code>
+<code><span class="line"><span class="ln">17</span>    next_token = torch.<span class="fn">gather</span>(probs_idx, -<span class="num">1</span>, next_token)</span></code>
+<code><span class="line"><span class="ln">18</span>    <span class="kw">return</span> next_token</span></code>
+</pre>
+      <div class="code-note" data-panel="sample"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <span class="section-num">13</span>
+  <h2><code>text_completion</code>: prime the cache, then decode</h2>
+  <p>
+    Encode the prompt to token ids, respect <code>max_batch_size</code> and <code>max_seq_len</code> chosen at construction. For each prompt position during warm-up, run <code>model.forward(tokens[:, i:i+1], start_pos=i)</code> (or batched prompt variants) to fill caches—then switch to sampling from the last column of logits.
+    Append sampled ids, increment <code>start_pos</code>, stop at EOS or <code>max_gen_len</code>. Use <code>torch.inference_mode()</code> and the same <code>dtype</code> as weights (<code>float16</code>/<code>bfloat16</code> on GPU) for throughput.
+  </p>
+  <p>
+    The reference keeps <code>assert seqlen == 1</code> in the cached forward to enforce incremental decode—one new embedding row per step after priming. Prompt processing can use a batched path or a loop with growing <code>start_pos</code>; the reference loops one token at a time for simplicity.
+  </p>
+  <p>
+    During prompt priming you still call the model on each prompt token mainly to <strong>fill</strong> <code>cache_k</code>/<code>cache_v</code>; logits on padded prompt positions are disposable. Implementation-wise, tensors often reserve the full max length with padding, copy true prompt ids into the prefix, then overwrite only non-prompt slots as generation proceeds. End-of-sequence handling should trigger on <strong>newly generated</strong> positions—hitting EOS inside the warm-up prompt should not abort decoding early.
+  </p>
+  <div class="jupyter-cell">
+    <div class="cell-header"><span class="cell-label">In [5]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+    <div class="code-header"><span class="code-filename">notebook.ipynb</span><span class="code-lines">L1–4</span></div>
+    <pre class="code-block"><code><span class="line"><span class="ln">1</span>tokens = torch.<span class="fn">tensor</span>([[<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]], device=<span class="str">"cuda"</span>)</span></code>
+<code><span class="line"><span class="ln">2</span><span class="kw">for</span> i, t <span class="kw">in</span> <span class="fn">enumerate</span>(tokens[<span class="num">0</span>]):</span></code>
+<code><span class="line"><span class="ln">3</span>    logits = model(t.<span class="fn">view</span>(<span class="num">1</span>,<span class="num">1</span>), start_pos=i)</span></code>
+<code><span class="line"><span class="ln">4</span>next_id = <span class="fn">sample_top_p</span>(torch.<span class="fn">softmax</span>(logits[:, -<span class="num">1</span>] <span class="op">/</span> temp, dim=-<span class="num">1</span>), <span class="num">0.9</span>)</span></code>
+</pre>
+    <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [5]</span><pre class="output-text">logits.shape == torch.Size([1, 1, vocab_size])
+# after warm-up, each step adds one token; KV cache length == start_pos+1</pre></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="play">
+  <span class="section-num">Play</span>
+  <h2>Playground: scalar knobs from the same math</h2>
+  <p>These controls do not run a multi-billion-parameter checkpoint; they visualize the algebra your <code>torch</code> code composes—<code>m·θ_i</code> products, FFN round-up, cache work savings, and beam growth.</p>
+  <div class="playground-grid">
+    <div class="card">
+      <h3>RoPE combination</h3>
+      <label class="ctrl" for="plPos">Position m</label>
+      <input type="range" id="plPos" min="0" max="2047" value="128">
+      <label class="ctrl" for="plBase">θ base</label>
+      <input type="range" id="plBase" min="1000" max="20000" step="500" value="10000">
+      <label class="ctrl" for="plI">Pair index i</label>
+      <input type="range" id="plI" min="0" max="63" value="5">
+      <div class="output-readout" id="plRopeComb"></div>
+    </div>
+    <div class="card">
+      <h3>FFN hidden round-up</h3>
+      <label class="ctrl" for="plRaw">Raw hidden</label>
+      <input type="range" id="plRaw" min="1" max="40" value="7">
+      <label class="ctrl" for="plAlign">Alignment</label>
+      <input type="range" id="plAlign" min="2" max="16" value="5">
+      <div class="output-readout" id="plRound"></div>
+    </div>
+    <div class="card">
+      <h3>Attention score volume</h3>
+      <label class="ctrl" for="plTok">Tokens T</label>
+      <input type="range" id="plTok" min="1" max="512" value="64">
+      <div class="output-readout" id="plTri"></div>
+    </div>
+    <div class="card">
+      <h3>Beam cost</h3>
+      <label class="ctrl" for="plBeam">Beam k</label>
+      <input type="range" id="plBeam" min="1" max="8" value="2">
+      <label class="ctrl" for="plDepth">Depth</label>
+      <input type="range" id="plDepth" min="1" max="32" value="16">
+      <div class="output-readout" id="plBeamOut"></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <p>Advanced NLP V2 · Chapter 05 · Coding LLaMA 2 · single-file interactive tutorial</p>
+</footer>
+
+<script>
+function toggleOut(btn) {
+  var cell = btn.closest('.jupyter-cell');
+  var out = cell.querySelector('.cell-output');
+  var on = out.style.display !== 'block';
+  out.style.display = on ? 'block' : 'none';
+  btn.textContent = on ? 'Hide Output ▲' : 'Show Output ▼';
+}
+
+function llamaProg(btn, id) {
+  var root = btn.closest('.code-progression');
+  root.querySelectorAll('.code-block').forEach(function (e) { e.style.display = 'none'; });
+  root.querySelector('#' + id).style.display = 'block';
+  root.querySelectorAll('.btn').forEach(function (b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  var caps = {
+    lp1: 'Fields only: params mirror what checkpoints and blocks read.',
+    lp2: 'Embeddings, ModuleList of blocks, RMSNorm, LM head — still no forward body.',
+    lp3: 'Precompute freqs_cis once; slice [start_pos:start_pos+seqlen] each call.',
+    lp4: 'Attention + SwiGLU live inside TransformerBlock; they receive start_pos and freqs.',
+    lp5: 'Full forward: embed → stack → norm → vocab logits (float32 at end for sampling).'
+  };
+  var step = { lp1: 1, lp2: 2, lp3: 3, lp4: 4, lp5: 5 }[id];
+  document.getElementById('llamaCap').textContent = caps[id];
+  document.getElementById('llamaProgLabel').textContent = 'Step ' + step + ' of 5';
+}
+
+function bindAnno(preId, noteId) {
+  var pre = document.getElementById(preId);
+  var note = document.getElementById(noteId);
+  if (!pre || !note) return;
+  pre.querySelectorAll('.ln.anno').forEach(function (ln) {
+    ln.addEventListener('click', function () {
+      var t = ln.getAttribute('data-note') || '';
+      note.innerHTML = '<strong>Line ' + ln.textContent.trim() + ':</strong> ' + t;
+    });
+  });
+}
+bindAnno('annArgs', 'noteArgs');
+bindAnno('annRope', 'noteRope');
+bindAnno('annAttn', 'noteAttn');
+
+(function () {
+  function softmax(arr) {
+    var m = Math.max.apply(null, arr);
+    var ex = arr.map(function (x) { return Math.exp(x - m); });
+    var s = ex.reduce(function (a, b) { return a + b; }, 0);
+    return ex.map(function (x) { return x / s; });
+  }
+
+  var ropeCanvas = document.getElementById('ropeCanvas');
+  if (ropeCanvas) {
+    var rctx = ropeCanvas.getContext('2d');
+    function drawRope() {
+      var m = parseInt(document.getElementById('ropeM').value, 10);
+      var th = parseInt(document.getElementById('ropeTheta').value, 10) / 100;
+      var x1 = 1.2, x2 = 0.7;
+      var phi = m * th;
+      var xr = x1 * Math.cos(phi) - x2 * Math.sin(phi);
+      var yr = x1 * Math.sin(phi) + x2 * Math.cos(phi);
+      rctx.fillStyle = '#0a0a0f';
+      rctx.fillRect(0, 0, ropeCanvas.width, ropeCanvas.height);
+      var cx = 200, cy = 130, s = 80;
+      rctx.strokeStyle = '#2a2a3a';
+      rctx.beginPath();
+      rctx.moveTo(cx - 180, cy); rctx.lineTo(cx + 220, cy);
+      rctx.moveTo(cx, cy - 120); rctx.lineTo(cx, cy + 120);
+      rctx.stroke();
+      function vec(x, y, col, lw) {
+        rctx.strokeStyle = col;
+        rctx.lineWidth = lw;
+        rctx.beginPath();
+        rctx.moveTo(cx, cy);
+        rctx.lineTo(cx + x * s, cy - y * s);
+        rctx.stroke();
+      }
+      vec(x1, x2, '#6c8cff', 3);
+      vec(xr, yr, '#34d399', 3);
+      rctx.fillStyle = '#e0e0e8';
+      rctx.font = '13px sans-serif';
+      rctx.fillText('Original (x₁,x₂)', cx + x1 * s + 8, cy - x2 * s);
+      rctx.fillText('After rotation by m·θ', cx + xr * s + 8, cy - yr * s + 16);
+      rctx.fillStyle = '#8888a0';
+      rctx.fillText('m = ' + m + ',  θ = ' + th.toFixed(2) + ' rad/step,  m·θ = ' + phi.toFixed(2), 24, 28);
+      document.getElementById('ropeOut').textContent =
+        'Rotated: (' + xr.toFixed(3) + ', ' + yr.toFixed(3) + ')  — matches Re/Im of (x₁+ix₂)·e^{i·m·θ}';
+    }
+    document.getElementById('ropeM').addEventListener('input', drawRope);
+    document.getElementById('ropeTheta').addEventListener('input', drawRope);
+    drawRope();
+  }
+
+  var thetaCanvas = document.getElementById('thetaCanvas');
+  if (thetaCanvas) {
+    var tctx = thetaCanvas.getContext('2d');
+    function drawThetaSchedule() {
+      var dh = parseInt(document.getElementById('thetaDim').value, 10);
+      var half = dh / 2;
+      tctx.fillStyle = '#0a0a0f';
+      tctx.fillRect(0, 0, thetaCanvas.width, thetaCanvas.height);
+      var ox = 50, oy = 180, w = 540;
+      tctx.strokeStyle = '#2a2a3a';
+      tctx.beginPath();
+      tctx.moveTo(ox, oy); tctx.lineTo(ox + w, oy);
+      tctx.stroke();
+      tctx.beginPath();
+      tctx.strokeStyle = '#a78bfa';
+      for (var i = 0; i < half; i++) {
+        var thi = Math.pow(10000, -2 * i / dh);
+        var px = ox + (i / (half - 1 || 1)) * w;
+        var py = oy - Math.log(thi + 1e-12) * 18;
+        if (i === 0) tctx.moveTo(px, py);
+        else tctx.lineTo(px, py);
+      }
+      tctx.stroke();
+      tctx.fillStyle = '#8888a0';
+      tctx.font = '12px sans-serif';
+      tctx.fillText('log θ_i (vertical) vs pair index i', ox, 24);
+      document.getElementById('thetaOut').textContent =
+        'd_h=' + dh + ': θ_0=1, θ_{d/2-1}=' +
+        Math.pow(10000, -2 * (half - 1) / dh).toExponential(4);
+    }
+    document.getElementById('thetaDim').addEventListener('input', drawThetaSchedule);
+    drawThetaSchedule();
+  }
+
+  function updateRms() {
+    var raw = document.getElementById('rmsVec').value.split(/[\s,]+/).map(parseFloat).filter(function (x) { return !isNaN(x); });
+    if (raw.length < 2) {
+      document.getElementById('rmsOut').textContent = 'Enter at least two numbers.';
+      return;
+    }
+    var g = parseInt(document.getElementById('rmsGamma').value, 10) / 100;
+    var eps = parseInt(document.getElementById('rmsEps').value, 10) * 1e-6;
+    var sumsq = raw.reduce(function (a, x) { return a + x * x; }, 0);
+    var d = raw.length;
+    var rms = Math.sqrt(sumsq / d + eps);
+    var out = raw.map(function (x) { return (x / rms) * g; });
+    document.getElementById('rmsOut').innerHTML =
+      'RMS=' + rms.toFixed(4) + ' | γ=' + g +
+      ' | out=[' + out.map(function (x) { return x.toFixed(3); }).join(', ') + ']';
+  }
+  var rmsVec = document.getElementById('rmsVec');
+  if (rmsVec) {
+    rmsVec.addEventListener('input', updateRms);
+    document.getElementById('rmsGamma').addEventListener('input', updateRms);
+    document.getElementById('rmsEps').addEventListener('input', updateRms);
+    updateRms();
+  }
+
+  var kvCanvas = document.getElementById('kvCanvas');
+  if (kvCanvas) {
+    var kctx = kvCanvas.getContext('2d');
+    function drawKv() {
+      var T = 8;
+      var step = parseInt(document.getElementById('kvStep').value, 10);
+      var cell = 28, pad = 50;
+      kctx.fillStyle = '#0a0a0f';
+      kctx.fillRect(0, 0, kvCanvas.width, kvCanvas.height);
+      kctx.fillStyle = '#e0e0e8';
+      kctx.font = '13px sans-serif';
+      kctx.fillText('Attention score grid (query row × key column)', pad, 28);
+      for (var i = 0; i < T; i++) {
+        for (var j = 0; j < T; j++) {
+          var redundant = i === step - 1 && j < step - 1;
+          var needed = i === step - 1;
+          kctx.fillStyle = needed ? (redundant ? 'rgba(244,114,182,0.25)' : 'rgba(52,211,153,0.35)') : '#12121a';
+          kctx.strokeStyle = '#2a2a3a';
+          kctx.strokeRect(pad + j * cell, pad + i * cell, cell, cell);
+          kctx.fillRect(pad + j * cell + 1, pad + i * cell + 1, cell - 2, cell - 2);
+        }
+      }
+      kctx.fillStyle = '#8888a0';
+      kctx.font = '11px sans-serif';
+      kctx.fillText('Green row = newest query vs all keys. Pink = redundant if full triangle recomputed each step.', pad, pad + T * cell + 36);
+      document.getElementById('kvOut').textContent =
+        'Step ' + step + ': compute 1×' + step + ' scores vs recomputing a growing ' + step + '×' + step + ' triangle each time.';
+    }
+    document.getElementById('kvStep').addEventListener('input', drawKv);
+    drawKv();
+  }
+
+  var gqaCanvas = document.getElementById('gqaCanvas');
+  if (gqaCanvas) {
+    var gctx = gqaCanvas.getContext('2d');
+    function drawGqa() {
+      var Hq = parseInt(document.getElementById('gqaHq').value, 10);
+      var Hkv = parseInt(document.getElementById('gqaHkv').value, 10);
+      if (Hkv > Hq) Hkv = Hq;
+      var rep = Hq / Hkv;
+      var ok = Number.isInteger(rep);
+      gctx.fillStyle = '#0a0a0f';
+      gctx.fillRect(0, 0, gqaCanvas.width, gqaCanvas.height);
+      var w = 22, pad = 40;
+      for (var h = 0; h < Hq; h++) {
+        gctx.fillStyle = ok ? '#6c8cff' : '#f87171';
+        gctx.fillRect(pad + h * (w + 4), 40, w, 50);
+      }
+      gctx.fillStyle = '#8888a0';
+      gctx.font = '12px sans-serif';
+      gctx.fillText('Query heads (H_q=' + Hq + ')', pad, 28);
+      if (ok && Hkv > 0) {
+        var block = (Hq / Hkv) * (w + 4);
+        for (var k = 0; k < Hkv; k++) {
+          gctx.fillStyle = '#34d399';
+          gctx.fillRect(pad + k * block, 120, block - 4, 40);
+        }
+      }
+      gctx.fillStyle = '#8888a0';
+      gctx.fillText('KV head groups (H_kv=' + Hkv + ')', pad, 112);
+      document.getElementById('gqaOut').textContent = ok
+        ? 'n_rep = ' + rep + ' (each KV head repeated to cover ' + rep + ' query heads)'
+        : 'H_q must be divisible by H_kv for repeat_kv (got ' + Hq + '/' + Hkv + ').';
+    }
+    document.getElementById('gqaHq').addEventListener('input', drawGqa);
+    document.getElementById('gqaHkv').addEventListener('input', drawGqa);
+    drawGqa();
+  }
+
+  function silu(t) { return t / (1 + Math.exp(-t)); }
+  var swiCanvas = document.getElementById('swiCanvas');
+  if (swiCanvas) {
+    var sctx = swiCanvas.getContext('2d');
+    function drawSwi() {
+      var g = parseInt(document.getElementById('swiGate').value, 10) / 100;
+      sctx.fillStyle = '#0a0a0f';
+      sctx.fillRect(0, 0, swiCanvas.width, swiCanvas.height);
+      var ox = 50, oy = 150, w = 540, h = 100;
+      sctx.strokeStyle = '#2a2a3a';
+      sctx.beginPath();
+      sctx.moveTo(ox, oy - h); sctx.lineTo(ox, oy + h);
+      sctx.moveTo(ox, oy); sctx.lineTo(ox + w, oy);
+      sctx.stroke();
+      function plot(fn, col) {
+        sctx.beginPath();
+        for (var px = 0; px <= w; px++) {
+          var t = (px / w) * 8 - 4;
+          var yv = fn(t);
+          var py = oy - Math.max(-h, Math.min(h, yv * 30));
+          if (px === 0) sctx.moveTo(ox + px, py);
+          else sctx.lineTo(ox + px, py);
+        }
+        sctx.strokeStyle = col;
+        sctx.lineWidth = 2;
+        sctx.stroke();
+      }
+      plot(function (t) { return Math.max(0, t); }, '#f87171');
+      plot(silu, '#6c8cff');
+      plot(function (t) { return silu(t) * (g * t); }, '#34d399');
+      sctx.fillStyle = '#8888a0';
+      sctx.font = '12px sans-serif';
+      sctx.fillText('ReLU(xW₁) vs SiLU(xW₁) vs SiLU·(g·x) gate', ox, 24);
+      document.getElementById('swiOut').textContent = 'Gate scale g=' + g.toFixed(2) + ' multiplies the value path before W₂.';
+    }
+    document.getElementById('swiGate').addEventListener('input', drawSwi);
+    drawSwi();
+  }
+
+  var tempCanvas = document.getElementById('tempCanvas');
+  if (tempCanvas) {
+    var tectx = tempCanvas.getContext('2d');
+    var baseLogits = [2.0, 1.5, 0.2, -0.5, -1.0];
+    function drawTemp() {
+      var T = parseInt(document.getElementById('tempSlider').value, 10) / 100;
+      var scaled = baseLogits.map(function (z) { return z / T; });
+      var p = softmax(scaled);
+      tectx.fillStyle = '#0a0a0f';
+      tectx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+      var bw = 100, ox = 40, oy = 180;
+      for (var i = 0; i < p.length; i++) {
+        tectx.fillStyle = '#2a2a3a';
+        tectx.fillRect(ox + i * (bw + 8), oy - 150, bw, 150);
+        tectx.fillStyle = '#f472b6';
+        tectx.fillRect(ox + i * (bw + 8), oy - p[i] * 300, bw, p[i] * 300);
+        tectx.fillStyle = '#8888a0';
+        tectx.font = '11px sans-serif';
+        tectx.fillText((p[i] * 100).toFixed(1) + '%', ox + i * (bw + 8) + 18, oy + 18);
+      }
+      document.getElementById('tempOut').textContent =
+        'T=' + T.toFixed(2) + ' on fixed logits → max mass ' + (Math.max.apply(null, p) * 100).toFixed(1) + '%';
+    }
+    document.getElementById('tempSlider').addEventListener('input', drawTemp);
+    drawTemp();
+  }
+
+  var toppCanvas = document.getElementById('toppCanvas');
+  if (toppCanvas) {
+    var tpctx = toppCanvas.getContext('2d');
+    var masses = [0.44, 0.40, 0.06, 0.04, 0.03, 0.02, 0.01];
+    function drawTopP() {
+      var pthresh = parseInt(document.getElementById('toppSlider').value, 10) / 100;
+      var sorted = masses.slice().sort(function (a, b) { return b - a; });
+      var cum = 0, keep = 0;
+      for (var i = 0; i < sorted.length; i++) {
+        cum += sorted[i];
+        keep = i + 1;
+        if (cum >= pthresh) break;
+      }
+      tpctx.fillStyle = '#0a0a0f';
+      tpctx.fillRect(0, 0, toppCanvas.width, toppCanvas.height);
+      var ox = 50, oy = 200, bw = 70;
+      cum = 0;
+      for (var j = 0; j < sorted.length; j++) {
+        var col = j < keep ? 'rgba(108,140,255,0.85)' : '#2a2a3a';
+        var h = sorted[j] * 400;
+        tpctx.fillStyle = col;
+        tpctx.fillRect(ox + j * (bw + 6), oy - h, bw, h);
+        cum += sorted[j];
+        tpctx.fillStyle = '#8888a0';
+        tpctx.font = '10px sans-serif';
+        tpctx.fillText((cum * 100).toFixed(0) + '%', ox + j * (bw + 6) + 10, oy - h - 6);
+      }
+      tpctx.fillStyle = '#e0e0e8';
+      tpctx.font = '12px sans-serif';
+      tpctx.fillText('Sorted masses; keep first ' + keep + ' for cumulative ≥ ' + (pthresh * 100).toFixed(0) + '%', ox, 24);
+      document.getElementById('toppOut').textContent =
+        'Tokens kept: ' + keep + ' / ' + sorted.length;
+    }
+    document.getElementById('toppSlider').addEventListener('input', drawTopP);
+    drawTopP();
+  }
+
+  function plUpdate() {
+    var m = parseInt(document.getElementById('plPos').value, 10);
+    var base = parseInt(document.getElementById('plBase').value, 10);
+    var ii = parseInt(document.getElementById('plI').value, 10);
+    var dh = 128;
+    var thi = Math.pow(base, -2 * ii / dh);
+    var ang = m * thi;
+    document.getElementById('plRopeComb').textContent =
+      'm·θ_i = ' + ang.toFixed(4) + ' rad (pair i=' + ii + ', base=' + base + ', d_h=' + dh + ' demo).';
+    var raw = parseInt(document.getElementById('plRaw').value, 10);
+    var al = parseInt(document.getElementById('plAlign').value, 10);
+    var rounded = Math.ceil(raw / al) * al;
+    document.getElementById('plRound').textContent =
+      'ceil(' + raw + '/' + al + ')×' + al + ' = ' + rounded;
+    var T = parseInt(document.getElementById('plTok').value, 10);
+    var naiveTri = (T * (T + 1) * (2 * T + 1)) / 6;
+    var cachedLinear = (T * (T + 1)) / 2;
+    document.getElementById('plTri').textContent =
+      'Σ t² (full triangle each step) ≈ ' + Math.round(naiveTri).toLocaleString() +
+      '; Σ t (one row) ≈ ' + Math.round(cachedLinear).toLocaleString();
+    var bk = parseInt(document.getElementById('plBeam').value, 10);
+    var dep = parseInt(document.getElementById('plDepth').value, 10);
+    var cost = Math.pow(bk, dep);
+    document.getElementById('plBeamOut').textContent =
+      'k^depth = ' + bk + '^' + dep + ' ≈ ' + (cost > 1e9 ? cost.toExponential(2) : cost.toLocaleString());
+  }
+  ['plPos', 'plBase', 'plI', 'plRaw', 'plAlign', 'plTok', 'plBeam', 'plDepth'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', plUpdate);
+  });
+  if (document.getElementById('plPos')) plUpdate();
+
+  var nav = document.getElementById('nav');
+  window.addEventListener('scroll', function () {
+    nav.classList.toggle('visible', window.scrollY > 280);
+  }, { passive: true });
+  var obs = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.fade-in').forEach(function (el) { obs.observe(el); });
+})();
+</script>
+</body>
+</html>

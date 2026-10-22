@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building Micrograd — Neural Networks: Zero to Hero</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.btn-sm { font-size: 0.75rem; padding: 4px 10px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; max-width: 340px; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin: 24px 0; }
+.qa-box .q { font-weight: 700; color: var(--text); margin-bottom: 12px; font-size: 1.02rem; }
+.qa-box p { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 80px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; }
+.ln { display: inline-block; width: 32px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 14px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.08); border-left: 2px solid var(--accent); margin-left: -16px; padding-left: 14px; }
+.line.new { background: rgba(52, 211, 153, 0.08); border-left: 2px solid var(--accent3); margin-left: -16px; padding-left: 14px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.85; text-decoration: underline dotted; }
+.ln.anno:hover { opacity: 1; }
+.code-note { padding: 12px 16px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; display: none; }
+.code-note strong { color: var(--accent); }
+.code-progression { margin: 28px 0; }
+.step-caption { margin-top: 12px; font-size: 0.9rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 16px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 16px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+canvas { border-radius: var(--radius); display: block; max-width: 100%; height: auto; background: var(--bg-card-alt); border: 1px solid var(--border); }
+.graph-wrap { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; min-height: 260px; position: relative; }
+.graph-wrap svg { width: 100%; height: 240px; display: block; }
+.chain-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.82rem; margin: 16px 0; }
+.chain-node { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card-alt); color: var(--text); transition: box-shadow 0.3s, border-color 0.3s; }
+.chain-node.glow { border-color: var(--accent3); box-shadow: 0 0 12px rgba(52,211,153,0.35); }
+.chain-arrow { color: var(--text-dim); }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">NN Zero to Hero</a><span class="bc-sep">›</span><span class="bc-current">Building Micrograd</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Neural Networks: Zero to Hero</a>
+  <div class="nav-links">
+    <a href="#s0">Micrograd</a><a href="#s1">Derivatives</a><a href="#s2">Value</a><a href="#s3">Manual BP</a><a href="#s4">Neuron</a>
+    <a href="#s5">Auto BP</a><a href="#s6">+= Bug</a><a href="#s7">More Ops</a><a href="#s8">MLP</a><a href="#s9">Training</a><a href="#s10">Summary</a><a href="#s11">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Building Micrograd</h1>
+    <p class="subtitle">Build an autograd engine and a trainable neural network from scratch in Python — forward graphs, backward passes, and the same ideas that power tensor libraries.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">11</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">6</span><span class="stat-label">Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:760px;margin:0 auto;">
+      You will implement <code>Value</code> with <code>data</code> and <code>grad</code>, track <code>_prev</code> and <code>_op</code>, draw expression graphs, backpropagate by hand, then automate with <code>_backward</code> closures and a topological sort. After fixing the <code>+=</code> accumulation bug and adding <code>exp</code>, <code>pow</code>, and friends, you will stack <code>Neuron</code>, <code>Layer</code>, and <code>MLP</code> and train with gradient descent — minimal code, full clarity.
+    </p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>What is Micrograd?</h2>
+    <p><strong>Micrograd</strong> is an <em>autograd</em> engine — <strong>automatic differentiation</strong> via <strong>backpropagation</strong>. Given a scalar <strong>loss</strong> computed from many operations, it finds <code>∂loss/∂w</code> for every parameter <code>w</code> so you can nudge weights to reduce the loss.</p>
+    <p>Here is a concrete flex of what that looks like before you have built anything yourself: wrap two leaves, say <code>a = Value(-4.0)</code> and <code>b = Value(2.0)</code>, then compose them with adds, multiplies, powers, offsets, negation, ReLU-style squashes, division, and so on until you hold a single output <code>g</code>. After the forward pass, <code>g.data</code> might read <strong>24.7</strong> (the exact number depends on the specific expression you wire). Call <code>g.backward()</code>: the engine walks the graph backward and fills <code>a.grad</code> and <code>b.grad</code>. In one representative run those read <strong>138</strong> and <strong>645</strong> — meaning a tiny positive nudge to <code>a</code> increases <code>g</code> with slope about 138 at that point, and a tiny positive nudge to <code>b</code> increases <code>g</code> with slope about 645. That local sensitivity is exactly what optimization consumes.</p>
+    <p>The library <strong>Micrograd</strong> itself is open source on GitHub (authored by <strong>Andrej Karpathy</strong> as a teaching artifact). The point of the scalar version is pedagogical: you decompose a network all the way to individual <code>+</code> and <code>*</code> on floats so the <strong>chain rule</strong> and graph bookkeeping are impossible to hide. Production stacks then pack the same scalars into <strong>tensors</strong> and run fused kernels — the <em>math</em> is unchanged; only <em>layout and throughput</em> change.</p>
+    <p>Numbers live in <code>Value</code> objects. Arithmetic builds a <strong>computational graph</strong>: each <code>Value</code> remembers <code>_prev</code> (children) and <code>_op</code> (how it was made). The <strong>forward pass</strong> fills <code>.data</code>; <code>backward()</code> on the output runs the <strong>backward pass</strong> and fills <code>.grad</code> on every node.</p>
+    <div class="formula">∂L/∂(each node) → stored in <code>node.grad</code></div>
+    <p>Micrograd is <strong>scalar-first</strong>: one float per <code>Value</code>. Frameworks like <strong>PyTorch</strong> and <strong>JAX</strong> pack scalars into <strong>tensors</strong> and use vectorized kernels. The chain rule and graph semantics are the same; tensors are for <strong>speed and memory layout</strong>, not a different theory.</p>
+    <div class="callout">
+      <p><strong>Everything else is just efficiency:</strong> the autograd <strong>engine</strong> — the piece that knows nothing about “layers” — is on the order of <strong>~100 lines</strong> of plain Python. The <strong><code>nn.py</code></strong> file on top (neuron, layer, MLP) is deliberately tiny: define a neuron, define a layer as a list of neurons, define an MLP as a sequence of layers. Altogether you are in the ballpark of <strong>~150 lines</strong> for the ideas that matter for training. Everything beyond that in a real framework is batching, memory layout, autograd scheduling at scale, and hardware.</p>
+    </div>
+    <p><strong>Neural networks</strong> are a particular shape of expression: dot products of inputs and weights, plus biases, plus nonlinearities like <code>tanh</code>, then a loss comparing predictions to targets. Backpropagation applies to <em>any</em> differentiable scalar graph; nets are the main application.</p>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">Forward</h3><p>Evaluate from leaves to root. Each <code>Value</code>’s <code>data</code> is the numeric result of its op.</p></div>
+      <div class="card"><h3 style="color:var(--accent2);">Backward</h3><p>Traverse from the output backward. Each op implements local gradients; the chain rule multiplies them into <code>grad</code>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Understanding Derivatives</h2>
+    <p>Consider <code>f(x) = 3x² − 4x + 5</code>. At <code>x = 3</code>, <code>f(3) = 20</code>. The derivative <code>f′(x)</code> is the <strong>limit</strong> of rise-over-run as the step goes to zero:</p>
+    <div class="formula">f′(x) = lim<sub>h→0</sub> (f(x+h) − f(x)) / h</div>
+    <p>With a small <code>h</code> (e.g. <code>0.001</code>), <code>(f(x+h)−f(x))/h</code> approximates the slope. If <code>h</code> is too tiny, floating-point <strong>cancellation</strong> makes the estimate unreliable — a practical nuance for <strong>numerical gradient checks</strong>.</p>
+    <p>Analytically <code>f′(x) = 6x − 4</code>. At <code>x = 3</code>, <code>f′ = 14</code> (positive — the curve rises to the right). At <code>x = −3</code>, <code>f′ = −22</code>. At <code>x = 2/3</code>, <code>f′ = 0</code> — a flat point (the vertex of the parabola).</p>
+    <div class="interactive-panel">
+      <h3>Derivative explorer</h3>
+      <p>Adjust <code>x</code> on the slider. The plot shows <code>f(x)</code> and the tangent line with slope <code>f′(x) = 6x − 4</code>.</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="color:var(--text-dim);">x =</label>
+        <input type="range" id="derivSlider" min="-50" max="50" value="30" aria-label="x">
+        <span class="slider-value" id="derivXVal">3.00</span>
+      </div>
+      <canvas id="derivCanvas" width="640" height="260"></canvas>
+      <p class="step-caption" id="derivCaption"></p>
+    </div>
+    <h3 style="margin-top:28px;">Multiple inputs</h3>
+    <p>For <code>d = a·b + c</code> with <code>a = 2.0</code>, <code>b = −3.0</code>, <code>c = 10.0</code>, you get <code>d = 4.0</code>. Partial derivatives: <code>∂d/∂a = b = −3</code>, <code>∂d/∂b = a = 2</code>, <code>∂d/∂c = 1</code>. Nudging <code>a</code> up slightly <em>decreases</em> <code>d</code> because <code>b</code> is negative: the product <code>a·b</code> contributes <em>less</em> when <code>a</code> moves opposite to the sign of <code>b</code>.</p>
+    <p>Walk the numerics once, because they reappear in backprop. With <code>h = 0.001</code>, <code>d1 = a*b + c = 4.0</code>. Bump <code>a</code> only: <code>d2 = (a+h)*b + c</code>. Because <code>b = −3</code>, increasing <code>a</code> pulls the sum <em>down</em>: <code>d2</code> lands near <strong>3.997</strong>. The finite-difference slope <code>(d2 − d1) / h</code> is about <strong>−3.0</strong>, matching <code>∂d/∂a = b</code>. Bump <code>b</code> instead and you get slope <strong>2.0</strong> (<code>∂d/∂b = a</code>). Bump <code>c</code> and the output moves one-for-one: slope <strong>1.0</strong>.</p>
+    <div class="formula">If z depends on y and y depends on x, then dz/dx = (dz/dy)·(dy/dx).</div>
+    <p>Standard calculus texts state the chain rule for nested dependencies. A compact form: if a variable <code>z</code> depends on <code>y</code>, and <code>y</code> depends on <code>x</code>, then <code>z</code> depends on <code>x</code> through the intermediate <code>y</code>, and</p>
+    <div class="formula">dz/dx = (dz/dy) · (dy/dx)</div>
+    <p>Picture three speeds stacked: if a <strong>car</strong> travels <strong>twice</strong> as fast as a <strong>bicycle</strong>, and the bicycle travels <strong>four times</strong> as fast as a <strong>person walking</strong>, then the car travels <strong>2 × 4 = 8</strong> times as fast as the walker. You do not add the two ratios; you <em>multiply</em> them. That multiplicative composition is the same combinatorics backpropagation uses when it threads a gradient from a loss through many intermediate ops.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">In [1]</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>h = <span class="num">0.001</span></code>
+<code><span class="line"><span class="ln">2</span>a, b, c = <span class="num">2.0</span>, <span class="op">-</span><span class="num">3.0</span>, <span class="num">10.0</span></code>
+<code><span class="line"><span class="ln">3</span>d1 = a<span class="op">*</span>b <span class="op">+</span> c</code>
+<code><span class="line"><span class="ln">4</span>d2 = (a <span class="op">+</span> h)<span class="op">*</span>b <span class="op">+</span> c</code>
+<code><span class="line hl"><span class="ln">5</span>slope ≈ (d2 <span class="op">-</span> d1) <span class="op">/</span> h</code></code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out</span>
+        <pre class="output-text">d1 = 4.0
+d2 = 3.997
+slope_a ≈ -3.0   # matches ∂d/∂a = b</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Building the <code>Value</code> class</h2>
+    <p>Start with a wrapper around a Python float: <code>self.data</code>. Implement <code>__repr__</code> for readable printing. Override <code>__add__</code> and <code>__mul__</code> so <code>a + b</code> and <code>a * b</code> return new <code>Value</code> instances whose <code>data</code> is the ordinary float result.</p>
+    <p>To record structure, pass <code>children=(self, other)</code> into new values. Store <code>_prev</code> as a <code>set</code> of children. A common pattern is to accept <code>_children</code> as a <strong>tuple</strong> in the constructor (so caller order is preserved) and immediately wrap it: <code>self._prev = set(_children)</code>. The <code>set</code> avoids duplicate bookkeeping in some graph traversals; the tuple is for convenience at construction sites. Set <code>_op</code> to a short string like <code>'+'</code> or <code>'*'</code> for debugging and visualization.</p>
+
+    <div class="code-progression">
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="showStep(this,'vs1')">Step 1: data</button>
+        <button type="button" class="btn" onclick="showStep(this,'vs2')">Step 2: + children</button>
+        <button type="button" class="btn" onclick="showStep(this,'vs3')">Step 3: + op</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">engine.py</span><span class="code-lines" id="valStepLines">Step 1 of 3</span></div>
+        <pre class="code-block" id="vs1"><code><span class="line"><span class="ln">1</span><span class="kw">class</span> <span class="fn">Value</span>:</code>
+<code><span class="line"><span class="ln">2</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">data</span>):</code>
+<code><span class="line hl"><span class="ln">3</span>        self.data = data</code>
+<code><span class="line"><span class="ln">4</span>    <span class="kw">def</span> <span class="fn">__repr__</span>(<span class="arg">self</span>):</code>
+<code><span class="line"><span class="ln">5</span>        <span class="kw">return</span> <span class="str">f'Value(data=</span>{<span class="arg">self</span>.data}<span class="str">)'</span></code></code></pre>
+        <pre class="code-block" id="vs2" style="display:none"><code><span class="line"><span class="ln">1</span><span class="kw">class</span> <span class="fn">Value</span>:</code>
+<code><span class="line"><span class="ln">2</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">data</span>, <span class="arg">_children</span>=(), <span class="arg">_op</span>=<span class="str">''</span>):</code>
+<code><span class="line hl new"><span class="ln">3</span>        self.data = data</code>
+<code><span class="line new"><span class="ln">4</span>        self._prev = <span class="fn">set</span>(_children)</code>
+<code><span class="line new"><span class="ln">5</span>        self._op = _op</code>
+<code><span class="line"><span class="ln">6</span>    <span class="kw">def</span> <span class="fn">__add__</span>(<span class="arg">self</span>, <span class="arg">other</span>):</code>
+<code><span class="line hl new"><span class="ln">7</span>        out = <span class="fn">Value</span>(self.data <span class="op">+</span> other.data, (<span class="arg">self</span>, other), <span class="str">'+'</span>)</code>
+<code><span class="line"><span class="ln">8</span>        <span class="kw">return</span> out</code></code></pre>
+        <pre class="code-block" id="vs3" style="display:none"><code><span class="line"><span class="ln">6</span>    <span class="kw">def</span> <span class="fn">__mul__</span>(<span class="arg">self</span>, <span class="arg">other</span>):</code>
+<code><span class="line hl new"><span class="ln">7</span>        <span class="kw">return</span> <span class="fn">Value</span>(self.data <span class="op">*</span> other.data, (<span class="arg">self</span>, other), <span class="str">'*'</span>)</code>
+<code><span class="line"><span class="ln">8</span>    <span class="cmt"># Graph: e = a*b; d = e + c → _prev links</span></code></code></pre>
+      </div>
+      <p class="step-caption" id="valStepCap">Wrap a scalar in <code>Value</code>; print with <code>__repr__</code>.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>__add__</code> and <code>__mul__</code></h3>
+        <p>Python dispatches <code>a + b</code> to <code>a.__add__(b)</code>. Return a <strong>new</strong> <code>Value</code> so the original leaves stay immutable for graph bookkeeping. Use plain <code>self.data + other.data</code> so you are adding floats, not recursing on <code>Value</code>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">engine.py</span><span class="code-lines">L12–22 / ~120</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">12</span>    <span class="kw">def</span> <span class="fn">__add__</span>(<span class="arg">self</span>, <span class="arg">other</span>):</code>
+<code><span class="line hl"><span class="ln">13</span>        other = other <span class="kw">if</span> <span class="fn">isinstance</span>(other, Value) <span class="kw">else</span> <span class="fn">Value</span>(other)</code>
+<code><span class="line"><span class="ln">14</span>        out = <span class="fn">Value</span>(self.data <span class="op">+</span> other.data, (<span class="arg">self</span>, other), <span class="str">'+'</span>)</code>
+<code><span class="line"><span class="ln">15</span>        <span class="kw">return</span> out</code>
+<code><span class="line"><span class="ln">16</span>    <span class="kw">def</span> <span class="fn">__mul__</span>(<span class="arg">self</span>, <span class="arg">other</span>):</code>
+<code><span class="line hl"><span class="ln">17</span>        other = other <span class="kw">if</span> <span class="fn">isinstance</span>(other, Value) <span class="kw">else</span> <span class="fn">Value</span>(other)</code>
+<code><span class="line"><span class="ln">18</span>        out = <span class="fn">Value</span>(self.data <span class="op">*</span> other.data, (<span class="arg">self</span>, other), <span class="str">'*'</span>)</code>
+<code><span class="line"><span class="ln">19</span>        <span class="kw">return</span> out</code></code></pre>
+      </div>
+    </div>
+
+    <p>Optional: a <code>label</code> field for diagrams. A typical <code>draw_dot(root)</code> helper builds a <strong>Graphviz</strong> graph: a <code>trace</code> routine enumerates nodes and edges, then for each value you emit a box node. The slightly tricky part is inserting <strong>synthetic operation nodes</strong> — little “<code>+</code>” or “<code>*</code>” circles that are <em>not</em> <code>Value</code> objects in your engine. They exist only in the picture so the visualization mirrors the expression structure. Only the square boxes are true values; the op nodes are drawing sugar.</p>
+
+    <div class="interactive-panel">
+      <h3>Computational graph builder</h3>
+      <p>Click steps to grow the graph <code>e = a*b</code>, <code>d = e+c</code>, <code>L = d*f</code> (scalar toy). Nodes appear left-to-right like a forward pass.</p>
+      <div class="btn-group">
+        <button type="button" class="btn" onclick="graphStep(1)">+ a</button>
+        <button type="button" class="btn" onclick="graphStep(2)">+ b</button>
+        <button type="button" class="btn" onclick="graphStep(3)">× → e</button>
+        <button type="button" class="btn" onclick="graphStep(4)">+ c → d</button>
+        <button type="button" class="btn" onclick="graphStep(5)">+ f → L</button>
+        <button type="button" class="btn" onclick="graphReset()">Reset</button>
+      </div>
+      <div class="graph-wrap"><svg id="graphSvg" viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Manual backpropagation</h2>
+    <p>Build a small graph: <code>e = a*b</code>, <code>d = e+c</code>, <code>f</code> a separate leaf, <code>L = d*f</code>. Example numbers: <code>a=2</code>, <code>b=-3</code>, <code>c=10</code> → <code>e=-6</code>, <code>d=4</code>, with <code>f=-2</code> gives <code>L=-8</code>.</p>
+    <p>Add <code>self.grad = 0.0</code> on every <code>Value</code>. Zero means “no effect yet.” The base case is <code>∂L/∂L = 1</code>, so set <code>L.grad = 1</code>.</p>
+    <p>For multiplication <code>L = d·f</code>, hold the other factor fixed. From the limit definition: increment <code>d</code> by <code>h</code>, so the new output is <code>(d+h)·f</code>, subtract <code>d·f</code>, divide by <code>h</code>:</p>
+    <div class="formula">((d+h)·f − d·f) / h = (d·f + h·f − d·f) / h = f</div>
+    <p>So <code>∂L/∂d = f</code>. Symmetrically <code>∂L/∂f = d</code>. With <code>d = 4</code> and <code>f = −2</code>, set <code>d.grad = f.data = −2</code> and <code>f.grad = d.data = 4</code>. You can sanity-check with finite differences: bump <code>f.data</code> by <code>h</code> and read slope ≈ <code>4</code>; bump <code>d.data</code> by <code>h</code> and read slope ≈ <code>−2</code>.</p>
+    <p>For addition <code>d = e + c</code>, the local partials are <code>∂d/∂e = 1</code> and <code>∂d/∂c = 1</code>. From the definition with a bump <code>h</code> on <code>c</code> only:</p>
+    <div class="formula">((c+h) + e − (c + e)) / h = h/h = 1</div>
+    <p>By the <strong>chain rule</strong>, <code>∂L/∂c = (∂L/∂d)(∂d/∂c) = (∂L/∂d)·1</code>. The little <code>+</code> node does not know about <code>L</code>; it only knows “I added two parents.” Its <strong>local</strong> Jacobian entries are both <code>1</code>. Whatever gradient arrives from above — here <code>∂L/∂d = −2</code> — is <strong>routed unchanged</strong> to <code>c</code> and <code>e</code>: <code>c.grad = e.grad = −2</code>. That is why people call a sum node a <strong>gradient distributor</strong> or router.</p>
+    <p>For <code>e = a·b</code>, <code>∂e/∂a = b</code> and <code>∂e/∂b = a</code> (same limit argument as for <code>d·f</code>). You already have <code>∂L/∂e = −2</code> from the sum node. Chain again:</p>
+    <div class="formula">∂L/∂a = (∂L/∂e)(∂e/∂a) = (−2)·(−3) = 6  ∂L/∂b = (∂L/∂e)(∂e/∂b) = (−2)·(2) = −4</div>
+    <p>So <code>a.grad = 6</code> and <code>b.grad = −4</code> for this graph. Finite-difference bumps on <code>a</code> and <code>b</code> should reproduce those slopes up to floating-point noise.</p>
+    <div class="callout ok">
+      <p><strong>Gradient ascent preview:</strong> if your goal were to <em>increase</em> <code>L</code> (unusual for training, but good for intuition), you would nudge each leaf by a small step <em>along</em> its gradient. After one such update and a fresh forward pass, <code>L</code> might move from <strong>−8</strong> toward a <em>less negative</em> value (for example <strong>−7</strong> in a representative run). Training normally <em>minimizes</em> loss, so you step in the <strong>opposite</strong> direction — same sensitivity information, flipped sign.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> backpropagation is the chain rule applied recursively backward through the graph. Each node only needs local derivatives; global sensitivities compose by multiplication.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Chain rule visualizer</h3>
+      <p>Step backward from <code>L</code> through <code>d</code> to <code>c</code>. Watch how <code>∂L/∂d</code> combines with <code>∂d/∂c = 1</code>.</p>
+      <div class="btn-group">
+        <button type="button" class="btn" id="chainBtn0" onclick="chainAnim(0)">1. L.grad = 1</button>
+        <button type="button" class="btn" id="chainBtn1" onclick="chainAnim(1)">2. d, f from ×</button>
+        <button type="button" class="btn" id="chainBtn2" onclick="chainAnim(2)">3. c, e from +</button>
+      </div>
+      <div class="chain-flow" id="chainFlow">
+        <span class="chain-node" id="cnL">L</span><span class="chain-arrow">←</span>
+        <span class="chain-node" id="cnd">d</span><span class="chain-arrow">←</span>
+        <span class="chain-node" id="cnc">c</span>
+      </div>
+      <p class="step-caption" id="chainCap">∂L/∂c = (∂L/∂d)(∂d/∂c) = ∂L/∂d × 1</p>
+    </div>
+
+    <p><strong>Numerical gradient checking</strong>: bump one leaf’s <code>data</code> by <code>h</code>, recompute <code>L</code>, compare <code>(L_new - L_old)/h</code> to <code>leaf.grad</code>. <strong>Optimization picture</strong>: increasing a leaf a little in the direction of its gradient increases <code>L</code> (for maximization); training usually <strong>minimizes</strong> loss, so you step <em>against</em> the gradient.</p>
+
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">In [2]</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="cmt"># After manual backprop</span></code>
+<code><span class="line"><span class="ln">2</span><span class="fn">print</span>(a.grad, b.grad)  <span class="cmt"># ∂L/∂a, ∂L/∂b</span></code></code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out</span>
+        <pre class="output-text">6.0 -4.0   # example for L=d*f with d=4, f=-2 chain through e=a*b</pre>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Backprop through a neuron</h2>
+    <p>A classical <strong>neuron</strong> computes <code>z = w·x + b</code> (dot product of weights and inputs, plus bias), then applies an activation such as <code>tanh</code>, which squashes <code>ℝ</code> into <code>(−1, 1)</code>.</p>
+    <p>Biological neurons are intricate; the usual <strong>mathematical cartoon</strong> is simpler. Inputs <code>xᵢ</code> arrive along connections modeled as <strong>synapses</strong> with strengths <code>wᵢ</code>. Each synapse contributes <code>wᵢ·xᵢ</code> into the cell body. A <strong>bias</strong> <code>b</code> acts like baseline “trigger happiness”: it shifts how easy it is for the neuron to fire even when inputs are weak. The body sums <code>∑ wᵢxᵢ + b</code>, then passes that scalar through a <strong>squashing nonlinearity</strong> (historically sigmoid or tanh). The output is that squashed value.</p>
+    <p>Read <code>tanh</code> qualitatively from its plot: at input <code>0</code>, output <code>0</code>. Large positive inputs saturate smoothly toward <code>+1</code>; large negative inputs toward <code>−1</code>. If you crank a neuron’s bias so the pre-activation feeding <code>tanh</code> is large (for example bias <code>8</code> with small weights), the output might land near <strong>0.96</strong> — you are already on the shoulder of the curve approaching the plateau at <code>1</code>.</p>
+    <div class="formula">tanh(x) = (e<sup>2x</sup> − 1) / (e<sup>2x</sup> + 1)</div>
+    <p>You can implement <code>tanh</code> as one primitive op with derivative <code>d/dx tanh(x) = 1 − tanh(x)²</code>, or decompose it into <code>exp</code>, adds, and divides — both are valid as long as forward and backward are consistent.</p>
+
+    <div class="interactive-panel">
+      <h3>Tanh explorer</h3>
+      <p>Slide <code>x</code> to see <code>tanh(x)</code> and <code>1 − tanh²(x)</code> (derivative).</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="color:var(--text-dim);">x =</label>
+        <input type="range" id="tanhSlider" min="-100" max="100" value="0" aria-label="tanh x">
+        <span class="slider-value" id="tanhXVal">0.00</span>
+      </div>
+      <canvas id="tanhCanvas" width="640" height="220"></canvas>
+      <p class="step-caption" id="tanhCap"></p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Worked numbers (2-D neuron):</strong> Arrange inputs, weights, and bias so the pre-activation <code>n</code> is a nice value — for example, setting bias to about <strong>6.8814…</strong> makes the arithmetic clean. Suppose the raw sum feeding <code>tanh</code> is <strong>0.8814…</strong> so that <code>o = tanh(n) ≈ 0.7071</code>. Then the local derivative <code>d o / d n = 1 − tanh(n)² = 1 − o²</code> evaluates to <strong>0.5</strong> exactly in that configuration. With <code>o.grad = 1</code> (treating <code>o</code> as the scalar you differentiate), <code>n.grad = 0.5</code>.</p>
+      <p>Every <code>+</code> below <code>n</code> copies that upstream <code>0.5</code> to each summand branch (because local partials are <code>1</code>). At a product node <code>x₂·w₂</code>, <code>x₂.grad = w₂.data × (upstream)</code> and <code>w₂.grad = x₂.data × (upstream)</code>. If <code>x₂ = 0</code>, then <code>w₂.grad = 0</code>: wiggling a weight that is multiplied by a <em>zero</em> input does not move the output — the derivative correctly vanishes. Meanwhile <code>x₂.grad</code> can still be nonzero (here <strong>0.5</strong>) because the <em>input</em> channel still routes gradient from the other side of the graph. For the companion branch, you might see <code>w₁.grad = −1.5</code> and <code>x₁.grad = 1.0</code> in the same worked example — concrete targets when you hand-verify your engine.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Manual backward through <code>tanh</code></h3>
+        <p>If <code>o = tanh(n)</code> and you have <code>∂L/∂o</code>, then <code>∂L/∂n = (1 − o²)·∂L/∂o</code>. Below that, <code>+</code> distributes the gradient to <code>w·x</code> and <code>b</code>; <code>*</code> splits between paired operands.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">neuron_manual.md</span><span class="code-lines">recipe</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span>o.grad = <span class="num">1.0</span>   <span class="cmt"># if L=o</span></code>
+<code><span class="line hl"><span class="ln">2</span>n.grad += (<span class="num">1</span> <span class="op">-</span> o.data<span class="op">**</span><span class="num">2</span>) <span class="op">*</span> o.grad</code>
+<code><span class="line"><span class="ln">3</span><span class="cmt"># plus into dot and bias...</span></code></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Automating the backward pass</h2>
+    <p>Each <code>Value</code> stores a closure <code>_backward</code> that knows how to route <code>out.grad</code> into its parents’ <code>grad</code> using local Jacobian entries. For <code>+</code>: both parents get <code>out.grad</code>. For <code>*</code>: <code>self.grad += other.data * out.grad</code> and symmetrically. For <code>tanh</code>: <code>self.grad += (1 − t²) * out.grad</code> with <code>t = tanh(self.data)</code>.</p>
+
+    <div class="callout warn">
+      <p><strong>Do not call the closure at assignment time.</strong> Write <code>out._backward = _backward</code>, not <code>out._backward = _backward()</code>. Calling it immediately runs the function (which returns <code>None</code>) instead of storing the function object for later topological execution.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>_backward</code> closures</h3>
+        <p>Click line numbers for chain-rule notes. Accumulate with <code>+=</code> (explained in the next section).</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">engine.py</span><span class="code-lines">L40–58 / ~120</span></div>
+        <pre class="code-block annotated"><code><span class="line" data-note="Closure captures out, self, other for multiply node."><span class="ln anno">40</span>        <span class="kw">def</span> <span class="fn">_backward_mul</span>():</code>
+<code><span class="line hl" data-note="∂(a*b)/∂a = b; chain: multiply by out.grad. Use += for multi-path."><span class="ln anno">41</span>            self.grad <span class="op">+=</span> other.data <span class="op">*</span> out.grad</code>
+<code><span class="line" data-note="Symmetric: ∂(a*b)/∂b = a."><span class="ln anno">42</span>            other.grad <span class="op">+=</span> self.data <span class="op">*</span> out.grad</code>
+<code><span class="line" data-note="Add node routes the same upstream grad to both inputs."><span class="ln anno">45</span>        <span class="kw">def</span> <span class="fn">_backward_add</span>():</code>
+<code><span class="line hl"><span class="ln anno">46</span>            self.grad <span class="op">+=</span> out.grad</code>
+<code><span class="line"><span class="ln anno">47</span>            other.grad <span class="op">+=</span> out.grad</code></code></pre>
+        <div class="code-note" id="annoNote1"></div>
+      </div>
+    </div>
+
+    <p>Order matters: before calling a node’s <code>_backward</code>, all nodes that <em>consume</em> it must already have final <code>grad</code>. A <strong>topological sort</strong> of a <strong>directed acyclic graph</strong> lays nodes out so every edge goes “forward” along the list: parents before children in the dependency order you need for the forward pass. The classic recursive recipe: depth-first from the output, mark visited, recurse into each child in <code>_prev</code>, then <strong>append this node</strong>. That post-order list ends with the root last; walking it <strong>reversed</strong> means you hit each node only after everything <em>above</em> it in the forward graph has already propagated <code>grad</code> into its outputs.</p>
+    <div class="callout">
+      <p><strong>Post-order append:</strong> a node’s <code>_backward</code> reads <code>out.grad</code>, which must already include every path from the loss through later ops. Visiting children first ensures downstream contributions have deposited into <code>out.grad</code> (with <code>+=</code> when multiple paths exist) before you propagate into parents.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>backward()</code> and topological sort</h3>
+        <p>Depth-first search builds a post-order list; reversing gives a valid backward schedule. Set <code>out.grad = 1</code>, then visit nodes from output toward inputs.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">engine.py</span><span class="code-lines">L62–88 / ~120</span></div>
+        <pre class="code-block annotated"><code><span class="line" data-note="Nested DFS: visit children in _prev first, then append this node."><span class="ln anno">62</span>    <span class="kw">def</span> <span class="fn">build_topo</span>(<span class="arg">v</span>, <span class="arg">visited</span>, <span class="arg">topo</span>):</code>
+<code><span class="line hl"><span class="ln anno">63</span>        <span class="kw">if</span> v <span class="kw">not in</span> visited:</code>
+<code><span class="line"><span class="ln anno">64</span>            visited.add(v)</code>
+<code><span class="line"><span class="ln anno">65</span>            <span class="kw">for</span> ch <span class="kw">in</span> v._prev:</code>
+<code><span class="line"><span class="ln anno">66</span>                build_topo(ch, visited, topo)</code>
+<code><span class="line hl" data-note="Post-order: ensures consumers appear later in topo list."><span class="ln anno">67</span>            topo.append(v)</code>
+<code><span class="line" data-note="Reverse topological order: from loss toward leaves."><span class="ln anno">72</span>    <span class="kw">for</span> n <span class="kw">in</span> <span class="fn">reversed</span>(topo):</code>
+<code><span class="line hl"><span class="ln anno">73</span>        n._backward()</code></code></pre>
+        <div class="code-note" id="annoNote2"></div>
+      </div>
+    </div>
+
+    <div class="code-progression">
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="showStepNN(this,'nn1')">Neuron</button>
+        <button type="button" class="btn" onclick="showStepNN(this,'nn2')">+ Layer</button>
+        <button type="button" class="btn" onclick="showStepNN(this,'nn3')">+ MLP</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">nn.py</span><span class="code-lines" id="nnStepLines">Step 1 of 3</span></div>
+        <pre class="code-block" id="nn1"><code><span class="line"><span class="ln">1</span><span class="kw">class</span> <span class="fn">Neuron</span>:</code>
+<code><span class="line"><span class="ln">2</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">nin</span>):</code>
+<code><span class="line hl"><span class="ln">3</span>        self.w = [Value(random.uniform(<span class="op">-</span><span class="num">1</span>,<span class="num">1</span>)) <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(nin)]</code>
+<code><span class="line"><span class="ln">4</span>        self.b = Value(<span class="num">0</span>)</code>
+<code><span class="line"><span class="ln">5</span>    <span class="kw">def</span> <span class="fn">__call__</span>(<span class="arg">self</span>, <span class="arg">x</span>):</code>
+<code><span class="line hl"><span class="ln">6</span>        act = <span class="fn">sum</span>((wi*xi <span class="kw">for</span> wi,xi <span class="kw">in</span> <span class="fn">zip</span>(self.w,x)), self.b)</code>
+<code><span class="line"><span class="ln">7</span>        <span class="kw">return</span> act.tanh()</code></code></pre>
+        <pre class="code-block" id="nn2" style="display:none"><code><span class="line new"><span class="ln">10</span><span class="kw">class</span> <span class="fn">Layer</span>:</code>
+<code><span class="line new"><span class="ln">11</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">nin</span>, <span class="arg">nout</span>):</code>
+<code><span class="line hl new"><span class="ln">12</span>        self.neurons = [Neuron(nin) <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(nout)]</code>
+<code><span class="line new"><span class="ln">13</span>    <span class="kw">def</span> <span class="fn">__call__</span>(<span class="arg">self</span>, <span class="arg">x</span>): <span class="kw">return</span> [n(x) <span class="kw">for</span> n <span class="kw">in</span> self.neurons]</code></code></pre>
+        <pre class="code-block" id="nn3" style="display:none"><code><span class="line new"><span class="ln">16</span><span class="kw">class</span> <span class="fn">MLP</span>:</code>
+<code><span class="line new"><span class="ln">17</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">nin</span>, <span class="arg">nouts</span>):</code>
+<code><span class="line hl new"><span class="ln">18</span>        sz = [nin] <span class="op">+</span> <span class="fn">list</span>(nouts)</code>
+<code><span class="line new"><span class="ln">19</span>        self.layers = [Layer(sz[i], sz[i<span class="op">+</span><span class="num">1</span>]) <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="fn">len</span>(nouts))]</code>
+<code><span class="line new"><span class="ln">20</span>    <span class="kw">def</span> <span class="fn">__call__</span>(<span class="arg">self</span>, <span class="arg">x</span>):</code>
+<code><span class="line new"><span class="ln">21</span>        <span class="kw">for</span> L <span class="kw">in</span> self.layers: x = L(x)</code>
+<code><span class="line new"><span class="ln">22</span>        <span class="kw">return</span> x</code></code></pre>
+      </div>
+      <p class="step-caption" id="nnStepCap">One neuron: weights, bias, dot + <code>tanh</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>The accumulation bug (<code>+=</code>)</h2>
+    <p>Consider <code>b = a + a</code>. The same <code>Value</code> appears twice as a child. If <code>_backward</code> for <code>+</code> uses assignment <code>self.grad = out.grad</code> twice, the second write <strong>overwrites</strong> the first — you lose a factor of 2. The derivative of <code>b = 2a</code> with respect to <code>a</code> should be <strong>2</strong>; a broken engine reports <strong>1</strong>.</p>
+    <p>A richer failure mode: let <code>d = a·b</code>, <code>e = a + b</code>, <code>f = e·d</code>, and backprop from <code>f</code>. Early branches may write <code>a.grad</code> and <code>b.grad</code> correctly, but when <code>d.backward</code> runs later, bare assignment can <strong>overwrite</strong> those tensors instead of adding a second contribution. Any time a variable is reused in more than one sub-expression, multiple backward paths converge on the same leaf.</p>
+    <p>The fix is the <strong>multivariate chain rule</strong>: contributions from disjoint paths through the graph <strong>sum</strong>. Implementation-wise, always accumulate with <code>+=</code> starting from <code>grad = 0</code> at leaves.</p>
+    <div class="callout warn">
+      <p><strong>The accumulation bug:</strong> always update with <code>+=</code> in <code>_backward</code> implementations, not <code>=</code>, unless you have proven a single consumer.</p>
+    </div>
+    <p>This matches PyTorch semantics: <code>.grad</code> tensors accumulate until you zero them.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>More operations</h2>
+    <p>Decompose <code>tanh</code> into <code>exp</code>, multiply, add, divide, power — useful practice. <code>exp</code>: <code>d/dx eˣ = eˣ</code>, so <code>self.grad += out.data * out.grad</code> because the forward output <code>out.data</code> equals <code>eˣ</code> at that node. For <code>pow</code> with a <strong>constant</strong> exponent <code>k</code> (Python <code>int</code> or <code>float</code>, not a different <code>Value</code>), the power rule is</p>
+    <div class="formula">d/dx (xᵏ) = k · xᵏ⁻¹</div>
+    <p>Implement <code>self.grad += (k * self.data**(k-1)) * out.grad</code> — local derivative times upstream. <strong>Division</strong> is the special case <code>k = −1</code>: <code>a / b = a · b⁻¹</code> once <code>pow</code> exists.</p>
+    <p>Rebuilding <code>tanh</code> from <code>exp</code> uses the same rational form as the math references: <code>tanh(n) = (e²ⁿ − 1) / (e²ⁿ + 1)</code> (equivalently the <code>(eⁿ − e⁻ⁿ)/(eⁿ + e⁻ⁿ)</code> layout). Forward values and leaf gradients should match the fused <code>tanh</code> op up to floating-point noise — a strong correctness check.</p>
+    <p><strong>Division</strong>: implement as <code>a * b**(-1)</code> once <code>pow</code> exists. <strong>Subtraction</strong>: <code>a + (-1)*b</code>. Implement <code>__neg__</code>, <code>__sub__</code>, and <code>__rmul__</code> so literals like <code>2 * v</code> work — Python tries <code>v.__rmul__(2)</code> when <code>int.__mul__</code> fails.</p>
+    <p>Verifying: atomic <code>tanh</code> vs composite <code>tanh</code> should give identical forward values and leaf gradients (up to float noise). In <strong>PyTorch</strong>, scalar tensors with <code>requires_grad=True</code> mirror the same story; <code>.backward()</code> fills <code>.grad</code>.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>exp</code> backward</h3>
+        <p>Local derivative equals the forward output of <code>exp</code>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">engine.py</span><span class="code-lines">L90–98 / ~120</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">90</span>    <span class="kw">def</span> <span class="fn">exp</span>(<span class="arg">self</span>):</code>
+<code><span class="line"><span class="ln">91</span>        x = self.data</code>
+<code><span class="line hl"><span class="ln">92</span>        out = <span class="fn">Value</span>(math.exp(x), (<span class="arg">self</span>,), <span class="str">'exp'</span>)</code>
+<code><span class="line"><span class="ln">93</span>        <span class="kw">def</span> <span class="fn">_backward</span>():</code>
+<code><span class="line hl"><span class="ln">94</span>            self.grad <span class="op">+=</span> out.data <span class="op">*</span> out.grad</code>
+<code><span class="line"><span class="ln">95</span>        out._backward = _backward</code>
+<code><span class="line"><span class="ln">96</span>        <span class="kw">return</span> out</code></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Neuron, Layer, MLP</h2>
+    <p><code>Neuron(nin)</code> holds <code>nin</code> weights and a bias; <code>__call__(x)</code> returns <code>tanh(w·x+b)</code>. <code>Layer(nin,nout)</code> is a list of independent neurons. <code>MLP(nin, [n1,n2,...])</code> chains layers so each layer’s vector output feeds the next.</p>
+    <p><strong>Shape story:</strong> an MLP pictured with <strong>three</strong> inputs, <strong>two</strong> hidden layers of <strong>four</strong> neurons each, and <strong>one</strong> output neuron is instantiated like <code>MLP(3, [4, 4, 1])</code>. Internally you maintain <code>sz = [nin] + list(nouts)</code> and create <code>Layer(sz[i], sz[i+1])</code> for each consecutive pair. A convenience: if the last layer has exactly one neuron, return that scalar <code>Value</code> directly instead of a one-element list so call sites stay clean.</p>
+    <p><strong><code>zip</code> for the dot product:</strong> <code>zip(w, x)</code> pairs <code>wᵢ</code> with <code>xᵢ</code>. Sum <code>wᵢ * xᵢ</code> with a start value <code>self.b</code> so you do not initialize the accumulation separately — <code>sum((wi*xi for wi, xi in zip(self.w, x)), self.b)</code> in Python.</p>
+    <p>Add <code>parameters()</code> on each class returning a flat list of leaf <code>Value</code>s — mirroring <code>nn.Module.parameters()</code> in spirit. Training loops iterate <code>p.data -= lr * p.grad</code> for each parameter.</p>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>parameters()</code></h3>
+        <p>Recursively collect weights and biases for optimizers.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">nn.py</span><span class="code-lines">L24–35 / ~60</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">24</span>    <span class="kw">def</span> <span class="fn">parameters</span>(<span class="arg">self</span>):</code>
+<code><span class="line hl"><span class="ln">25</span>        <span class="kw">return</span> self.w <span class="op">+</span> [self.b]</code>
+<code><span class="line"><span class="ln">28</span><span class="kw">class</span> <span class="fn">Layer</span>:</code>
+<code><span class="line hl"><span class="ln">32</span>    <span class="kw">def</span> <span class="fn">parameters</span>(<span class="arg">self</span>):</code>
+<code><span class="line"><span class="ln">33</span>        <span class="kw">return</span> [p <span class="kw">for</span> n <span class="kw">in</span> self.neurons <span class="kw">for</span> p <span class="kw">in</span> n.parameters()]</code>
+<code><span class="line"><span class="ln">36</span><span class="kw">class</span> <span class="fn">MLP</span>:</code>
+<code><span class="line hl"><span class="ln">40</span>    <span class="kw">def</span> <span class="fn">parameters</span>(<span class="arg">self</span>):</code>
+<code><span class="line"><span class="ln">41</span>        <span class="kw">return</span> [p <span class="kw">for</span> L <span class="kw">in</span> self.layers <span class="kw">for</span> p <span class="kw">in</span> L.parameters()]</code></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Training the network</h2>
+    <p>Pick a toy dataset — <strong>four</strong> planar points with binary targets in <code>{−1, +1}</code>. The network should learn to emit <strong>+1.0</strong> on some corners and <strong>−1.0</strong> on others (a tiny XOR-style classification lesson). Before training, forward passes might read roughly <strong>0.91</strong>, <strong>0.88</strong>, <strong>0.80</strong> on examples where you wanted negative outputs — clearly wrong but typical under random init.</p>
+    <p>Define <strong>loss</strong> as a single scalar scoring overall fit. A simple choice is <strong>sum of squared errors</strong> (related to MSE): for each pair <code>(y_gt, y_pred)</code>, add <code>(y_gt − y_pred)²</code>. Squaring removes sign disagreement and grows steeply when you are far off. When prediction equals target, that term is <strong>zero</strong>. A representative initial total might land near <strong>7.12</strong> once you sum all four contributions — dominated by the egregious mistakes, with almost-no loss on the one prediction already close to its target.</p>
+    <p>Calling <code>loss.backward()</code> paints gradients on <em>every</em> intermediate, including input coordinates. You usually <strong>ignore data gradients</strong> because examples are fixed; you care about weights. If a particular weight’s <code>grad</code> is <strong>negative</strong>, slightly <em>increasing</em> that weight <em>decreases</em> the loss at first order — that is the sign check people perform mentally before trusting an optimizer.</p>
+    <div class="comparison">
+      <div class="card"><h3>Before a step</h3><p>Random weights produce biased outputs; loss is high (order <strong>~7</strong> in the canonical four-point demo, exact value depends on init).</p></div>
+      <div class="card"><h3>After many steps</h3><p>Predictions approach <strong>±1</strong>; total loss can drop to <strong>~1e−9</strong> territory when the problem is easy and the step size is well behaved.</p></div>
+    </div>
+    <p>A concrete <strong>parameter count</strong> for the <code>3 → 4 → 4 → 1</code> MLP above is <strong>41</strong> scalar <code>Value</code>s when you tally every <code>w</code> and <code>b</code> — tiny, but already unwieldy to differentiate by hand, which is why the graph machinery matters.</p>
+    <div class="callout">
+      <p>If you visualize <code>draw_dot(loss)</code> after forward-evaluating <strong>all four</strong> examples and summing their squared errors, the diagram explodes: it contains <strong>four</strong> full forward replicas of the MLP glued together under one loss node. That is “excessive” on purpose — it shows how a training step is literally one giant differentiable expression. In practice, million-point datasets use <strong>minibatches</strong> so each step forwards only a slice of data, but the autograd pattern is identical.</p>
+    </div>
+    <p>Each step: <strong>forward</strong> to compute <code>L</code>, <code>L.backward()</code> to fill <code>grad</code>, then update <code>p.data += -lr * p.grad</code> for every parameter <code>p</code> (minus because you <strong>minimize</strong> loss). Before the next <code>backward()</code>, reset <code>p.grad = 0</code> for all parameters — otherwise gradients <strong>accumulate</strong> across steps.</p>
+
+    <div class="callout warn">
+      <p><strong>Zero grad before backward:</strong> if you forget to clear <code>grad</code>, the second backward adds on top of the first. Always zero (or <code>detach</code> in frameworks) between optimization steps unless you intentionally sum gradients.</p>
+    </div>
+    <div class="callout">
+      <p><strong>Why forgetting <code>zero_grad</code> can still “work” on toy data:</strong> every <code>_backward</code> uses <code>+=</code>, so stale gradients accumulate and act like an uncontrolled step size. On a tiny, easy dataset that can accidentally converge; on harder problems it usually breaks training.</p>
+    </div>
+
+    <p><strong>Learning rate</strong> <code>lr</code>: too small → painfully slow progress; too large → oscillation or divergence (loss explodes or NaNs). This mirrors full-scale training, just easier to see in two dimensions.</p>
+    <p>Gradient descent interprets the gradient vector as pointing uphill on the loss. Minimization therefore steps <strong>opposite</strong> the gradient: <code>p.data += -lr * p.grad</code> (equivalently subtract <code>lr * p.grad</code>). A representative manual sequence might show loss moving <strong>4.84 → 4.36 → 3.9 → …</strong> as you iterate forward → backward → update. Push <code>lr</code> too high and you can overshoot a valley; sometimes you recover, sometimes the loss blows up — tuning step size remains part art, part science, especially for plain vanilla SGD.</p>
+    <p>PyTorch tensors are the same autograd story at industrial scale: leaves with <code>requires_grad=True</code>, <code>.backward()</code>, and <code>.grad</code> — just packed into arrays and updated by fused kernels instead of Python floats. Chapter 2 walks through that translation.</p>
+
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">In [3]</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">for</span> k <span class="kw">in</span> <span class="fn">range</span>(<span class="num">20</span>):</code>
+<code><span class="line hl"><span class="ln">2</span>    ypred = <span class="fn">model</span>(x)</code>
+<code><span class="line"><span class="ln">3</span>    loss = <span class="fn">mse</span>(ypred, y)</code>
+<code><span class="line hl"><span class="ln">4</span>    loss.backward()</code>
+<code><span class="line"><span class="ln">5</span>    <span class="kw">for</span> p <span class="kw">in</span> model.parameters():</code>
+<code><span class="line hl"><span class="ln">6</span>        p.data <span class="op">+=</span> <span class="op">-</span>lr <span class="op">*</span> p.grad</code>
+<code><span class="line"><span class="ln">7</span>        p.grad = <span class="num">0.0</span></code></code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out</span>
+        <pre class="output-text">step 000 loss 0.8234
+step 005 loss 0.2104
+step 010 loss 0.0581
+step 015 loss 0.0193
+step 019 loss 0.0089</pre>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Training loss curve (animated)</h3>
+      <p>Synthetic smooth descent illustrating a well-chosen learning rate. Press <strong>Replay</strong> to re-run.</p>
+      <div class="btn-group">
+        <button type="button" class="btn" onclick="replayLossAnim()">Replay</button>
+      </div>
+      <canvas id="lossCanvas" width="640" height="220"></canvas>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Learning rate explorer</h3>
+      <p>Drag <code>lr</code> (log scale). The plot shows a simple modeled loss trajectory: tiny <code>lr</code> barely moves; moderate <code>lr</code> decays smoothly; huge <code>lr</code> oscillates or blows up.</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="font-family:var(--mono);color:var(--text-dim);">log₁₀(lr)</label>
+        <input type="range" id="lrSlider" min="-40" max="5" value="-15" aria-label="log learning rate">
+        <span class="slider-value" id="lrVal">0.03</span>
+      </div>
+      <canvas id="lrCanvas" width="640" height="220"></canvas>
+      <p class="step-caption" id="lrCaption"></p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Training loop structure</h3>
+        <p>Forward → scalar loss → <code>backward()</code> → parameter update → <code>zero_grad</code>. This is the same pattern as <code>loss.backward(); optimizer.step(); optimizer.zero_grad()</code> in PyTorch.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">L1–18 / ~40</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">zero_grad</span>(params):</code>
+<code><span class="line hl"><span class="ln">2</span>    <span class="kw">for</span> p <span class="kw">in</span> params: p.grad = <span class="num">0.0</span></code>
+<code><span class="line"><span class="ln">4</span><span class="kw">for</span> step <span class="kw">in</span> <span class="fn">range</span>(steps):</code>
+<code><span class="line hl"><span class="ln">5</span>    loss = <span class="fn">forward</span>(model, xs, ys)</code>
+<code><span class="line"><span class="ln">6</span>    zero_grad(model.parameters())</code>
+<code><span class="line hl"><span class="ln">7</span>    loss.backward()</code>
+<code><span class="line"><span class="ln">8</span>    <span class="kw">for</span> p <span class="kw">in</span> model.parameters():</code>
+<code><span class="line hl"><span class="ln">9</span>        p.data <span class="op">+=</span> <span class="op">-</span>lr <span class="op">*</span> p.grad</code></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Summary and real-world context</h2>
+    <p><strong>Neural nets</strong> are large differentiable expressions plus a <strong>loss</strong>. <strong>Backpropagation</strong> is automatic application of the <strong>chain rule</strong> backward through the graph. <strong>Gradient descent</strong> (or variants) steps parameters opposite the loss gradient to improve fit.</p>
+    <p><code>Value</code> maps to a scalar PyTorch tensor with <code>requires_grad=True</code>; <code>backward()</code> and <code>parameters()</code> mirror the same ergonomics. Chapter 2 scales this to tensors, batches, and fused kernels — the autograd story is unchanged.</p>
+    <p>Next-scale topics (not required to grasp the core): <strong>batching</strong>, <strong>cross-entropy</strong> for classification, <strong>L2 regularization</strong>, <strong>learning-rate schedules</strong>, adaptive optimizers, mixed precision, etc.</p>
+    <p>At industrial scale the <em>mechanism</em> is unchanged: a forward graph, a scalar loss, reverse-mode AD, and parameter updates. Language models such as <strong>GPT</strong> family systems boil down to predicting the <strong>next token</strong> from context — billions or (in the largest public systems) hundreds of <strong>billions</strong> of parameters, trained with losses like <strong>cross-entropy</strong> rather than sum-of-squares on tiny toy grids — but it is still <code>forward → backward → step</code> at the logical level.</p>
+    <p>The public <strong>Micrograd</strong> repository mirrors this lesson in miniature: <code>engine.py</code> holds <code>Value</code>, <code>backward</code>, <code>_prev</code>, <code>_op</code>, and ops including a <strong>ReLU</strong> nonlinearity in the maintained code path. The walkthrough above stresses <code>tanh</code> because its smooth derivative exercises the chain rule nicely; ReLU, sigmoid, and tanh are interchangeable MLP nonlinearities in principle — pick one, implement forward and local backward, compose. A test harness in the project builds the same expression in Micrograd and <strong>PyTorch</strong> and asserts forward and backward agreement. A richer <code>demo.ipynb</code> shows batched points, a <strong>max-margin</strong> loss variant, <strong>L2</strong> regularization, and <strong>learning-rate decay</strong> (shrinking step size late in training for finer fitting).</p>
+    <h3 style="margin-top:28px;">What you built, in one pass</h3>
+    <ul style="color:var(--text-dim);padding-left:1.2rem;line-height:1.85;">
+      <li><code>Value</code> with <code>data</code>, <code>grad</code>, <code>_prev</code>, <code>_op</code>, and <code>_backward</code>.</li>
+      <li>Arithmetic that grows a DAG: <code>__add__</code>, <code>__mul__</code>, <code>__pow__</code>, <code>__neg__</code>, <code>__sub__</code>, <code>__truediv__</code>, <code>__rmul__</code>.</li>
+      <li>Nonlinearities and <code>exp</code>; optional fused <code>tanh</code> vs expanded rational form.</li>
+      <li><code>backward()</code> with DFS topological sort and reversed traversal.</li>
+      <li><code>Neuron</code>, <code>Layer</code>, <code>MLP</code> plus <code>parameters()</code> for optimization.</li>
+      <li>Training loop: forward <code>MSE</code>, <code>backward</code>, <code>zero_grad</code>, <code>p.data += -lr * p.grad</code>.</li>
+    </ul>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">You now know</h3><p>How a scalar autograd engine schedules <code>_backward</code>, why <code>+=</code> matters, and how a tiny <code>MLP</code> trains.</p></div>
+      <div class="card"><h3 style="color:var(--accent2);">Scale up with</h3><p>Tensors, batches, GPU kernels, dataloaders, and mature optimizers — same math, industrial packaging.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Playground</h2>
+    <p>Tweak a synthetic parabola and numerical step <code>h</code> to see finite-difference error behavior. This is the same idea as gradient checking your <code>_backward</code> implementations.</p>
+    <div class="interactive-panel">
+      <h3>Numerical derivative playground</h3>
+      <div class="two-col">
+        <div>
+          <label style="color:var(--text-dim);display:block;margin-bottom:8px;">x</label>
+          <input type="range" id="pgX" min="-50" max="50" value="30">
+          <span class="slider-value" id="pgXv">3.0</span>
+        </div>
+        <div>
+          <label style="color:var(--text-dim);display:block;margin-bottom:8px;">log₁₀(h)</label>
+          <input type="range" id="pgH" min="-80" max="-5" value="-30">
+          <span class="slider-value" id="pgHv">0.001</span>
+        </div>
+      </div>
+      <p style="margin-top:16px;font-family:var(--mono);font-size:0.9rem;color:var(--text);" id="pgOut"></p>
+    </div>
+    <div class="interactive-panel" style="margin-top:28px;">
+      <h3>Mini chain-rule sketch pad</h3>
+      <p>Write down a 3-node graph on paper: <code>u = a*b</code>, <code>v = u+c</code>, <code>L = v*v</code>. Pick numbers for <code>a,b,c</code>, compute <code>L</code>, then fill <code>∂L/∂v</code>, <code>∂L/∂u</code>, <code>∂L/∂a</code> without a computer. Compare to micrograd after you implement it.</p>
+      <ol style="color:var(--text-dim);padding-left:1.2rem;line-height:1.8;">
+        <li>Forward: evaluate <code>u.data</code>, <code>v.data</code>, <code>L.data</code>.</li>
+        <li>Set <code>L.grad = 1</code>; back through <code>*</code> for <code>v*v</code>.</li>
+        <li>Back through <code>+</code> to reach <code>u</code> and <code>c</code>.</li>
+        <li>Back through <code>*</code> for <code>a*b</code> to reach leaves.</li>
+        <li>Verify one leaf with <code>(L(x+h)-L(x))/h</code>.</li>
+      </ol>
+    </div>
+    <div class="callout">
+      <p><strong>Playground goal:</strong> build reflexes for reading <code>grad</code> as sensitivity and for spotting when <code>+=</code> vs <code>=</code> matters before you scale to tensors.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Neural Networks: Zero to Hero · Chapter 01 · Building Micrograd</p>
+  <p style="margin-top:12px;max-width:640px;margin-left:auto;margin-right:auto;">
+    Single-file interactive tutorial · dark theme · inline CSS/JS · sections <code>#s0</code>–<code>#s11</code>.
+  </p>
+  <p style="margin-top:8px;font-size:0.8rem;">
+    <span class="tag tag-blue">autograd</span>
+    <span class="tag tag-green">chain rule</span>
+    <span class="tag tag-blue">MLP</span>
+    <span class="tag tag-green">gradient descent</span>
+  </p>
+  
+  
+</footer>
+
+<script>
+function toggleOut(btn) {
+  const cell = btn.closest('.jupyter-cell');
+  const out = cell.querySelector('.cell-output');
+  const on = out.style.display !== 'block';
+  out.style.display = on ? 'block' : 'none';
+  btn.textContent = on ? 'Hide Output ▲' : 'Show Output ▼';
+}
+
+function showStep(btn, id) {
+  const root = btn.closest('.code-progression');
+  root.querySelectorAll('.code-block').forEach(el => { el.style.display = 'none'; });
+  const t = root.querySelector('#' + id);
+  if (t) t.style.display = 'block';
+  root.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const cap = root.querySelector('#valStepCap');
+  const lines = root.querySelector('#valStepLines');
+  if (id === 'vs1') { cap.textContent = 'Wrap a scalar; pretty-print with __repr__.'; if(lines) lines.textContent = 'Step 1 of 3'; }
+  if (id === 'vs2') { cap.textContent = 'Track _prev and build + with children tuple.'; if(lines) lines.textContent = 'Step 2 of 3'; }
+  if (id === 'vs3') { cap.textContent = 'Multiply reuses the same child-tracking pattern.'; if(lines) lines.textContent = 'Step 3 of 3'; }
+}
+
+function showStepNN(btn, id) {
+  const root = btn.closest('.code-progression');
+  root.querySelectorAll('.code-block').forEach(el => { el.style.display = 'none'; });
+  root.querySelector('#' + id).style.display = 'block';
+  root.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const cap = root.querySelector('#nnStepCap');
+  const lines = root.querySelector('#nnStepLines');
+  if (id === 'nn1') { cap.textContent = 'Neuron: random weights, bias, tanh activation.'; if(lines) lines.textContent = 'Step 1 of 3'; }
+  if (id === 'nn2') { cap.textContent = 'Layer: parallel neurons, independent outputs.'; if(lines) lines.textContent = 'Step 2 of 3'; }
+  if (id === 'nn3') { cap.textContent = 'MLP: list of layers, chained forward pass.'; if(lines) lines.textContent = 'Step 3 of 3'; }
+}
+
+// ----- Derivative canvas -----
+function fquad(x) { return 3*x*x - 4*x + 5; }
+function dfquad(x) { return 6*x - 4; }
+
+function renderDeriv() {
+  const slider = document.getElementById('derivSlider');
+  const x = parseInt(slider.value, 10) / 10;
+  document.getElementById('derivXVal').textContent = x.toFixed(2);
+  const c = document.getElementById('derivCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0,0,W,H);
+  const pad = 40;
+  const xMin = -5, xMax = 5, yMin = -5, yMax = 35;
+  function X(px) { return pad + (px - xMin) / (xMax - xMin) * (W - 2*pad); }
+  function Y(py) { return H - pad - (py - yMin) / (yMax - yMin) * (H - 2*pad); }
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(X(xMin), Y(0)); ctx.lineTo(X(xMax), Y(0));
+  ctx.moveTo(X(0), Y(yMin)); ctx.lineTo(X(0), Y(yMax));
+  ctx.stroke();
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i <= 200; i++) {
+    const xv = xMin + (xMax-xMin)*i/200;
+    const yv = fquad(xv);
+    const px = X(xv), py = Y(yv);
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  const y0 = fquad(x), m = dfquad(x);
+  const x1 = x - 1.2, x2 = x + 1.2;
+  ctx.strokeStyle = '#34d399';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(X(x1), Y(m*(x1-x)+y0));
+  ctx.lineTo(X(x2), Y(m*(x2-x)+y0));
+  ctx.stroke();
+  ctx.fillStyle = '#f472b6';
+  ctx.beginPath();
+  ctx.arc(X(x), Y(y0), 6, 0, Math.PI*2);
+  ctx.fill();
+  document.getElementById('derivCaption').textContent =
+    'f(' + x.toFixed(2) + ') = ' + y0.toFixed(3) + '   |   f′(' + x.toFixed(2) + ') = ' + m.toFixed(3);
+}
+document.getElementById('derivSlider').addEventListener('input', renderDeriv);
+renderDeriv();
+
+// ----- Graph builder -----
+let gStep = 0;
+function graphReset() {
+  gStep = 0;
+  const svg = document.getElementById('graphSvg');
+  svg.innerHTML = '';
+}
+function graphStep(n) {
+  const svg = document.getElementById('graphSvg');
+  if (n === 1) graphReset();
+  gStep = Math.max(gStep, n);
+  const W = 640, H = 240;
+  svg.innerHTML = '';
+  const ns = 'http://www.w3.org/2000/svg';
+  function addText(x,y,t,s=13) {
+    const el = document.createElementNS(ns,'text');
+    el.setAttribute('x',x); el.setAttribute('y',y);
+    el.setAttribute('fill','#e0e0e8');
+    el.setAttribute('font-family','monospace');
+    el.setAttribute('font-size',s);
+    el.textContent = t;
+    svg.appendChild(el);
+  }
+  function addEdge(x1,y1,x2,y2) {
+    const l = document.createElementNS(ns,'line');
+    l.setAttribute('x1',x1); l.setAttribute('y1',y1);
+    l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+    l.setAttribute('stroke','#6c8cff');
+    l.setAttribute('stroke-width','2');
+    svg.appendChild(l);
+  }
+  function addBox(x,y,w,h,label) {
+    const r = document.createElementNS(ns,'rect');
+    r.setAttribute('x',x); r.setAttribute('y',y);
+    r.setAttribute('width',w); r.setAttribute('height',h);
+    r.setAttribute('rx',8);
+    r.setAttribute('fill','#12121a');
+    r.setAttribute('stroke','#2a2a3a');
+    svg.appendChild(r);
+    addText(x+10,y+h/2+5,label);
+  }
+  if (gStep >= 1) addBox(40,100,56,40,'a');
+  if (gStep >= 2) addBox(120,100,56,40,'b');
+  if (gStep >= 3) {
+    addBox(220,40,40,36,'×');
+    addEdge(96,120,220,58); addEdge(176,120,260,58);
+    addBox(300,30,56,56,'e');
+    addEdge(260,58,300,58);
+  }
+  if (gStep >= 4) {
+    addBox(120,170,56,40,'c');
+    addBox(380,100,40,36,'+');
+    addEdge(328,58,380,118);
+    addEdge(176,190,380,136);
+    addBox(460,92,56,56,'d');
+    addEdge(420,118,460,120);
+  }
+  if (gStep >= 5) {
+    addBox(40,30,56,40,'f');
+    addBox(560,92,40,36,'×');
+    addEdge(96,50,560,110);
+    addEdge(516,120,560,126);
+    addBox(520,170,80,48,'L');
+    addEdge(600,128,560,194);
+  }
+}
+
+// ----- Chain rule -----
+function chainAnim(step) {
+  const ids = ['cnL','cnd','cnc'];
+  ids.forEach(id => document.getElementById(id).classList.remove('glow'));
+  const cap = document.getElementById('chainCap');
+  if (step === 0) {
+    document.getElementById('cnL').classList.add('glow');
+    cap.textContent = 'Base case: ∂L/∂L = 1 → set L.grad = 1';
+  } else if (step === 1) {
+    document.getElementById('cnd').classList.add('glow');
+    document.getElementById('cnL').classList.add('glow');
+    cap.textContent = 'L = d·f → ∂L/∂d = f, ∂L/∂f = d (multiply node)';
+  } else {
+    document.getElementById('cnc').classList.add('glow');
+    document.getElementById('cnd').classList.add('glow');
+    cap.textContent = 'd = e+c → ∂L/∂c = ∂L/∂d · 1 (plus routes gradient)';
+  }
+}
+
+// ----- Tanh -----
+function renderTanh() {
+  const s = document.getElementById('tanhSlider');
+  const x = parseInt(s.value,10)/20;
+  document.getElementById('tanhXVal').textContent = x.toFixed(2);
+  const c = document.getElementById('tanhCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0,0,W,H);
+  const pad = 36;
+  const xMin = -3, xMax = 3;
+  function X(px) { return pad + (px - xMin)/(xMax-xMin)*(W-2*pad); }
+  function Y(py) { return H/2 - py*(H/2-pad); }
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.beginPath();
+  ctx.moveTo(0,H/2); ctx.lineTo(W,H/2);
+  ctx.stroke();
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i=0;i<=200;i++) {
+    const xv = xMin + (xMax-xMin)*i/200;
+    const yv = Math.tanh(xv);
+    const px = X(xv), py = Y(yv);
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = '#34d399';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i=0;i<=200;i++) {
+    const xv = xMin + (xMax-xMin)*i/200;
+    const yv = 1 - Math.tanh(xv)*Math.tanh(xv);
+    const px = X(xv), py = Y(yv*0.5);
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+  const th = Math.tanh(x), d = 1-th*th;
+  ctx.fillStyle = '#f472b6';
+  ctx.beginPath();
+  ctx.arc(X(x), Y(th), 6, 0, Math.PI*2);
+  ctx.fill();
+  document.getElementById('tanhCap').textContent = 'tanh(x)=' + th.toFixed(4) + '   d/dx=' + d.toFixed(4);
+}
+document.getElementById('tanhSlider').addEventListener('input', renderTanh);
+renderTanh();
+
+// ----- Loss animation -----
+let lossAnimId = null;
+function replayLossAnim() {
+  if (lossAnimId) cancelAnimationFrame(lossAnimId);
+  const c = document.getElementById('lossCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const pts = [];
+  for (let i=0;i<=40;i++) pts.push({x:i, y: 0.9*Math.exp(-0.18*i)+0.02+0.015*Math.sin(i*0.7)});
+  let frame = 0;
+  function tick() {
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0,0,W,H);
+    const pad = 36;
+    function X(ix) { return pad + ix/40*(W-2*pad); }
+    function Y(iy) { return pad + (1-iy)* (H-2*pad); }
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.strokeRect(pad,pad,W-2*pad,H-2*pad);
+    ctx.strokeStyle = '#6c8cff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const n = Math.min(frame, pts.length);
+    for (let i=0;i<n;i++) {
+      const px = X(pts[i].x), py = Y(pts[i].y);
+      if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    frame++;
+    if (frame <= pts.length + 8) lossAnimId = requestAnimationFrame(tick);
+  }
+  tick();
+}
+replayLossAnim();
+
+// ----- LR explorer -----
+function lrFromSlider() {
+  const v = parseInt(document.getElementById('lrSlider').value,10);
+  return Math.pow(10, v/20);
+}
+function renderLR() {
+  const lr = lrFromSlider();
+  document.getElementById('lrVal').textContent = lr.toExponential(2);
+  const c = document.getElementById('lrCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0,0,W,H);
+  const pad = 36;
+  const steps = 50;
+  let caption = '';
+  function Yv(loss) { return pad + (loss)*(H-2*pad); }
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.strokeRect(pad,pad,W-2*pad,H-2*pad);
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  let unstable = false;
+  for (let i=0;i<=steps;i++) {
+    const t = i/steps;
+    let L = Math.exp(-lr*35*t) * 0.95 + 0.05;
+    if (lr > 0.35) { L += 0.25*lr*Math.sin(t*20*lr); unstable = true; }
+    if (lr > 0.55 && i > 15) L *= 1 + (lr-0.5)*(i-15)*0.08;
+    const px = pad + t*(W-2*pad);
+    const py = pad + L*(H-2*pad);
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    if (L > 1.2 || !isFinite(L)) { unstable = true; break; }
+  }
+  ctx.stroke();
+  if (lr < 0.008) caption = 'Very small lr: loss decreases slowly.';
+  else if (!unstable && lr < 0.35) caption = 'Moderate lr: smooth descent.';
+  else caption = 'Large lr: oscillation or divergence risk — reduce lr.';
+  document.getElementById('lrCaption').textContent = caption;
+}
+document.getElementById('lrSlider').addEventListener('input', renderLR);
+renderLR();
+
+// ----- Playground -----
+function pgUpdate() {
+  const x = parseInt(document.getElementById('pgX').value,10)/10;
+  const h = Math.pow(10, parseInt(document.getElementById('pgH').value,10)/10);
+  document.getElementById('pgXv').textContent = x.toFixed(1);
+  document.getElementById('pgHv').textContent = h.toExponential(2);
+  const f0 = fquad(x), f1 = fquad(x+h);
+  const num = (f1-f0)/h;
+  const ana = dfquad(x);
+  document.getElementById('pgOut').textContent =
+    'f(x)=' + f0.toFixed(6) + '  f(x+h)=' + f1.toFixed(6) +
+    '  (f(x+h)-f(x))/h = ' + num.toFixed(6) + '   analytic f′(x)=' + ana.toFixed(6) +
+    '   |error|=' + Math.abs(num-ana).toExponential(2);
+}
+document.getElementById('pgX').addEventListener('input', pgUpdate);
+document.getElementById('pgH').addEventListener('input', pgUpdate);
+pgUpdate();
+
+// ----- Annotated code clicks -----
+document.querySelectorAll('.ln.anno').forEach(ln => {
+  ln.addEventListener('click', () => {
+    const line = ln.closest('.line');
+    const note = line && line.dataset.note;
+    const panel = ln.closest('.code-panel');
+    if (!panel || !note) return;
+    let box = panel.querySelector('.code-note');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'code-note';
+      panel.appendChild(box);
+    }
+    box.style.display = 'block';
+    box.innerHTML = '<strong>Line ' + ln.textContent.trim() + ':</strong> ' + note;
+  });
+});
+
+// ----- Scroll: nav + fade-in -----
+const nav = document.getElementById('nav');
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+</body>
+</html>
+

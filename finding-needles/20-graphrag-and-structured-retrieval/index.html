@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GraphRAG, Knowledge Graphs &amp; Structured Retrieval | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 96px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    @media (max-width: 640px) {
+      .main-nav.collapsed { display: none; }
+    }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover, .main-nav a.active { color: var(--accent); }
+    .nav-toggle {
+      display: none;
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    @media (max-width: 640px) {
+      .nav-toggle { display: block; }
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(167, 139, 250, 0.14), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(34, 211, 238, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(52, 211, 153, 0.09), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.55rem, 4vw, 2.65rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent2);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .demo-box {
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin: 20px 0;
+    }
+    .demo-box h4 {
+      margin: 0 0 14px;
+      font-size: 0.95rem;
+      color: var(--accent3);
+      font-weight: 600;
+    }
+    label.dlbl { display: block; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 6px; }
+    input[type="text"], input[type="search"], textarea, select {
+      width: 100%;
+      font-family: var(--sans);
+      font-size: 0.92rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    textarea { min-height: 100px; resize: vertical; font-family: var(--sans); line-height: 1.5; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    button.btn {
+      font-family: var(--sans);
+      font-size: 0.88rem;
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.btn:hover { background: rgba(34, 211, 238, 0.22); }
+    button.btn-secondary {
+      border-color: var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+    }
+    button.btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+    .triple-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr auto;
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 720px) {
+      .triple-row { grid-template-columns: 1fr; }
+    }
+    .triple-row input { margin-bottom: 0; }
+    .graph-svg-wrap {
+      width: 100%;
+      overflow: auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-top: 12px;
+    }
+    .graph-svg-wrap svg { display: block; margin: 0 auto; }
+    .split-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 768px) {
+      .split-2 { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      color: var(--text-dim);
+    }
+    .panel h5 { margin: 0 0 10px; color: var(--accent4); font-size: 0.85rem; }
+    .panel pre {
+      margin: 0;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--accent5);
+    }
+    .tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--accent3);
+      margin: 2px 4px 2px 0;
+    }
+    .step-list { counter-reset: st; list-style: none; padding: 0; margin: 16px 0; }
+    .step-list li {
+      counter-increment: st;
+      position: relative;
+      padding-left: 44px;
+      margin-bottom: 14px;
+      color: var(--text-dim);
+    }
+    .step-list li::before {
+      content: counter(st);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+    footer.site-foot {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+    .kbd {
+      font-family: var(--mono);
+      font-size: 0.8em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+    table.data-t {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      margin: 16px 0;
+    }
+    table.data-t th, table.data-t td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+    table.data-t th { background: var(--bg-card-alt); color: var(--accent); }
+    .drift-path { font-family: var(--mono); font-size: 0.8rem; color: var(--accent5); }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../index.html">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../index.html">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">GraphRAG</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="true" aria-controls="mainNav">Menu</button>
+  <nav class="main-nav" id="mainNav" aria-label="Chapter sections">
+    <a href="#hero">Top</a>
+    <a href="#s0">Why graphs</a>
+    <a href="#s1">KG basics</a>
+    <a href="#s2">Extraction</a>
+    <a href="#s3">GraphRAG</a>
+    <a href="#s4">Pipeline</a>
+    <a href="#s5">Text-to-SQL</a>
+    <a href="#s6">Hybrid</a>
+    <a href="#s7">Playground</a>
+  </nav>
+
+  <header class="hero" id="hero">
+    <span class="chapter-badge">Chapter 20 · 26</span>
+    <h1>GraphRAG, Knowledge Graphs &amp; Structured Retrieval</h1>
+    <p class="subtitle">
+      Move beyond “similar passages” to <strong>connected facts</strong>: entities, relationships, communities, and queries over structured stores.
+      <code>GraphRAG</code> blends graph structure with retrieval-augmented generation; extraction pipelines turn unstructured text into typed graphs; <code>text-to-SQL</code> remains the right tool when answers live in tables rather than prose.
+    </p>
+    <div class="hero-stats" role="presentation">
+      <div class="hero-stat"><div class="val">8</div><div class="lbl">Guided sections</div></div>
+      <div class="hero-stat"><div class="val">6+</div><div class="lbl">Interactive demos</div></div>
+      <div class="hero-stat"><div class="val">1</div><div class="lbl">Mini GraphRAG lab</div></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="fade-in" id="s0">
+      <h2>00 · Why graphs?</h2>
+      <p>
+        Dense retrieval with embeddings excels at finding <em>semantically similar text</em>: paragraphs that read alike, paraphrases, and topical neighbors.
+        What it often misses is <strong>explicit structure</strong>—who bought whom, which product belongs to which line, which paper cites which method—especially when those facts are scattered across many documents.
+      </p>
+      <p>
+        Consider a question like <strong>“Which companies acquired AI startups in 2024?”</strong> A vector index may return news articles that <em>mention</em> acquisitions and AI, yet the model still has to reconstruct a precise list from noisy prose.
+        A <code>knowledge graph</code> stores acquisitions as typed edges between company nodes, optionally with a <code>year</code> property, so retrieval can be constrained to paths that actually satisfy the query shape.
+      </p>
+      <div class="callout">
+        <strong>Core idea.</strong> Graphs capture <code>entities</code> (nodes), <code>relationships</code> (edges), and optional <code>attributes</code> on both.
+        <code>GraphRAG</code> combines that structure with generative models so answers can be grounded in multi-hop facts and community-level themes—not only the nearest embedding neighbors.
+      </div>
+      <h3>Where vectors stop and graphs start</h3>
+      <ul class="fancy">
+        <li><strong>Similarity without linkage.</strong> Two chunks may both discuss “M&amp;A trends” without ever co-locating the same <code>(acquirer, target, date)</code> triple in one passage.</li>
+        <li><strong>Multi-hop reasoning.</strong> Answering “Which investors backed firms later acquired by BigTech?” is naturally expressed as path queries over a graph, not a single cosine match.</li>
+        <li><strong>Global questions.</strong> Thematic prompts (“What are the main themes in this corpus?”) benefit from <em>summaries of clusters</em> of related entities—something pure chunk retrieval does not organize for you.</li>
+      </ul>
+      <p>
+        None of this replaces embeddings. The strongest systems often <strong>hybridize</strong>: graphs for relational scaffolding, vectors for fuzzy language and long-form evidence.
+        Extraction, GraphRAG architecture, SQL grounding, and hybrid routing follow—with an in-browser lab at the end.
+      </p>
+    </section>
+
+    <section class="fade-in" id="s1">
+      <h2>01 · Knowledge graph fundamentals</h2>
+      <p>
+        A <code>knowledge graph</code> is a labeled network: <strong>nodes</strong> represent things in the world (people, organizations, products, concepts), and <strong>edges</strong> represent how those things connect
+        (<code>acquired_by</code>, <code>located_in</code>, <code>invented</code>, <code>part_of</code>, and so on).
+        Unlike a bag of text chunks, the graph makes <em>relational commitments</em> explicit—useful both for humans auditing data and for algorithms traversing structure.
+        These curated entity–relation graphs differ from the statistically induced <code>SKG</code> in <a href="../13-wormhole-vectors/index.html#s1">Chapter 13</a>, which bridges lexical, semantic, and behavioral spaces—but both move retrieval beyond flat text chunks.
+      </p>
+      <h3>Schema and typing</h3>
+      <p>
+        Real graphs usually enforce a <code>schema</code>: allowed <strong>entity types</strong> (for example <code>Company</code>, <code>Person</code>, <code>Technology</code>) and <strong>relationship types</strong> with domain and range constraints
+        (only <code>Company</code> may <code>acquire</code> another <code>Company</code>).
+        Schema reduces ambiguity, improves deduplication, and helps downstream query planners know which indexes and filters apply.
+      </p>
+      <h3>Triples and property graphs</h3>
+      <p>
+        The atomic statement is often written as a <code>triple</code>: <strong>(subject, predicate, object)</strong>—for example <code>(Google, acquired, DeepMind)</code>.
+        In a <code>property graph</code> model (think <code>Neo4j</code>, <code>Apache TinkerPop</code>), nodes and relationships can carry key-value <code>properties</code> such as <code>announced_on</code>, <code>deal_size_usd</code>, or <code>confidence</code>.
+      </p>
+      <div class="card">
+        <p style="margin:0 0 12px;"><strong>Quick comparison</strong></p>
+        <table class="data-t" aria-label="Graph models">
+          <thead><tr><th>Representation</th><th>Strength</th><th>Typical tooling</th></tr></thead>
+          <tbody>
+            <tr><td>RDF triples + ontologies</td><td>Interoperability, standards (RDFS/OWL)</td><td>Triple stores, SPARQL</td></tr>
+            <tr><td>Property graph</td><td>Flexible properties, fast traversals</td><td>Neo4j, Memgraph, JanusGraph</td></tr>
+            <tr><td>In-memory graph in Python</td><td>Prototyping, algorithms</td><td><code>NetworkX</code>, <code>igraph</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="demo-box" id="demoTriples">
+        <h4>Interactive · Build a tiny knowledge graph</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Add <code>subject</code>, <code>predicate</code>, and <code>object</code> strings. The demo deduplicates nodes and draws directed edges. This is a pedagogical sketch—not a production store.
+        </p>
+        <div class="triple-row">
+          <div><label class="dlbl" for="subj">Subject</label><input type="text" id="subj" placeholder="Google" autocomplete="off" /></div>
+          <div><label class="dlbl" for="pred">Predicate</label><input type="text" id="pred" placeholder="acquired" autocomplete="off" /></div>
+          <div><label class="dlbl" for="obj">Object</label><input type="text" id="obj" placeholder="DeepMind" autocomplete="off" /></div>
+          <div><button type="button" class="btn" id="addTriple">Add triple</button></div>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn btn-secondary" id="loadSampleTriples">Load example corpus</button>
+          <button type="button" class="btn btn-secondary" id="clearTriples">Clear all</button>
+        </div>
+        <div class="graph-svg-wrap" id="tripleGraphHost"></div>
+        <p id="tripleListOut" style="font-family:var(--mono);font-size:0.78rem;color:var(--text-dim);margin:12px 0 0;"></p>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s2">
+      <h2>02 · Entity and relationship extraction</h2>
+      <p>
+        Most source material arrives as unstructured text. <code>GraphRAG</code> therefore begins with <strong>structure induction</strong>: algorithms (and often models) that propose entities and relationships with confidence scores.
+        The output is rarely perfect; entity resolution, human review, and constraint checks are normal parts of a mature pipeline.
+      </p>
+      <h3>Named Entity Recognition</h3>
+      <p>
+        <code>NER</code> tags spans as <code>PER</code>, <code>ORG</code>, <code>LOC</code>, <code>MISC</code>, or custom types. Libraries such as <code>spaCy</code> and transformer models on <code>Hugging Face</code> provide strong baselines.
+        NER alone does not give edges—it gives candidate nodes anchored to character offsets in text.
+      </p>
+      <h3>Relationship extraction</h3>
+      <p>
+        Classical approaches combine <code>dependency parsing</code>, syntactic patterns, and supervised classifiers over token pairs. Pattern guards help—for example, ensuring subject and object mentions co-occur within a sentence window.
+        <code>Open Information Extraction (OpenIE)</code> aims for high recall triples without a fixed schema, which is powerful but noisy.
+      </p>
+      <h3>Hearst patterns</h3>
+      <p>
+        Lexico-syntactic templates like <strong>“X such as Y”</strong> or <strong>“Y and other X”</strong> cue <code>hypernym</code> / taxonomic relations (Y is a kind of X). They are lightweight, interpretable, and still useful as features or silver-label generators.
+      </p>
+      <h3>LLM-assisted extraction</h3>
+      <p>
+        Prompting a capable LLM with a strict JSON schema can produce entities and typed relations at scale. Guardrails matter: validate JSON, coerce types, reject unknown predicates if you maintain a closed schema, and log provenance (doc id, offsets) for auditability.
+      </p>
+      <div class="callout">
+        <strong>Semantic knowledge graphs (SKG).</strong> As introduced in <a href="../13-wormhole-vectors/index.html#s1">Chapter 13</a>, an <code>SKG</code> couples graph structure with semantic representations—entity embeddings, node summaries, or neighborhood encoders—so lexical variation resolves to canonical IDs while supporting soft retrieval alongside exact graph matching. GraphRAG extraction produces a related but typically more <em>typed and curated</em> entity graph from documents.
+      </div>
+
+      <div class="demo-box" id="demoHearst">
+        <h4>Interactive · Hearst &amp; pattern hints</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Type a short sentence using templates like <code>Entities such as X</code> or <code>X, a Y,</code>. The demo highlights candidate hypernym edges (illustrative heuristics only).
+        </p>
+        <label class="dlbl" for="hearstInput">Sentence</label>
+        <input type="text" id="hearstInput" placeholder="AI frameworks such as PyTorch and JAX support GPU training." />
+        <div class="btn-row">
+          <button type="button" class="btn" id="runHearst">Analyze patterns</button>
+        </div>
+        <div class="panel" id="hearstOut" aria-live="polite">Results appear here.</div>
+      </div>
+
+      <div class="demo-box" id="demoNERsim">
+        <h4>Interactive · Toy “NER” span picker</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Capitalized multi-word phrases and known suffixes (<code>Inc.</code>, <code>LLC</code>) are highlighted as pretend <code>ORG</code> spans; title-cased pairs as pretend <code>PER</code>. This mimics rule-heavy baselines, not a neural tagger.
+        </p>
+        <label class="dlbl" for="nerText">Paragraph</label>
+        <textarea id="nerText">OpenAI released GPT-4 Turbo. Microsoft Corporation partnered with Mistral AI in Europe. Dr. Ada Norton published benchmarks on retrieval.</textarea>
+        <div class="btn-row">
+          <button type="button" class="btn" id="runNERsim">Extract pseudo-entities</button>
+        </div>
+        <div class="panel" id="nerOut" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s3">
+      <h2>03 · Microsoft GraphRAG (reference architecture)</h2>
+      <p>
+        The public <code>GraphRAG</code> research implementation popularized a concrete end-to-end pattern: ingest text, extract an entity-relationship graph, detect communities, summarize those communities, and expose multiple retrieval modes over the resulting artifacts.
+        Understanding this flow helps you map ideas to your own tooling even if you reimplement pieces differently.
+      </p>
+      <h3>Pipeline outline</h3>
+      <ol class="fancy">
+        <li>Segment documents into units suitable for extraction (often overlapping windows).</li>
+        <li>Use an LLM (or hybrid extractors) to propose entities, relationship types, and reified claims.</li>
+        <li>Build a graph with deduplicated nodes; optionally weight edges by frequency and confidence.</li>
+        <li>Run community detection—commonly <code>Leiden</code>—to find cohesive clusters at one or more resolutions.</li>
+        <li>Ask an LLM to write <strong>community summaries</strong> that compress each cluster into narrative form.</li>
+        <li>Index both local facts (text units, incident edges) and global summaries for retrieval-time routing.</li>
+      </ol>
+      <h3>Search modes (conceptual)</h3>
+      <ul class="fancy">
+        <li><strong>Local search.</strong> Anchor on specific entities mentioned in the question; gather neighboring nodes and supporting text for fine-grained factual prompts.</li>
+        <li><strong>Global search.</strong> Lean on community summaries to answer broad, thematic questions that do not name a single entity.</li>
+        <li><strong>DRIFT-style search.</strong> Emphasize <em>following typed relationships</em> across multiple hops—helpful when the evidence path is longer than one adjacency step.</li>
+      </ul>
+
+      <div class="demo-box" id="demoLG">
+        <h4>Interactive · Local vs global retrieval (simulated)</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Pick a question. The panels show <em>illustrative</em> contexts each mode would emphasize. Real systems rank and ground on your actual graph and sources.
+        </p>
+        <label class="dlbl" for="lgQuestion">Question</label>
+        <select id="lgQuestion">
+          <option value="q1">Who acquired DeepMind and when did that matter for AI research?</option>
+          <option value="q2">What are the dominant themes across our AI safety policy corpus?</option>
+          <option value="q3">Which suppliers connect to both automotive and battery programs?</option>
+        </select>
+        <div class="btn-row">
+          <button type="button" class="btn" id="runLG">Compare modes</button>
+        </div>
+        <div class="split-2">
+          <div class="panel"><h5>Local (entity-centric)</h5><pre id="lgLocal"></pre></div>
+          <div class="panel"><h5>Global (community summaries)</h5><pre id="lgGlobal"></pre></div>
+        </div>
+      </div>
+
+      <div class="demo-box" id="demoDrift">
+        <h4>Interactive · Multi-hop path sketch (DRIFT-style)</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Click steps to expand a pretend reasoning path over typed edges. This visualizes <em>why</em> multi-hop retrieval differs from fetching a single top chunk.
+        </p>
+        <div class="btn-row">
+          <button type="button" class="btn btn-secondary" data-drift="0">Start: Company A</button>
+          <button type="button" class="btn btn-secondary" data-drift="1">Hop 1: invested_in → Startup S</button>
+          <button type="button" class="btn btn-secondary" data-drift="2">Hop 2: acquired_by → Company B</button>
+          <button type="button" class="btn btn-secondary" data-drift="3">Hop 3: headquartered_in → City C</button>
+        </div>
+        <p class="drift-path" id="driftPath" aria-live="polite">Path: (select steps)</p>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s4">
+      <h2>04 · Building a GraphRAG pipeline</h2>
+      <p>
+        Production pipelines glue together ingestion, extraction, graph writes, analytics, and serving. The list below is a practical decomposition you can map to orchestrators (<code>Dagster</code>, <code>Airflow</code>), event buses, or simple batch jobs.
+      </p>
+      <ul class="step-list">
+        <li><strong>Document ingestion &amp; splitting.</strong> Normalize encodings, deduplicate files, and split into windows with modest overlap so entities that span boundaries still appear whole in at least one chunk.</li>
+        <li><strong>Entity &amp; relationship extraction.</strong> Combine <code>NER</code>, parsers, and LLM structured outputs; keep raw mentions for provenance.</li>
+        <li><strong>Entity resolution.</strong> Cluster string-variants (“Open AI”, “OpenAI”) to one canonical ID using embeddings, rules, and pairwise classifiers.</li>
+        <li><strong>Graph construction.</strong> Load nodes/edges into <code>NetworkX</code> for analysis or into <code>Neo4j</code> for transactional queries and visualization.</li>
+        <li><strong>Community detection.</strong> Apply <code>Leiden</code> / <code>Louvain</code> at multiple resolutions to capture both fine and coarse structure.</li>
+        <li><strong>Summary generation.</strong> For each community, generate a concise narrative plus bullet claims with citations back to supporting text units.</li>
+        <li><strong>Search indexes.</strong> Maintain a vector index over textual units, a keyword/BM25 index if helpful, and graph-native indices for one- and two-hop expansions.</li>
+      </ul>
+      <div class="callout">
+        <strong>Cost awareness.</strong> LLM extraction and hierarchical summarization can dominate spend. Mitigations include smaller models for draft graphs, caching by document version, sampling edges for summarization, and reusing stable community assignments when only a few files change.
+      </div>
+    </section>
+
+    <section class="fade-in" id="s5">
+      <h2>05 · Structured data retrieval — <code>text-to-SQL</code></h2>
+      <p>
+        Much of the world’s decisive data already lives in <strong>tabular form</strong>: relational databases, warehouses, spreadsheets, and metrics APIs.
+        For questions that map cleanly to joins, filters, and aggregations, converting natural language to <code>SQL</code> (or a DSL) can outperform vector search because the answer is <em>exact</em> rather than approximate retrieval over prose.
+      </p>
+      <h3>Typical architecture</h3>
+      <p>
+        A common pattern is: <strong>question → schema linking → LLM generates SQL → execute against the database → optionally validate → feed rows (and/or a sub-sampled schema) back to the LLM → final natural language answer.</strong>
+        Toolkits like <code>LangChain</code> SQL agents and <code>LlamaIndex</code> SQL modules implement variations of this loop with guardrails and retry logic.
+      </p>
+      <h3>Schema linking</h3>
+      <p>
+        Models hallucinate fewer column names when you inject a curated <code>CREATE TABLE</code> excerpt, sample rows, value distributions, and short column glossaries.
+        Some systems learn string matches from past questions or embed column metadata for nearest-neighbor selection before generation.
+      </p>
+      <h3>Challenges</h3>
+      <ul class="fancy">
+        <li><strong>Complex joins.</strong> Star schemas and many-to-many bridges confuse naive prompts; provide join paths or a semantic layer (metrics definitions).</li>
+        <li><strong>Ambiguous columns.</strong> Multiple date columns named <code>created_at</code> require disambiguation rules or clarifying questions.</li>
+        <li><strong>Safety.</strong> Treat generated SQL as untrusted input: use read-only roles, allowlists, timeouts, row limits, and static analysis to mitigate injection and runaway scans.</li>
+      </ul>
+
+      <div class="demo-box" id="demoSQL">
+        <h4>Interactive · Question → SQL (toy generator)</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          The generator uses keyword routing over a fixed demo schema (<code>companies</code>, <code>acquisitions</code>, <code>investors</code>). It illustrates the <em>shape</em> of text-to-SQL, not production accuracy.
+        </p>
+        <label class="dlbl" for="sqlQ">Ask in plain language</label>
+        <input type="search" id="sqlQ" placeholder="Total acquisition value by year for AI companies" />
+        <div class="btn-row">
+          <button type="button" class="btn" id="genSQL">Generate SQL</button>
+          <button type="button" class="btn btn-secondary" id="fillSQLexample">Use example question</button>
+        </div>
+        <div class="panel"><h5>Generated SQL</h5><pre id="sqlOut">-- Your query will appear here.</pre></div>
+        <div class="panel"><h5>Explain step (simulated)</h5><pre id="sqlExplain">—</pre></div>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s6">
+      <h2>06 · Hybrid approaches</h2>
+      <p>
+        Graphs and SQL excel when the query shape is relational; dense retrieval excels when the query is exploratory or definitional.
+        Most mature assistants <strong>compose</strong> backends instead of betting everything on one mechanism.
+      </p>
+      <h3>Complementary roles</h3>
+      <ul class="fancy">
+        <li><strong>Graph-first.</strong> “Who,” “which entity,” “along which supply chain,” “within which subsidiary” — precise hop constraints and typed paths.</li>
+        <li><strong>Vector-first.</strong> “Explain,” “compare tradeoffs,” “summarize criticism,” “what metaphors appear” — language-heavy tasks where similarity is the right prior.</li>
+      </ul>
+      <h3>Routing</h3>
+      <p>
+        A lightweight <code>query classifier</code> (rules, small model, or LLM tool-choice) can route to subgraph retrieval, SQL execution, BM25 search, or multi-source fusion.
+        Confidence thresholds and abstention matter: when routing is uncertain, run multiple backends and merge with a reranker.
+      </p>
+      <h3>Knowledge-grounded validation</h3>
+      <p>
+        Use graph facts as <em>constraints</em> on generation: retrieve candidate answers from SQL or graph lookup, then ask the model to verbalize only what those tuples support.
+        Mismatches between retrieved facts and draft answers become detectable contradictions you can repair or flag.
+      </p>
+
+      <div class="demo-box" id="demoRoute">
+        <h4>Interactive · Hybrid router (rule sketch)</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Enter a question; heuristics suggest whether to emphasize <code>graph/SQL</code>, <code>vector</code>, or <code>fusion</code>. Replace these rules with trained classifiers in real deployments.
+        </p>
+        <label class="dlbl" for="routeQ">Question</label>
+        <input type="text" id="routeQ" placeholder="Compare narrative risk disclosures vs. structured credit exposures for Q3." />
+        <div class="btn-row">
+          <button type="button" class="btn" id="runRoute">Suggest routing</button>
+        </div>
+        <div class="panel" id="routeOut" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s7">
+      <h2>07 · Playground — Mini GraphRAG</h2>
+      <p>
+        This lab ties the thread together inside the browser: paste a short passage, extract simple entities and relationships with transparent heuristics, visualize the graph, and ask a question that is answered using the edges you induced.
+        It is intentionally small so you can see every step—production GraphRAG adds scale, storage, and model sophistication on the same skeleton.
+      </p>
+
+      <div class="demo-box" id="playground">
+        <h4>Mini GraphRAG lab</h4>
+        <label class="dlbl" for="pgText">Source text (a few paragraphs)</label>
+        <textarea id="pgText">Anthropic partnered with Amazon Web Services. Amazon invested in Anthropic. OpenAI competes with Anthropic on large language models. Google Cloud offers TPUs for training.</textarea>
+        <div class="btn-row">
+          <button type="button" class="btn" id="pgExtract">Extract graph</button>
+          <button type="button" class="btn btn-secondary" id="pgClear">Reset</button>
+        </div>
+        <div class="split-2" style="margin-top:8px;">
+          <div class="panel"><h5>Extracted entities</h5><div id="pgEntities"></div></div>
+          <div class="panel"><h5>Extracted relationships</h5><div id="pgRels"></div></div>
+        </div>
+        <div class="graph-svg-wrap" id="pgGraphHost" style="margin-top:14px;"></div>
+        <label class="dlbl" for="pgAsk" style="margin-top:16px;">Question</label>
+        <input type="text" id="pgAsk" placeholder="Who partnered with whom?" />
+        <div class="btn-row">
+          <button type="button" class="btn" id="pgAnswer">Answer from graph</button>
+        </div>
+        <div class="panel"><h5>Graph-grounded answer</h5><pre id="pgAnsOut" style="color:var(--text);">—</pre></div>
+      </div>
+
+      <p>
+        When you outgrow this toy, export triples to your graph database, attach provenance pointers to offsets in source documents, and replace the heuristics with trained extractors—while keeping the same conceptual stages: <strong>induce structure, summarize communities, retrieve locally or globally, and hybridize with vectors or SQL when the question demands it.</strong>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    <p>Search Zero to Hero · Chapter 20 · GraphRAG, Knowledge Graphs &amp; Structured Retrieval</p>
+    <p style="margin-top:8px;">Single-file reference tutorial · vanilla JS · dark theme</p>
+  </footer>
+
+  <script>
+(function () {
+  'use strict';
+
+  /* ---------- Nav + scroll spy + fade-in ---------- */
+  var nav = document.getElementById('mainNav');
+  var toggle = document.getElementById('navToggle');
+  if (toggle && nav) {
+    toggle.addEventListener('click', function () {
+      var collapsed = nav.classList.toggle('collapsed');
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+  }
+
+  var sections = document.querySelectorAll('section.fade-in');
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) e.target.classList.add('visible');
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  sections.forEach(function (s) { io.observe(s); });
+
+  var navLinks = document.querySelectorAll('.main-nav a[href^="#"]');
+  function setActive() {
+    var y = window.scrollY + 140;
+    var id = 'hero';
+    sections.forEach(function (sec) {
+      if (sec.offsetTop <= y) id = sec.id;
+    });
+    navLinks.forEach(function (a) {
+      var href = a.getAttribute('href');
+      a.classList.toggle('active', href === '#' + id || (id === 'hero' && href === '#hero'));
+    });
+  }
+  window.addEventListener('scroll', setActive, { passive: true });
+  setActive();
+
+  /* ---------- Graph layout helpers ---------- */
+  function layoutCircle(nodes, edges, w, h) {
+    var keys = Object.keys(nodes);
+    var n = keys.length;
+    var cx = w / 2;
+    var cy = h / 2;
+    var r = Math.min(w, h) * 0.36;
+    var pos = {};
+    keys.forEach(function (k, i) {
+      var ang = (2 * Math.PI * i) / Math.max(n, 1) - Math.PI / 2;
+      pos[k] = { x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) };
+    });
+    return pos;
+  }
+
+  function renderGraphSVG(container, nodeSet, triples) {
+    var nodes = {};
+    nodeSet.forEach(function (k) { nodes[k] = true; });
+    var w = Math.min(720, container.clientWidth || 720);
+    var h = 320;
+    var pos = layoutCircle(nodes, triples, w, h);
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', String(w));
+    svg.setAttribute('height', String(h));
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Knowledge graph visualization');
+
+    triples.forEach(function (t) {
+      var a = pos[t.s];
+      var b = pos[t.o];
+      if (!a || !b) return;
+      var line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', a.x);
+      line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x);
+      line.setAttribute('y2', b.y);
+      line.setAttribute('stroke', '#3f3f5a');
+      line.setAttribute('stroke-width', '2');
+      svg.appendChild(line);
+      var mx = (a.x + b.x) / 2;
+      var my = (a.y + b.y) / 2;
+      var tp = document.createElementNS(ns, 'text');
+      tp.setAttribute('x', mx);
+      tp.setAttribute('y', my - 4);
+      tp.setAttribute('fill', '#8888a0');
+      tp.setAttribute('font-size', '10');
+      tp.setAttribute('text-anchor', 'middle');
+      tp.textContent = t.p;
+      svg.appendChild(tp);
+    });
+
+    Object.keys(nodes).forEach(function (k) {
+      var p = pos[k];
+      var circle = document.createElementNS(ns, 'circle');
+      circle.setAttribute('cx', p.x);
+      circle.setAttribute('cy', p.y);
+      circle.setAttribute('r', '22');
+      circle.setAttribute('fill', '#181825');
+      circle.setAttribute('stroke', '#22d3ee');
+      circle.setAttribute('stroke-width', '2');
+      svg.appendChild(circle);
+      var text = document.createElementNS(ns, 'text');
+      text.setAttribute('x', p.x);
+      text.setAttribute('y', p.y + 4);
+      text.setAttribute('fill', '#e0e0e8');
+      text.setAttribute('font-size', '11');
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = k.length > 14 ? k.slice(0, 12) + '…' : k;
+      svg.appendChild(text);
+    });
+
+    container.innerHTML = '';
+    container.appendChild(svg);
+  }
+
+  /* ---------- Demo: triples ---------- */
+  var tripleStore = [];
+  var tripleNodes = new Set();
+  var host = document.getElementById('tripleGraphHost');
+  var listOut = document.getElementById('tripleListOut');
+
+  function redrawTriples() {
+    var nodes = [];
+    tripleNodes.forEach(function (n) { nodes.push(n); });
+    renderGraphSVG(host, nodes, tripleStore);
+    listOut.textContent = tripleStore.length
+      ? tripleStore.map(function (t) { return '(' + t.s + ', ' + t.p + ', ' + t.o + ')'; }).join(' · ')
+      : 'No triples yet.';
+  }
+
+  function addTripleFromInputs() {
+    var s = document.getElementById('subj').value.trim();
+    var p = document.getElementById('pred').value.trim();
+    var o = document.getElementById('obj').value.trim();
+    if (!s || !p || !o) return;
+    tripleStore.push({ s: s, p: p, o: o });
+    tripleNodes.add(s);
+    tripleNodes.add(o);
+    document.getElementById('subj').value = '';
+    document.getElementById('pred').value = '';
+    document.getElementById('obj').value = '';
+    redrawTriples();
+  }
+
+  document.getElementById('addTriple').addEventListener('click', addTripleFromInputs);
+  document.getElementById('clearTriples').addEventListener('click', function () {
+    tripleStore = [];
+    tripleNodes = new Set();
+    redrawTriples();
+  });
+  document.getElementById('loadSampleTriples').addEventListener('click', function () {
+    tripleStore = [
+      { s: 'Google', p: 'acquired', o: 'DeepMind' },
+      { s: 'DeepMind', p: 'located_in', o: 'London' },
+      { s: 'Google', p: 'invests_in', o: 'Anthropic' },
+      { s: 'Microsoft', p: 'partners_with', o: 'OpenAI' },
+      { s: 'OpenAI', p: 'competes_with', o: 'Anthropic' }
+    ];
+    tripleNodes = new Set();
+    tripleStore.forEach(function (t) { tripleNodes.add(t.s); tripleNodes.add(t.o); });
+    redrawTriples();
+  });
+  redrawTriples();
+
+  /* ---------- Demo: Hearst ---------- */
+  document.getElementById('runHearst').addEventListener('click', function () {
+    var txt = document.getElementById('hearstInput').value.trim();
+    var out = document.getElementById('hearstOut');
+    if (!txt) {
+      out.textContent = 'Enter a sentence first.';
+      return;
+    }
+    var findings = [];
+    var re1 = /([\w\s]+?)\s+such\s+as\s+([^\.]+)/i;
+    var m1 = txt.match(re1);
+    if (m1) {
+      var hyper = m1[1].trim();
+      var rest = m1[2].split(/,|\band\b/i).map(function (x) { return x.trim(); }).filter(Boolean);
+      rest.forEach(function (hy) {
+        findings.push('Hearst: (“' + hy + '”, hypernym_of, “' + hyper + '”)');
+      });
+    }
+    var re2 = /([A-Z][\w]+(?:\s+[A-Z][\w]+)*),\s*a\s+([\w\s]+?),/g;
+    var m2;
+    while ((m2 = re2.exec(txt)) !== null) {
+      findings.push('Appositive: (“' + m2[1].trim() + '”, instance_of, “' + m2[2].trim() + '”)');
+    }
+    out.innerHTML = findings.length
+      ? findings.map(function (f) { return '<div class="tag">' + f + '</div>'; }).join(' ')
+      : 'No simple Hearst/appositive pattern matched. Try “X such as Y, Z” wording.';
+  });
+
+  /* ---------- Demo: pseudo-NER ---------- */
+  document.getElementById('runNERsim').addEventListener('click', function () {
+    var t = document.getElementById('nerText').value;
+    var out = document.getElementById('nerOut');
+    var orgs = [];
+    var pers = [];
+    var m;
+    var orgSuffix = /\b([A-Z][\w&.-]*(?:\s+[A-Z][\w&.-]*)+)\s+(?:Inc\.|LLC|Ltd\.|Corporation|Corp\.)\b/g;
+    while ((m = orgSuffix.exec(t)) !== null) orgs.push(m[1].trim());
+    var orgBeforeVerb = /\b([A-Z][\w&.-]*(?:\s+[A-Z][\w&.-]*)+)\s+(?:partnered|invested|released|acquired|announced|published)\b/g;
+    while ((m = orgBeforeVerb.exec(t)) !== null) orgs.push(m[1].trim());
+    var orgTwoToken = /\b([A-Z][a-z]+)\s+([A-Z]{2,}|[A-Z][a-z]+)\b/g;
+    while ((m = orgTwoToken.exec(t)) !== null) {
+      if (/^(in|on|at|to|for|of|the|and|with)$/i.test(m[2])) continue;
+      orgs.push((m[1] + ' ' + m[2]).trim());
+    }
+    var openAIstyle = /\b([A-Z][a-z]*[A-Z][\w]*)\b/g;
+    while ((m = openAIstyle.exec(t)) !== null) orgs.push(m[1]);
+    var perRe = /\b(Dr\.|Mr\.|Ms\.|Mrs\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g;
+    while ((m = perRe.exec(t)) !== null) pers.push(m[1] + ' ' + m[2]);
+    function uniq(a) {
+      var s = {};
+      a.forEach(function (x) { s[x] = true; });
+      return Object.keys(s);
+    }
+    orgs = uniq(orgs);
+    pers = uniq(pers);
+    out.innerHTML =
+      '<div><strong style="color:#a78bfa">ORG</strong> ' +
+      (orgs.length ? orgs.map(function (x) { return '<span class="tag">' + x + '</span>'; }).join(' ') : '<span class="tag">—</span>') +
+      '</div><div style="margin-top:10px"><strong style="color:#34d399">PER</strong> ' +
+      (pers.length ? pers.map(function (x) { return '<span class="tag">' + x + '</span>'; }).join(' ') : '<span class="tag">—</span>') +
+      '</div>';
+  });
+
+  /* ---------- Demo: local vs global ---------- */
+  var LG = {
+    q1: {
+      local: 'Anchors: Google, DeepMind.\nEdges: (Google, acquired, DeepMind).\nText units: press release paragraph with acquisition date; analyst note on research impact.\nUse when the question names specific entities and expects precise chronology.',
+      global: 'Community summary (AI labs cluster): “Large labs consolidate frontier model capacity; acquisitions couple research groups to cloud distribution.”\nUseful for backdrop, less for a single deal’s date unless tied to supporting text retrieval.'
+    },
+    q2: {
+      local: 'No single entity anchor fits; local neighborhood would be arbitrary without a seed.\nFallback: detect topical keywords → map to nearest hub entities (policy, safety, liability).',
+      global: 'Community summaries at medium resolution:\n• Cluster A: liability & insurance language.\n• Cluster B: model evaluation & benchmarks.\n• Cluster C: export controls & hardware dependencies.\nThematic answers synthesize across these narratives with citations to member sources.'
+    },
+    q3: {
+      local: 'Seed from “battery” and “automotive” programs; expand 2-hop over (supplier_of), (division_of), (contracts_with).\nReturns a short list of supplier nodes shared by both program subgraphs.',
+      global: 'Supply-chain community summary highlights vertical integration trends; complements local path evidence when the question is exploratory (“what patterns emerge?”).'
+    }
+  };
+
+  document.getElementById('runLG').addEventListener('click', function () {
+    var k = document.getElementById('lgQuestion').value;
+    var pack = LG[k] || LG.q1;
+    document.getElementById('lgLocal').textContent = pack.local;
+    document.getElementById('lgGlobal').textContent = pack.global;
+  });
+
+  /* ---------- Demo: DRIFT steps ---------- */
+  var driftState = [];
+  document.querySelectorAll('[data-drift]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var idx = parseInt(btn.getAttribute('data-drift'), 10);
+      driftState = driftState.filter(function (x) { return x <= idx; });
+      if (driftState.indexOf(idx) === -1) driftState.push(idx);
+      driftState.sort(function (a, b) { return a - b; });
+      var labels = [
+        'Company A',
+        '—[invested_in]→ Startup S',
+        '—[acquired_by]→ Company B',
+        '—[headquartered_in]→ City C'
+      ];
+      var parts = ['Company A'];
+      for (var i = 1; i <= 3; i++) {
+        if (driftState.indexOf(i) !== -1) parts.push(labels[i]);
+      }
+      document.getElementById('driftPath').textContent = 'Path: ' + parts.join(' ');
+    });
+  });
+
+  /* ---------- Demo: text-to-SQL toy ---------- */
+  var SCHEMA_NOTE = '-- Schema:\n-- companies(id, name, sector)\n-- acquisitions(id, acquirer_id, target_id, year, deal_usd)\n-- investors(id, name)\n-- investments(investor_id, company_id, round, amount_usd)\n';
+
+  function toySql(q) {
+    var lower = q.toLowerCase();
+    if (/total|sum|aggregate/.test(lower) && /acquisition|acquired|deal/.test(lower)) {
+      return {
+        sql: SCHEMA_NOTE + 'SELECT a.year, SUM(a.deal_usd) AS total_usd\nFROM acquisitions a\nJOIN companies t ON t.id = a.target_id\nWHERE t.sector = \'AI\'\nGROUP BY a.year\nORDER BY a.year;',
+        explain: 'Detected aggregation over acquisitions with an AI sector filter. In production, confirm the sector encoding and NULL deal handling.'
+      };
+    }
+    if (/investor|invested|funding|round/.test(lower)) {
+      return {
+        sql: SCHEMA_NOTE + 'SELECT i.name AS investor, c.name AS company, v.round, v.amount_usd\nFROM investments v\nJOIN investors i ON i.id = v.investor_id\nJOIN companies c ON c.id = v.company_id\nORDER BY v.amount_usd DESC\nLIMIT 25;',
+        explain: 'Matched funding/investment intent → star-join pattern from investments to dimension tables.'
+      };
+    }
+    if (/join|both|connect/.test(lower) && /supplier|program/.test(lower)) {
+      return {
+        sql: '-- (demo) Suppose tables suppliers, programs, supplier_program(program_id, supplier_id)\nSELECT s.name\nFROM suppliers s\nJOIN supplier_program sp ON sp.supplier_id = s.id\nJOIN programs p ON p.id = sp.program_id\nWHERE p.name IN (\'Automotive\', \'Battery\')\nGROUP BY s.name\nHAVING COUNT(DISTINCT p.name) = 2;',
+        explain: 'Illustrates relational counting to find entities bridging two categories—common SQL idiom for “both” questions.'
+      };
+    }
+    return {
+      sql: SCHEMA_NOTE + 'SELECT c.name, c.sector\nFROM companies c\nWHERE c.name ILIKE \'%\' || :needle || \'%\'\nLIMIT 50;',
+      explain: 'Fallback: parameterized name search. Replace :needle with extracted entity from the question; add schema linking for columns.'
+    };
+  }
+
+  document.getElementById('genSQL').addEventListener('click', function () {
+    var q = document.getElementById('sqlQ').value.trim() || 'list companies';
+    var r = toySql(q);
+    document.getElementById('sqlOut').textContent = r.sql;
+    document.getElementById('sqlExplain').textContent = r.explain;
+  });
+  document.getElementById('fillSQLexample').addEventListener('click', function () {
+    document.getElementById('sqlQ').value = 'Show total acquisition deal value by year for companies in the AI sector';
+    document.getElementById('genSQL').click();
+  });
+
+  /* ---------- Demo: router ---------- */
+  document.getElementById('runRoute').addEventListener('click', function () {
+    var q = document.getElementById('routeQ').value.toLowerCase();
+    var out = document.getElementById('routeOut');
+    var graphHints = /\b(who|which company|acquired|supplier|invested|headquartered|subsidiary|parent)\b/.test(q);
+    var vecHints = /\b(explain|compare|describe|metaphor|narrative|tone|summarize|why might)\b/.test(q);
+    var sqlHints = /\b(total|average|sum|count|group by|quarter|q[1-4]|join|sql|table)\b/.test(q);
+    var rec = [];
+    if (sqlHints) rec.push('Primary: <code>text-to-SQL</code> over curated schema + read-only execution.');
+    if (graphHints) rec.push('Primary: <code>graph</code> hop expansion with typed filters + provenance text units.');
+    if (vecHints) rec.push('Primary: <code>vector</code> retrieval (dense ± BM25) for language-heavy evidence.');
+    if (rec.length === 0) rec.push('Default: <code>fusion</code> — parallel sparse + dense + optional graph/SQL if entities or metrics detected.');
+    if ((graphHints && vecHints) || (sqlHints && vecHints)) {
+      rec.push('Secondary: <code>fusion</code> + cross-encoder rerank on merged candidates.');
+    }
+    out.innerHTML = '<div>' + rec.map(function (r) { return '<div class="tag" style="display:block;margin:6px 0;">' + r + '</div>'; }).join('') + '</div>';
+  });
+
+  /* ---------- Playground: mini extract + Q&A ---------- */
+  var pgTriples = [];
+  var pgNodes = new Set();
+
+  function extractFromText(text) {
+    var triples = [];
+    var t = text.replace(/\s+/g, ' ').trim();
+    var patterns = [
+      { re: /([A-Z][\w]+(?:\s+[A-Z][\w]+)*)\s+partnered\s+with\s+([A-Z][\w]+(?:\s+[A-Z][\w]+)*)/g, p: 'partnered_with' },
+      { re: /([A-Z][\w]+(?:\s+[A-Z][\w]+)*)\s+invested\s+in\s+([A-Z][\w]+(?:\s+[A-Z][\w]+)*)/g, p: 'invested_in' },
+      { re: /([A-Z][\w]+(?:\s+[A-Z][\w]+)*)\s+competes\s+with\s+([A-Z][\w]+(?:\s+[A-Z][\w]+)*)/g, p: 'competes_with' },
+      { re: /([A-Z][\w]+(?:\s+[A-Z][\w]+)*)\s+offers\s+([^.]+?)\s+for\s+([^.]+)\./g, p: 'offers_for' }
+    ];
+    var m;
+    patterns.forEach(function (pat) {
+      if (pat.p === 'offers_for') {
+        while ((m = pat.re.exec(t)) !== null) {
+          triples.push({ s: m[1].trim(), p: 'offers', o: (m[2].trim() + ' for ' + m[3].trim()).trim() });
+        }
+      } else {
+        while ((m = pat.re.exec(t)) !== null) {
+          triples.push({ s: m[1].trim(), p: pat.p, o: m[2].trim() });
+        }
+      }
+    });
+    return triples;
+  }
+
+  function renderPG() {
+    var entHost = document.getElementById('pgEntities');
+    var relHost = document.getElementById('pgRels');
+    pgNodes.clear();
+    pgTriples.forEach(function (tr) {
+      pgNodes.add(tr.s);
+      pgNodes.add(tr.o);
+    });
+    entHost.innerHTML = Array.from(pgNodes).map(function (e) {
+      return '<span class="tag">' + e + '</span>';
+    }).join(' ') || '<span class="tag">—</span>';
+    relHost.innerHTML = pgTriples.map(function (tr) {
+      return '<div class="tag" style="display:block;margin:4px 0;">(' + tr.s + ', ' + tr.p + ', ' + tr.o + ')</div>';
+    }).join('') || '<span class="tag">—</span>';
+    var gh = document.getElementById('pgGraphHost');
+    renderGraphSVG(gh, Array.from(pgNodes), pgTriples);
+  }
+
+  document.getElementById('pgExtract').addEventListener('click', function () {
+    var text = document.getElementById('pgText').value;
+    pgTriples = extractFromText(text);
+    renderPG();
+  });
+  document.getElementById('pgClear').addEventListener('click', function () {
+    pgTriples = [];
+    pgNodes.clear();
+    document.getElementById('pgAnsOut').textContent = '—';
+    renderPG();
+  });
+
+  document.getElementById('pgAnswer').addEventListener('click', function () {
+    var q = document.getElementById('pgAsk').value.toLowerCase();
+    if (!pgTriples.length) {
+      document.getElementById('pgAnsOut').textContent = 'Extract a graph first.';
+      return;
+    }
+    var lines = [];
+    if (/partner/.test(q)) {
+      pgTriples.filter(function (tr) { return tr.p === 'partnered_with'; }).forEach(function (tr) {
+        lines.push(tr.s + ' partnered with ' + tr.o + '.');
+      });
+    }
+    if (/invest/.test(q)) {
+      pgTriples.filter(function (tr) { return tr.p === 'invested_in'; }).forEach(function (tr) {
+        lines.push(tr.s + ' invested in ' + tr.o + '.');
+      });
+    }
+    if (/compet/.test(q)) {
+      pgTriples.filter(function (tr) { return tr.p === 'competes_with'; }).forEach(function (tr) {
+        lines.push(tr.s + ' competes with ' + tr.o + '.');
+      });
+    }
+    if (/offer|tpu|gpu|cloud/.test(q)) {
+      pgTriples.filter(function (tr) { return tr.p === 'offers'; }).forEach(function (tr) {
+        lines.push(tr.s + ' offers ' + tr.o + '.');
+      });
+    }
+    if (!lines.length) {
+      lines.push('No matching predicate found for this question. Try keywords: partner, invest, compete, offer.');
+      lines.push('Grounded triples available:\n' + pgTriples.map(function (tr) {
+        return '(' + tr.s + ', ' + tr.p + ', ' + tr.o + ')';
+      }).join('\n'));
+    }
+    document.getElementById('pgAnsOut').textContent = lines.join('\n');
+  });
+
+  /* Initial loads for demos that benefit */
+  document.getElementById('runLG').click();
+})();
+  </script>
+</body>
+</html>

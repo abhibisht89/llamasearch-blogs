@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forward & Backward Propagation — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  background: rgba(251,191,36,0.08);
+  border-left-color: var(--accent5);
+}
+.callout.warn p { color: var(--text-dim); }
+.callout.ok {
+  background: rgba(52,211,153,0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text-dim); }
+
+/* ===== Q&A box ===== */
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--accent2);
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); font-size: 0.92rem; line-height: 1.65; }
+.qa-box p + p { margin-top: 12px; }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+.flow-step:hover { border-color: var(--accent); }
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Chart container ===== */
+.chart-container { position: relative; margin: 20px 0; }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Input fields ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* ===== RNN step display ===== */
+.rnn-step { display: flex; align-items: center; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+.rnn-step .token { transition: all 0.3s; }
+.rnn-step .token.current { box-shadow: 0 0 0 2px var(--accent); }
+
+/* ===== Interview Q&A ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  font-family: var(--sans);
+}
+.hint-btn:hover, .reveal-btn:hover {
+  border-color: var(--accent);
+  background: rgba(108,140,255,0.08);
+}
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.hint-box.visible { display: block; }
+.answer {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.answer.visible { display: block; }
+.solution-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent3);
+  margin-bottom: 10px;
+}
+.explanation {
+  font-size: 0.92rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.explanation strong { color: var(--text); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Forward And Backward Propagation</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">Forward & Backward Propagation</a>
+  <div class="nav-links">
+    <a href="#s0">Overview</a>
+    <a href="#s1">Composition</a>
+    <a href="#s2">RNN</a>
+    <a href="#s3">Nonlinearities</a>
+    <a href="#s4">Training</a>
+    <a href="#s5">Loss</a>
+    <a href="#s6">Backpropagation</a>
+    <a href="#s7">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Forward & Backward Propagation</h1>
+    <p class="subtitle">
+      How neural language models turn a prefix into a probability distribution — and how they learn to do it better. From composition functions and RNNs to gradient descent and backpropagation.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">12</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">8</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1</span>
+        <span class="stat-label">Playground</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Neural language models compose token embeddings into a prefix representation, pass it through a softmax layer, and output a probability distribution over the next word. This chapter covers the forward pass — averaging, fixed-window networks, and RNNs — and the backward pass via gradient descent and backpropagation.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 0: OVERVIEW ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>From Prefix to Distribution</h2>
+
+    <p>
+      A neural language model takes an input sequence (a prefix) and produces a probability distribution over the next word. The pipeline has two main stages: <strong>composition</strong> — turning a sequence of embeddings into a single vector — and <strong>prediction</strong> — turning that vector into a distribution via a linear layer and softmax.
+    </p>
+
+    <h3 style="margin-top:28px;">Terminology</h3>
+    <p>
+      The notation below uses a prefix of four tokens:
+    </p>
+
+    <div class="card card-alt">
+      <ul style="list-style:none; font-size:0.95rem;">
+        <li style="margin-bottom:10px;"><strong style="color:var(--accent);">C₁, C₂, C₃, C₄</strong> — token embeddings (each d-dimensional)</li>
+        <li style="margin-bottom:10px;"><strong style="color:var(--accent2);">X</strong> — the prefix vector: a single representation of the entire sequence</li>
+        <li style="margin-bottom:10px;"><strong style="color:var(--accent3);">Y</strong> — the output: a V-dimensional probability distribution over the vocabulary</li>
+      </ul>
+    </div>
+
+    <p>
+      The weight matrix <strong>W</strong> in the softmax layer is V × d: it projects the d-dimensional prefix vector into V logits, which softmax then turns into probabilities. Y is V-dimensional, X is d-dimensional. W could be stored as d × V instead — you would use X·W or transpose accordingly; the result must be V-dimensional.
+    </p>
+
+    <div class="formula">
+      Y = softmax(W · X) &nbsp;&nbsp; where X ∈ ℝᵈ, W ∈ ℝᵥˣᵈ, Y ∈ ℝᵥ
+    </div>
+
+    <p>
+      The softmax function ensures all outputs are positive and sum to one — a valid probability distribution. The <strong>composition step</strong> maps the token embeddings C₁, C₂, C₃, C₄ to the prefix vector X.
+    </p>
+
+    <p>
+      A concrete toy size that keeps the algebra small is <strong>d = 3</strong> for embedding dimension and <strong>V = 4</strong> for vocabulary size: then X lives in ℝ³, W is 4×3, and Y is a 4-way distribution. The same story scales to modern models where d and V are enormous.
+    </p>
+
+    <p>
+      Composition functions increase in complexity from <strong>elementwise transforms</strong> (few parameters, limited expressivity) through <strong>fixed-window neural language models</strong> (like n-grams, but with embeddings and learned projections) and <strong>recurrent neural networks</strong> (sequential composition with shared weights) to <strong>transformers</strong>, which replace recurrence with <strong>self-attention</strong>. Forward propagation through any of these blocks feeds the same softmax head.
+    </p>
+
+    <p>
+      With random initialization, every weight matrix and embedding is random, but the pipeline still maps a prefix to logits and then to a proper probability distribution. The distribution is unrelated to language until training nudges parameters so that likely continuations receive more mass.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Forward Propagation Pipeline</h3>
+      <p>Click each step to highlight it. See how data flows from tokens to the final distribution.</p>
+
+      <div class="flow" id="forwardFlow">
+        <div class="flow-step" data-step="0">C₁ C₂ C₃ C₄ — Token Embeddings</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" data-step="1">Composition → X (Prefix Vector)</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" data-step="2">Linear: W · X → Logits</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" data-step="3">Softmax → Y (Probability Distribution)</div>
+      </div>
+
+      <div id="forwardFlowDesc" style="margin-top:16px; font-size:0.9rem; color:var(--text-dim); min-height:40px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 1: COMPOSITION FUNCTIONS ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Composition: From Sequence to Vector</h2>
+
+    <p>
+      A composition function takes a <strong>sequence of d-dimensional embeddings</strong> (one per token in the prefix) and outputs a <strong>single vector</strong> representing the entire prefix. Ideally, this vector encodes everything useful for predicting the next word.
+    </p>
+
+    <h3 style="margin-top:28px;">Naive Composition: Elementwise Sum</h3>
+    <p>
+      The simplest approach is to add the embeddings:
+    </p>
+
+    <div class="formula">
+      X = C₁ + C₂ + C₃ + ... + Cₙ
+    </div>
+
+    <p>
+      This satisfies the input/output requirements but has severe limitations. You lose <strong>all position information</strong>: "my favorite LLM is" and "favorite is LLM my" produce the exact same sum, even though one is grammatical and the other isn't. You also have no notion of the immediate previous word, part of speech, or syntactic structure. A vector with large magnitude can dominate the sum. And critically, the composition function has <strong>no learned parameters</strong> — only the embeddings are trainable, which limits expressivity.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Embedding Averaging: Order Is Lost</h3>
+      <p>These two sentences produce the same composed vector when you sum their embeddings. Click to swap word order and see the result stays identical.</p>
+
+      <div class="two-col">
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Sentence A</label>
+          <div class="token-row" id="avgSentA">
+            <span class="token token-word">my</span>
+            <span class="token token-word">favorite</span>
+            <span class="token token-word">LLM</span>
+            <span class="token token-word">is</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Sentence B</label>
+          <div class="token-row" id="avgSentB">
+            <span class="token token-word">favorite</span>
+            <span class="token token-word">is</span>
+            <span class="token token-word">LLM</span>
+            <span class="token token-word">my</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-group" style="margin-top:16px;">
+        <button class="btn" onclick="swapAvgOrder()">Swap Order</button>
+      </div>
+
+      <div class="formula" style="margin-top:16px; font-size:0.85rem;">
+        Sum(A) = Sum(B) — same vector, different meaning!
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Fixed Window: Concatenation</h3>
+    <p>
+      Instead of summing, we can <strong>concatenate</strong> the last n embeddings. With window size 4 and d-dimensional embeddings, we get a 4d-dimensional vector Z:
+    </p>
+
+    <div class="formula">
+      Z = [C₁; C₂; C₃; C₄] &nbsp;&nbsp; (concatenation, 4d-dimensional)
+    </div>
+
+    <p>
+      The semicolon notation denotes concatenation — the same convention appears later in transformer notation (for example when packing heads or features). If each embedding has dimension d, concatenating four of them yields a vector in <strong>ℝ⁴ᵈ</strong>. We make the same <strong>Markov-style assumption</strong> as a classic n-gram: only the last n tokens matter; earlier context is dropped (truncated), just as a 4-gram table ignores everything before its 4-word prefix.
+    </p>
+
+    <p>
+      This architecture is a <strong>fixed-window neural language model</strong>; you will also see it called a <strong>neural n-gram model</strong>. It is the natural embedding-based cousin of a count-based n-gram: a table of strings versus a continuous function of concatenated embeddings.
+    </p>
+
+    <p>
+      For a generic composition function, the output vector does <strong>not</strong> have to match the embedding dimension d. You only need a <strong>fixed-size</strong> vector to multiply by the softmax matrix. Often we pick a hidden width d<sub>hid</sub> that may equal d, but it is a design choice, not a mathematical requirement.
+    </p>
+
+    <p>
+      We could feed Z straight into the vocabulary logits, but we usually insert at least one <strong>hidden layer</strong> so the model has extra parameters and can learn richer interactions between positions. Concretely, if Z ∈ ℝ⁴ᵈ, one choice is to map back into ℝᵈ with a weight matrix of shape <strong>d × 4d</strong>: the linear map has one row per output coordinate and consumes the full concatenated prefix. Other shapes are equally valid — the designer picks hidden widths.
+    </p>
+
+    <div class="formula">
+      H = f(W<sub>1</sub> · Z) , &nbsp;&nbsp; Y = softmax(W<sub>Y</sub> · H)
+    </div>
+
+    <p>
+      Here W<sub>1</sub> is the hidden-layer projection and <strong>W<sub>Y</sub></strong> is a <em>separate</em> output matrix for logits (the earlier softmax weight W in the two-stage diagram). Subscripts keep the roles distinct when both layers are on the page. The nonlinearity f is <strong>not</strong> softmax — softmax is reserved for the final distribution over the vocabulary; f is an elementwise nonlinearity such as ReLU or tanh.
+    </p>
+
+    <p>
+      Count-based n-grams store a count for every n-word string; increasing n from 4 to 5 multiplies storage roughly like <strong>Vⁿ</strong> — exponential in context length. The fixed-window neural model instead grows <strong>linearly in n</strong> in the sense that only the <em>input width</em> of the first matrix grows (from 4d to 5d, and so on): we store one embedding per word type and weight matrices, not a giant sparse table of every observed prefix. That is the storage win.
+    </p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3>Count-based n-gram</h3>
+        <p>Easy to interpret: inspect the table of counts. Sparsity hurts: unseen prefixes need back-off or smoothing. Storage explodes as n grows.</p>
+      </div>
+      <div class="card card-alt">
+        <h3>Fixed-window neural LM</h3>
+        <p>Harder to interpret: dense vectors and matrices. Smoother generalization: similar strings share structure through embeddings. Size scales linearly in n for the first layer width, not exponentially in Vⁿ.</p>
+      </div>
+    </div>
+
+    <p>
+      Unlike one-hot bags of words, embeddings let <strong>movie</strong> and <strong>film</strong> live near each other in vector space even though they are distinct tokens, which alleviates the extreme sparsity of exact string matching. At test time, a prefix never seen verbatim can still receive a sensible hidden state because the function is continuous in the embeddings rather than a lookup that returns zero counts.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Long context and weight tying across positions.</strong> A fixed window cannot capture long-range dependencies: predicting the next word in a long document still uses only the last n surface words. A subtler issue is that <strong>different rows of W<sub>1</sub> are tied to absolute positions inside the window</strong>. Compare the prefixes <em>my favorite LLM is</em> and <em>favorite LLM really is</em>: the next-word distribution should plausibly both favor continuations like <em>language models</em>. Yet the token <strong>LLM</strong> occupies position 3 in the first string and position 2 in the second, so the block of weights that processes “slot 3” never shares parameters with the block for “slot 2.” Scaling n to 50 or 500 makes this worse: there is little principled reason to treat the same lexeme at position 400 completely differently from position 450. Recurrent networks and later transformers address this in different ways.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Speed vs recurrence.</strong> Summing or concatenating the whole window and applying one or two feed-forward layers is <strong>parallel over the prefix</strong> and therefore fast at forward time. An RNN performs a separate update per token; it is typically <strong>slower</strong> for long sequences even though it fixes weight sharing and unbounded (in principle) context.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Linear Layer (Feed-Forward / Fully Connected)</h3>
+    <p>
+      The hidden layer has the form:
+    </p>
+
+    <div class="formula">
+      H = f(W · Z + b) &nbsp;&nbsp; or simply H = f(W · Z)
+    </div>
+
+    <p>
+      This operation — multiply by a weight matrix, optionally add bias, then apply an elementwise nonlinearity — is called a <strong>linear layer</strong> (as in <code>nn.Linear</code> in PyTorch), a <strong>feed-forward layer</strong>, or a <strong>fully connected layer</strong>. Papers and libraries use different names for the same map.
+    </p>
+
+    <p>
+      Bias vectors are real parameters in code, but we often <strong>omit bias from the chalkboard equations</strong> for cleanliness — you can always imagine an extra column appended to W or an augmented input with a constant 1. Nothing essential changes in the derivation.
+    </p>
+
+    <p>
+      Why must f be nonlinear? Suppose instead we only stack linear maps. Let B = W a for some input a, and then C = W′ B without any nonlinearity between them. Then C = W′W a = W″ a for a single combined matrix W″ = W′W. Fifty stacked linear layers still collapse to <strong>one</strong> linear transformation. As soon as we insert genuine nonlinearities between layers, no such global collapse is possible, and depth buys expressivity.
+    </p>
+
+    <div class="formula">
+      Without f: &nbsp; C = W′(W a) = (W′W) a. &nbsp;&nbsp; With f: &nbsp; C = f₂(W′ · f₁(W · a)) — not generally a single linear map.
+    </div>
+
+    <p>
+      The function f is a <strong>nonlinearity</strong>, applied elementwise to the vector produced by the linear map. Language pairs (prefix, next word) depend on syntax, semantics, and discourse in ways that are <strong>highly nonlinear</strong>; linear maps alone cannot capture those interactions, no matter how wide the matrices are.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 2: RNN ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Recurrent Neural Networks</h2>
+
+    <p>
+      Recurrent neural networks address the main weaknesses of fixed-window models: <strong>infinite sequence length</strong> (in theory) and <strong>weight sharing</strong> across all positions. Instead of processing the whole sequence at once, an RNN goes <strong>left to right, one word at a time</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">Sequential Composition</h3>
+    <p>
+      At each time step t, we compute a hidden state hₜ that depends on the <strong>previous hidden state</strong> hₜ₋₁ and the <strong>current token embedding</strong> cₜ:
+    </p>
+
+    <div class="formula">
+      hₜ = f(W_H · hₜ₋₁ + W_C · cₜ)
+    </div>
+
+    <p>
+      Write <strong>h<sub>t</sub></strong> for the hidden state at <strong>time step</strong> t (or position t). The name “time step” carries over from time-series applications; in text, it is simply the index in the sequence. The recurrence says that h<sub>t</sub> is a function of the <strong>previous hidden state</strong> h<sub>t−1</sub> and the <strong>current token embedding</strong> c<sub>t</sub>. The hidden size d<sub>hid</sub> and the embedding size d<sub>m</sub> need not match; the matrices are sized to make the addition legal inside f.
+    </p>
+
+    <p>
+      W_H is d<sub>hid</sub> × d<sub>hid</sub> (same hidden size in and out). W_C is d<sub>hid</sub> × d<sub>m</sub> (projects the embedding into hidden space). The nonlinearity f is typically <strong>tanh</strong> for shallow RNNs; ReLU appears in deeper stacks in practice. The same W_H and W_C are used at every time step — that's the weight sharing. The <strong>final hidden state</strong> h<sub>n</sub> is the prefix representation fed into the vocabulary logits (what we earlier called X before the softmax layer).
+    </p>
+
+    <div class="formula">
+      h₁ = f(W_C · c₁) &nbsp;&nbsp; (first position: no prior hidden state in the minimal setup; implementations often seed h₀ = 0)
+    </div>
+
+    <h3 style="margin-top:28px;">Step-by-Step Processing</h3>
+    <p>
+      For the sequence "my favorite LLM is": h₁ depends only on c₁; h₂ depends on h₁ and c₂; h₃ on h₂ and c₃; h₄ on h₃ and c₄. Each step incorporates one more token. Because the recurrence is sequential, the RNN is typically <strong>slower</strong> at long prefixes than a fixed-window model that touches all embeddings in one shot, but it gains variable-length context and shared weights across positions.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>RNN Step-by-Step</h3>
+      <p>Animate how the RNN processes tokens one at a time. Each step updates the hidden state using the previous hidden state and the current token.</p>
+
+      <div class="rnn-step" id="rnnStepDisplay">
+        <span class="token token-word">my</span>
+        <span class="token token-word">favorite</span>
+        <span class="token token-word">LLM</span>
+        <span class="token token-word">is</span>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" onclick="rnnStepPrev()">← Previous</button>
+        <button class="btn active" onclick="rnnStepNext()">Next →</button>
+        <button class="btn" onclick="rnnStepReset()">Reset</button>
+      </div>
+
+      <div id="rnnStepDesc" style="margin-top:12px; font-size:0.9rem; color:var(--text-dim);"></div>
+    </div>
+
+    <div class="callout">
+      <p>RNNs handle sequences of arbitrary length because the recurrence uses the same weights at every step. There is no fixed window — the hidden state carries information from the entire prefix.</p>
+    </div>
+
+    <p>
+      Neither RNNs nor the transformers that superseded them solve <strong>interpretability</strong>. Count-based n-grams wear their reasoning on their sleeve: low probability often traces to a missing or rare count. Neural models bury decisions in thousands of dense dimensions; a whole research area, neural <strong>language model interpretability</strong>, tries to attribute predictions to neurons, heads, or training facts. Expect opacity by default.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: NONLINEARITIES ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Nonlinearities: ReLU and Tanh</h2>
+
+    <p>
+      Nonlinearities are applied <strong>elementwise</strong> to the output of a linear layer. They're essential: without them, any stack of linear layers collapses to a single linear transformation. Language modeling requires modeling highly complex, nonlinear relationships between prefix and next word.
+    </p>
+
+    <h3 style="margin-top:28px;">ReLU</h3>
+    <p>
+      <strong>ReLU</strong> (Rectified Linear Unit) is the elementwise map ReLU(x) = max(0, x). For negative inputs the output is 0; for nonnegative inputs the output equals the input. On paper the graph has a <strong>kink at x = 0</strong> (a discontinuity in the derivative there), but in practice optimizers handle this the same way they handle other piecewise-smooth activations.
+    </p>
+
+    <div class="formula">
+      x = [−2.3, &nbsp; 5.7, &nbsp; 0] &nbsp;⇒&nbsp; ReLU(x) = [0, &nbsp; 5.7, &nbsp; 0]
+    </div>
+
+    <p>
+      Every coordinate is processed independently: large negative entries become zero, positive entries are unchanged. The derivative is simple (0 on the negative side, 1 on the positive side), which matters when we propagate gradients. The failure mode is <strong>dead neurons</strong>: if a unit’s pre-activation is always nonpositive for the data you see, the output stays 0, the gradient through that ReLU is 0, and the unit may never turn back on. <strong>Leaky ReLU</strong> and related variants use a tiny positive slope on the negative side so some signal still flows.
+    </p>
+
+    <h3 style="margin-top:28px;">Tanh</h3>
+    <p>
+      <strong>Tanh</strong> (hyperbolic tangent) is smooth and <strong>bounded in (−1, 1)</strong>: large positive inputs approach +1, large negative inputs approach −1, and 0 maps to 0. Compared with ReLU, there is no sharp corner at the origin; the function is differentiable everywhere.
+    </p>
+
+    <div class="formula">
+      d/dz tanh(z) = 1 − tanh²(z)
+    </div>
+
+    <p>
+      If the forward pass already stored tanh(z), the backward pass can reuse it: the derivative is an inexpensive function of the activation itself. That reuse is one reason tanh-like activations are pleasant in manual derivations and in libraries. The cost is <strong>saturation</strong>: when |z| is large, tanh(z) is extremely close to ±1, the derivative is nearly 0, and gradients multiplied through many steps <strong>vanish</strong>. Deep RNNs are especially exposed to this pathology (and to exploding gradients when gains exceed 1). ReLU avoids vanishing gradients on the positive side but trades that for the dead-neuron issue on the negative side.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Vanishing gradients in shallow fixed windows.</strong> In a compact feed-forward language model with only a couple of layers, you may not see dramatic vanishing gradients unless the network is deep or uses saturating nonlinearities aggressively. The topic becomes unavoidable for deep stacks and for RNNs unrolled over long sequences.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Tanh Activation Visualizer</h3>
+      <p>Drag the slider to see how tanh squashes any input into the range [-1, 1]. Large magnitudes saturate.</p>
+
+      <div class="slider-container">
+        <label>Input x: <span class="slider-value" id="tanhVal">0</span></label>
+        <input type="range" id="tanhSlider" min="-6" max="6" value="0" step="0.1">
+      </div>
+
+      <div class="chart-container">
+        <canvas id="tanhCanvas" width="800" height="220"></canvas>
+      </div>
+
+      <div class="formula" style="margin-top:12px;">
+        tanh(x) = <span id="tanhOutput">0</span> &nbsp;&nbsp; (always in [-1, 1])
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: TRAINING OVERVIEW ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Training Neural Language Models</h2>
+
+    <p>
+      Neural language models start with <strong>randomly initialized</strong> parameters. They produce valid probability distributions from the start — but those distributions are meaningless. Training adjusts the parameters so the model assigns higher probability to the correct next words in the training data.
+    </p>
+
+    <p>
+      At initialization, the conditional probability of the next token given the entire prefix is as random as the weights: the model has never seen natural language. After training on pairs (prefix, next word), we hope that when the prefix appears again, more probability mass sits on tokens that actually occurred in the corpus. A concrete supervision picture: for prefix <em>my favorite LLM is</em>, the model might initially assign high probability to nonsense like <em>cat</em> while the training target is <em>Gemini</em>; the loss penalizes that mismatch, and gradient-based updates rotate parameters toward better predictions.
+    </p>
+
+    <p>
+      A model can only learn what its data contains. Train predominantly on source code and it will struggle to write literary prose; train on short stories and it will be a weak coding assistant. If the objective is a broad general-purpose system, you want a <strong>large, diverse corpus</strong> so the empirical distribution you maximize resembles the mixture of tasks you care about at deployment time.
+    </p>
+
+    <h3 style="margin-top:28px;">Parameters</h3>
+    <p>
+      The <strong>parameters</strong> (often denoted θ) are what we train. For an RNN language model, these include: the embedding matrix (all Cᵢ), W_H, W_C, and the output matrix W_y for the softmax layer. Intermediate variables like hidden states are <strong>not</strong> parameters — they're computed from the input and parameters and change for every training example.
+    </p>
+
+    <p>
+      The trainable pieces are the <strong>embedding lookup table</strong> (every c<sub>i</sub> you might index), the hidden weight matrix W, and the output matrix W<sub>out</sub> that maps hidden units to logits. The tensor <strong>H</strong> is an activation: it depends on the particular prefix and disappears when the next example arrives. The symbol <strong>f</strong> names a fixed nonlinear function (ReLU, tanh, …) with <strong>no learnable weights of its own</strong> in the usual setup.
+    </p>
+
+    <h3 style="margin-top:28px;">Training Objective</h3>
+    <p>
+      We want to <strong>maximize the likelihood</strong> of the training data. Equivalently, we <strong>minimize the negative log likelihood</strong> of the correct next word. The loss function tells us how bad we're doing: high loss = bad, low loss = good. We need it to be smooth and differentiable so we can compute gradients.
+    </p>
+
+    <h3 style="margin-top:28px;">Gradient Descent</h3>
+    <p>
+      The <strong>gradient</strong> of the loss with respect to each parameter gives the <strong>direction of steepest ascent</strong>. To minimize the loss, we take a step in the <strong>opposite</strong> direction — the negative gradient. The update rule:
+    </p>
+
+    <div class="formula">
+      θ_new = θ_old − η · ∇L(θ)
+    </div>
+
+    <p>
+      Here η is the <strong>learning rate</strong> — a hyperparameter that controls step size. Too small: training is slow. Too large: we overshoot minima and oscillate. The loss landscape is highly non-convex; we typically find a local minimum, not the global one.
+    </p>
+
+    <p>
+      For each scalar parameter θ<sub>j</sub> in a weight matrix, the partial derivative ∂L/∂θ<sub>j</sub> answers: <em>if I nudge θ<sub>j</sub> by an infinitesimal positive amount while holding everything else fixed, how does the loss change?</em> You could approximate that quantity by brute force — perturb every entry, rerun the forward pass, and difference the losses — but analytic differentiation through the network is far cheaper. Differentiable nonlinearities and a differentiable loss make the gradient exact for a given minibatch.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Non-convexity and local minima.</strong> Because of depth, nonlinearities, and messy data, the training loss is not a nice bowl with a unique bottom. Gradient-based methods typically settle in <strong>some</strong> local basin. The hope — borne out empirically for large language models — is that “good enough” minima produce strong predictors even though we cannot certify global optimality.</p>
+    </div>
+
+    <p>
+      Picture a one-dimensional slice of loss versus a single parameter: you might land randomly on the curve, step downhill along the negative gradient, and eventually nestle near a valley. If the learning rate is <strong>too large</strong>, a single update can jump past the minimum to the opposite wall; the next gradient may point the other way, producing <strong>zig-zagging</strong> or divergence. If η is <strong>too small</strong>, each step barely moves, and reaching a low-loss region may take prohibitive wall-clock time. The art is choosing η (or an adaptive schedule) so progress is steady without instability.
+    </p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3>Parameter</h3>
+        <p>Learned by gradient descent: entries of weight matrices, embedding vectors, biases. Collectively θ.</p>
+      </div>
+      <div class="card card-alt">
+        <h3>Hyperparameter</h3>
+        <p>Set before training: learning rate η, batch size, embedding dimension, hidden width, depth, choice of architecture, regularization knobs, random seeds. They shape optimization but are not updated by ∂L/∂· on equal footing with weights.</p>
+      </div>
+    </div>
+
+    <p>
+      The update rule we have written is vanilla <strong>stochastic gradient descent (SGD)</strong> on minibatches. Production language models almost always use adaptive optimizers — <strong>Adam</strong> is the de facto default — that maintain running statistics per parameter to rescale steps. Research continues: optimizers such as <strong>Muon</strong> appear in recent large-scale training recipes. PyTorch exposes these as drop-in replacements: you still call <code>loss.backward()</code>, but <code>optimizer.step()</code> applies a more intricate rule than θ ← θ − η∇L.
+    </p>
+
+    <p>
+      <strong>Batch size</strong> controls how many training tokens or sequences contribute to one gradient estimate before an update. The extremal cases clarify the trade-off. With <strong>trillions</strong> of tokens, you could forward the entire corpus, average the loss everywhere, compute one perfect gradient, and take a single giant step — statistically ideal, computationally absurd. At the other extreme, a batch of <strong>one</strong> sequence yields a very noisy gradient: cheap per step, but the direction may swing wildly. Practical training picks a middle ground. Example sizing: batch size 10 <em>sequences</em>, each padded or truncated to 1,000 tokens, yields on the order of <strong>10,000 token positions</strong> contributing to one averaged loss; you differentiate that average and step. Whether you average per token, per sequence, or with extra normalization is an implementation detail, but the principle is to aggregate enough mass that the gradient points sensibly while finishing the pass in reasonable time. Conventional wisdom is to use <strong>as large a batch as memory allows</strong> for more stable gradient estimates, subject to budget.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Gradient Descent Visualizer</h3>
+      <p>Watch how parameters move toward a minimum. The ball represents the current parameter value; the gradient points uphill, so we step downhill.</p>
+
+      <div class="chart-container">
+        <canvas id="gdCanvas" width="800" height="320"></canvas>
+      </div>
+
+      <div class="btn-group" style="margin-top:16px;">
+        <button class="btn" onclick="gdStep()">Step</button>
+        <button class="btn" onclick="gdReset()">Reset</button>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Learning Rate Explorer</h3>
+      <p>Adjust the learning rate and see how it affects convergence. Small η: slow but stable. Large η: fast but may overshoot.</p>
+
+      <div class="slider-container">
+        <label>Learning rate η: <span class="slider-value" id="lrVal">0.1</span></label>
+        <input type="range" id="lrSlider" min="0.01" max="0.5" value="0.1" step="0.01">
+      </div>
+
+      <div class="chart-container">
+        <canvas id="lrCanvas" width="800" height="260"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: LOSS AND GRADIENTS ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Loss Function and Cross-Entropy</h2>
+
+    <p>
+      For language modeling, we use the <strong>negative log likelihood</strong> of the correct next word. Given a prefix and the ground-truth next word (from training data), we want the model to assign that word high probability. Maximizing probability is equivalent to minimizing negative log probability.
+    </p>
+
+    <div class="formula">
+      L = −log P(correct next word | prefix)
+    </div>
+
+    <p>
+      On a full corpus we sum or average that quantity over every supervised position; the average negative log likelihood is the quantity tied to <strong>perplexity</strong> (perplexity exponentiates it). Minimizing the negative log probability is the same as <strong>maximizing the log probability</strong> of the observed token — the sign flip is purely convention for posing optimization as minimization.
+    </p>
+
+    <p>
+      This is a special case of <strong>cross-entropy loss</strong>. The general form is:
+    </p>
+
+    <div class="formula" style="font-size:0.85rem;">
+      L = − Σ_w P(w) log Q(w) &nbsp;&nbsp; (P = reference, Q = model prediction)
+    </div>
+
+    <p>
+      For next-word prediction, the reference P is one-hot: 1 on the correct word, 0 elsewhere. Then the sum has only one nonzero term, and cross-entropy reduces to −log Q(correct word).
+    </p>
+
+    <p>
+      Denote by <strong>Q</strong> the model’s predicted distribution over the vocabulary and by <strong>P</strong> the target distribution. The general cross-entropy is H(P, Q) = −∑<sub>w</sub> P(w) log Q(w). Language modeling usually uses a <strong>one-hot</strong> target: P(w<sub>gold</sub>) = 1 and P(w) = 0 elsewhere, which collapses the sum to −log Q(w<sub>gold</sub>). The framework still allows richer P (for example soft labels), but the default next-word setup is the degenerate case.
+    </p>
+
+    <p>
+      Real corpora repeat prefixes with different continuations: the same five-word context might be followed by <em>ChatGPT</em> in one document, <em>Claude</em> in another, <em>Gemini</em> in a third. Training still uses a one-hot target per occurrence, but across examples the model sees conflicting signals. The learned Q(· | prefix) then approximates the <strong>empirical conditional distribution</strong>: if most writers pick ChatGPT, the peak sits there with smaller mass on the alternatives. The predicted distribution may be <strong>peaked</strong> when the data are consistent or <strong>spread out</strong> when many endings are plausible — behavior tied to the entropy of the true continuation distribution given the prefix.
+    </p>
+
+    <p>
+      Optimization uses the negative log likelihood (equivalently cross-entropy) directly. <strong>Perplexity</strong> is the exponential of the average NLL — a monotone transform for monitoring and evaluation, easy to interpret as "how many equally likely choices the model thinks it has" — but not an extra term in ∂L/∂θ.
+    </p>
+
+    <h3 style="margin-top:28px;">Batch Size and SGD</h3>
+    <p>
+      <strong>Batch size</strong> is how many training examples we use to estimate the gradient before taking a step. Using the entire dataset gives the best gradient estimate but is slow. Using a single example (pure SGD) is fast but noisy. In practice we use mini-batches — a compromise. <strong>Stochastic gradient descent (SGD)</strong> typically refers to mini-batch updates. Modern optimizers like Adam use adaptive step sizes.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Loss Function Calculator</h3>
+      <p>Enter probabilities for a few words. The "correct" word is the first one. See how cross-entropy loss changes.</p>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:0.85rem; color:var(--text-dim);">Probabilities (comma-separated, first = correct):</label>
+        <input type="text" class="text-input" id="lossProbs" value="0.4, 0.3, 0.2, 0.1" oninput="updateLossCalc()">
+      </div>
+
+      <div id="lossCalcResult" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Conflicting training data:</strong> If the same prefix appears with different next words in the data (e.g., "my favorite LLM is" followed by ChatGPT, Claude, or Gemini in different documents), the model will learn to put probability mass on all of them, reflecting the empirical distribution. Data quality and filtering matter — biases in the data propagate to the model.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 6: BACKPROPAGATION ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Backpropagation</h2>
+
+    <p>
+      <strong>Backpropagation</strong> is the algorithm for computing the gradient of the loss with respect to all parameters efficiently. It uses the <strong>chain rule of calculus</strong>: if L depends on O, and O depends on W, then dL/dW = (dL/dO)(dO/dW). We work from the output layer backward to the input, reusing cached derivatives to avoid redundant computation.
+    </p>
+
+    <p>
+      The same recipe applies no matter which architecture feeds the loss: softmax on top of an RNN, a transformer block, or a tiny toy graph. In production, every weight is a tensor, but the <strong>scalar case</strong> below shows the pattern without index clutter.
+    </p>
+
+    <div class="formula">
+      Chain rule (composition): &nbsp; d/dx [ g(f(x)) ] = g′(f(x)) · f′(x)
+    </div>
+
+    <h3 style="margin-top:28px;">Worked example: two tanh layers with square loss</h3>
+    <p>
+      Consider scalars only. The input x is a real number supplied by the dataset (not a parameter). Two scalar weights w₁ and w₂ define
+    </p>
+
+    <div class="formula">
+      h = tanh(w₁ x), &nbsp;&nbsp; o = tanh(w₂ h)
+    </div>
+
+    <p>
+      Here h is a hidden activation and o is the model’s prediction. For regression pedagogy (not next-word classification), use the <strong>square loss</strong>
+    </p>
+
+    <div class="formula">
+      L = ½ (y − o)²
+    </div>
+
+    <p>
+      where y is a ground-truth target. A concrete training pair might be <strong>x = 3</strong> and <strong>y = −0.5</strong>: we want updates that move o toward −0.5 when x is 3. The parameter set is θ = {w₁, w₂}; the gradient ∇L lists the partial derivatives ∂L/∂w₁ and ∂L/∂w₂.
+    </p>
+
+    <p>
+      Introduce intermediate variables to mirror automatic differentiation:
+    </p>
+
+    <div class="formula">
+      b = w₁ x, &nbsp; h = tanh(b), &nbsp; a = w₂ h, &nbsp; o = tanh(a)
+    </div>
+
+    <p>
+      The identity <strong>d/dz tanh(z) = 1 − tanh²(z)</strong> means we can write the derivative of o with respect to a purely in terms of o itself: since o = tanh(a), we have <strong>do/da = 1 − o²</strong>. During the forward pass we already computed o; the backward pass squares it once and subtracts from 1.
+    </p>
+
+    <h3 style="margin-top:22px;">Computing ∂L/∂w₂ (closest to the loss)</h3>
+    <p>
+      Apply the chain rule tracing from L back to w₂:
+    </p>
+
+    <div class="formula">
+      ∂L/∂w₂ = (∂L/∂o) · (∂o/∂a) · (∂a/∂w₂)
+    </div>
+
+    <p>
+      Term by term: L = ½(y − o)² gives <strong>∂L/∂o = −(y − o)</strong> (the leading ½ cancels with the factor 2 from the square). Next, ∂o/∂a = 1 − o² as above. Finally a = w₂ h implies <strong>∂a/∂w₂ = h</strong>. Multiplying the three scalars yields ∂L/∂w₂ for the current forward values.
+    </p>
+
+    <h3 style="margin-top:22px;">Computing ∂L/∂w₁ (deeper in the graph)</h3>
+    <p>
+      w₁ influences L only through b → h → a → o. The full chain is
+    </p>
+
+    <div class="formula">
+      ∂L/∂w₁ = (∂L/∂o) · (∂o/∂a) · (∂a/∂h) · (∂h/∂b) · (∂b/∂w₁)
+    </div>
+
+    <p>
+      We already know ∂L/∂o and ∂o/∂a from the previous block. New pieces: a = w₂ h gives <strong>∂a/∂h = w₂</strong>; h = tanh(b) gives <strong>∂h/∂b = 1 − h²</strong>; b = w₁ x gives <strong>∂b/∂w₁ = x</strong>. Multiply everything in order to obtain ∂L/∂w₁.
+    </p>
+
+    <h3 style="margin-top:28px;">The Key Insight</h3>
+    <p>
+      Compare the two expansions. The product <strong>(∂L/∂o)(∂o/∂a)</strong> appears verbatim in both ∂L/∂w₂ and ∂L/∂w₁. Backpropagation’s speed comes from <strong>caching that shared upstream signal</strong> the first time it is needed, then multiplying by the local derivatives of the lower layer. In deeper nets the cached object is often called the <em>upstream gradient</em> or <em>error signal</em> arriving at a node. Branchy architectures may need several caches; for a straight chain, one running product suffices.
+    </p>
+
+    <h3 style="margin-top:28px;">Gradient Flow</h3>
+    <p>
+      Gradients flow backward through: softmax → linear layer → (for RNN) through each time step. In RNNs, gradients can <strong>vanish</strong> (shrink to near zero) or <strong>explode</strong> (grow very large) as they propagate through many time steps. Tanh saturation contributes to vanishing gradients. This is a fundamental challenge in training RNNs on long sequences.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Backprop Flow Diagram</h3>
+      <p>Click to see gradient flow backward through the network. Gradients propagate from the loss to each parameter.</p>
+
+      <div class="flow" id="backpropFlow">
+        <div class="flow-step" data-step="0">Loss L</div>
+        <div class="flow-arrow">↑ ∂L/∂Y</div>
+        <div class="flow-step" data-step="1">Softmax → ∂L/∂(W·X)</div>
+        <div class="flow-arrow">↑ ∂L/∂X</div>
+        <div class="flow-step" data-step="2">Linear → ∂L/∂W, ∂L/∂H</div>
+        <div class="flow-arrow">↑ (RNN: through time)</div>
+        <div class="flow-step" data-step="3">∂L/∂W_H, ∂L/∂W_C, ∂L/∂C</div>
+      </div>
+
+      <div id="backpropFlowDesc" style="margin-top:16px; font-size:0.9rem; color:var(--text-dim); min-height:40px;"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Parameter Update</h3>
+    <p>
+      Once we have the gradient, we update each parameter: θⱼ_new = θⱼ_old − η · ∂L/∂θⱼ. In PyTorch, <code>loss.backward()</code> accumulates gradients into each parameter’s <code>.grad</code> buffer, and <code>optimizer.step()</code> applies the update rule configured for that optimizer. A typical micro-loop is: forward pass → compute scalar loss (for example negative log likelihood of the gold next token) → <code>loss.backward()</code> → <code>optimizer.step()</code> → <code>optimizer.zero_grad()</code> (or equivalent) so the next iteration does not add to stale derivatives. The heavy engineering work lives in defining the forward graph; differentiation is delegated to the framework.
+    </p>
+
+    <div class="callout">
+      <p><strong>Automatic differentiation:</strong> Modern frameworks compute gradients automatically from the forward pass. Define your network and loss; call <code>loss.backward()</code> and the gradients for every parameter are computed. This has made implementing and debugging neural networks much easier than manual gradient derivation.</p>
+    </div>
+
+    <div class="formula">
+      w₁<sup>new</sup> = w₁<sup>old</sup> − η · ∂L/∂w₁ , &nbsp;&nbsp; w₂<sup>new</sup> = w₂<sup>old</sup> − η · ∂L/∂w₂
+    </div>
+
+    <p>
+      After each minibatch (or single example in the toy setting), evaluate L, backpropagate, apply the update, then advance to the next data. Repeat until the loss curve flattens — that empirical stationarity is the practical notion of <strong>convergence</strong> for deep networks.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Scope in real models.</strong> Language models use matrix-valued weights, sequence losses summed over positions, and softmax rather than scalar square error. The chain rule is identical in spirit; only dimension bookkeeping grows. Hand-deriving ∂L/∂W for every layer is rarely done in research workflows because <strong>automatic differentiation</strong> is exact for the forward graph you implement.</p>
+    </div>
+
+    <p>
+      Gradient descent as written refreshes the entire θ. In practice you sometimes <strong>freeze</strong> subsets of parameters — for example fine-tuning only the last linear head on a tiny dataset to limit overfitting, or updating a low-rank adapter such as <strong>LoRA</strong> while keeping the base transformer fixed. The mathematics is the same; you zero out or skip the gradients for frozen blocks.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 7: PLAYGROUND ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Playground</h2>
+
+    <p>
+      Compute cross-entropy loss, explore tanh and ReLU, and build intuition for gradient descent.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>ReLU vs Tanh Comparison</h3>
+      <p>Move the slider to compare ReLU and tanh on the same input. ReLU zeros out negatives; tanh squashes to [-1, 1].</p>
+
+      <div class="slider-container">
+        <label>Input x: <span class="slider-value" id="reluTanhVal">0</span></label>
+        <input type="range" id="reluTanhSlider" min="-3" max="3" value="0" step="0.1">
+      </div>
+
+      <div class="two-col" style="margin-top:16px;">
+        <div class="card card-alt">
+          <p style="margin-bottom:4px; color:var(--text-dim);">ReLU(x)</p>
+          <p style="font-family:var(--mono); font-size:1.2rem; color:var(--accent);" id="reluOut">0</p>
+        </div>
+        <div class="card card-alt">
+          <p style="margin-bottom:4px; color:var(--text-dim);">tanh(x)</p>
+          <p style="font-family:var(--mono); font-size:1.2rem; color:var(--accent3);" id="tanhOut">0</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Vanishing Gradient Intuition</h3>
+      <p>When tanh saturates (input magnitude large), its derivative approaches 0. Gradients multiply through the chain rule — small derivatives cause vanishing gradients.</p>
+
+      <div class="slider-container">
+        <label>Input x: <span class="slider-value" id="vanishingVal">0</span></label>
+        <input type="range" id="vanishingSlider" min="-3" max="3" value="0" step="0.1">
+      </div>
+
+      <div class="formula">
+        tanh'(x) = 1 − tanh²(x) = <span id="tanhDerivOut">1</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p>
+    Forward & Backward Propagation — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+function toggleHint(id) {
+  const el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('visible');
+}
+function reveal(id) {
+  const el = document.getElementById(id + '-answer');
+  if (el) el.classList.add('visible');
+}
+
+// ============================================================
+// SECTION 0: FORWARD FLOW DIAGRAM
+// ============================================================
+
+const forwardSteps = [
+  'Token embeddings C₁...C₄ are the input. Each token in the prefix is represented by a d-dimensional vector.',
+  'Composition combines the sequence into a single vector X. This can be sum, concatenation, or RNN recurrence.',
+  'A linear layer multiplies X by weight matrix W to produce logits (scores) for each word in the vocabulary.',
+  'Softmax converts logits into a valid probability distribution: positive values that sum to 1.'
+];
+
+document.querySelectorAll('#forwardFlow .flow-step').forEach((el, i) => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('#forwardFlow .flow-step').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('forwardFlowDesc').textContent = forwardSteps[i];
+  });
+});
+document.querySelector('#forwardFlow .flow-step').click();
+
+// ============================================================
+// SECTION 1: EMBEDDING AVERAGING DEMO
+// ============================================================
+
+const avgWords = ['my', 'favorite', 'LLM', 'is'];
+let avgOrderA = [...avgWords];
+let avgOrderB = ['favorite', 'is', 'LLM', 'my'];
+
+function renderAvgSents() {
+  const divA = document.getElementById('avgSentA');
+  const divB = document.getElementById('avgSentB');
+  divA.innerHTML = avgOrderA.map(w => `<span class="token token-word">${w}</span>`).join('');
+  divB.innerHTML = avgOrderB.map(w => `<span class="token token-word">${w}</span>`).join('');
+}
+
+function swapAvgOrder() {
+  [avgOrderA, avgOrderB] = [avgOrderB, avgOrderA];
+  renderAvgSents();
+}
+
+renderAvgSents();
+
+// ============================================================
+// SECTION 2: RNN STEP-BY-STEP
+// ============================================================
+
+const rnnWords = ['my', 'favorite', 'LLM', 'is'];
+let rnnStepIdx = 0;
+
+function updateRnnStep() {
+  const display = document.getElementById('rnnStepDisplay');
+  display.innerHTML = rnnWords.map((w, i) => {
+    const t = document.createElement('span');
+    t.className = 'token ' + (i < rnnStepIdx ? 'token-word' : i === rnnStepIdx ? 'token-new current' : 'token-word');
+    t.style.opacity = i > rnnStepIdx ? 0.5 : 1;
+    t.textContent = w;
+    return t;
+  }).map(el => el.outerHTML).join('');
+
+  const desc = document.getElementById('rnnStepDesc');
+  if (rnnStepIdx === 0) desc.textContent = 'Start: h₀ is typically zero. Ready to process first token.';
+  else if (rnnStepIdx <= rnnWords.length) {
+    desc.textContent = `Step ${rnnStepIdx}: h${rnnStepIdx} = tanh(W_H·h${rnnStepIdx-1} + W_C·c${rnnStepIdx}). Hidden state now encodes "${rnnWords.slice(0, rnnStepIdx).join(' ')}".`;
+  }
+  if (rnnStepIdx >= rnnWords.length) {
+    desc.textContent = `Final: h₄ is the prefix vector X, fed to softmax to predict the next word.`;
+  }
+}
+
+function rnnStepNext() {
+  if (rnnStepIdx < rnnWords.length) rnnStepIdx++;
+  updateRnnStep();
+}
+
+function rnnStepPrev() {
+  if (rnnStepIdx > 0) rnnStepIdx--;
+  updateRnnStep();
+}
+
+function rnnStepReset() {
+  rnnStepIdx = 0;
+  updateRnnStep();
+}
+
+updateRnnStep();
+
+// ============================================================
+// SECTION 3: TANH VISUALIZER
+// ============================================================
+
+const tanhSlider = document.getElementById('tanhSlider');
+const tanhCanvas = document.getElementById('tanhCanvas');
+const tanhValEl = document.getElementById('tanhVal');
+const tanhOutputEl = document.getElementById('tanhOutput');
+
+function drawTanh() {
+  const x = parseFloat(tanhSlider.value);
+  const y = Math.tanh(x);
+  tanhValEl.textContent = x.toFixed(1);
+  tanhOutputEl.textContent = y.toFixed(4);
+
+  const ctx = tanhCanvas.getContext('2d');
+  const W = tanhCanvas.width;
+  const H = tanhCanvas.height;
+  const pad = { top: 20, right: 20, bottom: 40, left: 50 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const yPos = pad.top + (plotH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, yPos);
+    ctx.lineTo(W - pad.right, yPos);
+    ctx.stroke();
+  }
+  for (let i = 0; i <= 8; i++) {
+    const xPos = pad.left + (plotW / 8) * i;
+    ctx.beginPath();
+    ctx.moveTo(xPos, pad.top);
+    ctx.lineTo(xPos, H - pad.bottom);
+    ctx.stroke();
+  }
+
+  // tanh curve
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let px = 0; px <= plotW; px += 2) {
+    const xi = -4 + (px / plotW) * 8;
+    const yi = Math.tanh(xi);
+    const sx = pad.left + px;
+    const sy = pad.top + plotH - ((yi + 1) / 2) * plotH;
+    px === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
+  }
+  ctx.stroke();
+
+  // Current point
+  const sy = pad.top + plotH - ((y + 1) / 2) * plotH;
+  const sx = pad.left + ((x + 4) / 8) * plotW;
+  ctx.fillStyle = '#f472b6';
+  ctx.beginPath();
+  ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Axes labels
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('x', W / 2, H - 8);
+  ctx.textAlign = 'right';
+  ctx.fillText('tanh(x)', pad.left - 8, pad.top + 12);
+}
+
+tanhSlider.addEventListener('input', drawTanh);
+drawTanh();
+
+// ============================================================
+// SECTION 4: GRADIENT DESCENT VISUALIZER
+// ============================================================
+
+let gdX = 2.5;
+const gdMinX = 0.8;
+
+function drawGD() {
+  const canvas = document.getElementById('gdCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const pad = { top: 30, right: 20, bottom: 50, left: 50 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  function loss(x) { return Math.pow(x - gdMinX, 2) + 0.3; }
+  const xMin = -0.5, xMax = 4;
+  const yMin = 0, yMax = 12;
+
+  // Curve
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let px = 0; px <= plotW; px++) {
+    const xi = xMin + (px / plotW) * (xMax - xMin);
+    const yi = loss(xi);
+    const sy = pad.top + plotH - ((yi - yMin) / (yMax - yMin)) * plotH;
+    px === 0 ? ctx.moveTo(pad.left + px, sy) : ctx.lineTo(pad.left + px, sy);
+  }
+  ctx.stroke();
+
+  // Ball
+  const l = loss(gdX);
+  const sx = pad.left + ((gdX - xMin) / (xMax - xMin)) * plotW;
+  const sy = pad.top + plotH - ((l - yMin) / (yMax - yMin)) * plotH;
+  ctx.fillStyle = '#f472b6';
+  ctx.beginPath();
+  ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Min marker
+  const minSx = pad.left + ((gdMinX - xMin) / (xMax - xMin)) * plotW;
+  ctx.strokeStyle = 'rgba(52,211,153,0.5)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(minSx, pad.top);
+  ctx.lineTo(minSx, H - pad.bottom);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function gdStep() {
+  const eta = 0.3;
+  const grad = 2 * (gdX - gdMinX);
+  gdX = gdX - eta * grad;
+  gdX = Math.max(-0.5, Math.min(4, gdX));
+  drawGD();
+}
+
+function gdReset() {
+  gdX = 2.5;
+  drawGD();
+}
+
+drawGD();
+
+// ============================================================
+// SECTION 4: LEARNING RATE EXPLORER
+// ============================================================
+
+const lrSlider = document.getElementById('lrSlider');
+const lrCanvas = document.getElementById('lrCanvas');
+const lrValEl = document.getElementById('lrVal');
+
+function drawLR() {
+  const eta = parseFloat(lrSlider.value);
+  lrValEl.textContent = eta.toFixed(2);
+
+  const ctx = lrCanvas.getContext('2d');
+  const W = lrCanvas.width;
+  const H = lrCanvas.height;
+  const pad = { top: 20, right: 20, bottom: 40, left: 50 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const minX = 0.5;
+  let x = 2.5;
+  const path = [{ x: 2.5, y: Math.pow(2.5 - minX, 2) }];
+
+  for (let i = 0; i < 30; i++) {
+    const grad = 2 * (x - minX);
+    x = x - eta * grad;
+    x = Math.max(0, Math.min(3, x));
+    path.push({ x, y: Math.pow(x - minX, 2) });
+  }
+
+  const xMin = 0, xMax = 3;
+  const yMax = 8;
+
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([2, 2]);
+  ctx.beginPath();
+  for (let xi = 0; xi <= 3; xi += 0.05) {
+    const yi = Math.pow(xi - minX, 2);
+    const sx = pad.left + (xi / xMax) * plotW;
+    const sy = pad.top + plotH - (yi / yMax) * plotH;
+    xi === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = '#f472b6';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  path.forEach((p, i) => {
+    const sx = pad.left + (p.x / xMax) * plotW;
+    const sy = pad.top + plotH - (p.y / yMax) * plotH;
+    i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = '#f472b6';
+  const last = path[path.length - 1];
+  const lx = pad.left + (last.x / xMax) * plotW;
+  const ly = pad.top + plotH - (last.y / yMax) * plotH;
+  ctx.beginPath();
+  ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+lrSlider.addEventListener('input', drawLR);
+drawLR();
+
+// ============================================================
+// SECTION 5: LOSS CALCULATOR
+// ============================================================
+
+function updateLossCalc() {
+  const input = document.getElementById('lossProbs').value;
+  const probs = input.split(',').map(s => parseFloat(s.trim())).filter(v => !isNaN(v) && v > 0 && v <= 1);
+
+  const resultDiv = document.getElementById('lossCalcResult');
+
+  if (probs.length < 1) {
+    resultDiv.innerHTML = '<span style="color:var(--text-dim);">Enter at least one probability.</span>';
+    return;
+  }
+
+  const correctProb = probs[0];
+  const loss = -Math.log(correctProb);
+
+  resultDiv.innerHTML = `
+    <div class="card card-alt">
+      <p style="margin-bottom:8px; color:var(--text);">P(correct) = ${correctProb.toFixed(4)}</p>
+      <p style="margin-bottom:0; color:var(--text);">Loss = −log(P(correct)) = <strong style="color:var(--accent);">${loss.toFixed(4)}</strong></p>
+      <p style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);">
+        ${correctProb > 0.5 ? 'Good: model is confident in the correct word.' : correctProb > 0.1 ? 'Moderate: model has some probability on correct word.' : 'Bad: model assigns very low probability to the correct word.'}
+      </p>
+    </div>
+  `;
+}
+
+updateLossCalc();
+
+// ============================================================
+// SECTION 6: BACKPROP FLOW DIAGRAM
+// ============================================================
+
+const backpropSteps = [
+  'Loss L measures how bad the prediction is. We need ∂L/∂θ for every parameter θ.',
+  'Gradient flows through softmax. The derivative of cross-entropy + softmax has a simple form.',
+  'Gradient flows through the linear layer. We get ∂L/∂W and ∂L/∂X (to pass further back).',
+  'For RNN: gradients flow backward through time. Vanishing/exploding gradients can occur.'
+];
+
+document.querySelectorAll('#backpropFlow .flow-step').forEach((el, i) => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('#backpropFlow .flow-step').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('backpropFlowDesc').textContent = backpropSteps[i];
+  });
+});
+document.querySelector('#backpropFlow .flow-step').click();
+
+// ============================================================
+// SECTION 7: RELU VS TANH PLAYGROUND
+// ============================================================
+
+const reluTanhSlider = document.getElementById('reluTanhSlider');
+
+function updateReluTanh() {
+  const x = parseFloat(reluTanhSlider.value);
+  document.getElementById('reluTanhVal').textContent = x.toFixed(1);
+  document.getElementById('reluOut').textContent = Math.max(0, x).toFixed(4);
+  document.getElementById('tanhOut').textContent = Math.tanh(x).toFixed(4);
+}
+
+reluTanhSlider.addEventListener('input', updateReluTanh);
+updateReluTanh();
+
+// Vanishing gradient
+const vanishingSlider = document.getElementById('vanishingSlider');
+
+function updateVanishing() {
+  const x = parseFloat(vanishingSlider.value);
+  const t = Math.tanh(x);
+  const deriv = 1 - t * t;
+  document.getElementById('vanishingVal').textContent = x.toFixed(1);
+  document.getElementById('tanhDerivOut').textContent = deriv.toFixed(4);
+}
+
+vanishingSlider.addEventListener('input', updateVanishing);
+updateVanishing();
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dense Retrieval — Bi-Encoders for Scalable Search | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c8cff;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108, 140, 255, 0.14), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(52, 211, 153, 0.1), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.85rem, 5vw, 3rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 860px; color: var(--text-dim); font-size: 1.08rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .num { font-size: 1.75rem; font-weight: 700; color: var(--accent2); font-family: var(--mono); }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
+    .section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--border);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      scroll-margin-top: 96px;
+    }
+    .section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    .section h2 {
+      font-size: 1.55rem;
+      margin: 0 0 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .section-num { font-family: var(--mono); font-size: 0.9rem; color: var(--accent2); font-weight: 600; }
+    .section p { margin: 0 0 1em; color: var(--text); }
+    .section p:last-child { margin-bottom: 0; }
+    .section ul, .section ol { margin: 0 0 1em; padding-left: 1.35em; color: var(--text); }
+    .section li { margin-bottom: 0.45em; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .card h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      color: var(--accent3);
+    }
+    .formula.formula-lg { font-size: 0.95rem; text-align: center; color: var(--accent5); line-height: 1.55; }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 22px 0;
+    }
+    @media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.92rem;
+    }
+    .interactive-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel h3 { margin: 0 0 14px; font-size: 1rem; color: var(--accent2); }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.active { background: rgba(108, 140, 255, 0.15); border-color: var(--accent); color: var(--accent); }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    .slider-row input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+    .slider-row output { font-family: var(--mono); min-width: 52px; color: var(--accent5); }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 16px 0;
+    }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    table.data th { background: var(--bg-card-alt); color: var(--text-dim); font-weight: 600; }
+    table.data td { font-size: 0.82rem; }
+    table.data td.mono { font-family: var(--mono); font-size: 0.78rem; }
+    table.data .num { text-align: right; font-family: var(--mono); }
+    textarea.input-block, input.input-line, select.input-line {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin: 8px 0;
+    }
+    textarea.input-block { min-height: 120px; resize: vertical; }
+    .demo-out {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--accent3);
+      margin-top: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 0.12em 0.45em;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    canvas.arch-canvas, canvas.loss-canvas {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    .softmax-bars { margin-top: 14px; }
+    .softmax-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 0.8rem; }
+    .softmax-row .lbl { width: 88px; flex-shrink: 0; color: var(--text-dim); font-family: var(--mono); }
+    .softmax-row .bar-wrap {
+      flex: 1;
+      height: 18px;
+      background: var(--bg-card-alt);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .softmax-row .bar-fill { height: 100%; background: linear-gradient(90deg, var(--danger), var(--accent)); transition: width 0.12s ease; }
+    .softmax-row.pos .bar-fill { background: linear-gradient(90deg, var(--accent3), var(--accent)); }
+    .rank-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    @media (max-width: 720px) { .rank-grid { grid-template-columns: 1fr; } }
+    .rank-col {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-size: 0.82rem;
+    }
+    .rank-col h4 { margin: 0 0 10px; font-size: 0.85rem; color: var(--accent2); }
+    .rank-item {
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 0.76rem;
+    }
+    .rank-item .rk { color: var(--accent5); font-weight: 700; margin-right: 8px; }
+    .rank-item .sc { float: right; color: var(--text-dim); }
+    .hn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 640px) { .hn-grid { grid-template-columns: 1fr; } }
+    .hn-box {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: var(--bg-card-alt);
+      font-size: 0.88rem;
+    }
+    .hn-box h4 { margin: 0 0 10px; font-size: 0.9rem; }
+    .hn-box.easy h4 { color: var(--accent3); }
+    .hn-box.hard h4 { color: var(--danger); }
+    .small-note { font-size: 0.86rem; color: var(--text-dim); margin-top: 8px; }
+    .chapter-foot {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 0.88rem;
+      color: var(--text-dim);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    .chapter-foot a { color: var(--accent); text-decoration: none; }
+    .chapter-foot a:hover { text-decoration: underline; }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <style class="breadcrumb-styles">
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+  </style>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a><span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a><span class="bc-sep">›</span>
+    <span class="bc-current">Dense Retrieval</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="Chapter sections">
+    <a href="#s0">§0 Lexical → semantic</a>
+    <a href="#s1">§1 DPR</a>
+    <a href="#s2">§2 Bi-encoder</a>
+    <a href="#s3">§3 InfoNCE</a>
+    <a href="#s4">§4 Hard negatives</a>
+    <a href="#s5">§5 Similarity vs relevance</a>
+    <a href="#s6">§6 Modern models</a>
+    <a href="#s7">§7 Practical notes</a>
+    <a href="#s8">§8 Playground</a>
+  </nav>
+
+  <header class="hero">
+    <h1>Dense Retrieval — Bi-Encoders for Scalable Search</h1>
+    <p class="subtitle">
+      <strong>Dense retrieval</strong> maps queries and documents into a shared <code>embedding space</code> so that <code>cosine similarity</code> (or inner product after normalization) proxies
+      semantic nearness. Unlike <code>BM25</code>, which scores overlap of surface forms, a <code>bi-encoder</code> can connect paraphrases, bridge <code>vocabulary mismatch</code>, and reflect task-specific training—
+      at the cost of heavier indexing, opaque failure modes, and the eternal tension between <code>similarity</code> and true <code>relevance</code>.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">2×</div><div class="lbl">Encoders in classic DPR</div></div>
+      <div class="hero-stat"><div class="num">ANN</div><div class="lbl">Approximate nearest neighbors</div></div>
+      <div class="hero-stat"><div class="num">InfoNCE</div><div class="lbl">Contrastive training default</div></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section fade-in" id="s0">
+      <h2><span class="section-num">§0</span> From lexical to semantic retrieval</h2>
+      <p>
+        <code>BM25</code> excels at exact term matching (Chapters 2–3) but cannot bridge vocabulary gaps like <code>car</code>/<code>automobile</code>.
+      </p>
+      <div class="callout">
+        Encode the <code>query</code> and each <code>document</code> (or passage) into vectors <code>q, d ∈ ℝ<sup>d</sup></code> with a neural encoder. Define a score
+        <code>s(q, d) = ⟨q, d⟩</code> after <code>L2</code> normalization (equivalently cosine similarity). Retrieval becomes <strong>nearest-neighbor search</strong> in embedding space rather than inverted-index
+        intersection in term space. The geometry is learned from data; the index structure (<code>HNSW</code>, <code>IVF</code>, product quantization, etc.) is an engineering layer on top.
+      </div>
+      <p>
+        <strong>Dense passage retrieval</strong> (<code>DPR</code>, Karpukhin et al., 2020) is the reference point that popularized this recipe for open-domain question answering at scale: two <code>BERT</code>-class
+        encoders, contrastive training with negatives, and a clear empirical story that learned vectors can beat strong lexical baselines when the task rewards paraphrase and indirect evidence.
+        It did not erase <code>BM25</code>; in mature stacks, dense and lexical signals are routinely <strong>hybridized</strong>—either by fusing scores, running parallel retrievers, or using lexical first stages
+        to feed a reranker. <strong>Similarity is computed in embedding space, not term space.</strong>
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s1">
+      <h2><span class="section-num">§1</span> Dense Passage Retrieval (<code>DPR</code>)</h2>
+      <p>
+        The <code>DPR</code> architecture is a <strong>two-tower</strong> design. A <code>query encoder</code> (a <code>BERT</code>-based transformer) reads the question and outputs a pooled vector; a separate
+        <code>passage encoder</code> (another <code>BERT</code> with its own weights) reads each candidate passage and outputs its own pooled vector. Both outputs are typically <code>L2</code>-normalized so inner
+        product equals cosine similarity, which stabilizes training and plays nicely with standard approximate nearest neighbor libraries.
+      </p>
+      <p>
+        <strong>Why separate encoders?</strong> Queries and passages are not drawn from the same distribution of length, style, or information density. A question is short, interrogative, and
+        intentionally under-specified; a Wikipedia paragraph is declarative, self-contained, and packed with redundant supporting phrases. A single shared encoder can work—and many later
+        systems use one model with asymmetric prefixes—but <code>DPR</code>’s hypothesis is that <strong>specialization</strong> frees each tower to allocate capacity to its side’s quirks. The query tower can
+        emphasize interrogative cues and entity slots; the passage tower can emphasize definitional patterns and supporting facts.
+      </p>
+      <p>
+        <strong>Training</strong> follows the contrastive pattern now standard across retrieval. For each gold <code>(query, passage<sup>+</sup>)</code> pair in a mini-batch, treat all other passages as
+        <strong>in-batch negatives</strong>. The loss pushes <code>sim(q, p<sup>+</sup>)</code> above <code>sim(q, p<sub>i</sub>)</code> for every negative passage <code>p<sub>i</sub></code> in that batch. This is mathematically
+        an instance of <code>InfoNCE</code> / softmax cross-entropy over a partition function built from the batch.
+      </p>
+      <p>
+        <code>DPR</code> also demonstrated the power of <strong>BM25 negative sampling</strong> beyond random easy negatives: use <code>BM25</code> to retrieve top passages that are <em>not</em> labeled positive.
+        Those passages are often <strong>hard</strong>—lexically close or topically adjacent—forcing the dense encoder to learn finer boundaries than random unrelated paragraphs would require.
+        The recipe matters: training with only trivial negatives yields inflated offline metrics and brittle deployment behavior.
+      </p>
+      <p>
+        <strong>Datasets</strong> in the original line of work included <code>Natural Questions</code>, <code>TriviaQA</code>, and <code>WebQuestions</code>—supervision comes from question–answer evidence passages
+        mined from web or Wikipedia snapshots. On open-domain QA retrieval, <code>DPR</code> improved over <code>BM25</code> by substantial margins on recall-oriented metrics,
+        especially when downstream readers are sensitive to whether the true evidence appears anywhere in the top-<code>k</code> candidates.
+      </p>
+      <div class="card">
+        <h3>What <code>DPR</code> does not solve by itself</h3>
+        <p style="margin:0">
+          End-to-end QA also needs reading comprehension, calibration, and often reranking. <code>DPR</code> is a <strong>retrieval substrate</strong>: it addresses whether the right paragraph is in the candidate
+          set. Domain shift, temporal drift, and adversarial overlap between misleading passages remain active engineering concerns—dense models can be confidently wrong with high similarity.
+        </p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s2">
+      <h2><span class="section-num">§2</span> The bi-encoder architecture</h2>
+      <p>
+        Abstracting away from <code>DPR</code>-specific details, a <strong>bi-encoder</strong> is any setup where <code>f<sub>q</sub>(query)</code> and <code>f<sub>d</sub>(document)</code> produce vectors independently, without cross-attention
+        between the two inputs at encoding time. The towers may <strong>share weights</strong> (common in symmetric semantic search) or use <strong>separate parameters</strong> (common in asymmetric QA retrieval).
+        Shared-weight models simplify deployment—one checkpoint, one inference path—but asymmetric pairs often benefit from specialization or from <strong>instruction-style prefixes</strong> that tell the model
+        which role it is playing.
+      </p>
+      <p>
+        <strong>Offline indexing</strong> is the expensive phase: run <code>f<sub>d</sub></code> over the entire corpus (often sharded across workers), <code>L2</code>-normalize if needed, and load vectors into a vector database
+        or custom <code>ANN</code> service. For static snapshots this is a batch job; for rapidly changing content you need incremental updates, versioning, and consistency policies just like any search index.
+      </p>
+      <p>
+        <strong>Online querying</strong> is comparatively cheap: one forward pass for the query (milliseconds to tens of milliseconds on GPU, depending on width and batching), then a sublinear
+        approximate search returning top-<code>k</code> ids. The <strong>asymmetry</strong> is strategic—pay once per corpus revision, amortize across unbounded queries.
+      </p>
+      <div class="comparison">
+        <div>
+          <strong>Bi-encoder</strong><br />
+          Encode once per item; score with dot product. Complexity at query time is <code>O(1)</code> encoding plus <code>O(log N)</code> or sublinear <code>ANN</code>—not <code>O(N)</code> full attention over the corpus.
+        </div>
+        <div>
+          <strong>Cross-encoder</strong><br />
+          Concatenate query and document inside one transformer; every layer attends across both. State-of-the-art pairwise relevance for short lists, impractical as exhaustive first-stage retrieval.
+        </div>
+        <div>
+          <strong>Poly-encoder</strong><br />
+          Multiple representations per candidate (e.g., several summary vectors) to approximate cross-attention fidelity with a few more inner products—middle ground for reranking.
+        </div>
+        <div>
+          <strong>ColBERT-style late interaction</strong><br />
+          Token-level vectors with deferred interaction—often treated as its own family; richer than single-vector bi-encoders, still more index-friendly than full cross-encoders.
+        </div>
+      </div>
+      <p>
+        Production pipelines frequently chain them: bi-encoder (or hybrid lexical–dense) for width, cross-encoder or feature-heavy <code>Learning-to-Rank</code> for depth on dozens of candidates.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: two-tower data flow</h3>
+        <p class="small-note" style="margin-top:0">
+          Query and passage each pass through separate encoder towers; pooled vectors feed a similarity score. Real systems add normalization, optional quantization, and <code>ANN</code> indices between scoring and serving.
+        </p>
+        <canvas class="arch-canvas" id="archCanvas" width="720" height="320" aria-label="Bi-encoder architecture diagram"></canvas>
+        <div class="btn-group">
+          <button type="button" class="btn" id="archAnimBtn">Animate flow</button>
+          <button type="button" class="btn" id="archResetBtn">Reset</button>
+        </div>
+        <p class="demo-out" id="archOut">Animate flow: tokens → encoders → vectors → similarity.</p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s3">
+      <h2><span class="section-num">§3</span> <code>InfoNCE</code> loss — the training objective</h2>
+      <p>
+        <code>InfoNCE</code> (noise contrastive estimation) is the standard contrastive objective for many retrieval models. For a query embedding <code>q</code> and a positive passage embedding <code>p<sup>+</sup></code>
+        with negatives <code>{ p<sub>i</sub> }</code>, define similarities <code>s<sub>i</sub> = sim(q, p<sub>i</sub>)</code> (often dot product of normalized vectors). With temperature <code>τ &gt; 0</code>:
+      </p>
+      <div class="formula formula-lg">
+        L = −log<br />
+        <span style="display:inline-block;margin-top:6px">
+          exp(sim(q, p<sup>+</sup>) / τ) / Σ<sub>i</sub> exp(sim(q, p<sub>i</sub>) / τ)
+        </span>
+      </div>
+      <p>
+        Intuitively, the model is trained to classify which passage in the candidate pool belongs with the query; the softmax sharpens or softens those decisions. The positive index is supervised;
+        every other term in the denominator acts as a negative. When negatives are easy (very low similarity already), gradients shrink—one reason <strong>hard negative mining</strong> (§4) dominates practical recipes.
+      </p>
+      <p>
+        <strong>Temperature <code>τ</code></strong> rescales logits before the softmax. Small <code>τ</code> makes the distribution peaky—almost one-hot if a positive is clearly best—amplifying gradients for small mistakes
+        but sometimes increasing variance. Large <code>τ</code> smooths the distribution, spreading probability mass and behaving like gentler distillation toward uniform attention over negatives.
+      </p>
+      <p>
+        <strong>In-batch negatives</strong> recycle every other passage in the mini-batch as a negative for each query. That yields <code>B − 1</code> negatives per query for batch size <code>B</code> without extra forward passes.
+        The downside is correlation: negatives are not independent draws from the true corpus distribution. Despite that, the trick scales beautifully on modern accelerators.
+      </p>
+      <p>
+        <strong>Why large batch sizes help:</strong> more negatives increase the effective difficulty of the classification problem inside each step, provide richer gradient signal about relative ordering,
+        and better approximate the full corpus partition function—at least in expectation. Memory becomes the bottleneck; tricks include gradient accumulation, cross-device negatives via
+        <code>all-gather</code> of embeddings, and mixed-precision training.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: temperature and the softmax mass</h3>
+        <p class="small-note" style="margin-top:0">
+          Fixed illustrative similarities: positive <code>p<sup>+</sup></code> at <code>0.72</code>, negatives at <code>0.15, 0.22, 0.18, 0.31, 0.12</code>. Adjust <code>τ</code> and watch how probability mass concentrates on the positive—and how
+          <code>InfoNCE</code> loss responds. This is a single-step diagnostic, not a full training run.
+        </p>
+        <div class="slider-row">
+          <label for="tauSlider">Temperature <code>τ</code></label>
+          <input type="range" id="tauSlider" min="2" max="200" value="50" />
+          <output id="tauOut">0.50</output>
+        </div>
+        <p class="demo-out" id="infoNceOut"></p>
+        <div class="softmax-bars" id="softmaxBars" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s4">
+      <h2><span class="section-num">§4</span> Hard negative mining</h2>
+      <p>
+        Uniform random negatives are often <strong>too easy</strong>: their embeddings drift far from the query early in training, contributing tiny gradients. The model masters a toy decision boundary
+        that does not resemble deployment, where the user sees a slate of plausibly related snippets scraped from the web, not random noise paragraphs.
+      </p>
+      <p>
+        <strong>BM25 negatives</strong> are the classic cheap hard-negative source: retrieve top-<code>k</code> lexical hits that are <em>not</em> labeled relevant. They tend to share vocabulary and surface topic with the
+        query while missing the precise supporting fact—exactly the confusion you want the dense encoder to unlearn.
+      </p>
+      <p>
+        <strong>Cross-encoder negatives</strong> push further: take pairs that a strong cross-encoder mis-scores—passages it thinks are relevant but humans mark irrelevant—and use them as hard negatives for the
+        bi-encoder. The teacher is imperfect but often sharper than lexical overlap alone.
+      </p>
+      <p>
+        <strong>In-batch hard negatives</strong> select the highest-similarity wrong passage within the current batch as an extra emphasis target, sometimes mixed with random negatives for stability.
+        <strong>Curriculum learning</strong> varies difficulty over time—start with easier negatives so optimization does not collapse, then ramp hardness as representations stabilize.
+        Across many ablations, the quality and difficulty distribution of negatives often matters as much as architectural width—a mid-sized model with excellent negatives and clean positives routinely beats a giant model fed naive random pairs, because the loss fires where the decision boundary must live.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: easy vs hard negatives (toy examples)</h3>
+        <p class="small-note" style="margin-top:0">
+          Stylized passages for intuition. Select a query to compare a random unrelated negative with a lexical overlap negative.
+        </p>
+        <label for="hnQuery" class="small-note">Example query</label>
+        <select class="input-line" id="hnQuery">
+          <option value="france">What is the capital of France?</option>
+          <option value="python">How do I read a CSV in Python?</option>
+          <option value="gpu">Why is my GPU training run OOM?</option>
+        </select>
+        <div class="hn-grid" style="margin-top:14px">
+          <div class="hn-box easy">
+            <h4>Easy random negative</h4>
+            <p id="hnEasy" style="margin:0"></p>
+          </div>
+          <div class="hn-box hard">
+            <h4>Hard lexical negative</h4>
+            <p id="hnHard" style="margin:0"></p>
+          </div>
+        </div>
+        <p class="demo-out" id="hnExplain"></p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s5">
+      <h2><span class="section-num">§5</span> Similarity vs relevance</h2>
+      <p>
+        <strong>Cosine similarity is not relevance.</strong> It is a geometric proxy induced by training data and model capacity. Two strings can be close in embedding space because they share syntactic
+        templates, entities, or discourse genre—even when only one document answers the user’s information need.
+      </p>
+      <p>
+        Canonical pattern: the queries “What is the capital of France?” and “What is the capital of Germany?” embed similarly because they are structurally parallel and differ by a single entity slot.
+        Yet the <strong>correct answers</strong> are mutually exclusive. A retriever optimized purely for surface similarity might rank cross-country confusers highly unless negatives and task labels teach finer
+        discrimination—or unless a downstream reader resolves the ambiguity.
+      </p>
+      <p>
+        <strong>Relevance is task-specific</strong>: legal retrieval, e-commerce search, medical QA, and internal enterprise lookup each define different positive classes. <strong>Similarity is geometric</strong>:
+        an artifact of the encoder and the distribution it was trained on. Mismatch between the two is why offline embedding benchmarks only partially predict production wins.
+      </p>
+      <p>
+        Training data construction must encode your notion of relevance—pairs labeled by editors, clicks debiased, hard negatives drawn from confusers your metrics care about. <strong>Asymmetric search</strong>
+        (question ↔ evidence passage) amplifies the distinction: the query is a short underspecified probe; the document is a self-contained text blob. Prefixing inputs with <code>query:</code> vs
+        <code>passage:</code> (as in <code>E5</code>) explicitly signals roles to a shared encoder.
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s6">
+      <h2><span class="section-num">§6</span> Modern dense retrieval models</h2>
+      <p>
+        The ecosystem matured rapidly after <code>DPR</code>. Today’s checkpoints differ in pretraining data, instruction tuning, pooling, sequence length, and whether they emit symmetric or asymmetric
+        embeddings. Representative families—numbers are order-of-magnitude guides for planning, not guarantees on your corpus. Always re-measure on in-domain held-out sets.
+      </p>
+      <table class="data" aria-label="Comparison of embedding model families">
+        <thead>
+          <tr>
+            <th>Model / API</th>
+            <th>Typical <code>d</code></th>
+            <th>MTEB (indicative)</th>
+            <th>Latency note</th>
+            <th>Cost note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono"><code>E5</code> (instruct)</td>
+            <td class="num">1024 / 768</td>
+            <td>Strong retrieval average</td>
+            <td>GPU batch friendly</td>
+            <td>Open weights</td>
+          </tr>
+          <tr>
+            <td class="mono"><code>BGE</code></td>
+            <td class="num">1024</td>
+            <td>Competitive open baseline</td>
+            <td>Scales with size variant</td>
+            <td>Open weights</td>
+          </tr>
+          <tr>
+            <td class="mono"><code>GTE</code></td>
+            <td class="num">768–8192</td>
+            <td>High across general tasks</td>
+            <td>Larger dims cost ANN memory</td>
+            <td>Open weights</td>
+          </tr>
+          <tr>
+            <td class="mono">Cohere Embed v3</td>
+            <td class="num">1024</td>
+            <td>API-tier competitive</td>
+            <td>Network + SLA</td>
+            <td>Per-token commercial</td>
+          </tr>
+          <tr>
+            <td class="mono">OpenAI <code>text-embedding-3-*</code></td>
+            <td class="num">256–3072</td>
+            <td>Strong general purpose</td>
+            <td>Low ops burden</td>
+            <td>Per-token commercial</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        <code>E5</code> (“EmbEddings from bidirEctional Encoder rEpresentations”) popularized explicit <strong>instruction prefixes</strong> and large-scale weakly supervised contrastive training. <code>BGE</code> (BAAI General Embedding)
+        is a widely deployed open family with multilingual variants. <code>GTE</code> (General Text Embeddings) from Alibaba offers several sizes and long-context variants suited to aggressive quality targets.
+        Commercial APIs (Cohere, OpenAI) trade model access for simplicity; OpenAI’s third-generation line supports <strong>Matryoshka</strong>-style variable effective dimensions—truncate prefixes without retraining
+        a separate small model.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: illustrative retrieval preference by model</h3>
+        <p class="small-note" style="margin-top:0">
+          Synthetic ranking scores for one example query across model personas—different training objectives reorder the same four passages.
+        </p>
+        <label for="modelQuery">Example query</label>
+        <select class="input-line" id="modelQuery">
+          <option value="renewable">Government incentives for residential solar panels</option>
+          <option value="sql">Postgres JSONB indexing best practices</option>
+          <option value="health">Difference between LDL and HDL cholesterol</option>
+        </select>
+        <div class="btn-group" id="modelFamilyBtns" aria-label="Pick model family">
+          <button type="button" class="btn active" data-model="e5"><code>E5</code>-style</button>
+          <button type="button" class="btn" data-model="bge"><code>BGE</code>-style</button>
+          <button type="button" class="btn" data-model="api">Commercial API</button>
+        </div>
+        <table class="data" id="modelRankTable" style="margin-top:12px">
+          <thead>
+            <tr><th>Rank</th><th>Passage snippet</th><th class="num">Sim (illustr.)</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s7">
+      <h2><span class="section-num">§7</span> Practical considerations</h2>
+      <p>
+        <strong>Embedding dimension vs quality:</strong> higher <code>d</code> increases <code>ANN</code> memory and distance-compute cost, often improving recall up to a point of diminishing returns. Matryoshka-trained
+        checkpoints let you truncate prefixes when storage dominates; quantize only after validating acceptable regression on your metric.
+      </p>
+      <p>
+        <strong>Batch size during training:</strong> bigger batches mean more in-batch negatives → sharper contrastive signal, assuming learning rate and temperature are retuned. Watch for divergence if hardness ramps
+        too quickly; use gradient clipping and mixed precision carefully when pushing batch size.
+      </p>
+      <p>
+        <strong>Instruction prefixes:</strong> for <code>E5</code>-style models, follow the upstream template literally—<code>query: …</code> vs <code>passage: …</code> (or <code>document:</code>). A mismatch at serving time silently drifts the geometry
+        and can slash recall overnight after a deploy typo.
+      </p>
+      <p>
+        <strong>Domain adaptation:</strong> if your vocabulary and style diverge from pretraining (internal jargon, biomedical, legal), start with a strong off-the-shelf checkpoint and measure. Fine-tune with
+        curated positives and mined hard negatives when offline metrics justify the data and ops cost; otherwise prefer hybrid lexical–dense retrieval and reranking before touching base weights.
+      </p>
+      <div class="formula formula-lg">
+        Encode (offline) → Index (<code>ANN</code> + metadata) → Search (query vector + top-<code>k</code>) → Return ids → (optional) rerank / reader
+      </div>
+      <p>
+        Instrument every stage: embedding drift alerts, index freshness lag, <code>p95</code> query latency, and recall@<code>k</code> on golden queries. Dense retrieval fails quietly—high similarity with wrong facts—so
+        monitoring needs human spot checks and adversarial query sets, not only aggregate dashboards.
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s8">
+      <h2><span class="section-num">§8</span> Playground — hybrid intuition lab</h2>
+      <p>
+        Enter one query and several documents (one per line). The demo computes a <strong>hash-seeded pseudo-embedding</strong> per text—deterministic and useful only for UI intuition—plus a textbook
+        <code>BM25</code> score. Compare rankings side by side; production systems replace the hash with a trained encoder.
+      </p>
+
+      <label for="playQuery">Query</label>
+      <input class="input-line" type="text" id="playQuery" value="capital city France government" />
+
+      <label for="playDocs">Documents (one per line)</label>
+      <textarea class="input-block" id="playDocs">Paris is the capital and largest city of France, hosting national government institutions.
+Berlin is Germany's capital; it is not in France.
+The French Republic operates ministries and embassies from Paris.
+How to bake a chocolate soufflé without collapsing the rise.
+Lyon is a major French city known for gastronomy but is not the capital.
+Capital punishment remains a debated topic in several jurisdictions.</textarea>
+
+      <button type="button" class="btn" id="playRun">Run retrieval comparison</button>
+
+      <div class="rank-grid" style="margin-top:18px">
+        <div class="rank-col">
+          <h4><code>BM25</code> ranking</h4>
+          <div id="bm25Ranks"></div>
+        </div>
+        <div class="rank-col">
+          <h4>Dense (hash embedding cosine)</h4>
+          <div id="denseRanks"></div>
+        </div>
+      </div>
+      <p class="small-note" id="playNote"></p>
+
+      <p>
+        Rare proper nouns, SKUs, error codes, and verbatim legal phrases often favor exact token signals over dense retrieval. Dense models can smear credits across paraphrases—great for recall,
+        hazardous for precision on identifier-like queries. Hybrid fusion or two-stage retrieval is the pragmatic default.
+      </p>
+    </section>
+
+    <div class="chapter-foot">
+      <span>Search Zero to Hero · Chapter 07 / 26</span>
+      <span><a href="../06-sentence-embeddings/index.html">← Sentence embeddings</a> · <a href="../index.html">Series index</a></span>
+    </div>
+  </main>
+
+  <script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  const navToggle = $('navToggle');
+  const mainNav = $('mainNav');
+  navToggle.addEventListener('click', () => {
+    const open = mainNav.classList.toggle('visible');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  const io = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    },
+    { threshold: 0.08, rootMargin: '0px 0px -8% 0px' }
+  );
+  document.querySelectorAll('.section.fade-in').forEach((sec) => io.observe(sec));
+
+  /* ---------- §2 Architecture canvas ---------- */
+  const archCanvas = $('archCanvas');
+  const actx = archCanvas.getContext('2d');
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, bw, bh, r) {
+      this.moveTo(x + r, y);
+      this.arcTo(x + bw, y, x + bw, y + bh, r);
+      this.arcTo(x + bw, y + bh, x, y + bh, r);
+      this.arcTo(x, y + bh, x, y, r);
+      this.arcTo(x, y, x + bw, y, r);
+      this.closePath();
+      return this;
+    };
+  }
+  let archPhase = 0;
+  let archAnimTimer = null;
+
+  function drawArch() {
+    const w = archCanvas.width;
+    const h = archCanvas.height;
+    actx.fillStyle = '#0a0a0f';
+    actx.fillRect(0, 0, w, h);
+    actx.strokeStyle = '#2a2a3a';
+    actx.lineWidth = 1;
+    actx.strokeRect(0.5, 0.5, w - 1, h - 1);
+
+    const box = (x, y, bw, bh, title, sub, glow) => {
+      if (glow) {
+        actx.shadowColor = 'rgba(108, 140, 255, 0.45)';
+        actx.shadowBlur = 18;
+      }
+      actx.fillStyle = '#181825';
+      actx.strokeStyle = glow ? '#6c8cff' : '#2a2a3a';
+      actx.lineWidth = glow ? 2 : 1;
+      actx.beginPath();
+      actx.roundRect(x, y, bw, bh, 10);
+      actx.fill();
+      actx.stroke();
+      actx.shadowBlur = 0;
+      actx.fillStyle = '#e0e0e8';
+      actx.font = '600 14px Inter, sans-serif';
+      actx.fillText(title, x + 14, y + 28);
+      actx.fillStyle = '#8888a0';
+      actx.font = '12px Inter, sans-serif';
+      const lines = sub.split('\n');
+      lines.forEach((ln, i) => actx.fillText(ln, x + 14, y + 48 + i * 16));
+    };
+
+    const qGlow = archPhase >= 1 && archPhase <= 4;
+    const pGlow = archPhase >= 2 && archPhase <= 4;
+    const vqGlow = archPhase >= 3;
+    const vpGlow = archPhase >= 4;
+    const simGlow = archPhase >= 5;
+
+    box(36, 40, 200, 100, 'Query tokens', 'Short text span\n[CLS] · tokens · [SEP]', qGlow);
+    box(36, 170, 200, 110, 'Query encoder', 'Transformer tower\npool → L2 norm', archPhase >= 1 && archPhase <= 3);
+    box(280, 40, 200, 100, 'Passage tokens', 'Longer paragraph\n[CLS] · tokens · [SEP]', pGlow);
+    box(280, 170, 200, 110, 'Passage encoder', 'Separate or shared\nweights (design)', archPhase >= 2 && archPhase <= 4);
+
+    const drawVec = (cx, cy, label, glow) => {
+      actx.beginPath();
+      actx.arc(cx, cy, 28, 0, Math.PI * 2);
+      actx.fillStyle = '#12121a';
+      actx.fill();
+      actx.strokeStyle = glow ? '#34d399' : '#2a2a3a';
+      actx.lineWidth = glow ? 2 : 1;
+      actx.stroke();
+      actx.fillStyle = glow ? '#34d399' : '#8888a0';
+      actx.font = '12px monospace';
+      actx.fillText(label, cx - 22, cy + 4);
+    };
+    drawVec(136, 310, 'q ∈ ℝ^d', vqGlow);
+    drawVec(380, 310, 'd ∈ ℝ^d', vpGlow);
+
+    actx.strokeStyle = '#3a3a55';
+    actx.lineWidth = 1.5;
+    actx.setLineDash([6, 4]);
+    actx.beginPath();
+    actx.moveTo(136, 280);
+    actx.lineTo(136, 310);
+    actx.moveTo(380, 280);
+    actx.lineTo(380, 310);
+    actx.stroke();
+    actx.setLineDash([]);
+
+    actx.beginPath();
+    actx.moveTo(164, 310);
+    actx.lineTo(352, 310);
+    actx.strokeStyle = simGlow ? '#fbbf24' : '#3a3a55';
+    actx.lineWidth = simGlow ? 3 : 1.5;
+    actx.stroke();
+    actx.fillStyle = simGlow ? '#fbbf24' : '#8888a0';
+    actx.font = '600 12px Inter, sans-serif';
+    actx.fillText('sim(q, d) = dot / cos', 200, 302);
+
+    actx.fillStyle = '#555';
+    actx.font = '11px Inter, sans-serif';
+    actx.fillText('Bi-encoder: no cross-attention between towers at encode time', 36, 22);
+  }
+
+  function archStep() {
+    archPhase = Math.min(5, archPhase + 1);
+    drawArch();
+    $('archOut').textContent =
+      ['Idle', 'Query tower active', 'Passage tower active', 'Query vector produced', 'Passage vector produced', 'Similarity score computed'][archPhase] +
+      ' (step ' +
+      archPhase +
+      '/5)';
+    if (archPhase < 5) archAnimTimer = setTimeout(archStep, 650);
+    else archAnimTimer = null;
+  }
+
+  $('archAnimBtn').addEventListener('click', () => {
+    if (archAnimTimer) clearTimeout(archAnimTimer);
+    archPhase = 0;
+    drawArch();
+    archAnimTimer = setTimeout(archStep, 200);
+  });
+  $('archResetBtn').addEventListener('click', () => {
+    if (archAnimTimer) clearTimeout(archAnimTimer);
+    archAnimTimer = null;
+    archPhase = 0;
+    drawArch();
+    $('archOut').textContent = 'Reset. Press “Animate flow” to walk tokens → encoders → vectors → similarity.';
+  });
+  drawArch();
+
+  /* ---------- §3 InfoNCE + temperature ---------- */
+  const sims = [0.72, 0.15, 0.22, 0.18, 0.31, 0.12];
+  const labels = ['p+ (pos)', 'n1', 'n2', 'n3', 'n4', 'n5'];
+
+  function updateInfoNCE() {
+    const tau = (+$('tauSlider').value) / 100;
+    $('tauOut').textContent = tau.toFixed(2);
+    const logits = sims.map((s) => s / tau);
+    const maxL = Math.max(...logits);
+    const exps = logits.map((l) => Math.exp(l - maxL));
+    const sum = exps.reduce((a, b) => a + b, 0);
+    const probs = exps.map((e) => e / sum);
+    const loss = -Math.log(probs[0] + 1e-12);
+    $('infoNceOut').textContent =
+      'InfoNCE loss L ≈ ' +
+      loss.toFixed(4) +
+      '\nPositive probability mass: ' +
+      (probs[0] * 100).toFixed(2) +
+      '%  (higher is easier for the model; temperature shapes how peaked the softmax is)';
+
+    const host = $('softmaxBars');
+    host.innerHTML = '';
+    probs.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'softmax-row' + (i === 0 ? ' pos' : '');
+      row.innerHTML =
+        '<span class="lbl">' +
+        labels[i] +
+        '</span><span class="bar-wrap"><span class="bar-fill" style="width:' +
+        (p * 100).toFixed(2) +
+        '%"></span></span><span style="min-width:52px;text-align:right;font-family:var(--mono);color:var(--text-dim)">' +
+        (p * 100).toFixed(1) +
+        '%</span>';
+      host.appendChild(row);
+    });
+  }
+  $('tauSlider').addEventListener('input', updateInfoNCE);
+  updateInfoNCE();
+
+  /* ---------- §4 Hard negatives ---------- */
+  const hnData = {
+    france: {
+      easy: 'The International Space Station orbits Earth roughly every 90 minutes; astronauts conduct microgravity experiments aboard.',
+      hard: 'Berlin has been the capital of Germany since reunification; visitors often confuse European capitals when studying geography flashcards.',
+      explain:
+        'The hard negative shares geography + “capital” vocabulary with the query but answers the wrong country. BM25-style mining surfaces these confusers; random Wikipedia draws rarely do.'
+    },
+    python: {
+      easy: 'Koalas sleep up to 18 hours a day; eucalyptus leaves provide limited calories so energy conservation matters.',
+      hard: 'Reading JSON files in Python is easy with the json module; CSV-like parsing appears in many tutorials alongside pandas examples.',
+      explain:
+        'Hard negative overlaps “Python”, “read”, tabular data cues—tempting for a bag-of-words retriever—while failing the specific CSV-focused information need.'
+    },
+    gpu: {
+      easy: 'Gradient descent adjusts weights using backpropagation; optimizers like Adam combine momentum and adaptive learning rates.',
+      hard: 'CUDA out-of-memory errors often happen when batch size or activation checkpointing is too aggressive for VRAM; try smaller batches or gradient accumulation.',
+      explain:
+        'Lexical overlap on GPU/OOM jargon creates a false neighbor. Contrastive training with mined hard negatives teaches the embedding to prefer passages that actually explain root causes and fixes.'
+    }
+  };
+
+  function updateHN() {
+    const k = $('hnQuery').value;
+    const d = hnData[k];
+    $('hnEasy').textContent = d.easy;
+    $('hnHard').textContent = d.hard;
+    $('hnExplain').textContent = d.explain;
+  }
+  $('hnQuery').addEventListener('change', updateHN);
+  updateHN();
+
+  /* ---------- §6 Model comparison table ---------- */
+  const modelData = {
+    renewable: {
+      passages: [
+        { id: 'A', text: 'Federal tax credits for residential solar installations step down over time; states add rebates.' },
+        { id: 'B', text: 'Wind farms offshore compete with solar incentives in some markets; grid interconnection rules apply.' },
+        { id: 'C', text: 'Homeowners may claim renewable energy credits subject to eligibility caps and documentation.' },
+        { id: 'D', text: 'Nuclear plant decommissioning costs are unrelated to rooftop photovoltaic subsidies.' }
+      ],
+      e5: [0.94, 0.62, 0.88, 0.21],
+      bge: [0.91, 0.71, 0.85, 0.19],
+      api: [0.93, 0.58, 0.90, 0.17]
+    },
+    sql: {
+      passages: [
+        { id: 'A', text: 'GIN indexes accelerate JSONB containment queries; choose ops according to workload.' },
+        { id: 'B', text: 'B-tree indexes help range scans on scalar columns; JSONB often needs expression indexes.' },
+        { id: 'C', text: 'Postgres full-text search uses tsvector; different from JSONB path ops.' },
+        { id: 'D', text: 'MyISAM storage engine history; largely irrelevant to modern Postgres tuning.' }
+      ],
+      e5: [0.92, 0.78, 0.55, 0.12],
+      bge: [0.89, 0.80, 0.52, 0.14],
+      api: [0.93, 0.76, 0.58, 0.11]
+    },
+    health: {
+      passages: [
+        { id: 'A', text: 'LDL transports cholesterol to tissues; HDL returns it to the liver for clearance.' },
+        { id: 'B', text: 'Triglycerides store energy; lipid panels report them alongside cholesterol fractions.' },
+        { id: 'C', text: 'Blood pressure measures arterial force; distinct from lipoprotein particle counts.' },
+        { id: 'D', text: 'Statins reduce cholesterol synthesis in the liver; adherence matters for outcomes.' }
+      ],
+      e5: [0.96, 0.68, 0.41, 0.59],
+      bge: [0.94, 0.70, 0.44, 0.57],
+      api: [0.95, 0.66, 0.45, 0.61]
+    }
+  };
+
+  let activeModel = 'e5';
+
+  function renderModelTable() {
+    const qk = $('modelQuery').value;
+    const pack = modelData[qk];
+    const scores = pack[activeModel];
+    const order = pack.passages
+      .map((p, i) => ({ p, s: scores[i], i }))
+      .sort((a, b) => b.s - a.s);
+    const tb = $('modelRankTable').querySelector('tbody');
+    tb.innerHTML = '';
+    order.forEach((row, rnk) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="num">' +
+        (rnk + 1) +
+        '</td><td><strong>' +
+        row.p.id +
+        '.</strong> ' +
+        row.p.text +
+        '</td><td class="num">' +
+        row.s.toFixed(2) +
+        '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  $('modelQuery').addEventListener('change', renderModelTable);
+  $('modelFamilyBtns').addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn');
+    if (!btn || !btn.dataset.model) return;
+    $('modelFamilyBtns').querySelectorAll('.btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeModel = btn.dataset.model;
+    renderModelTable();
+  });
+  renderModelTable();
+
+  /* ---------- §8 Playground: tokenize, BM25, hash embeddings ---------- */
+  function tokenize(t) {
+    return String(t)
+      .toLowerCase()
+      .match(/[a-z0-9]+/g) || [];
+  }
+
+  function mulberry32(a) {
+    return function () {
+      let t = (a += 0x6d2b79f5);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function hashEmbed(text, dim) {
+    const toks = tokenize(text);
+    const v = new Float32Array(dim);
+    for (let ti = 0; ti < toks.length; ti++) {
+      let h = 2166136261;
+      const w = toks[ti];
+      for (let i = 0; i < w.length; i++) {
+        h ^= w.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      const rnd = mulberry32(h >>> 0);
+      for (let j = 0; j < dim; j++) {
+        const u = rnd() * 2 - 1;
+        v[j] += u / Math.sqrt(toks.length + 1);
+      }
+    }
+    let s = 0;
+    for (let j = 0; j < dim; j++) s += v[j] * v[j];
+    s = Math.sqrt(s) || 1;
+    for (let j = 0; j < dim; j++) v[j] /= s;
+    return v;
+  }
+
+  function cosineVec(a, b) {
+    let d = 0;
+    for (let i = 0; i < a.length; i++) d += a[i] * b[i];
+    return d;
+  }
+
+  function bm25Score(queryTerms, docTokens, docLen, avgdl, df, N, k1, b) {
+    const tf = {};
+    docTokens.forEach((t) => {
+      tf[t] = (tf[t] || 0) + 1;
+    });
+    let score = 0;
+    for (let qi = 0; qi < queryTerms.length; qi++) {
+      const term = queryTerms[qi];
+      const f = tf[term] || 0;
+      if (!f) continue;
+      const n = df[term] || 0;
+      const idf = Math.log(1 + (N - n + 0.5) / (n + 0.5));
+      const denom = f + k1 * (1 - b + (b * docLen) / avgdl);
+      score += idf * ((f * (k1 + 1)) / denom);
+    }
+    return score;
+  }
+
+  function runPlayground() {
+    const q = $('playQuery').value.trim();
+    const lines = $('playDocs')
+      .value.split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const DIM = 128;
+    if (!q || !lines.length) {
+      $('playNote').textContent = 'Enter a query and at least one document line.';
+      $('bm25Ranks').innerHTML = '';
+      $('denseRanks').innerHTML = '';
+      return;
+    }
+    const qTerms = tokenize(q);
+    const docsTok = lines.map(tokenize);
+    const docLens = docsTok.map((t) => t.length);
+    const avgdl = docLens.reduce((a, b) => a + b, 0) / docLens.length || 1;
+    const N = lines.length;
+    const df = {};
+    qTerms.forEach((term) => {
+      let c = 0;
+      for (let i = 0; i < docsTok.length; i++) {
+        if (docsTok[i].includes(term)) c++;
+      }
+      df[term] = c;
+    });
+
+    const k1 = 1.5;
+    const b = 0.75;
+    const bm25 = lines.map((doc, i) => ({
+      doc,
+      score: bm25Score(qTerms, docsTok[i], docLens[i], avgdl, df, N, k1, b)
+    }));
+    bm25.sort((a, b) => b.score - a.score);
+
+    const qv = hashEmbed(q, DIM);
+    const dense = lines.map((doc) => ({
+      doc,
+      score: cosineVec(qv, hashEmbed(doc, DIM))
+    }));
+    dense.sort((a, b) => b.score - a.score);
+
+    function renderRank(arr, el) {
+      el.innerHTML = '';
+      arr.forEach((row, idx) => {
+        const div = document.createElement('div');
+        div.className = 'rank-item';
+        const snippet = row.doc.length > 96 ? row.doc.slice(0, 93) + '…' : row.doc;
+        div.innerHTML =
+          '<span class="rk">#' +
+          (idx + 1) +
+          '</span>' +
+          snippet +
+          '<span class="sc">' +
+          row.score.toFixed(3) +
+          '</span>';
+        el.appendChild(div);
+      });
+    }
+    renderRank(bm25, $('bm25Ranks'));
+    renderRank(dense, $('denseRanks'));
+
+    const topB = bm25[0].doc;
+    const topD = dense[0].doc;
+    let note =
+      'Pseudo-dense uses deterministic hash embeddings (dim=' +
+      DIM +
+      ') for UI only. ';
+    if (topB === topD) note += 'Both methods agree on #1 for this example.';
+    else note += 'Methods disagree on #1—inspect overlap vs paraphrase to see why.';
+    $('playNote').textContent = note;
+  }
+  $('playRun').addEventListener('click', runPlayground);
+  runPlayground();
+})();
+  </script>
+</body>
+</html>

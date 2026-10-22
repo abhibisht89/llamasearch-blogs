@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Segment Anything: Promptable Visual Segmentation — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #8b9fff;
+  --accent3: #5ce1a6;
+  --accent4: #ff7eb3;
+  --accent5: #ffc857;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); margin-bottom: 20px; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+.nav-wrap {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav-wrap.visible { transform: translateY(0); }
+.nav-inner {
+  max-width: 920px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.nav-back { font-weight: 700; color: var(--accent); white-space: nowrap; font-size: 0.85rem; }
+.nav-toggle {
+  margin-left: auto; display: none;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.75rem; cursor: pointer; font-family: inherit;
+}
+.nav-toggle:hover { border-color: var(--accent); }
+.nav-links {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  font-size: 0.78rem;
+}
+.nav-links a { color: var(--text-dim); }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: block; }
+  .nav-links {
+    display: none; width: 100%; flex-direction: column; align-items: flex-start;
+    padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px;
+  }
+  .nav-wrap.open .nav-links { display: flex; }
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 88px 24px 64px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(108,140,255,0.18) 0%, transparent 68%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 14px; position: relative; z-index: 1; }
+.subtitle {
+  font-size: 1.12rem; color: var(--text-dim);
+  max-width: 720px; margin: 0 auto 28px; position: relative; z-index: 1;
+}
+.stats {
+  display: flex; gap: 28px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 28px; position: relative; z-index: 1;
+}
+.stat { text-align: center; }
+.stat-val {
+  display: block; font-size: 1.85rem; font-weight: 700;
+  color: var(--accent); font-family: var(--mono);
+}
+.stat-label {
+  font-size: 0.72rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 18px 0;
+}
+
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; margin: 18px 0;
+  font-family: var(--mono); font-size: 0.88rem; color: var(--accent3);
+  text-align: center; overflow-x: auto;
+}
+
+.callout {
+  background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 20px; margin: 20px 0;
+}
+.callout.warn {
+  background: rgba(251,191,36,0.09);
+  border-left-color: var(--accent5);
+}
+.callout.ok {
+  background: rgba(92,225,166,0.09);
+  border-left-color: var(--accent3);
+}
+.callout p:last-child { margin-bottom: 0; }
+
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 22px 0;
+  align-items: stretch;
+}
+@media (max-width: 720px) {
+  .comparison { grid-template-columns: 1fr; }
+}
+.comparison .card { margin: 0; }
+.comparison .card h3 {
+  font-size: 1rem;
+  color: var(--accent2);
+  margin-bottom: 10px;
+}
+
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin: 22px 0;
+}
+.qa-box .q {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.qa-box p:last-child { margin-bottom: 0; }
+
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 22px 0;
+}
+.interactive-panel h4 {
+  font-size: 0.95rem; color: var(--text); margin-bottom: 14px; font-weight: 600;
+}
+
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.88rem; cursor: pointer; margin: 4px 6px 4px 0;
+  font-family: inherit;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: rgba(108,140,255,0.18); border-color: var(--accent); color: var(--accent2); }
+.btn.active { border-color: var(--accent3); color: var(--accent3); }
+
+input[type="range"] { width: 100%; max-width: 360px; vertical-align: middle; }
+label.lbl { font-size: 0.8rem; color: var(--text-dim); display: block; margin-top: 8px; }
+
+ul.clean { margin: 12px 0 12px 1.2em; color: var(--text-dim); }
+ul.clean li { margin-bottom: 0.5em; }
+
+.fade-in { opacity: 0; transform: translateY(28px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent4); }
+
+.demo-canvas {
+  display: block; width: 100%; max-width: 100%; height: auto;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card-alt);
+  cursor: crosshair;
+}
+
+.demo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+.pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.step-diagram {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px; margin: 16px 0;
+}
+.step-box {
+  border: 1px solid var(--border); border-radius: 10px; padding: 14px;
+  background: var(--bg-card-alt); font-size: 0.78rem; color: var(--text-dim);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.step-box strong { display: block; color: var(--text); margin-bottom: 6px; font-size: 0.82rem; }
+.step-box.hot {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(108,140,255,0.35);
+}
+
+.bar-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 0.8rem; }
+.bar-row span.lbl { width: 140px; flex-shrink: 0; color: var(--text-dim); font-family: var(--mono); }
+.bar-track {
+  flex: 1; height: 22px; background: var(--bg-card-alt); border-radius: 6px;
+  border: 1px solid var(--border); overflow: hidden;
+}
+.bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent3)); transition: width 0.2s ease; }
+.bar-row span.val { width: 52px; text-align: right; font-family: var(--mono); color: var(--accent3); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.timeline {
+  position: relative; padding-left: 22px; margin: 16px 0;
+  border-left: 2px solid var(--border);
+}
+.timeline-item { margin-bottom: 18px; padding-left: 8px; }
+.timeline-item h4 { font-size: 0.9rem; color: var(--accent2); margin-bottom: 6px; }
+
+.readout { font-family: var(--mono); font-size: 0.85rem; color: var(--accent3); margin-top: 10px; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Segment Anything</span></nav>
+
+
+<nav class="nav-wrap" id="navWrap" aria-label="Chapter navigation">
+  <div class="nav-inner">
+    <a class="nav-back" href="../">← Advanced NLP V2</a>
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#s00">00</a>
+      <a href="#s01">01</a>
+      <a href="#s02">02</a>
+      <a href="#s03">03</a>
+      <a href="#s04">04</a>
+      <a href="#s05">05</a>
+      <a href="#s06">06</a>
+      <a href="#s07">07</a>
+      <a href="#s08">08</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>Segment Anything: Promptable Visual Segmentation</h1>
+    <p class="subtitle">
+      How Segment Anything Model (SAM), introduced by <strong>Kirillov et al.</strong> (Meta), turns images into masks under user control—like prompting in language modeling, but for pixels. Encoder–decoder design, MAE-pretrained ViT, ambiguity-aware multi-mask outputs, and the SA-1B data engine.
+    </p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">~50ms</span><span class="stat-label">mask latency (typical web)</span></div>
+      <div class="stat"><span class="stat-val">1.1B</span><span class="stat-label">masks in SA-1B</span></div>
+      <div class="stat"><span class="stat-val">256</span><span class="stat-label">embedding dim (fusion)</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00 — Overview</span>
+  <h2>What is image segmentation?</h2>
+  <p><strong>Image segmentation</strong> partitions a digital image into regions so pixels in the same region share coherent properties. Classic pipelines were <em>application-specific</em>: medical cell boundaries, pedestrians for autonomy, land cover in satellite imagery. Each domain needed costly pixel-level labels and its own specialized model.</p>
+  <p>Before promptable models, segmentation required <strong>pixel-by-pixel</strong> labels per application—medical, autonomy, satellite—and a separate model per domain. You could not ask for “all cats” or “all trees” unless that category was baked into training.</p>
+  <p><strong>Segment Anything</strong> targets <em>open-world</em> images: one model produces masks for diverse scenes without retraining per category. Its second breakthrough is <strong>promptable segmentation</strong>: you steer the output with <strong>points</strong> (foreground / background clicks), <strong>axis-aligned boxes</strong>, <strong>text</strong> (via a text encoder), or <strong>combinations</strong>—for example a box plus corrective points.</p>
+  <p>In an interactive UI, <strong>foreground</strong> clicks include regions and <strong>background</strong> clicks exclude them; a <strong>box</strong> localizes a target, and extra points refine the result. The image encoder runs once per image; only the prompt encoder and mask decoder rerun on each edit—typically on the order of <strong>50 ms</strong> per mask in web deployments.</p>
+  <div class="callout warn">
+    <p><strong>Ambiguity is real.</strong> A single click on produce might mean <em>this vegetable only</em>, <em>the whole group of vegetables</em>, or <em>just the pale interior</em> of one piece—humans disagree too. On text, a click on the letter <strong>Z</strong> might refer to the <strong>glyph</strong>, the <strong>entire line of text</strong>, or the <strong>wall</strong> behind it. The model cannot read intent; it must return at least one <strong>reasonable</strong> mask for the click, and ideally surface multiple interpretations.</p>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: prompt modalities on a synthetic scene</h4>
+    <p style="margin-bottom:12px;font-size:0.9rem">Toggle prompt types. Green = foreground point, red = background, dashed = box, caption = text conditioning (schematic).</p>
+    <div class="demo-row pill-group" id="promptPills">
+      <button type="button" class="btn active" data-mode="points">Points</button>
+      <button type="button" class="btn" data-mode="box">Box</button>
+      <button type="button" class="btn" data-mode="text">Text</button>
+      <button type="button" class="btn" data-mode="all">All combined</button>
+    </div>
+    <canvas class="demo-canvas" id="promptCanvas" width="880" height="320" style="max-height:360px;cursor:default"></canvas>
+    <p class="readout" id="promptReadout">Mode: points — foreground / background clicks as in interactive segmentation UIs.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01 — Vision foundation models</span>
+  <h2>From task-specific models to foundation models</h2>
+  <p>A <strong>foundation model</strong> is trained at scale on broad data, then adapted through <strong>prompts</strong> or light fine-tuning rather than rebuilding per task. SAM applies the same pattern to <strong>visual prompting</strong>: given points, a box, text, or a mix, produce a mask consistent with that prompt—not only “find class <code class="inline">k</code>.”</p>
+  <p>That shift matters because dense segmentation labels are expensive: human annotators trace boundaries pixel-wise. SAM’s design couples a heavy, <strong>run-once</strong> image encoder with a <strong>fast</strong> prompt encoder and mask decoder so the UI can refresh masks quickly after each edit—image embeddings are cached while prompts change. Only the prompt encoder and mask decoder rerun when you add clicks or resize a box; the ViT forward pass on the image is amortized across many prompt edits.</p>
+  <p>The training story mirrors the architecture’s ambition: the team started from a <strong>small</strong> labeled set, trained a model, used that model (with humans in the loop) to produce a <strong>larger</strong> set, and eventually scaled to <strong>fully automatic</strong> mask generation before training the final system on about <strong>1.1 billion</strong> masks—so the dataset and the model co-evolved.</p>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02 — Three design pillars</span>
+  <h2>Task, model, and ambiguity awareness</h2>
+  <p>The SAM paper highlights three innovations working together:</p>
+  <ul class="clean">
+    <li><strong>Promptable segmentation task.</strong> Unified interface for points, boxes, text, prior masks, and mixtures.</li>
+    <li><strong>Efficient encoder–decoder stack.</strong> Strong image representation (ViT-H image encoder) plus lightweight prompt encoding and a two-layer mask decoder suitable for interactive latency.</li>
+    <li><strong>Ambiguity handling.</strong> For an under-specified prompt (often a <em>single</em> point), output <strong>up to three</strong> ranked masks; with multiple prompts, a <strong>fourth</strong> mask token can be used internally—outputs collapse toward a single refined mask when ambiguity drops.</li>
+  </ul>
+  <p>The three-mask design matches how ambiguity shows up in practice: ranked hypotheses often correspond to a <strong>part</strong>, a <strong>sub-part</strong>, and the <strong>whole</strong>—three legitimate segmentations of the same click (equivalently: a tight region, a finer fragment, and an expanded context). When you supply <strong>more than one</strong> prompt, ambiguity drops, so the stack can route a <strong>fourth</strong> output token to an extra mask head; that fourth path is for the multi-prompt regime and is not surfaced for a lone single-point prompt.</p>
+  <div class="comparison">
+    <div class="card"><h3>Single sparse prompt</h3><p>Return <strong>three</strong> ranked masks plus predicted <strong>IoU</strong> quality so the UI or downstream code can choose or show alternatives.</p></div>
+    <div class="card"><h3>Multiple prompts</h3><p>A <strong>fourth</strong> mask token is available internally; predictions tend toward <strong>one</strong> refined mask because the user has disambiguated the request.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03 — SAM architecture</span>
+  <h2>Image encoder, prompt encoder, mask decoder</h2>
+  <p>End-to-end, SAM is an <strong>encoder–decoder</strong>:</p>
+  <ul class="clean">
+    <li><strong>Image encoder</strong> maps the input image to a dense embedding grid (MAE-pretrained Vision Transformer backbone).</li>
+    <li><strong>Prompt encoder</strong> embeds <em>sparse</em> prompts (points, boxes, text) into the same channel width as image features (256 dimensions) so they can fuse in attention.</li>
+    <li><strong>Dense prompt</strong> (optional): a previous mask is downsampled through convolutions and added <strong>element-wise</strong> to image embeddings—supplying a “hint” for iterative refinement.</li>
+    <li><strong>Mask decoder</strong> consumes (image features + mask hint) and prompt tokens; it predicts <strong>binary masks</strong> and <strong>IoU quality scores</strong> for each hypothesis.</li>
+  </ul>
+  <p>End-to-end, the decoder’s job is to emit a <strong>mask</strong> together with a <strong>confidence-style score</strong> (implemented via IoU prediction) so that, at inference time, multiple hypotheses can be ranked without access to ground-truth labels.</p>
+  <div class="callout ok">
+    <p><strong>Iterative refinement.</strong> Run the model once with an initial prompt (e.g. one point) to get a first mask. If you then add points instead of starting cold, you can feed that <strong>previous mask</strong> back as a <strong>dense prompt</strong>: it tells the network “this was close—adjust with these additions or subtractions.” The mask is not a new modality for its own sake; it is the <strong>last prediction</strong> recycled as a geometric hint.</p>
+  </div>
+  <div class="formula">
+    Sparse prompts → 256-d embeddings; image grid → 256-d; optional mask → downscaled dense embedding;<br>
+    fused features + prompt tokens → decoder → {mask<sub>1</sub>, mask<sub>2</sub>, mask<sub>3</sub>} + IoU scores
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04 — Image encoder (ViT + MAE)</span>
+  <h2>Patch tokens, MAE pre-training, salient features</h2>
+  <p>The <strong>Vision Transformer (ViT)</strong> treats an image as a token sequence. Following the line of work summarized in <em>An Image is Worth 16×16 Words</em> (Google Research), the image is divided into fixed-size patches—<strong>16×16</strong> pixels in the canonical setup—each patch is <strong>flattened</strong> and linearly projected into an <strong>embedding</strong> that summarizes local appearance. Those patch embeddings, plus <strong>positional encodings</strong>, feed a Transformer encoder whose <strong>self-attention</strong> lets every patch attend to every other patch, building context across the whole field of view.</p>
+  <p>For image <strong>classification</strong>, ViT prepends a learnable <strong>class token</strong> (the same “special token” idea as in BERT). Self-attention mixes that token with all patches; after the stack, the <strong>first</strong> output position—the class token’s final state—is passed through an <strong>MLP head</strong> to predict the label. Intuition: because the class token attends to every patch, the training objective forces it to compress <strong>global</strong> information from the entire image into one vector.</p>
+  <p>SAM’s image encoder builds on a <strong>Masked Autoencoder (MAE)</strong> recipe from <em>Masked Autoencoders Are Scalable Vision Learners</em> (Meta): roughly <strong>75%</strong> of patches are <strong>masked</strong> (removed or zeroed); the <strong>encoder</strong> runs only on the <strong>visible</strong> (~25%) patches. The encoder output is then arranged back into the original patch grid—with placeholders for masked slots—and a <strong>decoder</strong> attempts to reconstruct the <strong>full</strong> image. Training asks: can you recover the hidden pixels knowing only the visible quarter? When the answer is “reasonably yes,” the encoder’s hidden states must encode <strong>most salient information</strong> about the scene in a compact representation—exactly what you want before a segmentation head.</p>
+  <p>MAE pretraining gives a <strong>generic visual prior</strong>—structure, texture, layout—not just boundary cues—before segmentation fine-tuning. SAM <strong>keeps the MAE-pretrained ViT encoder</strong> (ViT-H scale) and <strong>discards the MAE decoder</strong>; the encoder feature map is what the mask decoder cross-attends to.</p>
+
+  <div class="interactive-panel">
+    <h4>Demo: patchification and MAE-style masking</h4>
+    <div class="demo-row">
+      <label class="lbl" style="display:inline;margin-right:8px">Patch grid</label>
+      <input type="range" id="patchSlider" min="8" max="24" value="16" />
+      <span class="readout" id="patchVal" style="display:inline;margin-left:8px">16 px</span>
+    </div>
+    <div class="demo-row pill-group">
+      <button type="button" class="btn primary" id="btnMae">Resample MAE mask (~75% hidden)</button>
+    </div>
+    <canvas class="demo-canvas" id="vitCanvas" width="880" height="360" style="cursor:default"></canvas>
+    <p class="readout" id="vitReadout">Visible patches feed the encoder; hidden patches are reconstruction targets during MAE training.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05 — Prompt encoder</span>
+  <h2>Sparse vs dense prompts and 2D positional encoding</h2>
+  <p><strong>Sparse prompts</strong> include point clicks, two corners of a box, and text. Each point has coordinates <code class="inline">(x, y)</code> and a <strong>label</strong>: foreground (add to mask) or background (subtract). Embeddings are built as <strong>positional encoding(point) + type embedding</strong>—separate vectors for foreground, background, top-left box corner, bottom-right, padding, etc.—all mapped to <strong>256 dimensions</strong> to match image features.</p>
+  <p>Implementation-wise, points arrive as a sequence of <code class="inline">(x, y)</code> pairs and label indices: <strong>foreground</strong> points add one learned vector, <strong>background</strong> points add another, and <strong>padding</strong> positions (when the batch packs variable-length prompts) use a dedicated padding embedding so the Transformer sees a fixed-width sequence. Boxes are two corners—<strong>top-left</strong> and <strong>bottom-right</strong>—each gets the same positional-encoding machinery as a point, then corner-specific type embeddings distinguish “this xy is upper-left” from “this xy is lower-right.”</p>
+  <p><strong>Text</strong> uses the text tower from <strong>CLIP</strong>: a sentence becomes a fixed-width embedding aligned with the image–text contrastive space, then projected into the fusion width.</p>
+  <p>For <strong>dense prompts</strong>, an input mask (often the previous prediction) is conv-downsampled to the image embedding resolution. If no mask is provided, a learned <strong>“no mask”</strong> embedding is broadcast. Fusion with the image map is a <strong>point-wise sum</strong>.</p>
+  <p>In the original Transformer (<em>Attention Is All You Need</em>), positional encodings combine <strong>sines and cosines</strong> of different frequencies so each token index maps to a unique vector; that works when position is <strong>one-dimensional</strong> (token 0, 1, 2, … along a sentence). Images are not 1-D: pixels vary along <strong>height and width simultaneously</strong>.</p>
+  <p>Unlike 1-D sinusoidal positions along a sentence, images need <strong>2D locality</strong>: Euclidean neighbors should be represented similarly. Independently encoding <em>x</em> and <em>y</em> with separate 1-D sinusoids can break isotropy—two pixels at similar image distance may look unrelated in embedding space. SAM adopts a <strong>Fourier feature</strong> positional encoding suited to continuous 2-D coordinates (as analyzed in Fourier-feature positional encoding work referenced alongside SAM).</p>
+  <div class="comparison">
+    <div class="card">
+      <h3>Separable x and y encodings</h3>
+      <p>If you encode horizontal and vertical coordinates with <strong>independent</strong> sinusoidal tables (as in the original Transformer for token index), a reference pixel can appear <strong>very similar</strong> to another pixel along a row or column yet <strong>dissimilar</strong> to a third pixel that is actually the <strong>same Euclidean distance</strong> away along a diagonal. That breaks the geometry images live in.</p>
+    </div>
+    <div class="card">
+      <h3>Distance-aware (Fourier-style) encoding</h3>
+      <p>What you want instead: fix an anchor; all pixels within a small radius (say <strong>10 px</strong>) should have <strong>high</strong> similarity; pixels near <strong>20 px</strong> should be less similar but still structured; similarity should depend on <strong>radius</strong> the same way in every direction, then fall off smoothly as you move outward—so local neighborhoods stay coherent in embedding space.</p>
+    </div>
+  </div>
+  <p>Learnable Fourier features for multi-dimensional coordinates appear in the literature as one principled fix; SAM’s implementation follows the paper’s chosen Fourier-feature recipe rather than naive separable axes. The shared width—<strong>256</strong> channels for prompts and for the image map—is what allows <strong>attention</strong> to fuse the two streams without an extra projection bottleneck at every interaction.</p>
+  <div class="callout warn">
+    <p>When reading the official code, every sparse location still lands in the same <strong>256-D</strong> fusion space; occasional commentary may typo “266,” but the tensor width matches the image embedding channel count.</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: naive separable vs isotropic 2D similarity (schematic)</h4>
+    <p style="margin-bottom:10px;font-size:0.9rem">Click the canvas to set an anchor. Heatmaps show cosine similarity from the anchor to every other cell—<strong>separable</strong> (independent x,y waves) vs <strong>distance-based</strong> radial falloff.</p>
+    <div class="demo-row pill-group">
+      <button type="button" class="btn active" id="peNaive">Separable x + y</button>
+      <button type="button" class="btn" id="peGood">Euclidean Fourier-style</button>
+    </div>
+    <canvas class="demo-canvas" id="peCanvas" width="560" height="400"></canvas>
+    <p class="readout" id="peReadout">Anchor similarity field — SAM-style encodings favor radial coherence.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06 — Mask decoder &amp; ambiguity</span>
+  <h2>Attention flow, output tokens, multi-mask heads</h2>
+  <p>The mask decoder stacks <strong>two identical transformer blocks</strong>. Each block performs:</p>
+  <ol style="margin:12px 0 12px 1.4em;color:var(--text-dim)">
+    <li><strong>Self-attention</strong> on prompt tokens <em>and</em> special <strong>output tokens</strong> (concatenated sequence).</li>
+    <li><strong>Cross-attention</strong> where queries are tokens and keys/values are <strong>image embeddings</strong> (prompt looks at the image).</li>
+    <li>A feed-forward <strong>MLP</strong>.</li>
+    <li>A second <strong>cross-attention</strong> with roles swapped: queries are image locations, keys/values are tokens (image looks back at the prompt).</li>
+  </ol>
+  <p><strong>Output tokens</strong> mirror BERT’s class token: learned slots prepended to the prompt sequence pool context via self-attention. SAM uses <strong>one IoU token</strong> (fed to an MLP that predicts intersection-over-union quality) and <strong>three mask tokens</strong> that, with upsampled image features, generate three low-resolution masks upscaled to full resolution.</p>
+  <p><strong>Positional encodings</strong> are re-added to image and prompt streams whenever they enter attention so geometric cues are not washed out—akin to residual positional refresh without duplicating the entire skip path.</p>
+  <div class="callout">
+    <p>Kirillov et al. emphasize that <strong>geometric information must not dissipate</strong> across depth: positional encodings are <strong>added back</strong> to image embeddings and to prompt embeddings <em>whenever</em> those tensors participate in attention, much like repeatedly nudging residual streams so locality survives many blocks.</p>
+  </div>
+  <p>Because the decoder stacks <strong>two</strong> identical transformer blocks, the pattern repeats: block one’s outputs feed block two. After both blocks, the pathway splits. One stream is the updated <strong>tokens</strong> (output slots + prompts); the other is the updated <strong>image feature map</strong> (<code class="inline">src</code> in the reference implementation). The <strong>IoU token</strong> is read first and passed through a small head to predict how well each mask will overlap ground truth at train time. Each <strong>mask token</strong> is sent through its <strong>own MLP</strong>; those vectors are combined with an <strong>upsampled</strong> copy of the image embedding to synthesize three low-resolution masks that are then upscaled to full image resolution.</p>
+  <p>The dual cross-attention pattern mirrors encoder–decoder Transformers for translation: first, <strong>queries = tokens, keys/values = image</strong> lets the prompt “look at” the scene; second, <strong>queries = image, keys/values = tokens</strong> lets each spatial location absorb what the prompt requested. You need <strong>both directions</strong> because one output sequence must carry <strong>mask-specific</strong> semantics (the output tokens) while the other must carry <strong>spatially aligned</strong> features for mask synthesis.</p>
+  <div class="callout warn">
+    <p><strong>Latency budget.</strong> The image encoder may be large and relatively slow; that is acceptable because each image is encoded <strong>once</strong> and the embedding is <strong>cached</strong>. What must stay fast for interactive use is the <strong>prompt encoder</strong> and the <strong>two-layer mask decoder</strong>—those rerun on every edit so the UI can feel instantaneous (on the order of tens of milliseconds on capable hardware).</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: step through one decoder block</h4>
+    <div class="step-diagram" id="decoderSteps">
+      <div class="step-box hot" data-i="0"><strong>1. Self-attn</strong>Output + prompt tokens attend to each other.</div>
+      <div class="step-box" data-i="1"><strong>2. Cross A</strong>Q = tokens, K,V = image map.</div>
+      <div class="step-box" data-i="2"><strong>3. MLP</strong>Token-wise feed-forward.</div>
+      <div class="step-box" data-i="3"><strong>4. Cross B</strong>Q = image, K,V = tokens.</div>
+    </div>
+    <div class="demo-row">
+      <button type="button" class="btn primary" id="decNext">Next step</button>
+      <button type="button" class="btn" id="decReset">Reset</button>
+    </div>
+    <p class="readout" id="decReadout">Step 1 / 4</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: one click, three plausible masks</h4>
+    <p style="margin-bottom:10px;font-size:0.9rem">A single ambiguous prompt can mean part, whole object, or context. SAM is trained to emit multiple hypotheses.</p>
+    <canvas class="demo-canvas" id="ambCanvas" width="880" height="280" style="cursor:default"></canvas>
+    <p class="readout" id="ambReadout">Three decoder slots visualize sub-part, object, and super-region interpretations.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07 — Training, SA-1B, and losses</span>
+  <h2>Data engine, automatic labeling, and supervision signals</h2>
+  <p><strong>SA-1B</strong> contains on the order of <strong>11 million images</strong> and <strong>1.1 billion masks</strong>. Building it relied on a three-stage <strong>data engine</strong> that escalates from pure human labor to model-assisted curation to fully machine-generated proposals:</p>
+  <div class="timeline">
+    <div class="timeline-item">
+      <h4>Stage A — Assisted manual</h4>
+      <p>A team of <strong>professional annotators</strong> labeled images using only <strong>brush</strong> and <strong>eraser</strong> tools—true pixel-by-pixel painting. This is the expensive baseline: every mask is human-made, comparable to building a segmentation dataset “from zero” without model help.</p>
+    </div>
+    <div class="timeline-item">
+      <h4>Stage B — Semi-automatic</h4>
+      <p>Train a model on Stage A, then let that model <strong>propose</strong> masks. Human operators <strong>correct</strong> proposals and <strong>annotate objects the model missed</strong>. Throughput rises because humans edit rather than draw every mask from scratch; the expanded corpus retrains the model again.</p>
+    </div>
+    <div class="timeline-item">
+      <h4>Stage C — Fully automatic</h4>
+      <p><strong>No human in the loop.</strong> For each image, place a regular grid of <strong>32 × 32</strong> point prompts (1024 seeds). The model emits candidate masks for every seed. Retain masks that combine <strong>high predicted IoU</strong> (model-estimated quality) with <strong>stability</strong>: threshold the probability map at <strong>0.5 − δ</strong> and <strong>0.5 + δ</strong>; if the resulting binary masks stay nearly the same, the proposal is stable under jitter. Because thousands of seeds yield <strong>massive overlap</strong> and duplicates, run <strong>non-maximum suppression (NMS)</strong>.</p>
+    </div>
+  </div>
+  <div class="callout ok">
+    <p><strong>NMS in one pass.</strong> Sort mask proposals by confidence. Take the top mask, then <strong>discard</strong> every remaining mask whose <strong>IoU</strong> with the chosen mask exceeds a fixed threshold. Repeat with the next surviving highest score. The same greedy filter used in object detection to collapse duplicate boxes applies here to collapse duplicate segments.</p>
+  </div>
+
+  <p><strong>Mask loss</strong> blends <strong>focal loss</strong> (handles extreme foreground/background pixel imbalance compared to plain cross-entropy) and <strong>Dice loss</strong> derived from the Dice coefficient (related to F1 overlap). SAM uses a high ratio of focal to Dice—on the order of <strong>20 : 1</strong>—so hard pixels and class imbalance dominate while overlap geometry is still explicitly shaped.</p>
+  <div class="comparison">
+    <div class="card">
+      <h3>Focal loss (×20)</h3>
+      <p>Generalizes cross-entropy with a focusing term that <strong>down-weights easy negatives</strong>. Dominates when the mask covers only a <strong>tiny fraction</strong> of pixels so the model still spends capacity on hard boundaries and rare foreground.</p>
+    </div>
+    <div class="card">
+      <h3>Dice loss (×1)</h3>
+      <p>Directly penalizes mismatch in <strong>set overlap</strong> between prediction and target. Weaker weighting leaves geometry refinement to a secondary channel while focal handles class imbalance.</p>
+    </div>
+  </div>
+  <div class="formula">
+    IoU = |A ∩ B| / |A ∪ B|  Dice = 2|A ∩ B| / (|A| + |B|)  L<sub>dice</sub> = 1 − Dice
+  </div>
+  <p><strong>IoU</strong> (Jaccard index) measures overlap between a prediction and the ground-truth region: perfect coverage of the true object with no spill yields IoU → 1; a shifted or shrunk box shares some intersection but also extra union mass, so the score stays middling until alignment tightens. In detection-style diagrams, <strong>false positives</strong> are predicted area outside the ground truth; <strong>false negatives</strong> are ground-truth area the model missed. Segmentation inherits the same vocabulary at the pixel level.</p>
+  <p>The <strong>IoU prediction head</strong> is trained to regress agreement between each predicted mask and the ground-truth mask so inference can rank multiple outputs without oracle labels.</p>
+  <div class="interactive-panel">
+    <h4>Demo: IoU as overlap changes</h4>
+    <p style="margin-bottom:8px;font-size:0.9rem">Adjust overlap between predicted (amber) and ground-truth (teal) regions.</p>
+    <label class="lbl" for="iouOverlap">Overlap extent</label>
+    <input type="range" id="iouOverlap" min="0" max="100" value="45" />
+    <canvas class="demo-canvas" id="iouCanvas" width="880" height="220" style="cursor:default;margin-top:12px"></canvas>
+    <p class="readout" id="iouReadout">IoU = 0.00</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: focal vs Dice contribution (20:1 weighting)</h4>
+    <p style="margin-bottom:8px;font-size:0.9rem">Illustrative loss components for a fixed prediction; imbalance-heavy focal term dominates the sum.</p>
+    <label class="lbl" for="hardness">Fraction of “hard” misclassified pixels</label>
+    <input type="range" id="hardness" min="0" max="100" value="35" />
+    <div style="margin-top:16px">
+      <div class="bar-row"><span class="lbl">20 × focal</span><div class="bar-track"><div class="bar-fill" id="barFocal"></div></div><span class="val" id="valFocal">0</span></div>
+      <div class="bar-row"><span class="lbl">1 × dice</span><div class="bar-track"><div class="bar-fill" id="barDice" style="background:linear-gradient(90deg,var(--accent4),var(--accent5))"></div></div><span class="val" id="valDice">0</span></div>
+    </div>
+    <p class="readout" id="lossReadout"></p>
+  </div>
+
+  <div class="callout">
+    <p><strong>Reading.</strong> The full technical treatment appears in Kirillov et al., <em>Segment Anything</em> (Meta / FAIR): task definition, architecture diagrams, SA-1B statistics, and training protocol. This chapter aligns with that reference and with the implementation-level walkthrough of encoders, decoder blocks, and the three-phase engine.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s08">
+  <span class="section-num">08 — Playground</span>
+  <h2>Sketch prompts on a canvas</h2>
+  <p>Click to place <strong>foreground</strong> (include) or <strong>background</strong> (exclude) points. Drag the box corners. This toy canvas rehearses the <strong>coarse-to-fine</strong> pattern—box or point first, then corrective clicks—not SAM weights. Production UIs also show <strong>multiple ranked masks</strong> for ambiguous prompts.</p>
+  <div class="interactive-panel">
+    <div class="demo-row pill-group">
+      <button type="button" class="btn active" id="pgFg">Add foreground (+)</button>
+      <button type="button" class="btn" id="pgBg">Add background (−)</button>
+      <button type="button" class="btn" id="pgClear">Clear</button>
+    </div>
+    <canvas class="demo-canvas" id="playCanvas" width="880" height="400"></canvas>
+    <p class="readout" id="playReadout">Foreground points attract a soft region; background points suppress; box constrains extent.</p>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  function drawPromptDemo(mode) {
+    const c = document.getElementById('promptCanvas');
+    const ctx = c.getContext('2d');
+    const w = c.width, h = c.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(60, 40, w - 120, h - 80);
+    ctx.strokeStyle = '#3d3d52';
+    ctx.strokeRect(60, 40, w - 120, h - 80);
+    ctx.fillStyle = '#5ce1a6';
+    ctx.beginPath();
+    ctx.arc(w * 0.35, h * 0.48, 55, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#6c8cff';
+    ctx.beginPath();
+    ctx.arc(w * 0.62, h * 0.52, 42, 0, Math.PI * 2);
+    ctx.fill();
+    const showPts = mode === 'points' || mode === 'all';
+    const showBox = mode === 'box' || mode === 'all';
+    const showTxt = mode === 'text' || mode === 'all';
+    if (showPts) {
+      ctx.fillStyle = '#5ce1a6';
+      ctx.beginPath();
+      ctx.arc(w * 0.35, h * 0.42, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f87171';
+      ctx.beginPath();
+      ctx.arc(w * 0.38, h * 0.58, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (showBox) {
+      ctx.save();
+      ctx.setLineDash([10, 6]);
+      ctx.strokeStyle = '#ffc857';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(w * 0.22, h * 0.22, w * 0.56, h * 0.56);
+      ctx.restore();
+    }
+    if (showTxt) {
+      ctx.fillStyle = 'rgba(108,140,255,0.25)';
+      ctx.fillRect(w * 0.52, h * 0.12, w * 0.38, 36);
+      ctx.fillStyle = '#e0e0e8';
+      ctx.font = '600 15px system-ui,sans-serif';
+      ctx.fillText('text: “blue region”', w * 0.55, h * 0.12 + 24);
+    }
+    const labels = {
+      points: 'Points — green adds, red removes (foreground / background labels in the prompt encoder).',
+      box: 'Box — top-left and bottom-right corners encoded with positional features + corner type embeddings.',
+      text: 'Text — CLIP-style text encoder projects language into the shared 256-d fusion space.',
+      all: 'Combined prompts — SAM fuses all sparse cues before cross-attention with the image map.'
+    };
+    document.getElementById('promptReadout').textContent = labels[mode];
+  }
+
+  let promptMode = 'points';
+  document.querySelectorAll('#promptPills .btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#promptPills .btn').forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      promptMode = b.getAttribute('data-mode');
+      drawPromptDemo(promptMode);
+    });
+  });
+  drawPromptDemo(promptMode);
+
+  const vitCanvas = document.getElementById('vitCanvas');
+  const vitCtx = vitCanvas.getContext('2d');
+  let maeHidden = new Set();
+  function regenMae(rows, cols) {
+    maeHidden = new Set();
+    const total = rows * cols;
+    const targetHide = Math.floor(total * 0.75);
+    const idx = [];
+    for (let i = 0; i < total; i++) idx.push(i);
+    for (let i = idx.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = idx[i];
+      idx[i] = idx[j];
+      idx[j] = t;
+    }
+    for (let k = 0; k < targetHide; k++) maeHidden.add(idx[k]);
+  }
+  function drawVit() {
+    const patch = parseInt(document.getElementById('patchSlider').value, 10);
+    document.getElementById('patchVal').textContent = patch + ' px';
+    const w = vitCanvas.width, h = vitCanvas.height;
+    vitCtx.fillStyle = '#181825';
+    vitCtx.fillRect(0, 0, w, h);
+    const imgX = 40, imgY = 30, imgW = 360, imgH = 260;
+    const cols = Math.floor(imgW / patch);
+    const rows = Math.floor(imgH / patch);
+    if (maeHidden.size === 0) regenMae(rows, cols);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const hue = ((r * 13 + c * 7) % 360);
+        const hid = maeHidden.has(i);
+        vitCtx.fillStyle = hid ? '#0a0a0f' : 'hsl(' + hue + ',35%,42%)';
+        vitCtx.fillRect(imgX + c * patch, imgY + r * patch, patch - 1, patch - 1);
+        if (!hid) {
+          vitCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+          vitCtx.strokeRect(imgX + c * patch, imgY + r * patch, patch - 1, patch - 1);
+        }
+      }
+    }
+    vitCtx.strokeStyle = '#6c8cff';
+    vitCtx.strokeRect(imgX, imgY, cols * patch, rows * patch);
+    vitCtx.fillStyle = '#e0e0e8';
+    vitCtx.font = '14px system-ui,sans-serif';
+    vitCtx.fillText('Encoder sees visible patches only →', imgX + imgW + 24, imgY + 40);
+    vitCtx.fillStyle = '#8888a0';
+    vitCtx.font = '12px system-ui,sans-serif';
+    vitCtx.fillText('MAE training reconstructs hidden cells from latents.', imgX + imgW + 24, imgY + 64);
+    const ax = imgX + imgW + 24, ay = imgY + 100;
+    vitCtx.strokeStyle = '#2a2a3a';
+    vitCtx.beginPath();
+    vitCtx.moveTo(ax, ay);
+    vitCtx.lineTo(ax + 160, ay);
+    vitCtx.lineTo(ax + 200, ay + 80);
+    vitCtx.stroke();
+    vitCtx.fillStyle = '#6c8cff';
+    vitCtx.font = '12px monospace';
+    vitCtx.fillText('ViT blocks', ax + 50, ay - 8);
+    document.getElementById('vitReadout').textContent =
+      'Grid ' + cols + '×' + rows + ' — ~' + Math.round(100 * maeHidden.size / (rows * cols)) + '% patches masked (MAE-style).';
+  }
+  document.getElementById('patchSlider').addEventListener('input', function () {
+    maeHidden = new Set();
+    drawVit();
+  });
+  document.getElementById('btnMae').addEventListener('click', function () {
+    const patch = parseInt(document.getElementById('patchSlider').value, 10);
+    const cols = Math.floor(360 / patch);
+    const rows = Math.floor(260 / patch);
+    regenMae(rows, cols);
+    drawVit();
+  });
+  drawVit();
+
+  const peCanvas = document.getElementById('peCanvas');
+  const peCtx = peCanvas.getContext('2d');
+  let peMode = 'naive';
+  let axCell = 7, ayCell = 5;
+  const gw = 28, gh = 20, cs = 18;
+  function peVal(px, py, cx, cy, mode) {
+    if (mode === 'naive') {
+      return (Math.sin(px * 0.7) + Math.sin(py * 0.9)) * 0.5;
+    }
+    const dx = px - cx, dy = py - cy;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    return Math.cos(d * 0.35);
+  }
+  function drawPe() {
+    peCtx.fillStyle = '#181825';
+    peCtx.fillRect(0, 0, peCanvas.width, peCanvas.height);
+    const cx = axCell + 0.5, cy = ayCell + 0.5;
+    let minV = 1, maxV = -1;
+    const vals = [];
+    for (let y = 0; y < gh; y++) {
+      for (let x = 0; x < gw; x++) {
+        const v = peVal(x, y, cx, cy, peMode);
+        vals.push(v);
+        minV = Math.min(minV, v);
+        maxV = Math.max(maxV, v);
+      }
+    }
+    let i = 0;
+    for (let y = 0; y < gh; y++) {
+      for (let x = 0; x < gw; x++) {
+        const t = (vals[i++] - minV) / (maxV - minV + 1e-6);
+        const r = Math.floor(20 + t * 120);
+        const g = Math.floor(30 + t * 100);
+        const b = Math.floor(60 + t * 180);
+        peCtx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+        peCtx.fillRect(20 + x * cs, 20 + y * cs, cs - 1, cs - 1);
+      }
+    }
+    peCtx.strokeStyle = '#ffc857';
+    peCtx.lineWidth = 2;
+    peCtx.strokeRect(20 + axCell * cs, 20 + ayCell * cs, cs - 1, cs - 1);
+    document.getElementById('peReadout').textContent =
+      peMode === 'naive'
+        ? 'Separable waves: diagonal equidistant points can look dissimilar (bad for 2D geometry).'
+        : 'Radial similarity: distance-aware encoding preserves Euclidean neighborhoods.';
+  }
+  peCanvas.addEventListener('click', function (ev) {
+    const rect = peCanvas.getBoundingClientRect();
+    const scaleX = peCanvas.width / rect.width;
+    const scaleY = peCanvas.height / rect.height;
+    const mx = (ev.clientX - rect.left) * scaleX - 20;
+    const my = (ev.clientY - rect.top) * scaleY - 20;
+    if (mx >= 0 && my >= 0) {
+      axCell = Math.max(0, Math.min(gw - 1, Math.floor(mx / cs)));
+      ayCell = Math.max(0, Math.min(gh - 1, Math.floor(my / cs)));
+      drawPe();
+    }
+  });
+  document.getElementById('peNaive').addEventListener('click', function () {
+    peMode = 'naive';
+    document.getElementById('peNaive').classList.add('active');
+    document.getElementById('peGood').classList.remove('active');
+    drawPe();
+  });
+  document.getElementById('peGood').addEventListener('click', function () {
+    peMode = 'good';
+    document.getElementById('peGood').classList.add('active');
+    document.getElementById('peNaive').classList.remove('active');
+    drawPe();
+  });
+  drawPe();
+
+  let decStep = 0;
+  const decBoxes = document.querySelectorAll('#decoderSteps .step-box');
+  const decTexts = [
+    'Self-attention mixes output tokens (IoU + mask slots) with prompt tokens.',
+    'Cross-attention A: queries from tokens, keys/values from image embeddings — prompt grounds in the image.',
+    'MLP processes the updated token sequence.',
+    'Cross-attention B: queries from image, keys/values from tokens — image features absorb prompt context.'
+  ];
+  function paintDec() {
+    decBoxes.forEach(function (el, j) {
+      el.classList.toggle('hot', j === decStep);
+    });
+    document.getElementById('decReadout').textContent = 'Step ' + (decStep + 1) + ' / 4 — ' + decTexts[decStep];
+  }
+  document.getElementById('decNext').addEventListener('click', function () {
+    decStep = (decStep + 1) % 4;
+    paintDec();
+  });
+  document.getElementById('decReset').addEventListener('click', function () {
+    decStep = 0;
+    paintDec();
+  });
+  paintDec();
+
+  const ambCanvas = document.getElementById('ambCanvas');
+  const ambCtx = ambCanvas.getContext('2d');
+  function drawAmb() {
+    const w = ambCanvas.width, h = ambCanvas.height;
+    ambCtx.fillStyle = '#181825';
+    ambCtx.fillRect(0, 0, w, h);
+    ambCtx.fillStyle = '#2a3548';
+    ambCtx.fillRect(w * 0.2, h * 0.2, w * 0.35, h * 0.55);
+    ambCtx.fillStyle = '#3d4a60';
+    ambCtx.fillRect(w * 0.48, h * 0.32, w * 0.38, h * 0.38);
+    const cx = w * 0.42, cy = h * 0.48;
+    ambCtx.fillStyle = '#f87171';
+    ambCtx.beginPath();
+    ambCtx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ambCtx.fill();
+    ambCtx.fillStyle = 'rgba(92,225,166,0.35)';
+    ambCtx.fillRect(w * 0.32, h * 0.38, w * 0.12, h * 0.18);
+    ambCtx.fillStyle = 'rgba(108,140,255,0.35)';
+    ambCtx.fillRect(w * 0.25, h * 0.25, w * 0.28, h * 0.45);
+    ambCtx.fillStyle = 'rgba(255,200,87,0.28)';
+    ambCtx.fillRect(w * 0.18, h * 0.15, w * 0.55, h * 0.65);
+    ambCtx.fillStyle = '#e0e0e8';
+    ambCtx.font = '12px system-ui,sans-serif';
+    ambCtx.fillText('Mask A — sub-part', w * 0.68, h * 0.28);
+    ambCtx.fillStyle = '#5ce1a6';
+    ambCtx.fillRect(w * 0.68, h * 0.3, 12, 12);
+    ambCtx.fillStyle = '#e0e0e8';
+    ambCtx.fillText('Mask B — object', w * 0.68, h * 0.42);
+    ambCtx.fillStyle = '#6c8cff';
+    ambCtx.fillRect(w * 0.68, h * 0.44, 12, 12);
+    ambCtx.fillStyle = '#e0e0e8';
+    ambCtx.fillText('Mask C — context', w * 0.68, h * 0.56);
+    ambCtx.fillStyle = '#ffc857';
+    ambCtx.fillRect(w * 0.68, h * 0.58, 12, 12);
+  }
+  drawAmb();
+
+  const iouCanvas = document.getElementById('iouCanvas');
+  const iouCtx = iouCanvas.getContext('2d');
+  function drawIou() {
+    const ov = parseInt(document.getElementById('iouOverlap').value, 10) / 100;
+    const w = iouCanvas.width, h = iouCanvas.height;
+    iouCtx.fillStyle = '#181825';
+    iouCtx.fillRect(0, 0, w, h);
+    const gw = 280, gh = 120, gx = 80, gy = 50;
+    const predW = gw, predH = gh;
+    const gtW = gw * (0.55 + ov * 0.45);
+    const gtH = gh * (0.55 + ov * 0.45);
+    const gtx = gx + (gw - gtW) / 2 + (1 - ov) * 35;
+    const gty = gy + (gh - gtH) / 2 + (1 - ov) * 20;
+    iouCtx.fillStyle = 'rgba(94,225,166,0.45)';
+    iouCtx.fillRect(gx, gy, predW, predH);
+    iouCtx.fillStyle = 'rgba(255,200,87,0.45)';
+    iouCtx.fillRect(gtx, gty, gtW, gtH);
+    const x1 = Math.max(gx, gtx), y1 = Math.max(gy, gty);
+    const x2 = Math.min(gx + predW, gtx + gtW), y2 = Math.min(gy + predH, gty + gtH);
+    const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+    const aPred = predW * predH, aGt = gtW * gtH;
+    const union = aPred + aGt - inter;
+    const iou = union > 0 ? inter / union : 0;
+    iouCtx.strokeStyle = '#e0e0e8';
+    iouCtx.lineWidth = 1;
+    iouCtx.strokeRect(gx, gy, predW, predH);
+    iouCtx.strokeRect(gtx, gty, gtW, gtH);
+    iouCtx.fillStyle = '#e0e0e8';
+    iouCtx.font = '13px monospace';
+    iouCtx.fillText('Ground truth (teal base)', gx + predW + 24, gy + 24);
+    iouCtx.fillText('Prediction (amber)', gx + predW + 24, gy + 48);
+    document.getElementById('iouReadout').textContent =
+      'IoU = |A∩B| / |A∪B| ≈ ' + iou.toFixed(3) + ' — used to score mask quality at inference.';
+  }
+  document.getElementById('iouOverlap').addEventListener('input', drawIou);
+  drawIou();
+
+  function updateLossBars() {
+    const h = parseInt(document.getElementById('hardness').value, 10) / 100;
+    const focal = 20 * (0.2 + h * 1.4);
+    const dice = 0.15 + (1 - h) * 0.5;
+    const maxV = 20 * 1.6 + 0.65;
+    document.getElementById('barFocal').style.width = (100 * focal / maxV) + '%';
+    document.getElementById('barDice').style.width = (100 * dice / maxV) + '%';
+    document.getElementById('valFocal').textContent = focal.toFixed(2);
+    document.getElementById('valDice').textContent = dice.toFixed(2);
+    document.getElementById('lossReadout').textContent =
+      'Total mask loss ∝ 20·focal + 1·dice (illustrative scale). Higher “hard pixel” rate bumps focal-dominated term.';
+  }
+  document.getElementById('hardness').addEventListener('input', updateLossBars);
+  updateLossBars();
+
+  const playCanvas = document.getElementById('playCanvas');
+  const playCtx = playCanvas.getContext('2d');
+  let pgMode = 'fg';
+  const fgPts = [];
+  const bgPts = [];
+  let box = { x: 120, y: 80, w: 420, h: 220 };
+  let dragBox = null;
+
+  document.getElementById('pgFg').addEventListener('click', function () {
+    pgMode = 'fg';
+    document.getElementById('pgFg').classList.add('active');
+    document.getElementById('pgBg').classList.remove('active');
+  });
+  document.getElementById('pgBg').addEventListener('click', function () {
+    pgMode = 'bg';
+    document.getElementById('pgBg').classList.add('active');
+    document.getElementById('pgFg').classList.remove('active');
+  });
+  document.getElementById('pgClear').addEventListener('click', function () {
+    fgPts.length = 0;
+    bgPts.length = 0;
+    drawPlay();
+  });
+
+  function dist2(x1, y1, x2, y2) {
+    const dx = x1 - x2, dy = y1 - y2;
+    return dx * dx + dy * dy;
+  }
+  function inBoxCorner(mx, my, bx, by, bw, bh) {
+    const r = 14;
+    const corners = [
+      { id: 'tl', x: bx, y: by },
+      { id: 'tr', x: bx + bw, y: by },
+      { id: 'bl', x: bx, y: by + bh },
+      { id: 'br', x: bx + bw, y: by + bh }
+    ];
+    for (let i = 0; i < corners.length; i++) {
+      if (dist2(mx, my, corners[i].x, corners[i].y) <= r * r) return corners[i].id;
+    }
+    return null;
+  }
+
+  function drawPlay() {
+    const w = playCanvas.width, h = playCanvas.height;
+    playCtx.fillStyle = '#12121a';
+    playCtx.fillRect(0, 0, w, h);
+    const img = playCtx.createImageData(w, h);
+    const bx = box.x, by = box.y, bw = box.w, bh = box.h;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let v = 0;
+        if (x >= bx && x <= bx + bw && y >= by && y <= by + bh) {
+          v = 0.35;
+          for (let i = 0; i < fgPts.length; i++) {
+            const d = Math.sqrt(dist2(x, y, fgPts[i].x, fgPts[i].y));
+            v += 0.22 * Math.exp(-d * d / (2 * 55 * 55));
+          }
+          for (let j = 0; j < bgPts.length; j++) {
+            const d = Math.sqrt(dist2(x, y, bgPts[j].x, bgPts[j].y));
+            v -= 0.28 * Math.exp(-d * d / (2 * 45 * 45));
+          }
+          v = Math.max(0, Math.min(1, v));
+        }
+        const o = (y * w + x) * 4;
+        const c = Math.floor(40 + v * 180);
+        img.data[o] = c;
+        img.data[o + 1] = Math.floor(50 + v * 120);
+        img.data[o + 2] = Math.floor(80 + v * 140);
+        img.data[o + 3] = 255;
+      }
+    }
+    playCtx.putImageData(img, 0, 0);
+    playCtx.strokeStyle = '#ffc857';
+    playCtx.setLineDash([8, 5]);
+    playCtx.strokeRect(bx, by, bw, bh);
+    playCtx.setLineDash([]);
+    function drawCorner(px, py) {
+      playCtx.fillStyle = '#ffc857';
+      playCtx.beginPath();
+      playCtx.arc(px, py, 8, 0, Math.PI * 2);
+      playCtx.fill();
+    }
+    drawCorner(bx, by);
+    drawCorner(bx + bw, by);
+    drawCorner(bx, by + bh);
+    drawCorner(bx + bw, by + bh);
+    playCtx.fillStyle = '#5ce1a6';
+    for (let i = 0; i < fgPts.length; i++) {
+      playCtx.beginPath();
+      playCtx.arc(fgPts[i].x, fgPts[i].y, 7, 0, Math.PI * 2);
+      playCtx.fill();
+    }
+    playCtx.fillStyle = '#f87171';
+    for (let j = 0; j < bgPts.length; j++) {
+      playCtx.beginPath();
+      playCtx.arc(bgPts[j].x, bgPts[j].y, 7, 0, Math.PI * 2);
+      playCtx.fill();
+    }
+  }
+
+  playCanvas.addEventListener('mousedown', function (ev) {
+    const rect = playCanvas.getBoundingClientRect();
+    const scaleX = playCanvas.width / rect.width;
+    const scaleY = playCanvas.height / rect.height;
+    const mx = (ev.clientX - rect.left) * scaleX;
+    const my = (ev.clientY - rect.top) * scaleY;
+    dragBox = inBoxCorner(mx, my, box.x, box.y, box.w, box.h);
+    if (!dragBox) {
+      if (pgMode === 'fg') fgPts.push({ x: mx, y: my });
+      else bgPts.push({ x: mx, y: my });
+      drawPlay();
+    }
+  });
+  window.addEventListener('mousemove', function (ev) {
+    if (!dragBox) return;
+    const rect = playCanvas.getBoundingClientRect();
+    const scaleX = playCanvas.width / rect.width;
+    const scaleY = playCanvas.height / rect.height;
+    const mx = (ev.clientX - rect.left) * scaleX;
+    const my = (ev.clientY - rect.top) * scaleY;
+    if (dragBox === 'tl') {
+      const nx = Math.min(mx, box.x + box.w - 40);
+      const ny = Math.min(my, box.y + box.h - 40);
+      box.w += box.x - nx;
+      box.h += box.y - ny;
+      box.x = nx;
+      box.y = ny;
+    } else if (dragBox === 'tr') {
+      const ny = Math.min(my, box.y + box.h - 40);
+      box.w = Math.max(40, mx - box.x);
+      box.h += box.y - ny;
+      box.y = ny;
+    } else if (dragBox === 'bl') {
+      const nx = Math.min(mx, box.x + box.w - 40);
+      box.w += box.x - nx;
+      box.x = nx;
+      box.h = Math.max(40, my - box.y);
+    } else if (dragBox === 'br') {
+      box.w = Math.max(40, mx - box.x);
+      box.h = Math.max(40, my - box.y);
+    }
+    drawPlay();
+  });
+  window.addEventListener('mouseup', function () {
+    dragBox = null;
+  });
+  drawPlay();
+
+  const navWrap = document.getElementById('navWrap');
+  const navToggle = document.getElementById('navToggle');
+
+  navToggle.addEventListener('click', function () {
+    const open = navWrap.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.querySelectorAll('#navLinks a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      navWrap.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  window.addEventListener('scroll', function () {
+    const y = window.scrollY;
+    navWrap.classList.toggle('visible', y > 220);
+    document.querySelectorAll('.fade-in:not(.visible)').forEach(function (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 50) el.classList.add('visible');
+    });
+  }, { passive: true });
+  window.dispatchEvent(new Event('scroll'));
+})();
+</script>
+</body>
+</html>

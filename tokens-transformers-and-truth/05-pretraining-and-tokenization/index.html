@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pre-training, BERT & Tokenization — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+.token-mask { background: rgba(248,113,113,0.2); color: var(--danger); border: 1px solid rgba(248,113,113,0.4); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+
+.callout.warn {
+  background: rgba(248, 113, 113, 0.08);
+  border-left-color: var(--danger);
+}
+.callout.warn p { color: var(--text); }
+
+.callout.ok {
+  background: rgba(52, 211, 153, 0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text); }
+
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+.qa-box p {
+  margin-bottom: 0;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Mask grid ===== */
+.mask-grid {
+  display: grid;
+  gap: 2px;
+  font-size: 0.65rem;
+  font-family: var(--mono);
+  margin: 16px 0;
+}
+.mask-cell {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  transition: all 0.2s;
+}
+.mask-cell.attend { background: rgba(52,211,153,0.4); color: var(--accent3); }
+.mask-cell.blocked { background: rgba(248,113,113,0.3); color: var(--danger); }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Interview Q&A ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  font-family: var(--sans);
+}
+.hint-btn:hover, .reveal-btn:hover {
+  border-color: var(--accent);
+  background: rgba(108,140,255,0.08);
+}
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(251,191,36,0.06);
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.hint-box.visible { display: block; }
+.answer {
+  display: none;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.answer.visible { display: block; }
+.solution-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent3);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.explanation {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.explanation strong { color: var(--text); }
+
+/* ===== Input fields ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Pretraining And Tokenization</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">Pre-training, BERT & Tokenization</a>
+  <div class="nav-links">
+    <a href="#s1">Decoder-Only</a>
+    <a href="#s2">Encoder</a>
+    <a href="#s3">Prefix LM</a>
+    <a href="#s4">Encoder-Decoder</a>
+    <a href="#s5">Pipeline</a>
+    <a href="#s6">Pre-training</a>
+    <a href="#s7">Post-training</a>
+    <a href="#s8">BERT</a>
+    <a href="#s9">Tokenization</a>
+    <a href="#s12">BPE</a>
+    <a href="#s14">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Pre-training, BERT & Tokenization</h1>
+    <p class="subtitle">
+      Transformer configurations, pre-training pipelines, BERT's masked language modeling, and the mechanics of tokenization — the architecture and training foundations behind modern language models.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">13</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">8</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1</span>
+        <span class="stat-label">Playground</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Understanding how transformers differ — decoder-only, encoder, prefix LM, and encoder-decoder — is essential for grasping why GPT and BERT behave so differently. We then trace the full training pipeline from random initialization through pre-training and post-training, dive into BERT's masked language modeling objective, and finally unpack tokenization: the critical step that turns raw text into the discrete tokens models consume.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 01: DECODER-ONLY TRANSFORMERS ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Decoder-Only Transformers</h2>
+
+    <p>
+      The dominant configuration in today's language models is the <strong>decoder-only transformer</strong>: <strong>L</strong> stacked layers of masked multi-head self-attention with a causal mask so position <em>i</em> attends only to positions 1 through <em>i</em>. Block structure, Q/K/V projections, residuals, and the vocabulary softmax head are laid out in <a href="../04-attention-and-transformers/">Chapter 04</a>.
+    </p>
+
+    <p>
+      Encoder stacks produce bidirectional Z vectors at every position — useful for classification, but unsuitable for naive next-token training because each position would already encode future tokens. Decoder-only models avoid that leakage by construction.
+    </p>
+
+    <p>
+      GPT-style models — GPT-2, GPT-3, GPT-4, Llama, Mistral, and most modern chat models — are all decoder-only. They excel at continuation, completion, and instruction-following because the training objective (next-token prediction) directly matches the generation task.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Pure decoder training:</strong> In a standard decoder-only language model, the training loss is applied at <em>every</em> non-padding position in the sequence, because nothing is treated as a privileged “prompt” region. Prefix-style masking is what later carves out a segment where no loss is needed.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Decoder-only transformers are the dominant configuration today because they are simple, scalable, and flexible. Any task that can be framed as "given input, generate output" works naturally with this architecture.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 02: ENCODER TRANSFORMERS ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Encoder Transformers</h2>
+
+    <p>
+      The <strong>encoder transformer</strong> differs from the decoder in one crucial way: it uses <strong>completely unmasked</strong> multi-head self-attention. Every position can attend to every other position — past, present, and future.
+    </p>
+
+    <p>
+      This creates a problem for next-word prediction. If the model can see the entire sequence, predicting the next token becomes trivial — it can simply "cheat" by looking at what comes next. The representations at each position already include information from the future, so there is no meaningful learning signal for autoregressive generation.
+    </p>
+
+    <p>
+      Instead, encoder models are designed for <strong>computing representations of full text sequences</strong>. They are excellent for tasks where you need a single vector (or per-position vectors) summarizing the whole input: sentiment analysis, named entity recognition, text classification, and similar tasks where the answer depends on the entire context.
+    </p>
+
+    <p>
+      Examples include <strong>BERT</strong>, <strong>RoBERTa</strong>, and <strong>ELECTRA</strong>. These models are not trained to generate text autoregressively; they use different objectives (like masked language modeling, which we cover later) that are compatible with bidirectional attention.
+    </p>
+
+    <p>
+      Encoder stacks are a natural fit when the task is “read this fixed string and emit a label (or a label at each position).” A pedagogical instance is counting: given a sequence of characters, predict at each timestep how many times the current character appeared strictly before and strictly after that position in the string (outputs in {0, 1, 2}). The answer at every location depends on the <em>entire</em> sequence, so bidirectional attention is appropriate; masking would throw away information you are explicitly asked to use.
+    </p>
+
+    <div class="formula">
+      Encoder use case: f(text) → vector(s) for classification, tagging, or scoring — not autoregressive completion of unseen future tokens.
+    </div>
+
+    <div class="callout">
+      <p><strong>Connection to diffusion:</strong> Some recent work explores diffusion-based language models that operate on continuous representations. The encoder's bidirectional view has conceptual parallels to how diffusion models can "see" the full sequence during denoising, though the mechanics differ.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 03: PREFIX LM ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Prefix LM (Prefix Language Model)</h2>
+
+    <p>
+      The <strong>prefix LM</strong> architecture sits between decoder-only and encoder-decoder. It has two conceptually distinct parts: a <strong>prompt</strong> (or prefix) and a <strong>completion</strong> (or response). The attention mask is <strong>partially masked</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">The Mask Structure</h3>
+    <p>
+      Imagine a sequence split into prompt tokens and completion tokens. The attention matrix can be thought of as four blocks:
+    </p>
+
+    <ul style="margin: 16px 0; padding-left: 24px; color: var(--text-dim);">
+      <li><strong style="color:var(--text);">Prompt × Prompt (top-left):</strong> Fully unmasked. All prompt tokens attend to all other prompt tokens.</li>
+      <li><strong style="color:var(--text);">Completion × Prompt (bottom-left):</strong> Fully unmasked. Completion tokens can attend to the entire prompt.</li>
+      <li><strong style="color:var(--text);">Completion × Completion (bottom-right):</strong> Causal mask. Each completion token attends only to previous completion tokens (and all prompt tokens). Future completion tokens are masked to −∞.</li>
+      <li><strong style="color:var(--text);">Prompt × Completion (top-right):</strong> Masked to −∞. Prompt tokens cannot attend to completion tokens (which do not exist at "prompt time").</li>
+    </ul>
+
+    <p>
+      In practice, the system prompt and user prompt are concatenated into one prompt block. The model then generates the completion autoregressively, with each new completion token attending to the full prompt and all previous completion tokens.
+    </p>
+
+    <h3 style="margin-top:28px;">Why Unmask the Prompt?</h3>
+    <p>
+      Because we do not compute loss on prompt tokens — we only compute loss on completion/response tokens. The prompt is given; we are not trying to predict it. Allowing bidirectional attention within the prompt gives <strong>richer representations</strong> for each prompt position, since each token can use full context from the rest of the prompt. There is no prediction needed there, so there is no risk of "cheating."
+    </p>
+
+    <p>
+      You could, in principle, run a single long causal mask over prompt plus completion. That is not wrong, but it is unnecessarily restrictive for the prompt segment: early prompt tokens would be blocked from attending to later prompt tokens even though you never ask the model to predict those later prompt tokens anyway. Unmasking within the prompt is a free way to give the completion side a better-conditioned view of the instruction.
+    </p>
+
+    <div class="formula">
+      Read attention matrices as <strong>rows = query positions</strong>, <strong>columns = key positions</strong>. The decoder-only <strong>causal mask</strong> (same idea as the “diagonal” mask in many papers) zeros out all entries above the main diagonal before softmax. Prefix LM keeps that causal structure only inside the completion block, while the prompt–prompt block is fully visible.
+    </div>
+
+    <p>
+      During training, implementations still materialize hidden states for prompt positions under the hood: completion queries need a stable, well-informed prompt representation. The mask shapes <em>what may attend where</em>; it does not mean the prompt is skipped in the forward pass.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:1rem;">Prefix LM (one stack)</h3>
+        <p>One set of weights; change the mask so prompt tokens are bidirectional among themselves and invisible to future completion keys, while completion tokens stay causal among themselves but see the whole prompt.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3); font-size:1rem;">Encoder–decoder (two stacks)</h3>
+        <p>Separate parameter pools for encoding the source and generating the target. Historically motivated for translation when source and target are different languages; adds hyperparameters (relative depth/width of each stack) but can specialize each half.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Comparison:</strong> Prefix LM is simpler than full encoder-decoder — it's a single transformer with a custom mask, rather than two separate networks. Many instruction-tuned models use prefix LM or a variant of it.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Mask Comparison Visualizer</h3>
+      <p>Toggle between different attention mask types. Green = attend, Red = masked (blocked). Rows = query positions, Columns = key positions.</p>
+
+      <div class="btn-group">
+        <button class="btn active" onclick="showMaskType('decoder')">Decoder-Only</button>
+        <button class="btn" onclick="showMaskType('encoder')">Encoder</button>
+        <button class="btn" onclick="showMaskType('prefix')">Prefix LM</button>
+        <button class="btn" onclick="showMaskType('encdec')">Encoder-Decoder</button>
+      </div>
+
+      <div id="maskVizContainer" style="margin-top:20px;"></div>
+      <div id="maskVizLegend" style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 04: ENCODER-DECODER ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Encoder-Decoder (Sequence-to-Sequence)</h2>
+
+    <p>
+      The <strong>encoder-decoder</strong> architecture uses <strong>two separate transformer networks</strong>: an encoder and a decoder. The original "Attention Is All You Need" paper used this for machine translation — French sentence in, English sentence out.
+    </p>
+
+    <h3 style="margin-top:28px;">Encoder</h3>
+    <p>
+      The encoder applies <strong>unmasked self-attention</strong> over the input sequence (e.g., the source sentence). It produces a set of <strong>Z vectors</strong> — one per input position — that encode the full input.
+    </p>
+
+    <h3 style="margin-top:28px;">Decoder</h3>
+    <p>
+      The decoder has two attention mechanisms per block:
+    </p>
+    <ol style="margin: 16px 0; padding-left: 24px; color: var(--text-dim);">
+      <li><strong style="color:var(--text);">Masked self-attention</strong> over the output (decoder) sequence. Same causal mask as decoder-only — each output position attends only to previous output positions.</li>
+      <li><strong style="color:var(--text);">Cross-attention</strong>: Q comes from the decoder, K and V come from the encoder's final Z vectors. The decoder "queries" the encoder's representation. Cross-attention is <strong>unmasked</strong> — the decoder can see all encoder positions.</li>
+    </ol>
+
+    <p>
+      Residual connections combine the decoder self-attention output with the cross-attention output. A decoder block = masked self-attention + cross-attention + feed-forward + residual connections, stacked L times.
+    </p>
+
+    <p>
+      Cross-attention is worth dissecting carefully. The attention weights are formed from decoder queries, but the <strong>value vectors being mixed are entirely a function of the encoder memory</strong>. Those values, by themselves, carry no information about which English (decoder) tokens have already been generated. The masked self-attention branch supplies that autoregressive context. The residual pathway is what fuses “what I have already produced in the target language” with “what the source sentence contributes,” so neither pathway is redundant.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Where do encoder K and V come from?</strong> In standard implementations, keys and values are linear projections of the encoder’s <strong>final-layer</strong> hidden states (the top-level Z vectors). Every cross-attention head reads from that same frozen encoder memory until the encoder is run again on a new source string.</p>
+    </div>
+
+    <p>
+      Training examples are <strong>paired sequences</strong>: a source string and a target string that align as supervision (translation, summarization with target text, etc.). Even though the correct target is available on disk, the decoder is still trained with a causal mask so that position <em>t</em> only depends on target positions &lt; <em>t</em> and on the encoder. At the first step the decoder might see only a start-of-sequence symbol plus the full source; it must predict the first real target token without peeking at later target tokens that appear in the label string.
+    </p>
+
+    <p>
+      Large decoder-only models on multilingual data can handle many tasks that once required a separate encoder, but the two-stack pattern remains essential wherever a generator must condition on <strong>another modality or external memory</strong> — images, retrieved documents, tool outputs — via cross-attention (queries from the generating side, keys and values from the external encoder).
+    </p>
+
+    <h3 style="margin-top:28px;">Inference</h3>
+    <p>
+      At inference time, the encoder is run once on the input. Its K and V are cached. The decoder then generates the output token by token; each new token attends to the cached encoder K/V via cross-attention, and to previous decoder tokens via self-attention.
+    </p>
+
+    <p>
+      This architecture has more hyperparameters (encoder size vs decoder size) and was historically dominant until GPT-3 demonstrated that prefix LM could achieve similar or better results for many tasks. Model sharding across GPUs (e.g., with DeepSpeed) is often used for large encoder-decoder models.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Engineering note:</strong> Distributed training must decide whether to shard by data, by layers, or both. Encoder–decoder stacks add extra communication patterns around cross-attention compared with a single-tower decoder, so the tooling and performance trade-offs are not identical even when the math is familiar.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Cross-Attention Flow Diagram</h3>
+      <p>See how Q comes from the decoder and K/V from the encoder. Click the steps to highlight the data flow.</p>
+
+      <div class="flow" id="crossAttentionFlow">
+        <div class="flow-step" id="flowEnc">Encoder: Input → Unmasked Self-Attn → Z vectors (K, V)</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="flowQ">Decoder: Q from decoder hidden states</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="flowCross">Cross-Attention: Q (decoder) × K,V (encoder) → Output</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="flowOut">Decoder output + residual → next layer</div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" onclick="highlightFlowStep(0)">1. Encoder</button>
+        <button class="btn" onclick="highlightFlowStep(1)">2. Q from Decoder</button>
+        <button class="btn" onclick="highlightFlowStep(2)">3. Cross-Attn</button>
+        <button class="btn" onclick="highlightFlowStep(3)">4. Output</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 05: THE TRAINING PIPELINE ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>The Training Pipeline</h2>
+
+    <p>
+      Modern language models are built in stages. The pipeline is a form of <strong>transfer learning</strong>: first learn general language understanding, then adapt to specific behaviors.
+    </p>
+
+    <div class="flow" id="pipelineFlow">
+      <div class="flow-step" id="pipe1">Randomly initialized transformer decoder</div>
+      <div class="flow-arrow">↓ Pre-training</div>
+      <div class="flow-step" id="pipe2">Pre-trained transformer (base model)</div>
+      <div class="flow-arrow">↓ Post-training</div>
+      <div class="flow-step" id="pipe3">Fine-tuned / aligned model</div>
+      <div class="flow-arrow">↓ Deployment</div>
+      <div class="flow-step" id="pipe4">Final deployed model</div>
+    </div>
+
+    <p>
+      <strong>Pre-training</strong> trains on a giant dataset of text — trillions of tokens — to produce a model that understands language broadly. <strong>Post-training</strong> takes that pre-trained model and adapts it on smaller, task-specific or instruction-following data to produce the final model you deploy.
+    </p>
+
+    <p>
+      The same transformer skeleton—embedding layer, attention blocks, feed-forward layers, output projection—persists across the whole journey. What changes is the <strong>numerical setting of the parameters</strong>: random at initialization, optimized for next-token (or encoder) objectives after pre-training, then nudged again during alignment. This entire two-stage recipe is the dominant modern instance of <strong>transfer learning</strong> in NLP: expensive broad learning once, cheaper adaptation many times.
+    </p>
+
+    <div class="formula">
+      Architecture fixed; parameters reweighted: θ<sub>random</sub> → θ<sub>pretrain</sub> → θ<sub>post-train</sub>.
+    </div>
+
+    <p>
+      Production systems often complicate the cartoon diagram: routing layers may send different prompts to different specialist models, and agentic stacks add tools and policies around the core transformer. Nevertheless, the large language model at the center is still usually trained with the pre-train / post-train split described here.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Pre-train vs Post-train Pipeline</h3>
+      <p>Click each stage to highlight it and see a brief description.</p>
+
+      <div class="btn-group" id="pipelineBtns">
+        <button class="btn" onclick="highlightPipeline(0)">Random Init</button>
+        <button class="btn" onclick="highlightPipeline(1)">Pre-training</button>
+        <button class="btn" onclick="highlightPipeline(2)">Post-training</button>
+        <button class="btn" onclick="highlightPipeline(3)">Deployed</button>
+      </div>
+
+      <div id="pipelineDesc" style="margin-top:16px; font-size:0.9rem; color:var(--text-dim); min-height:60px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 06: PRE-TRAINING DEEP DIVE ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Pre-training Deep Dive</h2>
+
+    <p>
+      Pre-training starts with a randomly initialized transformer and trains it on a <strong>massive dataset</strong>. Data typically comes from internet crawls (e.g., Common Crawl), books, textbooks, code repositories, and other text sources. Scale is measured in <strong>trillions of tokens</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">Data and Filtering</h3>
+    <p>
+      Raw crawls are filtered for quality: duplicates are removed, low-quality or toxic content is filtered out, and language/domain balance may be adjusted. Loss spikes during training often correlate with bad data — malformed text, encoding errors, or adversarial content.
+    </p>
+
+    <p>
+      Duplicates and gibberish are not just hygiene problems. Seeing the same memorizable passage many times increases the chance the model can regurgitate it verbatim from a short prefix; extremely noisy pages can inject gradients that produce sudden loss explosions when a bad minibatch appears. Operational logs from large training runs sometimes show mysterious upward spikes that can be traced, after investigation, to a handful of pathological documents.
+    </p>
+
+    <p>
+      Copyrighted data (books, textbooks) is commonly used. The legal and ethical status of this is debated — fair use arguments exist, but the question is far from settled.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Memorization vs utility:</strong> High-frequency passages (famous documents, boilerplate licenses) are often memorized in a narrow sense: given a prefix, the continuation matches training text. Whether that is harmful depends on deployment and rights. Litigation around generative models frequently turns on empirical demonstrations of verbatim reproduction from copyrighted sources, not on abstract perplexity scores.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Scale and Goals</h3>
+    <p>
+      The prevailing strategy has been to <strong>train the biggest model affordable</strong>. There are signs we may be hitting limits — scaling laws suggest diminishing returns — but for now, scale remains a key lever.
+    </p>
+
+    <p>
+      The goal of pre-training is <strong>not</strong> to solve specific tasks. It is to produce a model that understands many linguistic properties: grammar across languages, world knowledge (e.g., "the president of France is ___"), and broad semantic relationships. <strong>Emergent properties</strong> — capabilities that appear suddenly at scale — include in-context learning (famously demonstrated by GPT-3) and chain-of-thought reasoning.
+    </p>
+
+    <p>
+      <strong>In-context learning</strong> is the phenomenon where a sufficiently large model, given several input–output demonstrations in the prompt, can infer a pattern and apply it to a new instance without weight updates. <strong>Chain-of-thought</strong> behavior is another example where asking the model to externalize intermediate reasoning steps can improve performance on structured tasks like math, even though those behaviors were not hand-engineered token-by-token at pre-training time. Both illustrate why “just predicting the next token” at scale can yield surprisingly task-general internal algorithms.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:1rem;">Pre-training objective</h3>
+        <p>Self-supervised prediction on web-scale text (next token for decoders, masked tokens for encoders). Optimizes broad competence, not chat politeness.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3); font-size:1rem;">What users want</h3>
+        <p>Models that follow instructions, refuse unsafe requests, and answer in the requested format. That mismatch is exactly why post-training exists.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Pre-training is about general language understanding. The model learns to predict the next token, which implicitly requires understanding syntax, semantics, and factual knowledge. Task-specific behavior comes later, in post-training.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 07: POST-TRAINING OVERVIEW ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Post-training Overview</h2>
+
+    <p>
+      Post-training takes the pre-trained (base) model and adapts it to <strong>follow instructions</strong>, align with human values, and behave safely. It uses less data than pre-training, though the compute gap is closing as post-training methods become more sophisticated.
+    </p>
+
+    <p>
+      Methods include <strong>Supervised Fine-Tuning (SFT)</strong> — training on human-written instruction–response pairs — and <strong>Reinforcement Learning</strong> (e.g., RLHF, DPO) to refine behavior based on preferences.
+    </p>
+
+    <p>
+      Reinforcement-style phases differ from SFT because the training signal is often a <strong>scalar score or preference</strong> over a free-form completion rather than a single correct string. The model may produce a long chain of thought; only the final boxed answer might enter into the reward. That makes credit assignment harder but allows optimization for outcomes that are easy to verify (unit tests, answer keys) even when human demonstrations are scarce.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Qualitative sanity check:</strong> Compare a base checkpoint and an instruction-tuned checkpoint from the same family on a constrained creative prompt (for example, ten sentences on a theme with numbered lines and a rare word required in sentence five). The base model often continues the rubric, invents extra constraints, or analyzes the task; the aligned model typically executes the instructions. Both behaviors are “reasonable” under next-token prediction—the difference is whose intent wins.</p>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent2);">Base Model (Pre-trained)</h3>
+        <p>Given "Translate to French: Hello world", it might <strong>continue</strong> the instruction as if it were more text to complete, e.g. "Translate to French: Hello world and goodbye universe."</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3);">Instruct Model (Post-trained)</h3>
+        <p>Given the same prompt, it <strong>follows</strong> the instruction and outputs "Bonjour le monde" — the actual translation.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Base vs Instruct Demo</h3>
+      <p>Compare how a base model vs an instruct model might respond to the same prompt. Type a prompt and see the conceptual difference.</p>
+
+      <input type="text" class="text-input" id="instructPrompt" value="Summarize this in one sentence: Machine learning is a subset of artificial intelligence." placeholder="Enter a prompt" oninput="updateInstructDemo()">
+
+      <div class="two-col" id="instructOutput" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 08: BERT — MASKED LANGUAGE MODELING ===== -->
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>BERT — Masked Language Modeling</h2>
+
+    <p>
+      <strong>BERT</strong> (Bidirectional Encoder Representations from Transformers) is an encoder transformer with a different training objective. Because the encoder has no causal mask, next-word prediction would be trivial — the model could see the answer. So BERT uses <strong>Masked Language Modeling (MLM)</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">How MLM Works</h3>
+    <p>
+      During training, a random subset of tokens (typically ~15–30%) is replaced with a special <strong>[MASK]</strong> token. The model must predict the original token at each masked position. It can use context from both left and right — hence "bidirectional."
+    </p>
+
+    <p>
+      <strong>Trade-off:</strong> A low mask rate gives rich context but few training signals per example. A high mask rate gives more signals but less context per masked token. BERT uses around 15% masking.
+    </p>
+
+    <p>
+      The masking percentage is a true hyperparameter: papers explore roughly <strong>15–30%</strong>. At one extreme, masking almost everything leaves too little evidence for each prediction; at the other, masking a single token in a long sequence means paying for a full forward pass of bidirectional attention while receiving gradient signal from only one softmax. Decoder language models sidestep that tension by supervising every position (subject to padding rules).
+    </p>
+
+    <p>
+      In standard random MLM, masks are drawn without regard to contiguity—runs of adjacent <strong>[MASK]</strong> tokens can appear, and whether a span corresponds to one word or several depends entirely on the tokenizer. The model never sees the exact identity of what was removed at masked sites, but abundant surrounding context can make the task easier in a different way: if a rare word also appears unmasked elsewhere in the paragraph, the model may learn shallow <em>copying</em> shortcuts instead of deeper reasoning. Designing masking strategies that force harder predictions remains an active research theme.
+    </p>
+
+    <p>
+      Compared to next-word prediction: MLM computes loss only at masked positions, whereas decoder-only models compute loss at every position. So MLM can be less sample-efficient in terms of tokens used per training signal.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:1rem;">Causal LM (decoder)</h3>
+        <p>Supervise each step with left context only; natural for generation; no trivial leakage from future tokens because they are masked out.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3); font-size:1rem;">Masked LM (encoder)</h3>
+        <p>Use both sides of each mask; incompatible with naive next-token loss; excellent for sentence-level understanding and token-level classification.</p>
+      </div>
+    </div>
+
+    <p>
+      BERT is <strong>not good for text generation</strong> — it was trained with context before and after each token, so it is not set up for autoregressive generation. It excels at classification and representation tasks.
+    </p>
+
+    <p>
+      Diffusion-flavored language models revisit encoder-like training dynamics: they build on bidirectional or mask-based denoising ideas that rhyme with BERT, even though consumer-facing chat models are still overwhelmingly decoder stacks.
+    </p>
+
+    <h3 style="margin-top:28px;">Fine-tuning BERT</h3>
+    <p>
+      For tasks like sentiment analysis, you replace the MLM head with a task-specific classifier. A special <strong>[CLS]</strong> token is prepended to the input; its final representation is often used as the sequence embedding for classification. BERT dominated NLP from roughly 2019–2020 before the GPT-era shift.
+    </p>
+
+    <p>
+      The classifier head is not the only option: practitioners also pool <strong>mean</strong> final-layer representations over real tokens, or use the first or last subword piece of a span, depending on the toolkit. The <strong>[CLS]</strong> convention is the most cited because the original BERT paper standardized it, but the underlying principle is always “compress token-level encoder outputs into a fixed vector, then add a small softmax for K classes.”
+    </p>
+
+    <p>
+      Embeddings before the first transformer layer are <strong>not</strong> contextual: the same type has the same vector regardless of neighbors. Each subsequent layer mixes information from the whole sequence, so the final vector at position <em>i</em> entangles token identity with sentence-level context.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>MLM Simulator</h3>
+      <p>Enter a sentence and click "Mask Random Tokens" to see which tokens get masked. Try to predict them — the model would use bidirectional context.</p>
+
+      <input type="text" class="text-input" id="mlmInput" value="The quick brown fox jumps over the lazy dog" oninput="updateMLMDemo()">
+      <div class="btn-group" style="margin-top:12px;">
+        <button class="btn" onclick="maskRandomTokens()">Mask Random Tokens</button>
+        <button class="btn" onclick="revealMLM()">Reveal Answers</button>
+      </div>
+
+      <div id="mlmTokens" class="token-row" style="margin-top:16px;"></div>
+      <div id="mlmExplanation" style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 09: THE TOKENIZATION PROBLEM ===== -->
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>The Tokenization Problem</h2>
+
+    <p>
+      <strong>Tokenization</strong> is the process of mapping raw strings to sequences of discrete tokens — indices into a vocabulary. The model never sees raw text; it sees token IDs. The choice of tokenizer profoundly affects model behavior.
+    </p>
+
+    <p>
+      Recall the <strong>types vs tokens</strong> distinction: a type is a unique vocabulary entry; a token is an instance of that type in the sequence. "The" appearing three times is three tokens but one type.
+    </p>
+
+    <p>
+      Tokenization is not just a list of IDs. A complete recipe specifies (1) a <strong>vocabulary of types</strong> and (2) a deterministic procedure that maps any raw string to a sequence of those types. Once indices are chosen, the embedding layer simply looks up a row per index; everything interesting about spelling, punctuation, multilingual text, or code happens upstream of that lookup.
+    </p>
+
+    <div class="formula">
+      Raw string → tokenizer → [id<sub>1</sub>, id<sub>2</sub>, …, id<sub>T</sub>] → embedding matrix lookup → sequence of vectors fed to the transformer.
+    </div>
+
+    <p>
+      Punctuation and whitespace policy matters in detail: commas, periods, colons, and apostrophes are usually standalone types in modern subword vocabularies rather than being silently stripped. That is why two prompts that look similar to humans can produce different activations if the tokenizer splits them differently.
+    </p>
+
+    <h3 style="margin-top:28px;">Word-Level Tokenization</h3>
+    <p>
+      The simplest approach: split on whitespace and punctuation. "Hello world" → ["Hello", "world"]. But edge cases abound: "O'Neal" vs "aren't" — do we split on the apostrophe? "New York" — one token or two? Rule-based tokenizers need specialized rules, syntactic parsers, or NER (e.g., SpaCy) to handle these, and they do not scale well to multiple languages, code, or mixed content.
+    </p>
+
+    <p>
+      A morphological shortcut—“store stems and suffixes explicitly”—can reduce redundant types for inflected words, but high-quality analyzers exist for only a handful of languages and degrade on informal text and source code. That fragility helped motivate <strong>data-driven subword</strong> methods that learn splits from corpus statistics instead of linguistic handcraft.
+    </p>
+
+    <p>
+      Languages without whitespace — Thai, Chinese, Japanese — break this approach entirely. Word boundaries are not clearly defined.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Vocabulary churn:</strong> Even if you freeze English “words” today, neologisms, typos, and product names appear tomorrow. A static word-level table either grows without bound or maps growing swaths of text to a single fallback symbol.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 10: THE UNKNOWN WORD PROBLEM ===== -->
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>The Unknown Word Problem</h2>
+
+    <p>
+      With a fixed vocabulary, any word not in the vocab must be replaced with a special <strong>[UNK]</strong> (unknown) token. This causes <strong>information loss</strong>: you lose the identity of the word. "GPT-6" and "xyz123" might both become [UNK], and the model cannot distinguish them.
+    </p>
+
+    <p>
+      All unknown words share the same representation. The model must be trained to handle [UNK] during training, but contextually important words that fall out of vocabulary can severely hurt performance.
+    </p>
+
+    <p>
+      You cannot fix a missing type at test time by casually appending a new row to the embedding matrix: the model has no experience running forward passes with that row. Practical pipelines therefore inject <redacted_UNK> during <strong>training</strong> as well—often by randomly replacing rare words—so the network learns a statistical story for "something unknown lives here." That remedy preserves shape but still discards surface form, and documents littered with unknowns bleed information at every occurrence.
+    </p>
+
+    <p>
+      A masked infilling model might guess the word behind <UNK>, but the guess can be confidently wrong — especially for rare named entities or consecutive misses. Downstream modules would then condition on hallucinated specifics. Subword or byte-level tokenization preserves partial identity (for example the shared "GPT" prefix in a novel product name) instead of collapsing to one symbol.
+    </p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> The [UNK] problem motivates subword tokenization. If we can decompose rare words into known subword pieces, we avoid [UNK] entirely for most text.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 11: CHARACTER-LEVEL TOKENIZATION ===== -->
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Character-Level Tokenization</h2>
+
+    <p>
+      At the other extreme, use <strong>individual characters</strong> as tokens. Vocabulary is tiny (~100–200 for most scripts), and there is virtually no [UNK] problem — any character can be represented.
+    </p>
+
+    <p>
+      Unicode reminds us that "character" is not trivially small: the standard assigns on the order of <strong>100k+</strong> code points. If you truly support all of them as atomic types, the embedding table is no longer minute. In practice, ASCII-centric alphabets keep the table compact, while full Unicode coverage pushes you toward byte-level decompositions instead.
+    </p>
+
+
+    <p>
+      The downside: <strong>very long sequences</strong>. A 100-word sentence might become 500+ character tokens. Self-attention has <strong>quadratic complexity</strong> in sequence length — N² dot products. Doubling the sequence length quadruples compute. Long sequences are expensive.
+    </p>
+
+    <div class="formula">
+      Full self-attention over length <em>N</em>: each query attends to <em>N</em> keys → Θ(<em>N</em>²) pairwise score interactions (ignoring constant factors and head dimension).
+    </div>
+
+
+    <p>
+      Individual characters also carry little meaning on their own. Learning to compose them into words and phrases adds significant burden. For large-scale training, character-level tokenization has generally been a deal-breaker.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Sequence Length Calculator</h3>
+      <p>Enter a sentence and see token counts for word-level, character-level, and simulated BPE. Notice how N² complexity scales.</p>
+
+      <input type="text" class="text-input" id="seqCalcInput" value="The transformer architecture revolutionized NLP" oninput="updateSeqCalc()">
+
+      <div id="seqCalcResult" style="margin-top:16px;"></div>
+      <div id="seqCalcComplexity" style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 12: BYTE PAIR ENCODING ===== -->
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Byte Pair Encoding (BPE)</h2>
+
+    <p>
+      <strong>BPE</strong> strikes a balance between word-level and character-level tokenization. It starts with characters (or bytes) and iteratively merges the most frequent adjacent pairs into new tokens.
+    </p>
+
+    <h3 style="margin-top:28px;">Algorithm (Step by Step)</h3>
+    <ol style="margin: 16px 0; padding-left: 24px; color: var(--text-dim);">
+      <li><strong style="color:var(--text);">Pre-tokenize (optional in modern tools):</strong> Split on whitespace or apply a light rule-based split. Libraries like <strong>SentencePiece</strong> can learn segmentation directly from raw text with a weaker dependence on this step.</li>
+      <li><strong style="color:var(--text);">Initialize vocab:</strong> Add all individual characters (or bytes).</li>
+      <li><strong style="color:var(--text);">Tokenize corpus:</strong> Represent the corpus using the current vocab.</li>
+      <li><strong style="color:var(--text);">Count pairs:</strong> Count all adjacent token pairs in the tokenized corpus.</li>
+      <li><strong style="color:var(--text);">Merge:</strong> Merge the most frequent pair; add the new token to the vocab.</li>
+      <li><strong style="color:var(--text);">Re-tokenize:</strong> Update the corpus representation with the new merge.</li>
+      <li><strong style="color:var(--text);">Repeat:</strong> Go to step 4. Stop after S merges (S is often 32k–100k+).</li>
+    </ol>
+
+    <p>
+      At inference time, always prefer the <strong>shortest tokenization</strong> using available merges. Base characters are always in the vocab, so there is no [UNK] problem. Common words eventually become single tokens; rare words are split into subword pieces.
+    </p>
+
+    <p>
+      Example: with words hug(10), pug(5), pun(12), bun(4), hugs(5), the first merge might be "ug" (appears in hug, pug, pun, bun). Then "hu" or "pu", etc. The vocab grows with each merge.
+    </p>
+
+    <p>
+      Counting makes the first merge concrete. After splitting into characters, adjacent pair <strong>u+g</strong> appears across <em>hug</em>, <em>pug</em>, <em>pun</em>, <em>bun</em>, and <em>hugs</em> with frequencies that sum to <strong>20</strong> occurrences in this toy corpus—higher than competing pairs such as <strong>h+u</strong> (15 from <em>hug</em> and <em>hugs</em> alone). BPE therefore merges <strong>ug</strong> first, retokenizes, and repeats. After each merge, when multiple segmentations are possible, implementations prefer the <strong>shortest</strong> encoding under the current merge table so frequent words collapse into single types as soon as the merges exist.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Why BPE kills most unknowns:</strong> The initial alphabet (characters or bytes) already covers every symbol. Merges only add shortcuts; they never remove the ability to fall back to atomic pieces. Worst case, an unseen string becomes a longer sequence of known roots, not a dead <redacted_UNK>.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>BPE Step-by-Step Simulator</h3>
+      <p>Click "Merge" to perform the next BPE merge. Watch the vocab grow and the tokenization shorten.</p>
+
+      <div class="card card-alt" style="margin-bottom:16px;">
+        <div style="font-size:0.8rem; color:var(--text-dim); margin-bottom:8px;">Corpus: hug pug pun bun hugs</div>
+        <div id="bpeTokensDisplay" class="token-row"></div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" onclick="bpeMerge()">Merge</button>
+        <button class="btn" onclick="bpeReset()">Reset</button>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div style="font-size:0.8rem; color:var(--text-dim);">Vocab size: <span id="bpeVocabSize" style="color:var(--accent);">0</span></div>
+        <div id="bpeVocabList" style="margin-top:8px; font-size:0.8rem; font-family:var(--mono);"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 13: BEYOND BASIC BPE ===== -->
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Beyond Basic BPE</h2>
+
+    <p>
+      <strong>BPE over bytes</strong> (instead of characters) was introduced by GPT-2. UTF-8 encoding means: ASCII = 1 byte per character; many non-Latin scripts = 2–4 bytes; emojis = 4 bytes. A single vocabulary can handle any Unicode text without pre-defined character sets.
+    </p>
+
+    <p>
+      The disadvantage: non-Latin languages often produce longer sequences (more bytes per character). There are ~160k Unicode characters, so byte-level BPE can be less efficient for some languages.
+    </p>
+
+    <h3 style="margin-top:28px;">Dynamic Tokenization</h3>
+    <p>
+      Newer approaches like <strong>MegaByte</strong> (Meta) and <strong>Byte Latent Transformer (BLT)</strong> use a local encoder to compress byte subsequences into single vectors. The main transformer operates on this shorter "latent" sequence; prediction happens at the byte level at the end. Entropy-based splitting (in the BLT paper) decides how to segment. These methods are promising but not yet standard in state-of-the-art models.
+    </p>
+
+    <p>
+      <strong>MegaByte</strong> illustrates the pattern with fixed-width patches: non-overlapping groups of four raw bytes feed a tiny local encoder that emits one latent vector each, shrinking the sequence length seen by the massive transformer core. <strong>BLT</strong> refines the idea by letting a local model propose <strong>variable-length</strong> byte groups—high-entropy segments may stay granular while redundant stretches collapse—so the latent sequence length tracks information content more tightly than uniform patching.
+    </p>
+
+    <p>
+      Even when weights are proprietary, organizations publish tokenizers because billing, capacity planning, and benchmarking all require knowing how a string becomes tokens. Vocabulary sizes in the wild commonly land in the <strong>tens of thousands to 100k+</strong> merge types; tokenizer choice materially changes sequence length for lower-resource languages and therefore fairness metrics—not just engineering trivia.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Research frontier:</strong> Dynamic or latent tokenization introduces new bookkeeping: variable group boundaries interact awkwardly with causal masking compared with a fixed subword lattice. That is part of why BPE-style static vocabularies still dominate production systems despite the intellectual appeal of fully learned segmentation.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Byte vs Character Comparison</h3>
+      <p>See how different strings differ in byte count (UTF-8). ASCII is 1 byte/char; emojis and many non-Latin chars use more.</p>
+
+      <input type="text" class="text-input" id="byteCompareInput" value="Hello 世界 🚀" oninput="updateByteCompare()">
+
+      <div id="byteCompareResult" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PLAYGROUND ===== -->
+<section class="section fade-in" id="s14">
+  <div class="container">
+    <span class="section-num">14</span>
+    <h2>Playground</h2>
+    <p>
+      Experiment with tokenization and attention masks. Enter text to see different tokenization strategies side by side, and build custom attention masks.
+    </p>
+
+    <div class="interactive-panel" style="margin-top:32px;">
+      <h3>Tokenizer Explorer</h3>
+      <p>Enter text and see word-level, character-level, and simulated BPE tokenization side by side.</p>
+
+      <input type="text" class="text-input" id="playgroundInput" value="Machine learning models learn patterns from data" oninput="updateTokenizerExplorer()">
+
+      <div id="playgroundWord" style="margin-top:16px;"></div>
+      <div id="playgroundChar" style="margin-top:12px;"></div>
+      <div id="playgroundBPE" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Mask Builder</h3>
+      <p>Build custom attention masks. Enter prompt length and completion length, then select mask type.</p>
+
+      <div class="two-col">
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Prompt length</label>
+          <input type="number" class="text-input" id="maskPromptLen" value="3" min="1" max="10" oninput="updateMaskBuilder()">
+        </div>
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Completion length</label>
+          <input type="number" class="text-input" id="maskCompLen" value="4" min="1" max="10" oninput="updateMaskBuilder()">
+        </div>
+      </div>
+
+      <div class="btn-group" style="margin-top:12px;">
+        <button class="btn active" onclick="setMaskBuilderType('decoder')">Decoder</button>
+        <button class="btn" onclick="setMaskBuilderType('encoder')">Encoder</button>
+        <button class="btn" onclick="setMaskBuilderType('prefix')">Prefix LM</button>
+      </div>
+
+      <div id="maskBuilderGrid" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p>
+    Pre-training, BERT & Tokenization — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+// ============================================================
+// MASK COMPARISON VISUALIZER
+// ============================================================
+
+function showMaskType(type) {
+  const container = document.getElementById('maskVizContainer');
+  if (container) {
+    const panel = container.closest('.interactive-panel');
+    if (panel) {
+      panel.querySelectorAll('.btn-group .btn').forEach((b, i) => {
+        b.classList.remove('active');
+        const types = ['decoder', 'encoder', 'prefix', 'encdec'];
+        if (types[i] === type) b.classList.add('active');
+      });
+    }
+  }
+
+  const n = 6;
+  let mask = [];
+  const legends = {
+    decoder: 'Decoder-only: Causal mask. Each row (query) attends only to same and previous columns (keys).',
+    encoder: 'Encoder: Full attention. Every position attends to every position.',
+    prefix: 'Prefix LM: Prompt×Prompt unmasked, Completion×Prompt unmasked, Completion×Completion causal, Prompt×Completion blocked.',
+    encdec: 'Encoder-Decoder: Encoder (top) unmasked; Decoder (bottom) causal self-attn + cross-attn to encoder.'
+  };
+
+  if (type === 'decoder') {
+    for (let i = 0; i < n; i++) {
+      mask[i] = [];
+      for (let j = 0; j < n; j++) mask[i][j] = j <= i ? 'attend' : 'blocked';
+    }
+  } else if (type === 'encoder') {
+    for (let i = 0; i < n; i++) {
+      mask[i] = [];
+      for (let j = 0; j < n; j++) mask[i][j] = 'attend';
+    }
+  } else if (type === 'prefix') {
+    const p = 3, c = 3;
+    for (let i = 0; i < p + c; i++) {
+      mask[i] = [];
+      for (let j = 0; j < p + c; j++) {
+        if (i < p && j < p) mask[i][j] = 'attend';
+        else if (i >= p && j < p) mask[i][j] = 'attend';
+        else if (i >= p && j <= i) mask[i][j] = 'attend';
+        else mask[i][j] = 'blocked';
+      }
+    }
+  } else {
+    const enc = 3, dec = 3;
+    for (let i = 0; i < enc + dec; i++) {
+      mask[i] = [];
+      for (let j = 0; j < enc + dec; j++) {
+        if (i < enc && j < enc) mask[i][j] = 'attend';
+        else if (i >= enc && j < enc) mask[i][j] = 'attend';
+        else if (i >= enc && j >= enc && j <= i) mask[i][j] = 'attend';
+        else mask[i][j] = 'blocked';
+      }
+    }
+  }
+
+  let html = '<div class="mask-grid" style="grid-template-columns: repeat(' + mask[0].length + ', 24px);">';
+  mask.forEach(row => {
+    row.forEach(cell => {
+      html += '<div class="mask-cell ' + cell + '">' + (cell === 'attend' ? '✓' : '✗') + '</div>';
+    });
+  });
+  html += '</div>';
+  document.getElementById('maskVizContainer').innerHTML = html;
+  document.getElementById('maskVizLegend').textContent = legends[type];
+}
+
+showMaskType('decoder');
+
+// ============================================================
+// CROSS-ATTENTION FLOW
+// ============================================================
+
+function highlightFlowStep(step) {
+  ['flowEnc', 'flowQ', 'flowCross', 'flowOut'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('active', i === step);
+  });
+  document.querySelectorAll('#crossAttentionFlow ~ .btn-group .btn').forEach((b, i) => {
+    b.classList.toggle('active', i === step);
+  });
+}
+
+// ============================================================
+// PIPELINE HIGHLIGHT
+// ============================================================
+
+const pipelineDescs = [
+  'Random weights. No language knowledge yet.',
+  'Train on trillions of tokens. Learn grammar, facts, reasoning.',
+  'SFT, RLHF, DPO — align to instructions and human preferences.',
+  'Production model ready for deployment.'
+];
+
+function highlightPipeline(step) {
+  ['pipe1', 'pipe2', 'pipe3', 'pipe4'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('active', i === step);
+  });
+  document.getElementById('pipelineDesc').textContent = pipelineDescs[step];
+  document.querySelectorAll('#pipelineBtns .btn').forEach((b, i) => {
+    b.classList.toggle('active', i === step);
+  });
+}
+
+// ============================================================
+// BASE VS INSTRUCT DEMO
+// ============================================================
+
+function updateInstructDemo() {
+  const prompt = document.getElementById('instructPrompt').value || 'Enter a prompt';
+  document.getElementById('instructOutput').innerHTML = `
+    <div class="card">
+      <h3 style="font-size:0.9rem;">Base Model</h3>
+      <p style="font-size:0.85rem; margin:0;">Might continue: "${prompt} ...and here is more text that continues the instruction."</p>
+    </div>
+    <div class="card">
+      <h3 style="font-size:0.9rem;">Instruct Model</h3>
+      <p style="font-size:0.85rem; margin:0;">Follows instruction and produces the actual response.</p>
+    </div>
+  `;
+}
+updateInstructDemo();
+
+// ============================================================
+// MLM SIMULATOR
+// ============================================================
+
+let mlmMasked = [];
+let mlmOriginal = [];
+
+function updateMLMDemo() {
+  mlmMasked = [];
+  mlmOriginal = [];
+  const text = document.getElementById('mlmInput').value.trim();
+  const words = text ? text.split(/\s+/) : [];
+  mlmOriginal = [...words];
+  mlmMasked = words.map(w => ({ word: w, masked: false, revealed: false }));
+  renderMLMTokens();
+}
+
+function maskRandomTokens() {
+  const text = document.getElementById('mlmInput').value.trim();
+  const words = text ? text.split(/\s+/) : [];
+  mlmOriginal = [...words];
+  mlmMasked = words.map((w, i) => {
+    const masked = Math.random() < 0.3;
+    return { word: w, masked, revealed: false };
+  });
+  renderMLMTokens();
+  document.getElementById('mlmExplanation').textContent = 'Try to predict the masked tokens. The model uses bidirectional context (left and right) to predict each [MASK].';
+}
+
+function revealMLM() {
+  mlmMasked.forEach(t => t.revealed = true);
+  renderMLMTokens();
+  document.getElementById('mlmExplanation').textContent = 'All masked tokens revealed. BERT would predict these using full sentence context.';
+}
+
+function renderMLMTokens() {
+  const div = document.getElementById('mlmTokens');
+  div.innerHTML = '';
+  mlmMasked.forEach((t, i) => {
+    const span = document.createElement('span');
+    if (t.masked && !t.revealed) {
+      span.className = 'token token-mask';
+      span.textContent = '[MASK]';
+    } else if (t.masked && t.revealed) {
+      span.className = 'token token-new';
+      span.textContent = t.word;
+    } else {
+      span.className = 'token token-word';
+      span.textContent = t.word;
+    }
+    div.appendChild(span);
+  });
+}
+
+updateMLMDemo();
+
+// ============================================================
+// SEQUENCE LENGTH CALCULATOR
+// ============================================================
+
+function updateSeqCalc() {
+  const text = document.getElementById('seqCalcInput').value.trim();
+  const words = text ? text.split(/\s+/) : [];
+  const chars = text ? text.split('') : [];
+  const wordCount = words.length;
+  const charCount = chars.length;
+  const bpeEst = Math.floor(charCount * 0.4 + wordCount * 0.3);
+
+  document.getElementById('seqCalcResult').innerHTML = `
+    <div class="card card-alt">
+      <div class="two-col">
+        <div><strong>Word-level:</strong> <span style="color:var(--accent);">${wordCount}</span> tokens</div>
+        <div><strong>Character-level:</strong> <span style="color:var(--accent2);">${charCount}</span> tokens</div>
+        <div><strong>BPE (approx):</strong> <span style="color:var(--accent3);">~${bpeEst}</span> tokens</div>
+      </div>
+    </div>
+  `;
+  document.getElementById('seqCalcComplexity').innerHTML = `
+    Self-attention complexity: N². Word-level: ${wordCount}² = ${wordCount*wordCount} | Char-level: ${charCount}² = ${charCount*charCount} | BPE: ~${bpeEst}² = ~${bpeEst*bpeEst}
+  `;
+}
+updateSeqCalc();
+
+// ============================================================
+// BPE SIMULATOR
+// ============================================================
+
+let bpeCorpus = ['hug', 'pug', 'pun', 'bun', 'hugs'];
+let bpeVocab = new Set();
+let bpeMerges = [];
+let bpeStep = 0;
+
+function bpeInit() {
+  const chars = new Set();
+  bpeCorpus.forEach(w => w.split('').forEach(c => chars.add(c)));
+  bpeVocab = new Set(chars);
+  bpeMerges = [];
+  bpeStep = 0;
+}
+
+function bpeReset() {
+  bpeInit();
+  renderBPE();
+}
+
+function applyMerges(toks) {
+  let result = toks;
+  bpeMerges.forEach(([a, b]) => {
+    const merged = a + b;
+    result = result.map(t => {
+      const out = [];
+      let i = 0;
+      while (i < t.length) {
+        if (i < t.length - 1 && t[i] === a && t[i+1] === b) {
+          out.push(merged);
+          i += 2;
+        } else {
+          out.push(t[i]);
+          i++;
+        }
+      }
+      return out;
+    });
+  });
+  return result;
+}
+
+function bpeMerge() {
+  if (bpeStep === 0) bpeInit();
+
+  let toks = bpeCorpus.map(w => w.split(''));
+  toks = applyMerges(toks);
+
+  const pairs = {};
+  toks.forEach(tokenList => {
+    for (let i = 0; i < tokenList.length - 1; i++) {
+      const p = tokenList[i] + '|' + tokenList[i+1];
+      pairs[p] = (pairs[p] || 0) + 1;
+    }
+  });
+
+  const best = Object.entries(pairs).sort((a, b) => b[1] - a[1])[0];
+  if (!best || best[1] < 2) return;
+
+  const [a, b] = best[0].split('|');
+  const merged = a + b;
+  bpeVocab.add(merged);
+  bpeMerges.push([a, b]);
+  bpeStep++;
+
+  renderBPE();
+}
+
+function renderBPE() {
+  let toks = bpeCorpus.map(w => w.split(''));
+  toks = applyMerges(toks);
+
+  const tokenDiv = document.getElementById('bpeTokensDisplay');
+  if (!tokenDiv) return;
+  tokenDiv.innerHTML = '';
+  toks.flat().forEach(t => {
+    const span = document.createElement('span');
+    span.className = 'token token-word';
+    span.textContent = t;
+    tokenDiv.appendChild(span);
+  });
+
+  const vs = document.getElementById('bpeVocabSize');
+  const vl = document.getElementById('bpeVocabList');
+  if (vs) vs.textContent = bpeVocab.size;
+  if (vl) vl.textContent = 'Vocab: ' + [...bpeVocab].sort().join(', ');
+}
+
+bpeInit();
+renderBPE();
+
+// ============================================================
+// BYTE COMPARE
+// ============================================================
+
+function updateByteCompare() {
+  const text = document.getElementById('byteCompareInput').value;
+  let bytes = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.codePointAt(i);
+    if (code < 128) bytes += 1;
+    else if (code < 2048) bytes += 2;
+    else if (code < 65536) bytes += 3;
+    else bytes += 4;
+    if (code > 0xFFFF) i++;
+  }
+  const charCount = [...text].length;
+  document.getElementById('byteCompareResult').innerHTML = `
+    <div class="card card-alt">
+      <p style="margin:0;">Code points: <strong>${charCount}</strong> | UTF-8 bytes: <strong style="color:var(--accent);">${bytes}</strong></p>
+      <p style="margin:8px 0 0 0; font-size:0.85rem; color:var(--text-dim);">ASCII=1 byte, Latin/European=2, CJK=3, Emoji/surrogates=4</p>
+    </div>
+  `;
+}
+updateByteCompare();
+
+// ============================================================
+// TOKENIZER EXPLORER (PLAYGROUND)
+// ============================================================
+
+function updateTokenizerExplorer() {
+  const text = document.getElementById('playgroundInput').value.trim();
+  const words = text ? text.split(/\s+/) : [];
+  const chars = text ? text.split('') : [];
+  const bpeSim = text ? text.match(/\b\w+\b|./g) || [] : [];
+
+  document.getElementById('playgroundWord').innerHTML = '<div style="font-size:0.8rem; color:var(--text-dim); margin-bottom:6px;">Word-level:</div><div class="token-row">' +
+    words.map(w => `<span class="token token-word">${w}</span>`).join('') + '</div>';
+  document.getElementById('playgroundChar').innerHTML = '<div style="font-size:0.8rem; color:var(--text-dim); margin-bottom:6px;">Character-level:</div><div class="token-row">' +
+    chars.map(c => `<span class="token token-special">${c === ' ' ? '␣' : c}</span>`).join('') + '</div>';
+  document.getElementById('playgroundBPE').innerHTML = '<div style="font-size:0.8rem; color:var(--text-dim); margin-bottom:6px;">BPE-like (simplified):</div><div class="token-row">' +
+    bpeSim.map(t => `<span class="token token-highlight">${t === ' ' ? '␣' : t}</span>`).join('') + '</div>';
+}
+updateTokenizerExplorer();
+
+// ============================================================
+// MASK BUILDER
+// ============================================================
+
+let maskBuilderType = 'decoder';
+
+function setMaskBuilderType(t) {
+  maskBuilderType = t;
+  const grid = document.getElementById('maskBuilderGrid');
+  if (grid) {
+    const panel = grid.closest('.interactive-panel');
+    if (panel) {
+      panel.querySelectorAll('.btn-group .btn').forEach((b, i) => {
+        b.classList.toggle('active', ['decoder', 'encoder', 'prefix'][i] === t);
+      });
+    }
+  }
+  updateMaskBuilder();
+}
+
+function updateMaskBuilder() {
+  const p = Math.max(1, Math.min(10, parseInt(document.getElementById('maskPromptLen')?.value) || 3));
+  const c = Math.max(1, Math.min(10, parseInt(document.getElementById('maskCompLen')?.value) || 4));
+  const n = p + c;
+
+  let mask = [];
+  if (maskBuilderType === 'decoder') {
+    for (let i = 0; i < n; i++) {
+      mask[i] = [];
+      for (let j = 0; j < n; j++) mask[i][j] = j <= i ? 'attend' : 'blocked';
+    }
+  } else if (maskBuilderType === 'encoder') {
+    for (let i = 0; i < n; i++) {
+      mask[i] = [];
+      for (let j = 0; j < n; j++) mask[i][j] = 'attend';
+    }
+  } else {
+    for (let i = 0; i < n; i++) {
+      mask[i] = [];
+      for (let j = 0; j < n; j++) {
+        if (i < p && j < p) mask[i][j] = 'attend';
+        else if (i >= p && j < p) mask[i][j] = 'attend';
+        else if (i >= p && j >= p && j <= i) mask[i][j] = 'attend';
+        else mask[i][j] = 'blocked';
+      }
+    }
+  }
+
+  const grid = document.getElementById('maskBuilderGrid');
+  grid.innerHTML = '<div class="mask-grid" style="grid-template-columns: repeat(' + n + ', 28px);">' +
+    mask.flatMap(row => row.map(cell => '<div class="mask-cell ' + cell + '">' + (cell === 'attend' ? '✓' : '✗') + '</div>')).join('') +
+    '</div>';
+}
+
+updateMaskBuilder();
+
+// ============================================================
+// INTERVIEW Q&A (hint / reveal)
+// ============================================================
+
+function toggleHint(id) {
+  const el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('visible');
+}
+
+function reveal(id) {
+  const el = document.getElementById(id + '-answer');
+  if (el) el.classList.toggle('visible');
+}
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    if (el.getBoundingClientRect().top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+</body>
+</html>

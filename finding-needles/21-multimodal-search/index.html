@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multimodal Search — CLIP, ColPali &amp; Cross-Modal Retrieval | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 96px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    @media (max-width: 640px) {
+      .main-nav.collapsed { display: none; }
+    }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover, .main-nav a.active { color: var(--accent); }
+    .nav-toggle {
+      display: none;
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    @media (max-width: 640px) {
+      .nav-toggle { display: block; }
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(244, 114, 182, 0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(34, 211, 238, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(167, 139, 250, 0.1), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.5rem, 4vw, 2.55rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent4);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent2);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 20px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .demo-box {
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin: 20px 0;
+    }
+    .demo-box h4 {
+      margin: 0 0 14px;
+      font-size: 0.95rem;
+      color: var(--accent3);
+      font-weight: 600;
+    }
+    label.dlbl { display: block; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 6px; }
+    input[type="text"], input[type="search"], input[type="range"], textarea, select {
+      font-family: var(--sans);
+      font-size: 0.92rem;
+    }
+    input[type="text"], input[type="search"], textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    textarea { min-height: 88px; resize: vertical; line-height: 1.5; }
+    input[type="range"] { width: 100%; margin: 8px 0 16px; accent-color: var(--accent); }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    button.btn {
+      font-family: var(--sans);
+      font-size: 0.88rem;
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.btn:hover { background: rgba(34, 211, 238, 0.22); }
+    button.btn-secondary {
+      border-color: var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+    }
+    button.btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+    button.chip {
+      font-family: var(--sans);
+      font-size: 0.8rem;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    button.chip.active, button.chip:hover {
+      border-color: var(--accent2);
+      color: var(--accent2);
+      background: rgba(167, 139, 250, 0.12);
+    }
+    .split-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 768px) {
+      .split-2 { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      color: var(--text-dim);
+    }
+    .panel h5 { margin: 0 0 10px; color: var(--accent4); font-size: 0.85rem; }
+    canvas.embed-canvas, canvas.colpali-canvas {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      display: block;
+      border-radius: var(--radius);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .gallery-item {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid var(--border);
+      cursor: pointer;
+      background: var(--bg-card);
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .gallery-item:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .gallery-item.selected { border-color: var(--accent4); box-shadow: 0 0 0 2px rgba(244, 114, 182, 0.35); }
+    .gallery-item img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      display: block;
+    }
+    .gallery-item .score {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 6px 8px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      color: var(--accent3);
+    }
+    .gallery-item .rank {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+    }
+    .step-list { counter-reset: st; list-style: none; padding: 0; margin: 16px 0; }
+    .step-list li {
+      counter-increment: st;
+      position: relative;
+      padding-left: 44px;
+      margin-bottom: 14px;
+      color: var(--text-dim);
+    }
+    .step-list li::before {
+      content: counter(st);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+    table.data-t {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      margin: 16px 0;
+    }
+    table.data-t th, table.data-t td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+    table.data-t th { background: var(--bg-card-alt); color: var(--accent); }
+    .mode-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .pipeline-steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin: 12px 0;
+    }
+    .pipeline-steps .ps {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .pipeline-steps .ps.on {
+      border-color: var(--accent3);
+      color: var(--accent3);
+      background: rgba(52, 211, 153, 0.1);
+    }
+    .pipeline-steps .arrow { color: var(--text-dim); font-size: 0.85rem; }
+    footer.site-foot {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 40px;
+    }
+    .infonce-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+      margin-top: 10px;
+    }
+    @media (max-width: 600px) {
+      .infonce-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    .infonce-cell {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--text-dim);
+    }
+    .infonce-cell.pos { background: rgba(52, 211, 153, 0.25); border-color: var(--accent3); color: var(--accent3); }
+    .infonce-cell.neg { background: rgba(248, 113, 113, 0.12); }
+    .infonce-cell.query { background: rgba(56, 189, 248, 0.2); border-color: var(--query); color: var(--query); }
+    .legend-row { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.8rem; color: var(--text-dim); margin-top: 10px; }
+    .legend-row span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../index.html">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../index.html">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Multimodal Search</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="true" aria-controls="mainNav">Menu</button>
+  <nav class="main-nav" id="mainNav" aria-label="Page sections">
+    <a href="#hero">Top</a>
+    <a href="#s0">Multimodal web</a>
+    <a href="#s1">CLIP</a>
+    <a href="#s2">Retrieval</a>
+    <a href="#s3">VLMs</a>
+    <a href="#s4">ColPali</a>
+    <a href="#s5">E‑commerce</a>
+    <a href="#s6">Build</a>
+    <a href="#s7">Playground</a>
+  </nav>
+
+  <header class="hero" id="hero">
+    <span class="chapter-badge">Chapter 21 · 26</span>
+    <h1>Multimodal Search — <code>CLIP</code>, <code>ColPali</code> &amp; Cross-Modal Retrieval</h1>
+    <p class="subtitle">
+      The web is not only words. <strong>Vision–language models</strong> align images and text in a shared vector space;
+      <code>cross-modal retrieval</code> powers “find the picture from a sentence” (and the reverse); <code>ColPali</code> brings <code>late interaction</code> to document pages—often <strong>without traditional OCR</strong>.
+      In-browser demos and a <strong>multimodal search simulator</strong> close out the chapter.
+    </p>
+    <div class="hero-stats" role="presentation">
+      <div class="hero-stat"><div class="val">8</div><div class="lbl">Guided sections</div></div>
+      <div class="hero-stat"><div class="val">6</div><div class="lbl">Interactive demos</div></div>
+      <div class="hero-stat"><div class="val">1</div><div class="lbl">Search playground</div></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="fade-in" id="s0">
+      <h2>00 · Beyond text — the multimodal web</h2>
+      <p>
+        Human experience is inherently multimodal: we read <strong>text</strong>, look at <strong>images</strong>, listen to <strong>audio</strong>, and watch <strong>video</strong>.
+        Digital systems that only index plain strings leave enormous signal on the table—layout in a slide deck, color and texture in a product photo, charts that never became clean tables, spoken emphasis in a clip.
+        Modern retrieval therefore increasingly asks: <em>can one modality query another?</em>
+      </p>
+      <p>
+        A text query like <strong>“red summer dress”</strong> should rank matching <em>photographs</em>, not titles that happen to contain those tokens.
+        A description of a diagram—“flowchart with three branches about deployment”—should surface the right PDF page even when surrounding text is boilerplate.
+        Both require <strong>aligned representations</strong> so a query in one modality compares fairly against candidates stored in another.
+      </p>
+      <div class="callout">
+        <strong>Alignment is the hard part.</strong> Text token sequences and image pixel grids live in different native spaces.
+        Successful multimodal search learns a <code>joint embedding space</code> (or a <code>late interaction</code> mechanism) so that “similar meaning” becomes “similar geometry” for ranking.
+      </div>
+      <h3>Why this matters for search engineers</h3>
+      <ul class="fancy">
+        <li><strong>E‑commerce discovery.</strong> Text queries against catalog photos; “visual search” from an uploaded reference image.</li>
+        <li><strong>Document and slide retrieval.</strong> Finding pages where <em>structure</em> carries meaning—tables, plots, UI mockups—not only paragraphs.</li>
+        <li><strong>Media archives.</strong> Cross-modal bridges between transcripts, thumbnails, and full-resolution assets.</li>
+      </ul>
+      <p>
+        The chapter covers <code>CLIP</code>-style alignment, cross-modal retrieval, <code>VLMs</code>, <code>ColPali</code> for visual documents, e-commerce patterns, and a build checklist—ending with a search playground.
+      </p>
+
+      <div class="demo-box" id="demoModalities">
+        <h4>Interactive · Modalities on the wire</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Select a modality. The panel sketches a typical <strong>indexing path</strong> and a <strong>query path</strong>—pedagogical, not tied to any single vendor stack.
+        </p>
+        <div class="btn-row" id="modalityChips" role="group" aria-label="Content modality">
+          <button type="button" class="chip active" data-mod="text">Text</button>
+          <button type="button" class="chip" data-mod="image">Image</button>
+          <button type="button" class="chip" data-mod="audio">Audio</button>
+          <button type="button" class="chip" data-mod="video">Video</button>
+        </div>
+        <div class="split-2">
+          <div class="panel" id="modalityPanelA">
+            <h5>Typical corpus side</h5>
+            <p id="modalityCorpus" style="margin:0;">Tokenize → chunk → embed with a text encoder → store in a vector index with metadata filters.</p>
+          </div>
+          <div class="panel" id="modalityPanelB">
+            <h5>Typical query side</h5>
+            <p id="modalityQuery" style="margin:0;">User types a string → same text encoder → nearest neighbor search over embeddings → post-process.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s1">
+      <h2>01 · <code>CLIP</code> — contrastive language-image pretraining</h2>
+      <p>
+        <code>CLIP</code> (<strong>Contrastive Language–Image Pretraining</strong>) is the canonical vision–language pair: an <strong>image encoder</strong> (<code>ViT</code>, <code>ResNet</code>, or similar) and a <strong>text encoder</strong> map web-scale (image, caption) pairs into one <strong>shared embedding space</strong>.
+        Training follows the same <code>contrastive</code> / <code>InfoNCE</code> recipe as text embedding models in <a href="../06-sentence-embeddings/index.html#s2">Chapter 6</a>—in-batch negatives from mismatched image–text pairs, temperature-scaled softmax over the similarity matrix—except both towers are multimodal rather than sentence-only.
+      </p>
+      <div class="card">
+        <p style="margin:0 0 10px;"><strong>What you get at inference</strong></p>
+        <ul class="fancy" style="margin-bottom:0;">
+          <li><strong>Zero-shot classification.</strong> Embed class names (“golden retriever”, “dalmatian”) as text prototypes; classify an image by nearest text vector.</li>
+          <li><strong>Cross-modal retrieval.</strong> Embed a query sentence and rank images by cosine similarity—or embed an image and rank captions.</li>
+          <li><strong>Feature transfer.</strong> The image tower is a strong generic visual backbone for downstream tasks with light fine-tuning.</li>
+        </ul>
+      </div>
+
+      <div class="demo-box" id="demoEmbedSpace">
+        <h4>Interactive · Shared embedding space (schematic)</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Points are a toy 2D projection. <span style="color:var(--accent4);">■</span> image embeddings · <span style="color:var(--query);">■</span> text embeddings.
+          Drag the <strong>rotation</strong> slider to see how the same cloud can look different after a synthetic viewpoint change—real models live in hundreds of dimensions, but the intuition holds: matching pairs cluster.
+        </p>
+        <label class="dlbl" for="embedRotate">Projection angle</label>
+        <input type="range" id="embedRotate" min="0" max="628" value="120" aria-valuemin="0" aria-valuemax="628" />
+        <canvas id="embedCanvas" class="embed-canvas" width="860" height="340" aria-label="Toy embedding scatter plot"></canvas>
+        <p class="legend-row" style="margin-bottom:0;">
+          <span><span class="dot" style="background:var(--accent4);"></span> Images (product photos)</span>
+          <span><span class="dot" style="background:var(--query);"></span> Captions / queries</span>
+        </p>
+      </div>
+
+      <div class="demo-box" id="demoInfoNCE">
+        <h4>Interactive · Batch contrastive view</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          A miniature <code>5 × 5</code> batch. Rows are <strong>images</strong>, columns are <strong>texts</strong>. The diagonal is the positive pair for each row.
+          Adjust <strong>temperature</strong> τ: lower τ makes the <code>softmax</code> peakier (harder negatives matter more in relative terms).
+        </p>
+        <label class="dlbl" for="nceTemp">Temperature τ</label>
+        <input type="range" id="nceTemp" min="1" max="100" value="35" />
+        <div class="panel" style="margin-bottom:10px;">
+          <h5>Softmax mass on the true pair (row-wise mean)</h5>
+          <p id="nceMass" style="margin:0;font-family:var(--mono);color:var(--accent3);">—</p>
+        </div>
+        <div class="infonce-grid" id="nceGrid" aria-live="polite"></div>
+        <div class="legend-row">
+          <span><span class="dot" style="background:var(--accent3);"></span> Positive (i, i)</span>
+          <span><span class="dot" style="background:var(--danger);opacity:0.5;"></span> In-batch negative</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s2">
+      <h2>02 · Cross-modal retrieval</h2>
+      <p>
+        Once both images and texts map to comparable vectors, retrieval becomes a familiar <strong>nearest neighbor</strong> problem—only the encoder changes with the query modality.
+        <strong>Text-to-image</strong>: embed the query string with the text tower, compare against a gallery of precomputed image embeddings.
+        <strong>Image-to-text</strong>: embed the query image, compare against a corpus of text vectors (captions, titles, bullet lists).
+        <strong>Image-to-image</strong>: use the image tower on both sides for visual similarity, sometimes with additional metadata filters (category, price band, color family).
+      </p>
+      <p>
+        <strong>Text+image-to-image</strong> appears in interfaces like “more like this, but in blue.” A common pattern is to form a <strong>composite embedding</strong>: for example a weighted average of the text vector and the reference image vector after normalization,
+        or a small learned fusion module. Simplicity often wins early: average two <code>L2</code>-normalized vectors and renormalize.
+        The full production path almost always includes <code>batch inference</code> over the catalog, a vector index such as <code>HNSW</code>, and <strong>post-processing</strong> (business rules, diversity, deduplication, safety filters).
+      </p>
+      <div class="callout">
+        <strong>Precompute aggressively.</strong> Image embeddings are comparatively expensive; query-time latency improves when the corpus is already embedded and sharded in a datastore that supports high-QPS <code>ANN</code> search.
+      </div>
+
+      <div class="demo-box" id="demoCrossModal">
+        <h4>Interactive · Text-to-image ranking (illustrative)</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Pick a preset query or type your own. Scores simulate <code>cosine</code>-like similarity using keyword overlap against each image’s synthetic caption—useful for UI behavior, not benchmark truth.
+        </p>
+        <label class="dlbl" for="crossQuery">Query text</label>
+        <input type="search" id="crossQuery" placeholder="e.g. wooden desk minimalist" autocomplete="off" />
+        <div class="btn-row">
+          <button type="button" class="btn-secondary btn" data-q="red summer dress floral">Red dress</button>
+          <button type="button" class="btn-secondary btn" data-q="mountain lake reflection hiking">Mountain lake</button>
+          <button type="button" class="btn-secondary btn" data-q="modern office desk laptop">Office desk</button>
+          <button type="button" class="btn" id="crossRun">Rank images</button>
+        </div>
+        <div class="gallery" id="crossGallery" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s3">
+      <h2>03 · Vision-language models (<code>VLMs</code>)</h2>
+      <p>
+        <code>CLIP</code> excels at <strong>alignment</strong> and compact vectors, but it is not, by itself, a conversational reasoner over pixels.
+        <strong>Vision-language models</strong> extend the idea: architectures such as <code>LLaVA</code>, and proprietary systems like <code>GPT-4V</code>, <code>Claude 3</code>, and <code>Gemini</code>, interleave image understanding with language modeling so the network can describe scenes, answer questions, and follow instructions grounded in what is visible.
+      </p>
+      <h3>Search-relevant uses of <code>VLMs</code></h3>
+      <ul class="fancy">
+        <li><strong>Captioning for lexical retrieval.</strong> Generate textual descriptions of images or video keyframes; index those strings with your existing sparse or dense stack.</li>
+        <li><strong>Visual question answering.</strong> “What color is the car?” becomes structured metadata extraction when you trust the model’s parse.</li>
+        <li><strong><code>VLM</code> + <code>RAG</code> pattern.</strong> Retrieve candidate images (or pages) with embeddings, then let a <code>VLM</code> read pixels for verification, comparison, or summarization before a text <code>LLM</code> composes the final answer with citations to asset IDs.</li>
+      </ul>
+      <p>
+        The trade-offs are familiar: higher cost per document, latency budgets, and the need for guardrails when generated text becomes part of the index.
+        Hybrid designs often <strong>retrieve cheaply</strong> with vectors, then <strong>verify expensively</strong> with a <code>VLM</code> only on the top-<code>k</code>.
+      </p>
+
+      <div class="demo-box" id="demoVLMFlow">
+        <h4>Interactive · <code>VLM</code> + retrieval flow toggles</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Enable or disable stages. The summary updates to reflect how many expensive calls you might make per query—useful when reasoning about cost envelopes.
+        </p>
+        <div class="btn-row" style="flex-direction:column;align-items:stretch;">
+          <label style="display:flex;align-items:center;gap:10px;color:var(--text-dim);font-size:0.9rem;">
+            <input type="checkbox" id="vlmStage1" checked /> <span><strong>Stage A</strong> — Multimodal <code>ANN</code> retrieval (embeddings)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;color:var(--text-dim);font-size:0.9rem;">
+            <input type="checkbox" id="vlmStage2" checked /> <span><strong>Stage B</strong> — <code>VLM</code> caption / answer on top‑<code>k</code></span>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;color:var(--text-dim);font-size:0.9rem;">
+            <input type="checkbox" id="vlmStage3" /> <span><strong>Stage C</strong> — Text <code>LLM</code> synthesis with source IDs</span>
+          </label>
+        </div>
+        <div class="panel" style="margin-top:12px;">
+          <h5>Pipeline readout</h5>
+          <pre id="vlmReadout" style="margin:0;font-family:var(--mono);font-size:0.8rem;color:var(--accent5);white-space:pre-wrap;"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s4">
+      <h2>04 · <code>ColPali</code> — late interaction for visual documents</h2>
+      <p>
+        Classical document search over PDFs often runs <code>OCR</code> or extracts embedded text, then treats the page like a noisy text file.
+        That breaks when the signal is inherently visual: dense tables, compound figures, handwritten annotations, or charts where numbers live in pixels rather than a clean text layer.
+        <code>ColPali</code> (introduced in <a href="../11-late-interaction-learned-sparse/index.html#s4">Chapter 11</a>) applies <strong>late interaction</strong> directly to <strong>page images</strong>: patch embeddings from a vision backbone score against per-token query embeddings via <code>MaxSim</code>, so layout and non-textual graphics participate in the match—often <strong>without reliable OCR</strong>.
+      </p>
+      <h3><code>ViDoRe</code> and benchmarks</h3>
+      <p>
+        The <code>ViDoRe</code> benchmark family focuses on <strong>visual document retrieval</strong> tasks where page images are first-class.
+        It helps compare models that skip brittle text extraction pipelines against traditional <code>BM25</code> or dense baselines that only see what <code>OCR</code> recovered.
+        In practice, teams may still hybridize: use <code>ColPali</code>-style scoring for candidate generation, then optionally enrich with text-side signals where <code>OCR</code> is reliable.
+      </p>
+
+      <div class="demo-box" id="demoColPali">
+        <h4>Interactive · Patch-level attention heatmap (toy page)</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Move the pointer over the faux invoice page. Each cell approximates a <code>ViT</code> patch; color intensity simulates <code>MaxSim</code> contribution for the selected <strong>query token</strong>.
+        </p>
+        <label class="dlbl" for="colpaliToken">Highlight for token</label>
+        <select id="colpaliToken">
+          <option value="total">“total”</option>
+          <option value="invoice">“invoice”</option>
+          <option value="table">“table”</option>
+          <option value="chart">“chart”</option>
+        </select>
+        <canvas id="colpaliCanvas" class="colpali-canvas" width="640" height="420" aria-label="Document page with patch heatmap"></canvas>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s5">
+      <h2>05 · E‑commerce product discovery</h2>
+      <p>
+        Retail catalogs are <strong>image-first</strong>: text queries like <code>minimalist wooden desk</code> and uploaded reference photos both need embedding match against product images, usually with category filters so unrelated inventory does not compete.
+        <code>CLIP</code>, <code>SigLIP</code>, and <code>OpenCLIP</code> are common encoder choices; prompt tuning and in-domain fine-tuning correct domain shift between web training data and studio catalog photography.
+      </p>
+      <div class="card">
+        <p style="margin:0 0 10px;"><strong>Production sketch</strong></p>
+        <ol class="fancy" style="margin:0;padding-left:1.2rem;">
+          <li>Ingest catalog images + structured metadata (SKU, brand, taxonomy).</li>
+          <li>Batch-embed with a frozen multimodal encoder; normalize vectors.</li>
+          <li>Index with <code>HNSW</code> or another <code>ANN</code> algorithm; shard by locale or category.</li>
+          <li>Query path: embed text and/or image, apply filters, retrieve, rerank, deduplicate variants.</li>
+        </ol>
+      </div>
+
+      <div class="demo-box" id="demoEcomPipeline">
+        <h4>Interactive · Catalog indexing walkthrough</h4>
+        <p style="font-size:0.88rem;color:var(--text-dim);margin-top:0;">
+          Click each stage to advance. The detail pane lists engineering checkpoints you would verify in a design review.
+        </p>
+        <div class="pipeline-steps" id="ecomPipeline" role="tablist" aria-label="Pipeline stages">
+          <button type="button" class="ps on" data-step="0">Normalize images</button>
+          <span class="arrow">→</span>
+          <button type="button" class="ps" data-step="1">Encoder forward</button>
+          <span class="arrow">→</span>
+          <button type="button" class="ps" data-step="2">Vector index</button>
+          <span class="arrow">→</span>
+          <button type="button" class="ps" data-step="3">Query + filters</button>
+          <span class="arrow">→</span>
+          <button type="button" class="ps" data-step="4">Rerank</button>
+        </div>
+        <div class="panel" id="ecomDetail" style="margin-top:8px;">
+          <h5>Current stage</h5>
+          <p id="ecomText" style="margin:0;">Resize to a consistent shortest side; strip broken assets; record color profile notes.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="fade-in" id="s6">
+      <h2>06 · Building a multimodal search system</h2>
+      <p>
+        Moving from a notebook demo to a reliable service means pinning decisions on model choice, data hygiene, indexing mechanics, and query-time composition.
+        The list below is a practical ordering many teams follow; it is not a universal law, but it catches the dependencies early.
+      </p>
+      <ul class="step-list">
+        <li><strong>Choose an embedding model.</strong> Start with a strong general model (<code>CLIP</code>, <code>SigLIP</code>, <code>OpenCLIP</code>) and quantify domain shift on a hand-labeled slice before investing in fine-tuning.</li>
+        <li><strong>Pre-process and embed the corpus.</strong> Decide input resolutions, aspect handling (pad vs center crop), and whether to embed multiple crops per image. Batch GPU inference and checkpoint manifests for reproducibility.</li>
+        <li><strong>Index in a vector database.</strong> Store <code>SKU</code> / <code>URI</code> / access control metadata alongside vectors; plan for periodic re-embedding when the model version changes.</li>
+        <li><strong>Compose the query pipeline.</strong> Accept text, image bytes, or both; normalize exactly as training expects; expose toggles for strict filters vs exploration modes.</li>
+        <li><strong>Post-process.</strong> Business-aware reranking, near-duplicate suppression with perceptual hashing, and safety classifiers are standard finishing layers.</li>
+      </ul>
+      <h3>Operational knobs</h3>
+      <table class="data-t" aria-label="Practical considerations">
+        <thead>
+          <tr><th>Topic</th><th>What to decide</th><th>Why it matters</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>input resolution</code></td>
+            <td>Native vs fixed square; multi-crop ensembles</td>
+            <td>Trade GPU cost against fine-detail sensitivity (texture, small text in photos).</td>
+          </tr>
+          <tr>
+            <td><code>embedding dim</code></td>
+            <td>Model default vs distilled</td>
+            <td>Affects index footprint and distance compute; quantization interacts with recall.</td>
+          </tr>
+          <tr>
+            <td><code>batch processing</code></td>
+            <td>Offline jobs, backpressure, failure retries</td>
+            <td>Catalogs are living objects; embeddings must stay synchronized with asset updates.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        When documents—not catalog products—are the corpus, revisit section 04: if <code>OCR</code> is untrustworthy, a <code>ColPali</code>-style pathway may outperform text-only dense retrieval even when both are technically “vector search.”
+      </p>
+    </section>
+
+    <section class="fade-in" id="s7">
+      <h2>07 · Playground — multimodal search simulator</h2>
+      <p>
+        A small gallery stands in for a product or media catalog.
+        Use <strong>text-only</strong> mode to mimic a <code>CLIP</code>-like text tower query; <strong>visual similarity</strong> to mimic image-to-image matching against a chosen reference; <strong>combined</strong> to mimic a weighted fusion of both signals.
+        Numbers are deterministic heuristics for interactivity—replace them with real encoders in your stack.
+      </p>
+      <div class="demo-box" id="demoPlayground">
+        <h4>Multimodal search simulator</h4>
+        <div class="mode-bar" role="group" aria-label="Search mode">
+          <button type="button" class="chip active" data-mode="text">Text only</button>
+          <button type="button" class="chip" data-mode="visual">Visual similarity</button>
+          <button type="button" class="chip" data-mode="combined">Combined</button>
+        </div>
+        <label class="dlbl" for="pgQuery">Text query (used in text and combined modes)</label>
+        <input type="search" id="pgQuery" placeholder="Describe what you want to find…" autocomplete="off" />
+        <p style="font-size:0.85rem;color:var(--text-dim);margin:0 0 8px;">
+          In <strong>visual</strong> or <strong>combined</strong> mode, click a gallery thumbnail to set the reference image.
+        </p>
+        <div class="btn-row">
+          <button type="button" class="btn" id="pgRun">Search</button>
+          <button type="button" class="btn-secondary btn" id="pgReset">Reset gallery</button>
+        </div>
+        <div class="panel" style="margin-bottom:12px;">
+          <h5>Active signals</h5>
+          <pre id="pgSignals" style="margin:0;font-size:0.8rem;color:var(--accent5);white-space:pre-wrap;"></pre>
+        </div>
+        <div class="gallery" id="pgGallery" aria-live="polite"></div>
+      </div>
+      <p>
+        If you take one implementation idea from this page, let it be this: <strong>separate embedding generation from serving</strong>.
+        Treat encoders as versioned batch jobs, treat indexes as replaceable artifacts, and keep query-time code thin—parse inputs, call the index, apply policy layers.
+        That separation is how teams swap <code>SigLIP</code> for <code>CLIP</code>, add a <code>ColPali</code> stage for PDFs, or bolt on a <code>VLM</code> reranker without rewriting the entire product surface.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-foot">
+    Multimodal Search — alignment, retrieval, and document imagery. Chapter 21 · Search Zero to Hero
+  </footer>
+
+  <script>
+(function () {
+  'use strict';
+
+  function onReady(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  onReady(function () {
+    /* Nav + fade-in */
+    var navToggle = document.getElementById('navToggle');
+    var mainNav = document.getElementById('mainNav');
+    if (navToggle && mainNav) {
+      navToggle.addEventListener('click', function () {
+        var collapsed = mainNav.classList.toggle('collapsed');
+        navToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      });
+    }
+    var sections = document.querySelectorAll('section.fade-in');
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    sections.forEach(function (s) { io.observe(s); });
+
+    /* --- Demo 0: modalities --- */
+    var modCopy = {
+      text: {
+        corpus: 'Tokenize → chunk → embed with a text encoder → store in a vector index with metadata filters.',
+        query: 'User types a string → same text encoder → nearest neighbor search over embeddings → post-process.'
+      },
+      image: {
+        corpus: 'Resize / augment → image encoder (e.g. ViT) → L2-normalized vectors → multimodal or image-only ANN index.',
+        query: 'Optional text tower for cross-modal queries; image tower for visual similarity; combine with SKU metadata.'
+      },
+      audio: {
+        corpus: 'Chunk by time → log-mel or neural frontend → audio embedding model → temporal index with segment pointers.',
+        query: 'Text transcript embedding (ASR) or spoken-query encoder; join back to source timestamps for playback UI.'
+      },
+      video: {
+        corpus: 'Keyframe sampling or short clips → per-frame or tube embeddings → deduplicate near-identical shots.',
+        query: 'Text-to-video via shared space; or search transcripts + thumbnails; storyboards reduce cost vs dense per-frame.'
+      }
+    };
+    document.querySelectorAll('#modalityChips .chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var mod = btn.getAttribute('data-mod');
+        document.querySelectorAll('#modalityChips .chip').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        var mc = modCopy[mod] || modCopy.text;
+        document.getElementById('modalityCorpus').textContent = mc.corpus;
+        document.getElementById('modalityQuery').textContent = mc.query;
+      });
+    });
+
+    /* --- Demo 1: embedding canvas --- */
+    var embedCanvas = document.getElementById('embedCanvas');
+    var embedRotate = document.getElementById('embedRotate');
+    if (embedCanvas && embedRotate) {
+      var ctx = embedCanvas.getContext('2d');
+      var pairs = [
+        { ix: -0.7, iy: 0.35, tx: -0.55, ty: 0.42, label: 'dress' },
+        { ix: 0.2, iy: 0.65, tx: 0.28, ty: 0.58, label: 'sunset' },
+        { ix: 0.75, iy: -0.2, tx: 0.68, ty: -0.12, label: 'laptop' },
+        { ix: -0.35, iy: -0.55, tx: -0.42, ty: -0.5, label: 'invoice' },
+        { ix: 0.05, iy: 0.05, tx: 0.12, ty: -0.02, label: 'hiking' }
+      ];
+      function drawEmbed() {
+        var w = embedCanvas.width;
+        var h = embedCanvas.height;
+        var cx = w / 2;
+        var cy = h / 2;
+        var scale = Math.min(w, h) * 0.36;
+        var ang = parseInt(embedRotate.value, 10) / 100;
+        var cos = Math.cos(ang);
+        var sin = Math.sin(ang);
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#12121a';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#2a2a3a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+        ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+        ctx.stroke();
+        function proj(x, y) {
+          return { x: cx + (x * cos - y * sin) * scale, y: cy + (x * sin + y * cos) * scale };
+        }
+        pairs.forEach(function (p) {
+          var pi = proj(p.ix, p.iy);
+          var pt = proj(p.tx, p.ty);
+          ctx.strokeStyle = 'rgba(136,136,160,0.35)';
+          ctx.beginPath();
+          ctx.moveTo(pi.x, pi.y);
+          ctx.lineTo(pt.x, pt.y);
+          ctx.stroke();
+          ctx.fillStyle = '#f472b6';
+          ctx.beginPath();
+          ctx.arc(pi.x, pi.y, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#8888a0';
+          ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+          ctx.fillText(p.label, pi.x + 12, pi.y + 4);
+        });
+        ctx.fillStyle = '#8888a0';
+        ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+        ctx.fillText('Toy 2D projection of a high-dimensional joint space', 16, h - 14);
+      }
+      embedRotate.addEventListener('input', drawEmbed);
+      drawEmbed();
+    }
+
+    /* --- Demo 2: InfoNCE grid --- */
+    var nceTemp = document.getElementById('nceTemp');
+    var nceGrid = document.getElementById('nceGrid');
+    var nceMass = document.getElementById('nceMass');
+    if (nceTemp && nceGrid) {
+      var N = 5;
+      var logits = [
+        [2.1, 0.2, -0.4, 0.1, -0.2],
+        [0.0, 2.0, 0.3, -0.5, 0.0],
+        [-0.3, 0.1, 1.8, 0.4, -0.1],
+        [0.2, -0.2, 0.0, 2.2, 0.1],
+        [-0.1, 0.0, -0.3, 0.2, 1.9]
+      ];
+      function softmaxRow(row, tau) {
+        var m = Math.max.apply(null, row.map(function (v) { return v / tau; }));
+        var ex = row.map(function (v) { return Math.exp(v / tau - m); });
+        var s = ex.reduce(function (a, b) { return a + b; }, 0);
+        return ex.map(function (e) { return e / s; });
+      }
+      function renderNCE() {
+        var tau = parseInt(nceTemp.value, 10) / 10;
+        if (tau < 0.05) tau = 0.05;
+        nceGrid.innerHTML = '';
+        var masses = [];
+        for (var i = 0; i < N; i++) {
+          var probs = softmaxRow(logits[i], tau);
+          masses.push(probs[i]);
+          for (var j = 0; j < N; j++) {
+            var cell = document.createElement('div');
+            cell.className = 'infonce-cell' + (i === j ? ' pos' : ' neg');
+            cell.textContent = probs[j].toFixed(2);
+            cell.title = 'image ' + i + ' vs text ' + j;
+            var inten = Math.min(1, probs[j] * 1.8);
+            if (i !== j) cell.style.opacity = String(0.35 + inten * 0.5);
+            nceGrid.appendChild(cell);
+          }
+        }
+        var mean = masses.reduce(function (a, b) { return a + b; }, 0) / N;
+        nceMass.textContent = mean.toFixed(4) + '  (higher → model more confident about in-batch positives at this τ)';
+      }
+      nceTemp.addEventListener('input', renderNCE);
+      renderNCE();
+    }
+
+    /* --- Image catalog (shared) --- */
+    var CATALOG = [
+      { id: 'a', src: 'https://picsum.photos/id/1015/320/240', caption: 'river canyon water reflection gorge hiking blue' },
+      { id: 'b', src: 'https://picsum.photos/id/1060/320/240', caption: 'vegetables food market tomatoes peppers fresh organic' },
+      { id: 'c', src: 'https://picsum.photos/id/180/320/240', caption: 'laptop computer office desk keyboard modern work' },
+      { id: 'd', src: 'https://picsum.photos/id/338/320/240', caption: 'city skyline night lights buildings urban' },
+      { id: 'e', src: 'https://picsum.photos/id/429/320/240', caption: 'red dress fabric textile fashion summer floral' },
+      { id: 'f', src: 'https://picsum.photos/id/526/320/240', caption: 'wood wooden desk table minimalist furniture oak' },
+      { id: 'g', src: 'https://picsum.photos/id/628/320/240', caption: 'forest trees green trail nature moss hiking' },
+      { id: 'h', src: 'https://picsum.photos/id/835/320/240', caption: 'ocean beach sand waves summer coast blue' }
+    ];
+
+    function tokenize(s) {
+      return s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+    }
+
+    function textScore(query, caption) {
+      var q = tokenize(query);
+      var c = tokenize(caption);
+      if (!q.length) return 0;
+      var set = {};
+      c.forEach(function (w) { set[w] = true; });
+      var hit = 0;
+      q.forEach(function (w) { if (set[w]) hit++; });
+      return hit / Math.sqrt(q.length * Math.max(1, c.length));
+    }
+
+    function visualPresetScore(idA, idB) {
+      var order = CATALOG.map(function (x) { return x.id; });
+      var ia = order.indexOf(idA);
+      var ib = order.indexOf(idB);
+      if (ia < 0 || ib < 0) return 0;
+      var d = Math.abs(ia - ib);
+      return Math.max(0, 1 - d * 0.12);
+    }
+
+    function renderGallery(container, ranked, showRef) {
+      container.innerHTML = '';
+      ranked.forEach(function (r, idx) {
+        var item = document.createElement('div');
+        item.className = 'gallery-item' + (showRef && r.item.id === showRef ? ' selected' : '');
+        item.setAttribute('data-id', r.item.id);
+        var rank = document.createElement('div');
+        rank.className = 'rank';
+        rank.textContent = String(idx + 1);
+        var img = document.createElement('img');
+        img.src = r.item.src;
+        img.alt = r.item.caption;
+        img.loading = 'lazy';
+        var score = document.createElement('div');
+        score.className = 'score';
+        score.textContent = 'score ' + r.score.toFixed(3);
+        item.appendChild(rank);
+        item.appendChild(img);
+        item.appendChild(score);
+        container.appendChild(item);
+      });
+    }
+
+    /* --- Demo 3: cross-modal --- */
+    var crossQuery = document.getElementById('crossQuery');
+    var crossGallery = document.getElementById('crossGallery');
+    var crossRun = document.getElementById('crossRun');
+    function runCross() {
+      var q = crossQuery && crossQuery.value ? crossQuery.value : '';
+      var ranked = CATALOG.map(function (it) {
+        return { item: it, score: textScore(q, it.caption) + Math.sin((it.id.charCodeAt(0) + q.length) * 0.13) * 0.02 };
+      }).sort(function (a, b) { return b.score - a.score; });
+      renderGallery(crossGallery, ranked, null);
+    }
+    if (crossRun) crossRun.addEventListener('click', runCross);
+    document.querySelectorAll('#demoCrossModal [data-q]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        crossQuery.value = b.getAttribute('data-q');
+        runCross();
+      });
+    });
+    runCross();
+
+    /* --- Demo 4: VLM toggles --- */
+    function vlmRefresh() {
+      var a = document.getElementById('vlmStage1').checked;
+      var b = document.getElementById('vlmStage2').checked;
+      var c = document.getElementById('vlmStage3').checked;
+      var lines = [];
+      if (a) lines.push('1) Retrieve top-k with multimodal embeddings (cheap at scale).');
+      else lines.push('1) [skipped] No embedding retrieval — cold start from random samples (not recommended).');
+      if (b) lines.push('2) Run VLM on k=' + (a ? '32' : '8') + ' assets (expensive; GPU).');
+      else lines.push('2) [skipped] No VLM reads — risk missing fine visual details.');
+      if (c) lines.push('3) LLM composes answer with asset IDs (moderate cost).');
+      else lines.push('3) [skipped] Return raw VLM strings only.');
+      var cost = (a ? 1 : 0) + (b ? 6 : 0) + (c ? 2 : 0);
+      lines.push('---');
+      lines.push('Relative cost index: ' + cost + ' (unitless demo scale)');
+      document.getElementById('vlmReadout').textContent = lines.join('\n');
+    }
+    ['vlmStage1', 'vlmStage2', 'vlmStage3'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('change', vlmRefresh);
+    });
+    vlmRefresh();
+
+    /* --- Demo 5: ColPali heatmap --- */
+    var colCanvas = document.getElementById('colpaliCanvas');
+    var colToken = document.getElementById('colpaliToken');
+    if (colCanvas && colToken) {
+      var cctx = colCanvas.getContext('2d');
+      var cols = 10;
+      var rows = 8;
+      var heat = [];
+      function reseedHeat(token) {
+        heat = [];
+        for (var y = 0; y < rows; y++) {
+          var row = [];
+          for (var x = 0; x < cols; x++) {
+            var base = Math.sin(x * 0.7 + y * 0.5 + token.length) * 0.5 + 0.5;
+            row.push(base);
+          }
+          heat.push(row);
+        }
+      }
+      function drawColpali(mx, my) {
+        var w = colCanvas.width;
+        var h = colCanvas.height;
+        cctx.clearRect(0, 0, w, h);
+        cctx.fillStyle = '#1a1a24';
+        cctx.fillRect(0, 0, w, h);
+        cctx.fillStyle = '#e8e8f0';
+        cctx.fillRect(40, 36, w - 80, h - 72);
+        cctx.fillStyle = '#12121a';
+        cctx.font = 'bold 18px ' + getComputedStyle(document.body).fontFamily;
+        cctx.fillText('INVOICE #4492', 56, 62);
+        cctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+        cctx.fillStyle = '#555';
+        cctx.fillText('Acme Supplies · Visual-only retrieval demo', 56, 82);
+        cctx.strokeStyle = '#ccc';
+        cctx.strokeRect(56, 100, w - 112, 120);
+        cctx.fillStyle = '#2563eb';
+        for (var i = 0; i < 5; i++) {
+          cctx.fillRect(70 + i * 22, 160, 16, 50 - i * 8);
+        }
+        cctx.fillStyle = '#111';
+        cctx.font = '11px monospace';
+        cctx.fillText('Q1   Q2   Q3   Q4   Q5', 70, 150);
+        var cw = (w - 80) / cols;
+        var ch = (h - 80) / rows;
+        var token = colToken.value;
+        for (var yy = 0; yy < rows; yy++) {
+          for (var xx = 0; xx < cols; xx++) {
+            var cx = 40 + xx * cw;
+            var cy = 36 + yy * ch;
+            var dist = mx != null ? Math.hypot(mx - (cx + cw / 2), my - (cy + ch / 2)) : 999;
+            var bump = Math.max(0, 1 - dist / 120);
+            var v = Math.min(1, heat[yy][xx] * 0.55 + bump * 0.45);
+            cctx.fillStyle = 'rgba(34, 211, 238, ' + (0.08 + v * 0.55) + ')';
+            cctx.fillRect(cx, cy, cw + 0.5, ch + 0.5);
+          }
+        }
+        cctx.strokeStyle = '#2a2a3a';
+        cctx.lineWidth = 1;
+        for (var gx = 0; gx <= cols; gx++) {
+          cctx.beginPath();
+          cctx.moveTo(40 + gx * cw, 36);
+          cctx.lineTo(40 + gx * cw, h - 36);
+          cctx.stroke();
+        }
+        for (var gy = 0; gy <= rows; gy++) {
+          cctx.beginPath();
+          cctx.moveTo(40, 36 + gy * ch);
+          cctx.lineTo(w - 40, 36 + gy * ch);
+          cctx.stroke();
+        }
+        cctx.fillStyle = '#8888a0';
+        cctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+        cctx.fillText('Patch grid overlay (toy MaxSim emphasis)', 40, h - 12);
+      }
+      colToken.addEventListener('change', function () {
+        reseedHeat(colToken.value);
+        drawColpali(null, null);
+      });
+      colCanvas.addEventListener('mousemove', function (ev) {
+        var rect = colCanvas.getBoundingClientRect();
+        var mx = (ev.clientX - rect.left) * (colCanvas.width / rect.width);
+        var my = (ev.clientY - rect.top) * (colCanvas.height / rect.height);
+        drawColpali(mx, my);
+      });
+      colCanvas.addEventListener('mouseleave', function () {
+        drawColpali(null, null);
+      });
+      reseedHeat(colToken.value);
+      drawColpali(null, null);
+    }
+
+    /* --- Demo 6: e-commerce pipeline --- */
+    var ecomDetail = [
+      'Resize to a consistent shortest side; strip broken assets; record color profile notes.',
+      'Forward pass through the multimodal image tower; L2-normalize; attach SKU + locale metadata.',
+      'Shard HNSW (or IVF-PQ) by category to keep latency predictable for heavy tails.',
+      'Parse text and optional image upload; apply merchant filters; retrieve top-N with ANN.',
+      'Cross-encoder or heuristic rerank; merge duplicate SKUs; inject sponsored slots if applicable.'
+    ];
+    document.querySelectorAll('#ecomPipeline .ps').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('#ecomPipeline .ps').forEach(function (b) { b.classList.remove('on'); });
+        btn.classList.add('on');
+        var step = parseInt(btn.getAttribute('data-step'), 10);
+        document.getElementById('ecomText').textContent = ecomDetail[step] || '';
+      });
+    });
+
+    /* --- Playground --- */
+    var pgMode = 'text';
+    var pgRefId = null;
+    var pgGallery = document.getElementById('pgGallery');
+    document.querySelectorAll('#demoPlayground .chip[data-mode]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('#demoPlayground .chip[data-mode]').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        pgMode = btn.getAttribute('data-mode');
+        pgRefreshSignals();
+      });
+    });
+    function pgRefreshSignals() {
+      var q = document.getElementById('pgQuery').value.trim();
+      var lines = ['mode: ' + pgMode];
+      if (pgMode === 'text' || pgMode === 'combined') lines.push('text query: ' + (q || '(empty)'));
+      if (pgMode === 'visual' || pgMode === 'combined') lines.push('reference image id: ' + (pgRefId || '(click a thumbnail)'));
+      document.getElementById('pgSignals').textContent = lines.join('\n');
+    }
+    document.getElementById('pgQuery').addEventListener('input', pgRefreshSignals);
+
+    function pgRunSearch() {
+      var q = document.getElementById('pgQuery').value.trim();
+      var ranked;
+      if (pgMode === 'text') {
+        ranked = CATALOG.map(function (it) {
+          return { item: it, score: textScore(q, it.caption) };
+        });
+      } else if (pgMode === 'visual') {
+        if (!pgRefId) {
+          ranked = CATALOG.map(function (it, idx) {
+            return { item: it, score: 0.01 * (1 - idx * 0.02) };
+          });
+        } else {
+          ranked = CATALOG.map(function (it) {
+            return { item: it, score: visualPresetScore(pgRefId, it.id) };
+          });
+        }
+      } else {
+        var tPart = function (it) { return textScore(q, it.caption); };
+        ranked = CATALOG.map(function (it) {
+          var tv = tPart(it);
+          var vv = pgRefId ? visualPresetScore(pgRefId, it.id) : 0.35;
+          return { item: it, score: 0.55 * tv + 0.45 * vv };
+        });
+      }
+      ranked.sort(function (a, b) { return b.score - a.score; });
+      renderGallery(pgGallery, ranked, pgRefId);
+      pgRefreshSignals();
+    }
+
+    document.getElementById('pgRun').addEventListener('click', pgRunSearch);
+    document.getElementById('pgReset').addEventListener('click', function () {
+      pgRefId = null;
+      document.getElementById('pgQuery').value = '';
+      pgRefreshSignals();
+      pgRunSearch();
+    });
+    pgGallery.addEventListener('click', function (ev) {
+      var node = ev.target.closest('.gallery-item');
+      if (!node || !pgGallery.contains(node)) return;
+      pgRefId = node.getAttribute('data-id');
+      pgRefreshSignals();
+      if (pgMode !== 'text') pgRunSearch();
+    });
+    pgRunSearch();
+  });
+})();
+  </script>
+</body>
+</html>

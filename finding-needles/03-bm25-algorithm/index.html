@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BM25 — The Algorithm Behind Elasticsearch | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+      --border: #2a2a3a; --text: #e0e0e8; --text-dim: #8888a0;
+      --accent: #6c8cff; --accent2: #a78bfa; --accent3: #34d399;
+      --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108, 140, 255, 0.18), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(52, 211, 153, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.85rem, 5vw, 3rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 760px; color: var(--text-dim); font-size: 1.08rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .num { font-size: 1.75rem; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
+    .section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--border);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      scroll-margin-top: 96px;
+    }
+    .section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    .section h2 {
+      font-size: 1.55rem;
+      margin: 0 0 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .section-num { font-family: var(--mono); font-size: 0.9rem; color: var(--accent2); font-weight: 600; }
+    .section p { margin: 0 0 1em; color: var(--text); }
+    .section p:last-child { margin-bottom: 0; }
+    .section ul, .section ol { margin: 0 0 1em; padding-left: 1.35em; color: var(--text); }
+    .section li { margin-bottom: 0.45em; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .card h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      color: var(--accent3);
+    }
+    .formula.formula-lg { font-size: 1rem; text-align: center; color: var(--accent5); line-height: 1.5; }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 22px 0;
+    }
+    @media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.92rem;
+    }
+    .interactive-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel h3 { margin: 0 0 14px; font-size: 1rem; color: var(--accent2); }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.active { background: rgba(108, 140, 255, 0.15); border-color: var(--accent); color: var(--accent); }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    .slider-row input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+    .slider-row output { font-family: var(--mono); min-width: 52px; color: var(--accent5); }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 16px 0;
+    }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    table.data th { background: var(--bg-card-alt); color: var(--text-dim); font-weight: 600; }
+    table.data td { font-family: var(--mono); font-size: 0.8rem; }
+    table.data .num { text-align: right; }
+    textarea.input-block, input.input-line {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin: 8px 0;
+    }
+    textarea.input-block { min-height: 88px; resize: vertical; }
+    canvas.drawing {
+      width: 100%;
+      max-width: 100%;
+      height: 300px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      display: block;
+    }
+    .playground-results { margin-top: 20px; }
+    .doc-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      background: var(--bg-card-alt);
+    }
+    .doc-card .rank { font-family: var(--mono); color: var(--accent5); font-size: 0.9rem; margin-bottom: 6px; }
+    .term-breakdown {
+      font-size: 0.76rem;
+      color: var(--text-dim);
+      margin-top: 8px;
+      font-family: var(--mono);
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .calc-steps {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      max-height: 420px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    .pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(108, 140, 255, 0.12);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      margin-right: 6px;
+    }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <style class="breadcrumb-styles">
+    .breadcrumb-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+      background: #111118; border-bottom: 1px solid #23232f;
+      padding: 10px 24px; font-size: 0.82rem; color: #8888a0;
+    }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+  </style>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">BM25</span>
+  </nav>
+  <nav class="main-nav" id="mainNav" aria-label="On this page">
+    <a href="#s0">Why not TF-IDF</a>
+    <a href="#s1">Saturation</a>
+    <a href="#s2">Length norm</a>
+    <a href="#s3">Full formula</a>
+    <a href="#s4">vs TF-IDF</a>
+    <a href="#s5">BM25F</a>
+    <a href="#s6">Variants</a>
+    <a href="#s7">Playground</a>
+  </nav>
+  <header class="hero">
+    <h1>BM25 — The Algorithm Behind Elasticsearch</h1>
+    <p class="subtitle">
+      <code>BM25</code> is the workhorse ranking function in <code>Lucene</code>, <code>Elasticsearch</code>, and <code>Solr</code>.
+      Why <code>TF-IDF</code> breaks down in realistic collections, how term saturation and length normalization fix those failures,
+      and how to read the full scoring expression well enough to tune <code>k1</code> and <code>b</code> with confidence.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">8</div><div class="lbl">Sections</div></div>
+      <div class="hero-stat"><div class="num">6+</div><div class="lbl">Interactives</div></div>
+      <div class="hero-stat"><div class="num">Σ</div><div class="lbl">Query terms summed</div></div>
+    </div>
+  </header>
+  <main>
+    <section id="s0" class="section fade-in">
+      <h2><span class="section-num">00</span> Why <code>TF-IDF</code> Is Not Enough</h2>
+      <p>
+        <code>TF-IDF</code> was a breakthrough because it fused two intuitive ideas: a document that repeats a query term is probably more on-topic
+        (<code>TF</code>), and a term that is rare in the collection is more discriminative (<code>IDF</code>). For small, homogeneous corpora with
+        similarly sized documents, that pairing often produces sensible rankings. As soon as you index the open web, enterprise knowledge bases, or
+        product catalogs, the simplifying assumptions behind plain <code>TF-IDF</code> start to hurt.
+      </p>
+      <p>
+        The first weakness is that many <code>TF</code> weighting schemes treat frequency as nearly linear. If you double how often <code>cat</code>
+        appears, you double (or nearly double) the contribution of <code>cat</code> to the score. Human relevance is not linear in repetition:
+        the difference between seeing a term once and twice is large; the difference between ninety-eight and ninety-nine occurrences is negligible.
+        An unbounded <code>TF</code> factor lets spammy, boilerplate-heavy pages accumulate enormous scores simply by repetition.
+      </p>
+      <p>
+        The second weakness is length normalization. Longer documents contain more tokens in total, so they accumulate higher raw counts even when
+        the underlying topic relevance is unchanged. Without a principled correction, ranking becomes biased toward verbosity. Classic
+        <code>TF-IDF</code> mitigations (sublinear <code>TF</code> transforms, cosine normalization of vectors) help, but they are not always aligned
+        with probabilistic retrieval theory, and they interact awkwardly with fielded data such as titles versus bodies.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>Probabilistic motivation.</strong> The <code>probabilistic ranking principle</code> suggests ordering documents by estimated odds
+          of relevance given the query and the collection statistics. Scoring functions in the <code>Best Match (BM)</code> family were engineered to
+          approximate those odds using quantities the inverted index already stores: term frequency, document length, document frequency, and
+          collection size. <code>BM25</code> is the sweet spot: expressive enough for production search, simple enough to implement efficiently.
+        </p>
+      </div>
+      <p>
+        The <code>BM</code> family grew out of the Okapi system at City University London in the early 1990s, where Stephen Robertson,
+        Karen Spärck Jones, and colleagues developed <code>BM1</code>, <code>BM11</code>, <code>BM15</code>, and <code>BM25</code> as practical
+        approximations to probabilistic retrieval. <code>BM25</code> became the default because it adds tunable <code>k1</code> (saturation) and
+        <code>b</code> (length sensitivity) in a closed-form formula that runs at index-query speed.
+      </p>
+      <p>
+        <code>Lucene</code>’s default similarity has long been <code>BM25</code>-style, and both <code>Elasticsearch</code> and <code>Solr</code>
+        expose the same parameters in their similarity settings. That ubiquity makes <code>BM25</code> the right mental model even when you later
+        blend lexical scores with dense vectors or learning-to-rank models.
+      </p>
+    </section>
+
+    <section id="s1" class="section fade-in">
+      <h2><span class="section-num">01</span> Term Saturation</h2>
+      <p>
+        In a linear <code>TF</code> model, if a document mentions <code>insurance</code> ten times, it contributes ten times the weight of a single
+        mention. That sounds fair until you notice that after the first few mentions, you have already established topicality; additional mentions
+        mostly reflect writing style, page template noise, or keyword stuffing. The marginal information gained from each extra occurrence drops sharply.
+      </p>
+      <p>
+        <code>BM25</code> encodes diminishing returns with a saturating transform. Write the contribution of a term with raw count
+        <code>tf</code> as a fraction that approaches a horizontal asymptote as <code>tf</code> grows. A common equivalent form isolates the
+        saturation curve explicitly:
+      </p>
+      <div class="formula">TF<sub>saturated</sub> = (tf × (k1 + 1)) / (tf + k1)</div>
+      <p>
+        As <code>tf → ∞</code>, the expression tends to <code>k1 + 1</code>, so the per-term contribution cannot run away without bound.
+        The parameter <code>k1 &gt; 0</code> sets how fast the curve bends: small <code>k1</code> saturates aggressively (extra mentions stop
+        mattering quickly); large <code>k1</code> stretches the curve toward linearity.
+      </p>
+      <ul>
+        <li><code>k1 = 0</code> (degenerate limit): the formula collapses to a binary “present or not” behavior—generally avoided in real engines, but useful as intuition.</li>
+        <li><code>k1 ≈ 1.2</code>: the widespread default—moderate saturation, robust across many collections.</li>
+        <li><code>k1 ≈ 2.0</code>: slower saturation; term frequency continues to matter across a wider numeric range.</li>
+        <li><code>k1 → ∞</code>: the curve approaches raw <code>tf</code>; you lose explicit saturation (not recommended unless you have strong reasons).</li>
+      </ul>
+      <p>
+        <code>k1</code> also interacts with tokenization: aggressive stemming inflates effective <code>tf</code> (often warranting a lower
+        <code>k1</code>), while fine-grained tokenization keeps counts smaller (sometimes benefiting from a higher <code>k1</code>). The default
+        is a starting point for grid search or click-driven tuning—not a physical constant.
+      </p>
+      <div class="interactive-panel">
+        <h3>Interactive: saturation curve vs <code>k1</code></h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 12px;">
+          Horizontal axis: raw <code>tf</code> (0–80). Vertical axis: <code>(tf × (k1+1)) / (tf + k1)</code>. The dashed line shows the asymptote
+          <code>k1 + 1</code>.
+        </p>
+        <div class="slider-row">
+          <label for="k1Slider"><code>k1</code></label>
+          <input type="range" id="k1Slider" min="0.2" max="5" step="0.05" value="1.2" />
+          <output id="k1Out">1.2</output>
+        </div>
+        <canvas id="satCanvas" class="drawing" width="860" height="300" aria-label="BM25 saturation curve"></canvas>
+      </div>
+    </section>
+
+    <section id="s2" class="section fade-in">
+      <h2><span class="section-num">02</span> Document Length Normalization</h2>
+      <p>
+        Consider two documents that each contain the token <code>python</code> exactly five times. The first is a hundred-word README; the second is
+        a ten-thousand-word manual. Raw <code>tf</code> is identical, but the shorter file is far more focused: five mentions in a hundred words is
+        a strong signal, whereas five mentions in ten thousand words might be incidental. Pure frequency without context systematically undervalues
+        concise, information-dense texts and overvalues long texts that roam across many subtopics.
+      </p>
+      <p>
+        <code>BM25</code> compares each document’s length <code>dl</code> to the average document length <code>avgdl</code> in the collection.
+        The normalization factor multiplies <code>k1</code> inside the denominator, effectively requiring more term evidence in longer-than-average
+        documents to reach the same score contribution:
+      </p>
+      <div class="formula">length factor = (1 − b) + b × (dl / avgdl)</div>
+      <p>
+        The mixing parameter <code>b ∈ [0, 1]</code> controls how aggressively length is applied. With <code>b = 0</code>, the factor is always
+        <code>1</code>: lengths are ignored. With <code>b = 1</code>, the factor is exactly <code>dl / avgdl</code>: a document twice the average
+        length needs twice the term count to match a shorter peer. The classic default <code>b = 0.75</code> is a compromise that damps—but does not
+        fully eliminate—length effects, which tends to work well when collections mix tweets, articles, and long-form help pages.
+      </p>
+      <div class="interactive-panel">
+        <h3>Interactive: how <code>b</code> reshapes scores across lengths</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 12px;">
+          Fixed term <code>tf = 5</code> for a single query term, <code>k1 = 1.2</code>, <code>avgdl = 500</code> tokens. Bars show the
+          <code>BM25</code> term component (ignoring <code>IDF</code>, which is identical for all bars).
+        </p>
+        <div class="slider-row">
+          <label for="bSlider"><code>b</code></label>
+          <input type="range" id="bSlider" min="0" max="1" step="0.05" value="0.75" />
+          <output id="bOut">0.75</output>
+        </div>
+        <canvas id="lenCanvas" class="drawing" width="860" height="300" aria-label="Length normalization chart"></canvas>
+      </div>
+    </section>
+
+    <section id="s3" class="section fade-in">
+      <h2><span class="section-num">03</span> The Complete <code>BM25</code> Formula</h2>
+      <p>
+        Putting saturation and length normalization together, the relevance score of document <code>D</code> for multi-term query <code>Q</code> is
+        a sum over query terms <code>q<sub>i</sub></code>. Let <code>f(q<sub>i</sub>, D)</code> be the raw term frequency of <code>q<sub>i</sub></code>
+        in <code>D</code>, let <code>dl</code> be the length of <code>D</code>, and let <code>N</code> be the total number of documents with
+        <code>df(q<sub>i</sub>)</code> the document frequency of the term.
+      </p>
+      <div class="formula formula-lg">
+        Score(D, Q) = Σ<sub>i</sub> IDF(q<sub>i</sub>) ·
+        <span style="white-space:nowrap;">[ f(q<sub>i</sub>,D) · (k1 + 1) ] / [ f(q<sub>i</sub>,D) + k1 · ((1 − b) + b · dl / avgdl) ]</span>
+      </div>
+      <p>
+        The <code>IDF</code> factor in the Robertson–Walker formulation is not the textbook <code>log(N / df)</code>. It uses a smoothed ratio that
+        behaves gracefully when terms are extremely common or rare:
+      </p>
+      <div class="formula">IDF(t) = ln((N − df(t) + 0.5) / (df(t) + 0.5) + 1)</div>
+      <p>
+        The <code>+0.5</code> offsets are a form of <code>smoothing</code> inspired by Bayesian priors on counts. Unlike some classic definitions,
+        this <code>IDF</code> can dip below zero when a term appears in more than half of the documents—signaling that the term is not discriminative
+        in that collection. Engines sometimes add clamps or blend with other signals so extremely common terms do not invert rankings unexpectedly.
+      </p>
+      <div class="card">
+        <h3>Worked example (five documents, two-term query)</h3>
+        <p style="font-size:0.92rem;color:var(--text-dim);margin-bottom:12px;">
+          Collection <code>N = 5</code>, query <code>cat dog</code>. Default <code>k1 = 1.2</code>, <code>b = 0.75</code>. Tokenization is
+          whitespace/lowercase. Length <code>dl</code> is token count per document.
+        </p>
+        <table class="data">
+          <thead>
+            <tr><th>Doc</th><th>Text</th><th class="num">dl</th><th class="num">tf(cat)</th><th class="num">tf(dog)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>D1</td><td>cat cat dog</td><td class="num">3</td><td class="num">2</td><td class="num">1</td></tr>
+            <tr><td>D2</td><td>cat</td><td class="num">1</td><td class="num">1</td><td class="num">0</td></tr>
+            <tr><td>D3</td><td>cat dog dog</td><td class="num">3</td><td class="num">1</td><td class="num">2</td></tr>
+            <tr><td>D4</td><td>dog dog dog dog dog</td><td class="num">5</td><td class="num">0</td><td class="num">5</td></tr>
+            <tr><td>D5</td><td>bird cat</td><td class="num">2</td><td class="num">1</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:0.9rem;">
+          Step 1: <code>df(cat) = 4</code>, <code>df(dog) = 3</code>. Step 2: <code>avgdl = (3+1+3+5+2)/5 = 2.8</code>. Step 3: for each document compute
+          <code>len = (1 − b) + b × dl / avgdl</code>. Step 4: for each query term present, compute the saturation fraction times <code>IDF</code>.
+          Step 5: sum across terms. The calculator below reproduces the same numbers to arbitrary precision.
+        </p>
+      </div>
+      <div class="interactive-panel">
+        <h3>Interactive: full <code>BM25</code> calculator with intermediate values</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 10px;">One document per line. Query is a single line of text. Adjust <code>k1</code> and <code>b</code> to match the worked table.</p>
+        <label>Documents</label>
+        <textarea id="calcDocs" class="input-block" rows="5">cat cat dog
+cat
+cat dog dog
+dog dog dog dog dog
+bird cat</textarea>
+        <label>Query</label>
+        <input id="calcQuery" class="input-line" type="text" value="cat dog" />
+        <div class="slider-row">
+          <label for="calcK1"><code>k1</code></label>
+          <input type="range" id="calcK1" min="0" max="3" step="0.05" value="1.2" />
+          <output id="calcK1Out">1.2</output>
+        </div>
+        <div class="slider-row">
+          <label for="calcB"><code>b</code></label>
+          <input type="range" id="calcB" min="0" max="1" step="0.05" value="0.75" />
+          <output id="calcBOut">0.75</output>
+        </div>
+        <div class="btn-group">
+          <button type="button" class="btn active" id="calcRun">Recalculate</button>
+        </div>
+        <pre id="calcOut" class="calc-steps" aria-live="polite"></pre>
+      </div>
+    </section>
+
+    <section id="s4" class="section fade-in">
+      <h2><span class="section-num">04</span> <code>BM25</code> vs <code>TF-IDF</code> — Side by Side</h2>
+      <p>
+        Both functions try to rank by lexical overlap, but they implement different assumptions. <code>TF-IDF</code> (in its vector-space cosine form)
+        often combines sublinear <code>TF</code> with a classic <code>IDF</code> and then normalizes entire vectors—mixing term interactions globally.
+        <code>BM25</code> sums per-term contributions that each saturate independently and carries length correction inside every term’s denominator.
+      </p>
+      <table class="data">
+        <thead>
+          <tr><th>Aspect</th><th>Typical TF-IDF</th><th>BM25</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Term frequency</td><td>Often log-scaled or raw in a vector, then cosine-normalized</td><td>Explicit rational saturation with <code>k1</code></td></tr>
+          <tr><td>IDF</td><td><code>log(N/df)</code> variants (may add 1 to avoid log 0)</td><td>Smoothed <code>log((N−df+0.5)/(df+0.5)+1)</code></td></tr>
+          <tr><td>Length</td><td>Implicit via cosine of full vector, or ad hoc pivots</td><td>Explicit <code>(1−b)+b·dl/avgdl</code> per term</td></tr>
+          <tr><td>Score shape</td><td>Dot product / cosine in term space</td><td>Additive sum of bounded term scores</td></tr>
+        </tbody>
+      </table>
+      <div class="comparison">
+        <div>
+          <span class="pill">BM25 wins</span>
+          <p style="margin-top:10px;">
+            Collections with heavy-tailed length distributions (short titles beside long articles), pages with duplicated boilerplate, and queries
+            where you want diminishing returns on repetition. The parameters give direct control over those failure modes.
+          </p>
+        </div>
+        <div>
+          <span class="pill">TF-IDF comparable</span>
+          <p style="margin-top:10px;">
+            Uniform document lengths, small corpora, and baseline vector pipelines where you already cosine-normalize and do not need fine-grained
+            length modeling. Differences shrink when documents are similarly sized and spam is absent.
+          </p>
+        </div>
+      </div>
+      <div class="interactive-panel">
+        <h3>Interactive: same toy collection, two ranking functions</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 12px;">
+          Drag <code>df</code> for a fixed <code>N = 100</code> to see how classic <code>IDF</code> and <code>BM25 IDF</code> diverge for common terms.
+        </p>
+        <div class="slider-row">
+          <label for="dfCmp">df (term appears in this many docs)</label>
+          <input type="range" id="dfCmp" min="1" max="99" step="1" value="10" />
+          <output id="dfCmpOut">10</output>
+        </div>
+        <div class="formula" id="idfCompareReadout" style="margin-top:8px;color:var(--text);"></div>
+      </div>
+    </section>
+
+    <section id="s5" class="section fade-in">
+      <h2><span class="section-num">05</span> <code>BM25F</code> — Field-Aware <code>BM25</code></h2>
+      <p>
+        Real records are structured: a <code>title</code>, a <code>body</code>, a <code>url</code>, anchor text, metadata tags, and so on. A match
+        in the title is usually a stronger confirmation of topicality than the same match buried in a footer. <code>BM25F</code> generalizes
+        <code>BM25</code> by scoring each field separately—each field may have its own length statistics, its own <code>k1</code> and <code>b</code>,
+        and a boost weight—then combining the field-level signals.
+      </p>
+      <p>
+        Conceptually, you compute a weighted effective term frequency: sum over fields of <code>boost<sub>f</sub> × TF<sub>f</sub></code> (with
+        field-specific normalization), then plug that aggregate into the <code>BM25</code> rational form, or you sum fully field-local
+        <code>BM25</code> scores. Aggregation semantics vary by paper and engine, but field boosts are first-class—not an afterthought layered on a flat bag of words.
+      </p>
+      <p>
+        <code>Elasticsearch</code> exposes this idea through similarities per field, <code>multi_match</code> with typed field-centric combinations,
+        and newer query types such as <code>combined_fields</code> that aim to treat multiple text fields as a single inverted index for scoring
+        while still respecting term positions where possible. Tuning title boosts is often the highest leverage change you can make before touching
+        embeddings.
+      </p>
+      <div class="interactive-panel">
+        <h3>Interactive: two-field toy score</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin:0 0 12px;">
+          One document with separate <code>title</code> and <code>body</code> token counts for a single query term. The panel approximates a
+          weighted sum of field-level <code>BM25</code> term components (shared <code>IDF</code>, independent lengths).
+        </p>
+        <div class="slider-row"><label>title tf</label><input type="range" id="ftTitle" min="0" max="5" step="1" value="1" /><output id="ftTitleOut">1</output></div>
+        <div class="slider-row"><label>title len</label><input type="range" id="lenTitle" min="2" max="40" step="1" value="8" /><output id="lenTitleOut">8</output></div>
+        <div class="slider-row"><label>body tf</label><input type="range" id="ftBody" min="0" max="20" step="1" value="3" /><output id="ftBodyOut">3</output></div>
+        <div class="slider-row"><label>body len</label><input type="range" id="lenBody" min="20" max="800" step="10" value="400" /><output id="lenBodyOut">400</output></div>
+        <div class="slider-row"><label>title boost</label><input type="range" id="boostTitle" min="0.5" max="5" step="0.1" value="2" /><output id="boostTitleOut">2</output></div>
+        <pre id="bm25fOut" class="calc-steps" style="max-height:220px;"></pre>
+      </div>
+    </section>
+
+    <section id="s6" class="section fade-in">
+      <h2><span class="section-num">06</span> Beyond <code>BM25</code> — Bayesian <code>BM25</code> and Modern Variants</h2>
+      <p>
+        Research did not stop at the default formula. <code>Bayesian BM25</code> places priors on term weights or hyperparameters so estimates adapt
+        to collection size and sparsity more smoothly than fixed heuristics. Practically, you see this spirit in continued smoothing tweaks and
+        collection-specific tuning rather than a single monolithic “Bayesian switch” in production engines.
+      </p>
+      <p>
+        <code>BM25+</code> and <code>BM25L</code> adjust the lower bound of the term-frequency component so very long documents are not
+        over-penalized when lengths explode—useful in legal search and technical documentation where page length correlates weakly with relevance.
+        Another extension adds a <code>k3</code> parameter for query-term frequency (repeating a token in the query increases its weight), which
+        mirrors how some interfaces let users paste long, repetitive queries.
+      </p>
+      <p>
+        Neural dense retrieval and cross-encoders dominate leaderboards on many benchmarks, yet <code>BM25</code> remains fiercely competitive as a
+        zero-shot lexical baseline—fast, interpretable, and surprisingly hard to beat on exact-match-heavy tasks. The <code>BEIR</code> benchmark
+        suite popularized reporting both neural models and lexical baselines across diverse domains; teams routinely cite <code>BM25</code> numbers
+        to prove that a new architecture generalizes beyond a single corpus. When neural models fail on rare entities or out-of-domain vocabulary,
+        a strong lexical ranker is often the safety net.
+      </p>
+    </section>
+
+    <section id="s7" class="section fade-in">
+      <h2><span class="section-num">07</span> Playground — Mini search engine</h2>
+      <p>
+        Documents use <code>title | body</code> syntax (whitespace around <code>|</code> is fine). Lines without a pipe are treated as
+        <code>body</code> only. Enter a query, adjust <code>k1</code> and <code>b</code>, and compare fielded <code>BM25</code> against a summed
+        <code>TF-IDF</code> baseline (<code>log(1+tf) × log(N/df)</code> per query term).
+      </p>
+      <p>
+        The fielded <code>BM25</code> path uses fixed average title and body lengths (<code>12</code> and <code>400</code> tokens) in place of
+        collection-wide statistics a production indexer would compute. Absolute scores will differ from <code>Elasticsearch</code>, but ranking
+        behavior—including the effect of <code>k1</code>, <code>b</code>, and title boost—matches the mechanics above.
+      </p>
+      <p>
+        Raising <code>k1</code> on a document that repeats a query term restores repetition’s influence; setting <code>b = 0</code> removes length
+        correction and highlights the short dense hit versus a long repetitive one; switching to <code>TF-IDF sum</code> on uniform-length documents
+        often aligns the two rankers until one body grows long enough for <code>BM25</code> to diverge. Per-document breakdown lines list each
+        contributing field.
+      </p>
+      <div class="interactive-panel">
+        <h3>Documents</h3>
+        <textarea id="pgDocs" class="input-block" rows="6">neural search benchmarks | bm25 remains a strong lexical baseline across collections
+product docs | elasticsearch uses lucene bm25 similarity by default
+short title | very long body repeated token token token token token token token token
+cats and dogs | cats cats cats dogs
+dogs only here</textarea>
+        <label>Query</label>
+        <input id="pgQuery" class="input-line" type="text" value="bm25 elasticsearch" />
+        <div class="slider-row">
+          <label for="pgK1"><code>k1</code></label>
+          <input type="range" id="pgK1" min="0" max="3" step="0.05" value="1.2" />
+          <output id="pgK1Out">1.2</output>
+        </div>
+        <div class="slider-row">
+          <label for="pgB"><code>b</code></label>
+          <input type="range" id="pgB" min="0" max="1" step="0.05" value="0.75" />
+          <output id="pgBOut">0.75</output>
+        </div>
+        <div class="slider-row">
+          <label for="pgTitleBoost">title boost</label>
+          <input type="range" id="pgTitleBoost" min="0.5" max="4" step="0.1" value="2" />
+          <output id="pgTitleBoostOut">2</output>
+        </div>
+        <div class="btn-group" role="group" aria-label="Scoring mode">
+          <button type="button" class="btn active" id="pgModeBm25">BM25 (fielded)</button>
+          <button type="button" class="btn" id="pgModeTfidf">TF-IDF sum</button>
+        </div>
+        <div id="pgOut" class="playground-results" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+  <script>
+(function () {
+  'use strict';
+
+  // --- Tokenization: lowercase alphanumeric tokens (simple & deterministic)
+  function tokenize(text) {
+    return String(text || '')
+      .toLowerCase()
+      .match(/[a-z0-9]+/g) || [];
+  }
+
+  function termFreqMap(tokens) {
+    const m = Object.create(null);
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      m[t] = (m[t] || 0) + 1;
+    }
+    return m;
+  }
+
+  // --- BM25 IDF (Robertson–Walker / Lucene-style)
+  function idfBm25(N, df) {
+    const d = Math.max(0, df);
+    return Math.log((N - d + 0.5) / (d + 0.5) + 1);
+  }
+
+  function idfClassic(N, df) {
+    const d = Math.max(1, df);
+    return Math.log(N / d);
+  }
+
+  // Single-term BM25 contribution (query term frequency = 1)
+  function bm25Term(tf, dl, avgdl, k1, b, N, df) {
+    const idf = idfBm25(N, df);
+    const len = (1 - b) + b * (dl / avgdl);
+    const denom = tf + k1 * len;
+    if (denom <= 0) return { idf: idf, frac: 0, len: len };
+    const frac = (tf * (k1 + 1)) / denom;
+    return { idf: idf, frac: frac, len: len, score: idf * frac };
+  }
+
+  // --- Canvas helpers
+  function setupHiDPI(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.floor(rect.width * dpr);
+    const h = Math.floor(rect.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, cssW: rect.width, cssH: rect.height };
+  }
+
+  // Demo 1: saturation curve
+  const k1Slider = document.getElementById('k1Slider');
+  const k1Out = document.getElementById('k1Out');
+  const satCanvas = document.getElementById('satCanvas');
+
+  function drawSaturation() {
+    if (!satCanvas) return;
+    const k1 = parseFloat(k1Slider.value, 10);
+    k1Out.textContent = String(Math.round(k1 * 100) / 100);
+    const { ctx, cssW, cssH } = setupHiDPI(satCanvas);
+    ctx.clearRect(0, 0, cssW, cssH);
+    const padL = 48, padR = 24, padT = 24, padB = 40;
+    const plotW = cssW - padL - padR;
+    const plotH = cssH - padT - padB;
+    const tfMax = 80;
+    const yMax = k1 + 1;
+
+    function xPix(tf) { return padL + (tf / tfMax) * plotW; }
+    function yPix(y) { return padT + plotH - (y / yMax) * plotH; }
+
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT + plotH);
+    ctx.lineTo(padL + plotW, padT + plotH);
+    ctx.moveTo(padL, padT);
+    ctx.lineTo(padL, padT + plotH);
+    ctx.stroke();
+
+    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = 'rgba(244, 114, 182, 0.5)';
+    ctx.beginPath();
+    ctx.moveTo(padL, yPix(yMax));
+    ctx.lineTo(padL + plotW, yPix(yMax));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText('tf', padL + plotW - 16, padT + plotH + 28);
+    ctx.save();
+    ctx.translate(16, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('sat(tf)', 0, 0);
+    ctx.restore();
+    ctx.fillStyle = '#555';
+    ctx.fillText('asymptote k1+1', padL + 6, yPix(yMax) - 6);
+
+    ctx.strokeStyle = '#6c8cff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let tf = 0; tf <= tfMax; tf += 0.5) {
+      const sat = (tf * (k1 + 1)) / (tf + k1);
+      const x = xPix(tf);
+      const y = yPix(sat);
+      if (tf === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Mark tf=1,5,20
+    [1, 5, 20].forEach(function (tf) {
+      const sat = (tf * (k1 + 1)) / (tf + k1);
+      ctx.fillStyle = '#34d399';
+      ctx.beginPath();
+      ctx.arc(xPix(tf), yPix(sat), 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  if (k1Slider) {
+    k1Slider.addEventListener('input', drawSaturation);
+    window.addEventListener('resize', drawSaturation);
+    drawSaturation();
+  }
+
+  // Demo 2: length normalization bars
+  const bSlider = document.getElementById('bSlider');
+  const bOut = document.getElementById('bOut');
+  const lenCanvas = document.getElementById('lenCanvas');
+
+  function drawLengthDemo() {
+    if (!lenCanvas) return;
+    const b = parseFloat(bSlider.value, 10);
+    bOut.textContent = String(Math.round(b * 100) / 100);
+    const k1 = 1.2;
+    const tf = 5;
+    const avgdl = 500;
+    const lengths = [100, 250, 500, 1000, 4000];
+    const { ctx, cssW, cssH } = setupHiDPI(lenCanvas);
+    ctx.clearRect(0, 0, cssW, cssH);
+    const scores = lengths.map(function (dl) {
+      const r = bm25Term(tf, dl, avgdl, k1, b, 1000, 50);
+      return r.score / r.idf; // strip IDF for visual — same for all
+    });
+    let maxS = Math.max.apply(null, scores);
+    if (maxS <= 0) maxS = 1;
+    const barH = 36;
+    const gap = 14;
+    const left = 120;
+    const top0 = 40;
+    lengths.forEach(function (dl, i) {
+      const y = top0 + i * (barH + gap);
+      const w = ((cssW - left - 40) * scores[i]) / maxS;
+      ctx.fillStyle = '#8888a0';
+      ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+      ctx.textAlign = 'right';
+      ctx.fillText('dl=' + dl, left - 10, y + barH / 2 + 4);
+      ctx.fillStyle = '#181825';
+      ctx.fillRect(left, y, cssW - left - 40, barH);
+      const grd = ctx.createLinearGradient(left, y, left + w, y);
+      grd.addColorStop(0, '#6c8cff');
+      grd.addColorStop(1, '#34d399');
+      ctx.fillStyle = grd;
+      ctx.fillRect(left, y, w, barH);
+      ctx.fillStyle = '#e0e0e8';
+      ctx.textAlign = 'left';
+      ctx.fillText((Math.round(scores[i] * 1000) / 1000).toString(), left + w + 8, y + barH / 2 + 4);
+    });
+    ctx.fillStyle = '#a78bfa';
+    ctx.font = '11px monospace';
+    ctx.fillText('term component (IDF stripped), tf=5, avgdl=500, k1=1.2', 16, 22);
+  }
+
+  if (bSlider) {
+    bSlider.addEventListener('input', drawLengthDemo);
+    window.addEventListener('resize', drawLengthDemo);
+    drawLengthDemo();
+  }
+
+  // Demo 3: full calculator
+  const calcDocs = document.getElementById('calcDocs');
+  const calcQuery = document.getElementById('calcQuery');
+  const calcK1 = document.getElementById('calcK1');
+  const calcB = document.getElementById('calcB');
+  const calcK1Out = document.getElementById('calcK1Out');
+  const calcBOut = document.getElementById('calcBOut');
+  const calcOut = document.getElementById('calcOut');
+
+  function runCalculator() {
+    if (!calcDocs || !calcOut) return;
+    const k1 = parseFloat(calcK1.value, 10);
+    const b = parseFloat(calcB.value, 10);
+    calcK1Out.textContent = String(Math.round(k1 * 100) / 100);
+    calcBOut.textContent = String(Math.round(b * 100) / 100);
+
+    const lines = calcDocs.value.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    const docs = lines.map(tokenize);
+    const q = tokenize(calcQuery.value);
+    if (!docs.length || !q.length) {
+      calcOut.textContent = 'Need at least one document and a non-empty query.';
+      return;
+    }
+
+    const N = docs.length;
+    const dls = docs.map(function (t) { return Math.max(1, t.length); });
+    const sumDl = dls.reduce(function (a, x) { return a + x; }, 0);
+    const avgdl = sumDl / N;
+
+    const df = Object.create(null);
+    const docSets = docs.map(function (toks) {
+      const u = Object.create(null);
+      for (let i = 0; i < toks.length; i++) u[toks[i]] = 1;
+      return u;
+    });
+    const vocabAll = Object.create(null);
+    docs.forEach(function (toks) {
+      for (let i = 0; i < toks.length; i++) vocabAll[toks[i]] = 1;
+    });
+    Object.keys(vocabAll).forEach(function (term) {
+      let c = 0;
+      for (let i = 0; i < docSets.length; i++) if (docSets[i][term]) c++;
+      df[term] = c;
+    });
+
+    const qTerms = q;
+    const linesOut = [];
+    linesOut.push('Collection N = ' + N + ', avgdl = ' + (Math.round(avgdl * 10000) / 10000));
+    linesOut.push('k1 = ' + k1 + ', b = ' + b);
+    linesOut.push('Query terms: ' + qTerms.join(', '));
+    linesOut.push('');
+    qTerms.forEach(function (term) {
+      linesOut.push('IDF(' + term + ') = ln((N - df + 0.5)/(df + 0.5) + 1) = ' +
+        (Math.round(idfBm25(N, df[term] || 0) * 100000) / 100000) + '   (df=' + (df[term] || 0) + ')');
+    });
+    linesOut.push('');
+
+    const ranked = [];
+    for (let di = 0; di < docs.length; di++) {
+      const tfm = termFreqMap(docs[di]);
+      const dl = dls[di];
+      const lenF = (1 - b) + b * (dl / avgdl);
+      let total = 0;
+      const parts = [];
+      for (let qi = 0; qi < qTerms.length; qi++) {
+        const term = qTerms[qi];
+        const tf = tfm[term] || 0;
+        if (tf <= 0) continue;
+        const dfc = df[term] || 0;
+        const idf = idfBm25(N, dfc);
+        const denom = tf + k1 * lenF;
+        const frac = (tf * (k1 + 1)) / denom;
+        const s = idf * frac;
+        total += s;
+        parts.push(term + ': tf=' + tf + ', lenF=' + (Math.round(lenF * 10000) / 10000) +
+          ', idf=' + (Math.round(idf * 100000) / 100000) + ', contrib=' + (Math.round(s * 100000) / 100000));
+      }
+      ranked.push({ i: di, line: lines[di], total: total, parts: parts, dl: dl, lenF: lenF });
+    }
+    ranked.sort(function (a, b) { return b.total - a.total; });
+
+    ranked.forEach(function (r, idx) {
+      linesOut.push('--- Rank #' + (idx + 1) + '  score=' + (Math.round(r.total * 100000) / 100000) + '  (doc line ' + (r.i + 1) + ')');
+      linesOut.push('dl=' + r.dl + ', dl/avgdl=' + (Math.round((r.dl / avgdl) * 10000) / 10000) +
+        ', len factor (1-b+b*dl/avgdl)=' + (Math.round(r.lenF * 10000) / 10000));
+      r.parts.forEach(function (p) { linesOut.push('  ' + p); });
+      linesOut.push('text: ' + r.line);
+      linesOut.push('');
+    });
+    calcOut.textContent = linesOut.join('\n');
+  }
+
+  ['input', 'change'].forEach(function (ev) {
+    if (calcK1) calcK1.addEventListener(ev, runCalculator);
+    if (calcB) calcB.addEventListener(ev, runCalculator);
+  });
+  if (calcDocs) calcDocs.addEventListener('input', runCalculator);
+  if (calcQuery) calcQuery.addEventListener('input', runCalculator);
+  const calcRunBtn = document.getElementById('calcRun');
+  if (calcRunBtn) calcRunBtn.addEventListener('click', runCalculator);
+  runCalculator();
+
+  // Demo 4: IDF compare
+  const dfCmp = document.getElementById('dfCmp');
+  const dfCmpOut = document.getElementById('dfCmpOut');
+  const idfCompareReadout = document.getElementById('idfCompareReadout');
+
+  function runIdfCompare() {
+    if (!dfCmp || !idfCompareReadout) return;
+    const N = 100;
+    const dfc = parseInt(dfCmp.value, 10);
+    dfCmpOut.textContent = String(dfc);
+    const ib = idfBm25(N, dfc);
+    const classic = idfClassic(N, dfc);
+    idfCompareReadout.innerHTML =
+      '<div><strong>BM25 IDF:</strong> ln((N − df + 0.5)/(df + 0.5) + 1) = <code>' +
+      (Math.round(ib * 100000) / 100000) + '</code></div>' +
+      '<div style="margin-top:8px;"><strong>Classic IDF:</strong> ln(N/df) = <code>' +
+      (Math.round(classic * 100000) / 100000) + '</code></div>';
+  }
+  if (dfCmp) {
+    dfCmp.addEventListener('input', runIdfCompare);
+    runIdfCompare();
+  }
+
+  // Demo 5: BM25F two-field toy
+  const ftTitle = document.getElementById('ftTitle');
+  const lenTitle = document.getElementById('lenTitle');
+  const ftBody = document.getElementById('ftBody');
+  const lenBody = document.getElementById('lenBody');
+  const boostTitle = document.getElementById('boostTitle');
+  const bm25fOut = document.getElementById('bm25fOut');
+
+  function runBm25fDemo() {
+    if (!bm25fOut) return;
+    const tft = parseInt(ftTitle.value, 10);
+    const lt = parseInt(lenTitle.value, 10);
+    const tfb = parseInt(ftBody.value, 10);
+    const lb = parseInt(lenBody.value, 10);
+    const wb = parseFloat(boostTitle.value, 10);
+    document.getElementById('ftTitleOut').textContent = String(tft);
+    document.getElementById('lenTitleOut').textContent = String(lt);
+    document.getElementById('ftBodyOut').textContent = String(tfb);
+    document.getElementById('lenBodyOut').textContent = String(lb);
+    document.getElementById('boostTitleOut').textContent = String(Math.round(wb * 10) / 10);
+
+    const N = 1000;
+    const df = 40;
+    const k1 = 1.2;
+    const b = 0.75;
+    const idf = idfBm25(N, df);
+
+    function fieldScore(tf, len, avg) {
+      const lenF = (1 - b) + b * (len / avg);
+      const denom = tf + k1 * lenF;
+      if (denom <= 0) return 0;
+      return idf * (tf * (k1 + 1)) / denom;
+    }
+
+    const avgTitle = 12;
+    const avgBody = 500;
+    const sTitle = fieldScore(tft, lt, avgTitle);
+    const sBody = fieldScore(tfb, lb, avgBody);
+    const combined = wb * sTitle + sBody;
+    bm25fOut.textContent =
+      'Shared IDF (toy df=' + df + ', N=' + N + ') = ' + (Math.round(idf * 100000) / 100000) + '\n' +
+      'title field score ≈ ' + (Math.round(sTitle * 100000) / 100000) + '\n' +
+      'body field score  ≈ ' + (Math.round(sBody * 100000) / 100000) + '\n' +
+      'weighted total (boost_title×title + body) = ' + (Math.round(combined * 100000) / 100000);
+  }
+
+  [ftTitle, lenTitle, ftBody, lenBody, boostTitle].forEach(function (el) {
+    if (el) el.addEventListener('input', runBm25fDemo);
+  });
+  runBm25fDemo();
+
+  // --- Playground: fielded documents, BM25 vs TF-IDF
+  const pgDocs = document.getElementById('pgDocs');
+  const pgQuery = document.getElementById('pgQuery');
+  const pgK1 = document.getElementById('pgK1');
+  const pgB = document.getElementById('pgB');
+  const pgTitleBoost = document.getElementById('pgTitleBoost');
+  const pgOut = document.getElementById('pgOut');
+  let pgMode = 'bm25';
+
+  function parseFieldLine(line) {
+    const s = line.trim();
+    const pipe = s.indexOf('|');
+    if (pipe === -1) return { title: '', body: s };
+    return { title: s.slice(0, pipe).trim(), body: s.slice(pipe + 1).trim() };
+  }
+
+  function computeDfFielded(parsedDocs) {
+    const df = Object.create(null);
+    const N = parsedDocs.length;
+    for (let i = 0; i < N; i++) {
+      const seen = Object.create(null);
+      const toks = tokenize(parsedDocs[i].title).concat(tokenize(parsedDocs[i].body));
+      for (let j = 0; j < toks.length; j++) seen[toks[j]] = 1;
+      Object.keys(seen).forEach(function (t) {
+        df[t] = (df[t] || 0) + 1;
+      });
+    }
+    return df;
+  }
+
+  function scoreDocFieldedBm25(pdoc, qTerms, df, N, k1, b, titleBoost) {
+    const titleTok = tokenize(pdoc.title);
+    const bodyTok = tokenize(pdoc.body);
+    const dlTitle = Math.max(1, titleTok.length);
+    const dlBody = Math.max(1, bodyTok.length);
+    const avgTitle = 12;
+    const avgBody = 400;
+    const tfTitle = termFreqMap(titleTok);
+    const tfBody = termFreqMap(bodyTok);
+    let total = 0;
+    const lines = [];
+
+    for (let qi = 0; qi < qTerms.length; qi++) {
+      const term = qTerms[qi];
+      const dfc = df[term] || 0;
+      const idf = idfBm25(N, dfc);
+      let sub = 0;
+
+      function addField(tf, dl, avg, label, w) {
+        if (tf <= 0) return;
+        const lenF = (1 - b) + b * (dl / avg);
+        const denom = tf + k1 * lenF;
+        const frac = (tf * (k1 + 1)) / denom;
+        const sc = w * idf * frac;
+        sub += sc;
+        lines.push('  ' + label + ': tf=' + tf + ' idf×frac×w=' + (Math.round(sc * 100000) / 100000));
+      }
+
+      addField(tfTitle[term] || 0, dlTitle, avgTitle, 'title', titleBoost);
+      addField(tfBody[term] || 0, dlBody, avgBody, 'body', 1);
+      total += sub;
+    }
+    return { score: total, breakdown: lines.join('\n') };
+  }
+
+  function scoreDocTfidfSum(pdoc, qTerms, df, N) {
+    const toks = tokenize(pdoc.title).concat(tokenize(pdoc.body));
+    const tfm = termFreqMap(toks);
+    let total = 0;
+    const lines = [];
+    for (let qi = 0; qi < qTerms.length; qi++) {
+      const term = qTerms[qi];
+      const tf = tfm[term] || 0;
+      if (tf <= 0) continue;
+      const dfc = Math.max(1, df[term] || 0);
+      const idf = Math.log(N / dfc);
+      const w = Math.log(1 + tf) * idf;
+      total += w;
+      lines.push('  ' + term + ': log(1+tf)=' + (Math.round(Math.log(1 + tf) * 100000) / 100000) +
+        ' idf=' + (Math.round(idf * 100000) / 100000) + ' prod=' + (Math.round(w * 100000) / 100000));
+    }
+    return { score: total, breakdown: lines.join('\n') };
+  }
+
+  function runPlayground() {
+    if (!pgDocs || !pgQuery || !pgOut) return;
+    const k1 = parseFloat(pgK1.value, 10);
+    const b = parseFloat(pgB.value, 10);
+    const tb = parseFloat(pgTitleBoost.value, 10);
+    document.getElementById('pgK1Out').textContent = String(Math.round(k1 * 100) / 100);
+    document.getElementById('pgBOut').textContent = String(Math.round(b * 100) / 100);
+    document.getElementById('pgTitleBoostOut').textContent = String(Math.round(tb * 10) / 10);
+
+    const rawLines = pgDocs.value.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    const parsed = rawLines.map(parseFieldLine);
+    const qTerms = tokenize(pgQuery.value);
+    if (!parsed.length) {
+      pgOut.innerHTML = '<p class="callout">Add at least one document.</p>';
+      return;
+    }
+    if (!qTerms.length) {
+      pgOut.innerHTML = '<p class="callout">Query is empty after tokenization.</p>';
+      return;
+    }
+
+    const N = parsed.length;
+    const df = computeDfFielded(parsed);
+    const rows = parsed.map(function (pd, i) {
+      let r;
+      if (pgMode === 'bm25') r = scoreDocFieldedBm25(pd, qTerms, df, N, k1, b, tb);
+      else r = scoreDocTfidfSum(pd, qTerms, df, N);
+      return { i: i, line: rawLines[i], score: r.score, breakdown: r.breakdown };
+    });
+    rows.sort(function (a, b) { return b.score - a.score; });
+
+    let html = '<p style="color:var(--text-dim);font-size:0.85rem;">Mode: <strong>' +
+      (pgMode === 'bm25' ? 'BM25 (per-field lengths, title boost)' : 'TF-IDF sum over query terms') + '</strong></p>';
+    for (let r = 0; r < rows.length; r++) {
+      const x = rows[r];
+      html +=
+        '<div class="doc-card">' +
+          '<div class="rank">#' + (r + 1) + ' · score = ' + (Math.round(x.score * 100000) / 100000) + '</div>' +
+          '<div>' + x.line.replace(/</g, '&lt;').replace(/\|/g, '<span style="color:var(--accent2)"> | </span>') + '</div>' +
+          '<div class="term-breakdown">' + (x.breakdown || '(no query term hits)') + '</div>' +
+        '</div>';
+    }
+    pgOut.innerHTML = html;
+  }
+
+  const pgBtnBm25 = document.getElementById('pgModeBm25');
+  const pgBtnTfidf = document.getElementById('pgModeTfidf');
+  if (pgBtnBm25) {
+    pgBtnBm25.addEventListener('click', function () {
+      pgMode = 'bm25';
+      pgBtnBm25.classList.add('active');
+      if (pgBtnTfidf) pgBtnTfidf.classList.remove('active');
+      runPlayground();
+    });
+  }
+  if (pgBtnTfidf) {
+    pgBtnTfidf.addEventListener('click', function () {
+      pgMode = 'tfidf';
+      pgBtnTfidf.classList.add('active');
+      if (pgBtnBm25) pgBtnBm25.classList.remove('active');
+      runPlayground();
+    });
+  }
+  [pgDocs, pgQuery, pgK1, pgB, pgTitleBoost].forEach(function (el) {
+    if (el) el.addEventListener('input', runPlayground);
+  });
+  runPlayground();
+
+  // --- Scroll nav + fade-in
+  const mainNav = document.getElementById('mainNav');
+  window.addEventListener('scroll', function () {
+    if (!mainNav) return;
+    if (window.scrollY > 120) mainNav.classList.add('visible');
+    else mainNav.classList.remove('visible');
+  });
+  const io = new IntersectionObserver(
+    function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) en.target.classList.add('visible');
+      });
+    },
+    { threshold: 0.08, rootMargin: '0px 0px -8% 0px' }
+  );
+  document.querySelectorAll('.section.fade-in').forEach(function (sec) {
+    io.observe(sec);
+  });
+})();
+  </script>
+</body>
+</html>

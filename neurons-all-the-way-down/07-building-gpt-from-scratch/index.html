@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building GPT from Scratch — Neural Networks: Zero to Hero</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.btn-sm { font-size: 0.75rem; padding: 4px 10px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; max-width: 320px; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin: 24px 0; }
+.qa-box .q { font-weight: 700; color: var(--accent2); margin-bottom: 12px; }
+.qa-box p:last-child { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 80px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; }
+.ln { display: inline-block; width: 32px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 14px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.08); border-left: 2px solid var(--accent); margin-left: -16px; padding-left: 14px; }
+.line.new { background: rgba(52, 211, 153, 0.08); border-left: 2px solid var(--accent3); margin-left: -16px; padding-left: 14px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.85; text-decoration: underline dotted; }
+.code-note { padding: 12px 16px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; display: none; }
+.code-note strong { color: var(--accent); }
+.code-progression { margin: 28px 0; }
+.step-caption { margin-top: 12px; font-size: 0.9rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 16px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 16px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+canvas { border-radius: var(--radius); display: block; max-width: 100%; height: auto; background: var(--bg-card-alt); border: 1px solid var(--border); }
+.arch-diagram { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; min-height: 200px; padding: 24px; background: var(--bg-card-alt); border-radius: var(--radius); border: 1px solid var(--border); margin-top: 16px; }
+.arch-box { padding: 14px 20px; border-radius: 10px; border: 2px solid var(--accent); background: rgba(108,140,255,0.12); font-family: var(--mono); font-size: 0.8rem; color: var(--text); opacity: 0; transform: scale(0.9); transition: all 0.35s ease; }
+.arch-box.show { opacity: 1; transform: scale(1); }
+.arch-arrow { color: var(--text-dim); font-size: 1.2rem; opacity: 0; transition: opacity 0.3s; }
+.arch-arrow.show { opacity: 1; }
+.heatmap-wrap { overflow: auto; max-height: 400px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card-alt); padding: 8px; }
+.heatmap-grid { display: grid; gap: 1px; background: var(--border); width: max-content; margin: 0 auto; }
+.heatmap-cell { width: 20px; height: 20px; cursor: pointer; border: none; padding: 0; transition: transform 0.12s; }
+.heatmap-cell:hover { transform: scale(1.2); z-index: 2; outline: 2px solid var(--accent); }
+.pe-canvas-wrap { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.bar-row { display: flex; align-items: flex-end; gap: 4px; height: 160px; margin: 16px 0; }
+.bar-item { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bar-fill { width: 100%; background: linear-gradient(180deg, var(--accent3), var(--accent)); border-radius: 4px 4px 0 0; min-height: 2px; transition: height 0.2s; }
+.bar-label { font-family: var(--mono); font-size: 0.55rem; color: var(--text-dim); }
+.matrix-tip { font-family: var(--mono); font-size: 0.8rem; color: var(--accent5); margin-top: 12px; min-height: 2.5em; }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">NN Zero to Hero</a><span class="bc-sep">›</span><span class="bc-current">Building GPT from Scratch</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Neural Networks: Zero to Hero</a>
+  <div class="nav-links"><a href="#s0">Intro</a><a href="#s1">Transformer</a><a href="#s2">Data</a><a href="#s3">Bigram</a><a href="#s4">Attention</a><a href="#s5">Scaled</a><a href="#s6">Causal</a><a href="#s7">Softmax</a><a href="#s8">Multi-head</a><a href="#s9">Positional</a><a href="#s10">FFN</a><a href="#s11">ResNorm</a><a href="#s12">Block</a><a href="#s13">Stack</a><a href="#s14">Dropout</a><a href="#s15">GPT</a><a href="#s16">Train</a><a href="#s17">Generate</a><a href="#s18">Enc/Dec</a><a href="#s19">Scale</a><a href="#s20">Playground</a></div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Building GPT from Scratch</h1>
+    <p class="subtitle">Implement a decoder-only Transformer in PyTorch: from a bigram baseline through self-attention, multi-head blocks, and training on character-level Shakespeare — the same architectural blueprint that scales to large language models.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">28</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">9</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:760px;margin:0 auto;">
+      This chapter walks through <code>token</code> embeddings, causal <code>self-attention</code> with the <code>wei</code> weight matrix, <code>scaled_dot_product_attention</code>, <code>MultiHeadAttention</code>, feed-forward <code>MLP</code> sublayers, <code>LayerNorm</code> and residuals, stacking <code>n_layer</code>, <code>dropout</code>, and the full forward path <code>embedding → blocks → ln_f → lm_head</code>. You will see how training minimizes cross-entropy and how autoregressive sampling produces new text.
+    </p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Language models and probabilistic completion</h2>
+    
+<p>A <strong>language model</strong> assigns probabilities to sequences of discrete units (words, subwords, or characters) and extends a prefix by sampling the next unit again and again. At core it performs <strong>conditional next-step prediction</strong>.</p>
+<p>Because the next token is sampled from a distribution, the same prompt can yield different continuations. Ask twice for a haiku about why people should understand AI, and you might get two competent poems with different images and line breaks. That is not a bug: it is the defining behavior of a <em>stochastic</em> completer. The model defines <code>P(x_{t+1} | x_1, …, x_t)</code>; it does not define a single canonical completion. Temperature, top-<em>k</em>, and nucleus sampling change how sharply you draw from that distribution.</p>
+<div class="formula">P(sequence) = ∏<sub>t</sub> P(x<sub>t</sub> | x<sub>&lt;t</sub>)</div>
+<div class="callout"><p><strong>Key idea:</strong> A language model is a <em>probabilistic</em> engine over tokens. “Understanding” and “reasoning” emerge from compressing statistical regularities in training data into weights — the architecture we build here is the workhorse inside that story.</p></div>
+<p>In production stacks, the same core is paired with retrieval, tool use, safety filters, and alignment stages. Here we focus on the <strong>decoder-only Transformer</strong> that performs the raw next-token prediction.</p>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>“Attention Is All You Need” and what GPT stands for</h2>
+    
+<p>The <strong>Transformer</strong> architecture was introduced in the 2017 paper <em>Attention Is All You Need</em> (Vaswani et al.). On the page it can read like a specialized machine-translation system—and that was the original target: encode a source sentence and decode a translation. The same core—multi-head self-attention, position-aware embeddings, feed-forward sublayers, residuals, and depth—was reused with minor engineering tweaks in a huge fraction of later models.</p>
+<p><strong>GPT</strong> stands for <strong>Generatively Pre-trained Transformer</strong>: generative because it models the joint distribution of sequences; pre-trained because a large stage fits weights on broad text before task-specific adaptation; Transformer because attention blocks perform the heavy lifting.</p>
+<p>The title’s “Attention Is All You Need” slogan highlights what changed relative to RNN-heavy stacks: attention is the primary <em>routing</em> mechanism that lets tokens exchange information across distance in parallel. The surrounding MLPs still matter—they are per-token computation after mixing—but the architectural bet is on attention as the workhorse.</p>
+<div class="comparison">
+  <div class="card"><h3 style="color:var(--accent3);">Transformer core</h3><p>Alternating <strong>communication</strong> (attention mixes positions) and <strong>computation</strong> (position-wise MLP thinks locally).</p></div>
+  <div class="card"><h3 style="color:var(--accent2);">GPT family</h3><p>Stacks those blocks in a <strong>decoder-only</strong>, left-to-right, causally masked form suited to open-ended generation.</p></div>
+</div>
+<p>Minor engineering details differ across years (activation, normalization placement, parameter sharing), but the blueprint you will code — embeddings, causal attention, FFN, residuals, depth — matches what scales to billions of parameters.</p>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Tiny Shakespeare and character-level tokenization</h2>
+    
+<p>We train on <strong>Tiny Shakespeare</strong> — about one million characters in a single <code>input.txt</code> file. Character-level tokenization (<code>stoi</code>/<code>itos</code>, <code>vocab_size ≈ 65</code>) follows the same pipeline as <a href="../02-intro-to-language-modeling/">Chapter 02</a>; here it is applied to one long concatenated corpus instead of per-name lines.</p>
+<p>Production systems often use subword tokenizers (SentencePiece, tiktoken) to trade codebook size against sequence length. We stay character-level so Transformer mechanics stay transparent while the plumbing stays simple.</p>
+<p>After encoding, split the tensor: <strong>first 90%</strong> train, <strong>last 10%</strong> validation. Training draws <strong>random chunks</strong> of length <code>block_size</code> (context length). With <code>block_size = 8</code>, a slice <code>x[0], …, x[8]</code> yields inputs <code>X = x[0:8]</code> and targets <code>Y = x[1:9]</code> — eight supervised next-character problems in one pass, calibrated for both short and long prefixes at generation time. Beyond <code>block_size</code> you must crop, because positional embeddings only cover indices <code>0 … block_size−1</code>.</p>
+<p>Stack <code>batch_size</code> independent chunks for GPU throughput: with <code>batch_size = 4</code> and <code>block_size = 8</code>, you get <code>X</code> of shape <code>(4, 8)</code> and <strong>32</strong> independent predictions per forward pass. Batch rows never share attention edges.</p>
+<div class="jupyter-cell">
+<div class="cell-header"><span class="cell-label">In [1]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+<pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">with</span> <span class="fn">open</span>(<span class="str">'input.txt'</span>, <span class="str">'r'</span>) <span class="kw">as</span> f:</span></code>
+<code><span class="line"><span class="ln">2</span>    text = f.<span class="fn">read</span>()</span></code>
+<code><span class="line"><span class="ln">3</span>chars = <span class="fn">sorted</span>(<span class="fn">list</span>(<span class="fn">set</span>(text)))</span></code>
+<code><span class="line"><span class="ln">4</span>vocab_size = <span class="fn">len</span>(chars)  <span class="cmt"># often ~65</span></span></code></pre>
+<div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [1]</span><pre class="output-text">len(text) ≈ 1_000_000
+vocab_size = 65</pre></div>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Baseline: bigram model as an embedding lookup</h2>
+    
+<p>The simplest neural language model scores the next token from the <strong>current</strong> token alone: <code>nn.Embedding(vocab_size, vocab_size)</code> indexed by id returns a row of logits. <a href="../02-intro-to-language-modeling/">Chapter 02</a> derived the same idea as counts and gradients; here it is the baseline before adding context.</p>
+<p>After reshaping to <code>(B*T, vocab_size)</code> for cross-entropy, the first random loss is about <strong>4.87</strong> with <code>vocab_size = 65</code>. Uniform guessing gives <strong>ln(65) ≈ 4.17</strong>; seeing <strong>4.87 &gt; 4.17</strong> confirms the loss is wired correctly. Trained bigram runs on this corpus often land near <strong>val loss ≈ 2.5</strong>.</p>
+<p>The shared <code>generate</code> routine feeds the full growing prefix even though only the last token matters for bigrams — one code path survives when self-attention is added later. Sampling uses the last time index’s logits, <code>softmax</code>, and <code>torch.multinomial</code> (one draw per batch row). A common starting token is integer <strong>0</strong>, which in this encoding is typically the <strong>newline</strong>—a neutral way to begin “at the start of a line.” Before training, generations read as noise; after optimization they pick up bigram texture but remain globally incoherent.</p>
+<div class="code-section">
+<div class="code-explanation">
+<h3>Why this shape?</h3>
+<p>Input <code>idx</code> has shape <code>(B, T)</code>. Embedding lookup yields <code>(B, T, C)</code> with <code>C = vocab_size</code> for the pure bigram parameterization. Those tensors are interpreted as logits for a categorical distribution at every position.</p>
+<div class="callout warn"><p><strong>PyTorch detail:</strong> <code>F.cross_entropy</code> expects class dimension in a specific layout; reshape to <code>(B*T, C)</code> for logits and <code>(B*T)</code> for targets before the loss call.</p></div>
+</div>
+<div class="code-panel">
+<div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L12–24</span></div>
+<pre class="code-block annotated"><code><span class="line"><span class="ln">12</span><span class="kw">class</span> <span class="fn">BigramLanguageModel</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">13</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, vocab_size):</span></code>
+<code><span class="line"><span class="ln">14</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">15</span>        <span class="arg">self</span>.token_embedding_table = nn.<span class="fn">Embedding</span>(vocab_size, vocab_size)</span></code>
+<code><span class="line"><span class="ln">16</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, idx, targets=<span class="kw">None</span>):</span></code>
+<code><span class="line hl"><span class="ln">17</span>        logits = <span class="arg">self</span>.token_embedding_table(idx)</span></code>
+<code><span class="line"><span class="ln">18</span>        loss = <span class="kw">None</span></span></code>
+<code><span class="line"><span class="ln">19</span>        <span class="kw">if</span> targets <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span>:</span></code>
+<code><span class="line"><span class="ln">20</span>            B, T, C = logits.shape</span></code>
+<code><span class="line hl"><span class="ln">21</span>            logits = logits.<span class="fn">view</span>(B*T, C)</span></code>
+<code><span class="line"><span class="ln">22</span>            targets = targets.<span class="fn">view</span>(B*T)</span></code>
+<code><span class="line hl"><span class="ln">23</span>            loss = F.<span class="fn">cross_entropy</span>(logits, targets)</span></code>
+<code><span class="line"><span class="ln">24</span>        <span class="kw">return</span> logits, loss</span></code>
+</pre>
+<div class="code-note" data-panel="1"></div>
+</div>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Self-attention: queries, keys, and values</h2>
+    
+<p>Before learned queries and keys, a useful warmup is <strong>causal averaging</strong> (sometimes described informally as a <strong>bag-of-words</strong> over the past): for each time <code>t</code>, replace the token vector with the mean of its own vector and all previous vectors. That coupling is extremely lossy—spatial order within the prefix is washed out—but it introduces the key implementation trick: a <strong>lower-triangular</strong> matrix of weights, row-normalized to sum to one, left-multiplies the sequence matrix so each row becomes a weighted sum of allowed predecessors. Plain matrix multiply with a mask of ones under the diagonal implements cumulative sums; dividing each row by its count implements cumulative <em>means</em>. PyTorch’s <code>tril</code> builds that mask; batched <code>@</code> applies the same logic independently for every batch row.</p>
+<p>To let positions <strong>communicate</strong> in a data-dependent way, each token builds three linear projections: a <strong>query</strong> <code>q</code> (“what am I looking for?”), a <strong>key</strong> <code>k</code> (“what do I contain?”), and a <strong>value</strong> <code>v</code> (“what do I broadcast if selected?”). Raw affinities are <code>wei = q @ k^T</code> with the last two dimensions transposed appropriately under a batch dimension.</p>
+<p>Intuition: an eighth-position token might behave like a vowel that “asks” for consonantal evidence earlier in the prefix; if some channel in a key vector encodes “consonant in positions ≤4,” the dot product can spike and <code>softmax</code> will route a large fraction of mass to that key’s <strong>value</strong> vector. You aggregate <code>v</code>, not the raw token embedding <code>x</code>: think of <code>x</code> as private state, and <code>v</code> as the packet you agree to transmit to whoever finds you relevant.</p>
+<div class="callout"><p><strong>Directed-graph view:</strong> attention is a <strong>communication mechanism</strong> on a graph. In autoregressive language modeling with eight slots, node 1 listens only to itself, node 2 to {1,2}, …, node 8 to {1…8}. Other tasks use other topologies: bidirectional encoder blocks (e.g. for sentence-level classification) omit the future mask so all nodes may attend to all nodes. <strong>Cross-attention</strong> is the general case where queries come from one stream and keys/values from another—as in encoder–decoder translation, where decoder queries read from encoder memory.</p></div>
+<div class="callout ok"><p><strong>Worked micro-example (why <code>tril</code> + matmul = causal sums).</strong> Let <code>B</code> be a 3×2 matrix of token features. With a 3×3 matrix of all ones, the first row of the product is the column-wise sum across all three rows—e.g. first column <strong>2+6+6 = 14</strong> if that column is <code>[2,6,6]^T</code>, second column <strong>7+4+5 = 16</strong> if it is <code>[7,4,5]^T</code>. Replace the all-ones matrix by a <strong>lower-triangular mask of ones</strong>: row 1 selects only the top row of <code>B</code>; row 2 sums rows 1–2 (<strong>2+6 = 8</strong> and <strong>7+4 = 11</strong> in this toy); row 3 sums all three (<strong>14</strong> and <strong>16</strong>). Renormalize each mask row to sum to one and those partial sums become <strong>causal means</strong>—the bag-of-previous-tokens construction, vectorized without a Python loop over time.</p></div>
+<div class="interactive-panel">
+<h3>Demo: attention pattern heatmap (causal 8×8)</h3>
+<p>Hover a cell to read the normalized weight from key position → query position after softmax and masking. Brightness encodes magnitude.</p>
+<div class="heatmap-wrap"><div class="heatmap-grid" id="heatmapGrid" style="grid-template-columns: repeat(8, 20px);"><button type="button" class="heatmap-cell" data-i="0" data-j="0" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="0" data-j="1" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="0" data-j="2" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="0" data-j="3" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="0" data-j="4" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="0" data-j="5" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="0" data-j="6" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="0" data-j="7" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="1" data-j="0" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="1" data-j="1" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="1" data-j="2" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="1" data-j="3" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="1" data-j="4" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="1" data-j="5" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="1" data-j="6" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="1" data-j="7" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="2" data-j="0" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="2" data-j="1" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="2" data-j="2" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="2" data-j="3" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="2" data-j="4" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="2" data-j="5" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="2" data-j="6" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="2" data-j="7" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="3" data-j="0" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="3" data-j="1" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="3" data-j="2" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="3" data-j="3" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="3" data-j="4" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="3" data-j="5" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="3" data-j="6" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="3" data-j="7" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="4" data-j="0" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="4" data-j="1" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="4" data-j="2" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="4" data-j="3" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="4" data-j="4" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="4" data-j="5" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="4" data-j="6" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="4" data-j="7" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="5" data-j="0" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="5" data-j="1" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="5" data-j="2" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="5" data-j="3" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="5" data-j="4" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="5" data-j="5" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="5" data-j="6" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="5" data-j="7" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="6" data-j="0" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="6" data-j="1" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="6" data-j="2" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="6" data-j="3" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="6" data-j="4" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="6" data-j="5" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="6" data-j="6" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="6" data-j="7" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="7" data-j="0" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="7" data-j="1" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="7" data-j="2" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="7" data-j="3" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="7" data-j="4" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="7" data-j="5" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="7" data-j="6" style="background:#222;" aria-label="cell"></button><button type="button" class="heatmap-cell" data-i="7" data-j="7" style="background:#222;" aria-label="cell"></button></div></div>
+<p class="heatmap-legend" id="heatmapLegend">Hover a cell</p>
+</div>
+<div class="code-section">
+<div class="code-explanation">
+<h3>Single attention head</h3>
+<p>Project <code>x</code> with learned matrices to <code>q</code>, <code>k</code>, <code>v</code>. Affinity matrix before mask: <code>wei = q @ k.transpose(-2,-1)</code>. The story continues in the next sections with scaling, masking, softmax, and the <code>@ v</code> aggregation.</p>
+</div>
+<div class="code-panel">
+<div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L40–52</span></div>
+<pre class="code-block annotated"><code><span class="line"><span class="ln">40</span>head_size = <span class="num">16</span></span></code>
+<code><span class="line hl"><span class="ln">41</span>key = <span class="arg">self</span>.key(x); query = <span class="arg">self</span>.query(x)</span></code>
+<code><span class="line hl"><span class="ln">42</span>wei = query @ key.<span class="fn">transpose</span>(-<span class="num">2</span>, -<span class="num">1</span>)</span></code>
+<code><span class="line"><span class="ln">43</span><span class="cmt"># (B, T, hs) @ (B, hs, T) → (B, T, T)</span></span></code>
+<code><span class="line"><span class="ln">44</span>wei = wei.<span class="fn">masked_fill</span>(tril==<span class="num">0</span>, float(<span class="str">'-inf'</span>))</span></code>
+<code><span class="line"><span class="ln">45</span>wei = F.<span class="fn">softmax</span>(wei, dim=-<span class="num">1</span>)</span></code>
+<code><span class="line hl"><span class="ln">46</span>value = <span class="arg">self</span>.value(x)</span></code>
+<code><span class="line hl"><span class="ln">47</span>out = wei @ value</span></code>
+<code><span class="line"><span class="ln">48</span><span class="kw">return</span> out</span></code>
+</pre>
+<div class="code-note" data-panel="1"></div>
+</div>
+</div>
+<div class="callout"><p><strong>Implementation note:</strong> the causal mask <code>tril</code> is not a learned parameter; in PyTorch it is usually registered as a <strong>buffer</strong> on the module so it moves with the model to GPU and appears in <code>state_dict</code> handling, but is excluded from gradient updates. After a single head is wired with scaled dot-product, masked softmax, and values, training typically needs a <em>lower</em> learning rate than the bigram baseline.</p></div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Scaled dot-product attention</h2>
+    
+<div class="formula">Attention(Q, K, V) = softmax(QK<sup>T</sup> / √d<sub>k</sub>) V</div>
+<p>Dot products grow in variance with dimension. If <code>q</code> and <code>k</code> are roughly zero-mean, unit-variance per dimension, the dot product variance scales with <strong>head size</strong> <code>d_k</code>. Multiplying the logits by <strong>1/√d_k</strong> restores unit-scale variance before the nonlinearity. That is the <strong>scaled</strong> in “scaled dot-product attention” from the paper.</p>
+<p>Why care for <code>softmax</code>? Compare applying <code>softmax</code> to a nearly flat vector versus the same vector scaled by a large constant (say ×8). In the flat case you get a diffuse distribution; as magnitudes grow, mass collapses onto the argmax—approaching a one-hot. At initialization you do <em>not</em> want every token to listen to only one predecessor; you want broad, trainable mixing. Scaling keeps pre-softmax scores moderate so early training remains stable.</p>
+<p>Dividing by <code>sqrt(head_size)</code> in code (e.g. <code>head_size = 16</code> in a first head) is therefore not cosmetic—it is variance control feeding directly into the sharpness of attention weights.</p>
+<div class="callout"><p><strong>You might wonder:</strong> is scaling optional? For toy dims it can seem fine; for width 64, 128, … it becomes essential for stable optimization at depth.</p></div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Causal masking and the <code>wei</code> matrix</h2>
+    
+<p>Language modeling conditions on the <strong>past only</strong>. For position <code>t</code>, logits predicting token <code>t+1</code> must not depend on tokens <code>&gt;t</code>. A clean pattern: start from a lower-triangular scaffold, set entries where <code>tril == 0</code> to <strong>negative infinity</strong> via <code>masked_fill</code>, then apply <code>softmax</code> along the key dimension. Future positions contribute <code>exp(−∞) = 0</code>. Before masking, raw <code>wei</code> may show positive and negative affinities between all pairs; the upper triangle is then disallowed.</p>
+<p>It is common to name the pre-softmax affinity tensor <code>wei</code> while learning — think “weights” in gestation. Initialize it to zeros (before learned <code>q</code>/<code>k</code>) and uniform mixing appears; after learning, rows become sparse or peaked depending on context. After <code>masked_fill</code> and <code>softmax</code>, each row is a proper convex combination of past value vectors.</p>
+<div class="callout warn"><p><strong>Attention has no built-in notion of “left vs. right.”</strong> Without positional encodings, permuting token order would yield the same pairwise attention structure up to permutation. Convolution, by contrast, bakes in locality on a grid. That is why we add token and position embeddings before attention: you must inject structural bias explicitly.</p></div>
+<div class="interactive-panel">
+<h3>Demo: self-attention matrix visualizer</h3>
+<p>Move the mouse over the grid; the tooltip line shows row index (query time), column index (key time), and example weight.</p>
+<div class="heatmap-wrap"><div class="heatmap-grid" id="weiVizGrid" style="grid-template-columns: repeat(8, 24px);"></div></div>
+<p class="matrix-tip" id="weiVizTip">—</p>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Softmax turns affinities into mixture weights</h2>
+    
+<div class="formula">softmax(z)<sub>i</sub> = exp(z<sub>i</sub>) / Σ<sub>j</sub> exp(z<sub>j</sub>)</div>
+<p>Exponentiation emphasizes larger logits; normalization forces non-negative entries summing to one. Combined with causal masking, row <code>t</code> assigns zero mass to all future columns.</p>
+<p>Concretely, <code>softmax(z)_i = exp(z_i) / Σ_j exp(z_j)</code>. If all <code>z_i</code> are near zero, the outputs approximate a uniform distribution over the allowed (unmasked) entries. Multiply <code>z</code> by a large scalar and the largest coordinate hogs probability mass—useful to understand temperature in sampling, and useful to fear at the attention layer if pre-softmax logits are poorly scaled.</p>
+<p>If logits are tiny, the distribution is diffuse (closer to uniform over allowed positions). If logits are huge, one entry dominates — a hard selection. Training nudges the network toward confident but not pathological peaks.</p>
+<div class="interactive-panel">
+<h3>Demo: temperature / sampling explorer</h3>
+<p>Synthetic logits for five next tokens. Temperature divides logits before softmax; lower temperature sharpens the distribution (greedy-like), higher flattens it.</p>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+<label style="color:var(--text-dim);font-family:var(--mono);">T =</label>
+<input type="range" id="tempSlider" min="20" max="200" value="100" aria-label="temperature">
+<span class="slider-value" id="tempVal">1.00</span>
+</div>
+<div class="bar-row" id="tempBars"></div>
+<p class="step-caption" id="tempCaption">Entropy decreases as T → 0.</p>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Multi-head attention: parallel heads, concatenate</h2>
+    
+<p>A single head must compress everything into one subspace. <strong>Multi-head attention</strong> runs several attention operations in parallel with separate <code>W_q, W_k, W_v</code> projections, then concatenates along the channel axis and linearly mixes with an output projection.</p>
+<p>In a compact educational setup with <code>n_embd = 32</code> and <strong>four heads</strong>, each head often uses dimension <strong>8</strong> so that <code>4 × 8 = 32</code> channels match after concatenation—analogous in spirit to <strong>grouped</strong> filters in convolution: multiple independent communication pathways, each narrower, then fused. Different heads specialize to different relational patterns (local punctuation, vowel–consonant rhythm, longer-range line structure, etc.).</p>
+<div class="comparison">
+  <div class="card"><h3 style="color:var(--accent3);">Single head</h3><p>One routing pattern; simpler, fewer parameters per layer; can underfit rich syntactic/semantic patterns.</p></div>
+  <div class="card"><h3 style="color:var(--accent2);">Multi-head</h3><p>Multiple independent attention subspaces; analogous to grouped filters in CNNs; better capacity at similar total width.</p></div>
+</div>
+<div class="interactive-panel">
+<h3>Demo: multi-head mixing</h3>
+<p>Two synthetic heads emphasize different offsets (local vs. medium range). The stacked bar shows per-head contribution to a position’s incoming mixture mass (illustrative).</p>
+<canvas id="multiHeadCanvas" width="560" height="220"></canvas>
+</div>
+<div class="code-section">
+<div class="code-explanation">
+<h3><code>MultiHeadAttention</code> structure</h3>
+<p>Each <code>Head</code> returns <code>(B,T,head_size)</code>. <code>torch.cat</code> on dim=-1 restores <code>n_embd</code>. A final linear projects back to model width.</p>
+</div>
+<div class="code-panel">
+<div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L70–88</span></div>
+<pre class="code-block annotated"><code><span class="line"><span class="ln">70</span><span class="kw">class</span> <span class="fn">MultiHeadAttention</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">71</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, num_heads, head_size, n_embd):</span></code>
+<code><span class="line"><span class="ln">72</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">73</span>        <span class="arg">self</span>.heads = nn.<span class="fn">ModuleList</span>([Head(...) <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(num_heads)])</span></code>
+<code><span class="line hl"><span class="ln">74</span>        <span class="arg">self</span>.proj = nn.<span class="fn">Linear</span>(n_embd, n_embd)</span></code>
+<code><span class="line"><span class="ln">75</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">76</span>        out = torch.<span class="fn">cat</span>([h(x) <span class="kw">for</span> h <span class="kw">in</span> <span class="arg">self</span>.heads], dim=-<span class="num">1</span>)</span></code>
+<code><span class="line"><span class="ln">77</span>        out = <span class="arg">self</span>.proj(out)</span></code>
+<code><span class="line"><span class="ln">78</span>        <span class="kw">return</span> out</span></code>
+</pre>
+<div class="code-note" data-panel="1"></div>
+</div>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Positional encodings: token + position embeddings</h2>
+    
+<p>Self-attention is <strong>permutation equivariant</strong> on its own: it has no notion of left vs. right unless you inject positional information. Add a learned table <code>position_embedding_table</code> of shape <code>(block_size, n_embd)</code> to the token embeddings.</p>
+<div class="formula">x = token_emb(idx) + pos_emb(0:T)</div>
+<p>Broadcasting aligns <code>(B,T,n_embd)</code> with <code>(T,n_embd)</code>. During generation, never feed more than <code>block_size</code> tokens without cropping, or indices exceed the position table.</p>
+<p>It helps to introduce an intermediate width <code>n_embd</code> (for example <strong>32</strong> in a toy configuration) even before attention: <code>token_embedding_table</code> maps <code>vocab_size → n_embd</code>, and a separate <code>lm_head</code> linear maps <code>n_embd → vocab_size</code> to produce logits. For a pure bigram model, position embeddings carry no useful gradient signal (translation invariance), but the moment self-attention couples positions, those positional vectors become essential.</p>
+<p>Attention is applied per batch index: you can picture <code>batch_size</code> disjoint graphs. With <code>B = 4</code> and <code>T = 8</code>, you have four separate pools of eight nodes — no edges between pools. Batched matrix multiply is purely a performance convenience.</p>
+<div class="formula">PE<sub>(pos, 2i)</sub> = sin(pos / 10000<sup>2i/d</sup>)  PE<sub>(pos, 2i+1)</sub> = cos(pos / 10000<sup>2i/d</sup>)</div>
+<div class="interactive-panel">
+<h3>Demo: sinusoidal positional basis (illustration)</h3>
+<p>The original paper used fixed sines/cosines; learned embeddings are common in GPT-style models. This canvas plots PE<sub>(pos,2i)</sub> = sin(pos / 10000<sup>2i/d</sup>) for a few dimensions.</p>
+<div class="pe-canvas-wrap"><canvas id="peCanvas" width="560" height="240"></canvas></div>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Feed-forward network (MLP) inside each block</h2>
+    
+<p>After attention mixes information across positions, each position needs <strong>private</strong> computation. The Transformer block’s MLP applies the same two-layer network at every time step independently. A minimal first version is <code>Linear → ReLU → Linear</code> confined to per-token channels. The original Transformer diagram labels this “position-wise feed-forward network”; the paper’s prototype sizes used an inner dimension <strong>four times</strong> the model width (e.g. 512-dimensional residual vectors with a 2048-dimensional inner layer). Matching that <strong>4× expansion</strong> in tiny models is a deliberate echo of the same compute pattern.</p>
+<div class="callout ok"><p><strong>Loss checkpoint:</strong> moving from attention-only wiring to attention-plus-MLP on Tiny Shakespeare often shaves validation loss on the order of <strong>≈2.28 → ≈2.24</strong> under comparable training budgets—the generations still look rough, but the trend confirms that nonlinearity after mixing helps.</p></div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Residual connections and layer normalization</h2>
+    
+<p><strong>Residuals</strong> fork around sublayers: <code>x = x + sublayer(ln(x))</code> in the common <em>pre-norm</em> arrangement. Skip connections let gradient flow directly through addition nodes, so early layers receive supervision even in deep stacks.</p>
+<p><strong>LayerNorm</strong> normalizes each token’s activations across the embedding dimension (see formula below). Unlike <strong>BatchNorm</strong> (<a href="../04-activations-gradients-batchnorm/">Chapter 04</a>), it needs no running statistics and behaves the same at train and test time — which is why Transformers use it by default.</p>
+<div class="formula">LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β  (per token, μ, σ over embedding dim)</div>
+<div class="callout warn"><p><strong>Post-LN vs pre-LN:</strong> the original “Attention Is All You Need” figures place “Add &amp; Norm” <em>after</em> the sublayer. Many contemporary decoder stacks (including GPT-style training recipes) apply LayerNorm <em>before</em> attention and before the MLP—the <strong>pre-norm</strong> variant. Same modules; different wiring. Pre-norm tends to optimize more smoothly when depth grows.</p></div>
+<div class="callout ok"><p><strong>Loss checkpoint:</strong> after pre-norm LayerNorm inside each block plus a final <code>ln_f</code> before <code>lm_head</code>, validation loss on Tiny Shakespeare often lands near <strong>≈2.06</strong> before aggressive scaling — down from roughly <strong>2.28</strong> at the first architectural additions. The win grows more pronounced as width and depth increase.</p></div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>One Transformer block: attention + FFN + residuals</h2>
+    
+<div class="interactive-panel">
+<h3>Demo: architecture builder</h3>
+<p>Reveal how submodules chain inside a decoder block.</p>
+<div class="btn-group" id="archBtns">
+<button type="button" class="btn active" onclick="archStep(0)">1. Embedding</button>
+<button type="button" class="btn" onclick="archStep(1)">2. + Attention</button>
+<button type="button" class="btn" onclick="archStep(2)">3. + FFN</button>
+<button type="button" class="btn" onclick="archStep(3)">4. + Residual &amp; Norm</button>
+<button type="button" class="btn" onclick="archStep(4)">5. Stack depth</button>
+</div>
+<div class="arch-diagram" id="archDiagram">
+<span class="arch-box" id="ab0">token + pos emb</span><span class="arch-arrow" id="aa01">→</span><span class="arch-box" id="ab1">causal multi-head</span><span class="arch-arrow" id="aa12">→</span><span class="arch-box" id="ab2">FFN MLP</span><span class="arch-arrow" id="aa23">→</span><span class="arch-box" id="ab3">+ residual, LayerNorm</span><span class="arch-arrow" id="aa34">→</span><span class="arch-box" id="ab4">× n_layer blocks</span>
+</div>
+</div>
+<div class="code-section">
+<div class="code-explanation">
+<h3><code>Block</code> forward</h3>
+<p>Pre-norm self-attention sublayer, then pre-norm MLP. Dropout may appear after attention and after MLP when enabled.</p>
+</div>
+<div class="code-panel">
+<div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L95–110</span></div>
+<pre class="code-block annotated"><code><span class="line"><span class="ln">95</span><span class="kw">class</span> <span class="fn">Block</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">96</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">97</span>        x = x + <span class="arg">self</span>.sa(<span class="arg">self</span>.ln1(x))</span></code>
+<code><span class="line hl"><span class="ln">98</span>        x = x + <span class="arg">self</span>.ffwd(<span class="arg">self</span>.ln2(x))</span></code>
+<code><span class="line"><span class="ln">99</span>        <span class="kw">return</span> x</span></code>
+</pre>
+<div class="code-note" data-panel="1"></div>
+</div>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Stacking blocks: <code>n_layer</code> depth</h2>
+    
+<p>Repeat the block <code>n_layer</code> times via <code>nn.Sequential</code> or <code>ModuleList</code>. Depth increases receptive field through repeated mixing: later layers indirectly integrate information from farther away, bounded by context length <code>block_size</code>.</p>
+<p>Width (<code>n_embd</code>), depth (<code>n_layer</code>), heads, and FFN expansion together determine parameter count and compute.</p>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s14">
+  <div class="container">
+    <span class="section-num">14</span>
+    <h2>Dropout as regularization</h2>
+    
+<p><code>nn.Dropout(p)</code> randomly zeroes a subset of activations (or attention weights) on each forward pass during training. The mask changes every step, which effectively trains a mixture of many “thinned” sub-networks; at evaluation time dropout is disabled so those sub-networks are averaged in expectation. The technique originates in the mid-2010s literature on regularizing large nets by breaking co-adaptation.</p>
+<p>Typical placements in a decoder block: on attention probabilities after <code>softmax</code>, on the attention output after the output projection, on the residual path back into the trunk, and inside the MLP. For Tiny Shakespeare, once you widen and deepen the model, <strong>dropout with <code>p ≈ 0.2</code></strong> (20% of the nominated activations dropped per pass) is a practical default when you fear overfitting to a one-megabyte corpus.</p>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s15">
+  <div class="container">
+    <span class="section-num">15</span>
+    <h2>Full GPT module: embeddings, blocks, final norm, LM head</h2>
+    
+<div class="formula">logits = lm_head( ln_f( blocks( token_emb(idx) + pos_emb(0…T−1) ) ) )</div>
+<p>The class holds <code>token_embedding_table</code>, <code>position_embedding_table</code>, a sequence of <code>Block</code> modules, final <code>ln_f</code>, and <code>lm_head</code> mapping <code>n_embd → vocab_size</code>. Some implementations weight-tie the token embedding with <code>lm_head</code> to save parameters; pedagogical code often keeps them separate for clarity.</p>
+<p>A representative “small but serious” Shakespeare run uses on the order of <strong>ten million</strong> parameters—large enough to show structure, tiny by production standards. The reference educational stack that hits <strong>validation loss ≈ 1.48</strong> after scaled training often sets <strong>batch_size = 64</strong>, <strong>block_size = 256</strong> (256 characters of context to predict the 257th), <strong>n_embd = 384</strong>, <strong>n_head = 6</strong> (so head dimension <strong>384/6 = 64</strong>), <strong>n_layer = 6</strong>, AdamW with a reduced learning rate as the model grows, and <strong>dropout = 0.2</strong>. On a high-end GPU (e.g. A100-class), that training might complete in on the order of <strong>fifteen minutes</strong>; on CPU or small laptops you should shrink depth and width first.</p>
+<div class="comparison">
+  <div class="card"><h3>Before scaling (~2.06 val)</h3><p>Smaller context, narrower embeddings, fewer layers—good for debugging attention masks and loss plumbing.</p></div>
+  <div class="card"><h3>After scaling (≈1.48 val)</h3><p>Longer context (256), wider channels (384), six layers/heads—generations read Shakespeare-<em>ish</em> locally even when globally nonsensical.</p></div>
+</div>
+<div class="code-progression">
+<div class="btn-group">
+<button type="button" class="btn active" onclick="gptStep(this,'g1')">Skeleton</button>
+<button type="button" class="btn" onclick="gptStep(this,'g2')">+ Blocks</button>
+<button type="button" class="btn" onclick="gptStep(this,'g3')">+ LM head</button>
+</div>
+<div class="code-panel">
+<div class="code-header"><span class="code-filename">model.py</span><span class="code-lines" id="gptStepLabel">Step 1 of 3</span></div>
+<pre class="code-block" id="g1"><code><span class="line"><span class="ln">1</span><span class="kw">class</span> <span class="fn">GPT</span>(nn.Module):</span>
+<code><span class="line"><span class="ln">2</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, vocab_size, n_embd, n_layer, n_head, block_size):</span>
+<code><span class="line"><span class="ln">3</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span>
+<code><span class="line hl"><span class="ln">4</span>        <span class="arg">self</span>.tok_emb = nn.<span class="fn">Embedding</span>(vocab_size, n_embd)</span>
+<code><span class="line"><span class="ln">5</span>        <span class="arg">self</span>.pos_emb = nn.<span class="fn">Embedding</span>(block_size, n_embd)</span>
+<code><span class="line"><span class="ln">6</span>        <span class="cmt"># blocks + ln_f + lm_head come next</span></span>
+<code><span class="line"><span class="ln">7</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, idx, targets=<span class="kw">None</span>):</span>
+<code><span class="line"><span class="ln">8</span>        ...</span>
+</code></pre>
+<pre class="code-block" id="g2" style="display:none"><code><span class="line hl"><span class="ln">4</span>        <span class="arg">self</span>.blocks = nn.<span class="fn">Sequential</span>(*[Block(...) <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(n_layer)])</span>
+<code><span class="line hl"><span class="ln">5</span>        <span class="arg">self</span>.ln_f = nn.<span class="fn">LayerNorm</span>(n_embd)</span>
+<code><span class="line"><span class="ln">6</span>        <span class="arg">self</span>.lm_head = nn.<span class="fn">Linear</span>(n_embd, vocab_size)</span>
+</code></pre>
+<pre class="code-block" id="g3" style="display:none"><code><span class="line"><span class="ln">10</span>        B, T = idx.shape</span>
+<code><span class="line hl"><span class="ln">11</span>        x = <span class="arg">self</span>.tok_emb(idx) + <span class="arg">self</span>.pos_emb(torch.<span class="fn">arange</span>(T, device=idx.device))</span>
+<code><span class="line"><span class="ln">12</span>        x = <span class="arg">self</span>.blocks(x)</span>
+<code><span class="line"><span class="ln">13</span>        x = <span class="arg">self</span>.ln_f(x)</span>
+<code><span class="line hl"><span class="ln">14</span>        logits = <span class="arg">self</span>.lm_head(x)</span>
+<code><span class="line"><span class="ln">15</span>        <span class="cmt"># cross-entropy with targets as before</span></span>
+</code></pre>
+</div>
+<p class="step-caption" id="gptCap">Start from embeddings; stack depth; decode to vocabulary.</p>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s16">
+  <div class="container">
+    <span class="section-num">16</span>
+    <h2>Training loop on Shakespeare</h2>
+    
+<p>Sample random chunks of length <code>block_size</code> from the train split. Inputs <code>x</code> are characters <code>0…T-1</code>; targets <code>y</code> are the next character at every position (offset by one inside the chunk). A batch stacks independent sequences along dimension <code>B</code>.</p>
+<p>Optimizer is commonly <strong>AdamW</strong>. A useful default for many Transformer language-model runs is <strong>learning rate ≈ 3×10⁻⁴</strong>, but you must retune as depth and width grow—self-attention stacks are less tolerant of aggressive steps than a lone embedding table. Move tensors and modules to <code>cuda</code> when available so embedding lookups and batched matmuls run on the accelerator.</p>
+<p>Printing <code>loss.item()</code> every step is misleading: each minibatch is a noisy draw. Instead, periodically call an <strong>estimate_loss</strong> helper that switches the model to <code>eval()</code>, runs <code>eval_iters</code> batches on both train and validation splits with <code>torch.no_grad()</code>, averages cross-entropy, then returns to <code>train()</code>. Even when <code>eval()</code> is a no-op (pure embedding table), that pattern is worth keeping because dropout and similar layers behave differently across modes.</p>
+<div class="callout ok"><p><strong>Loss trajectory on Tiny Shakespeare (representative educational run).</strong> Numbers depend on seeds and steps, but the following plateaus are the ones to anchor intuition: <strong>bigram trained ≈2.5</strong> validation loss; <strong>single-head scaled causal attention ≈2.4</strong> (a real improvement over 2.5, but text still weak); <strong>multi-head attention ≈2.28</strong>; <strong>+ position-wise feed-forward MLP ≈2.24</strong>; <strong>+ residual connections with a 4× inner FFN ≈2.08</strong> (train loss may dip below validation—early overfitting); <strong>+ pre-norm LayerNorm in blocks and final norm ≈2.06</strong>; after <strong>scaling width/depth/context</strong> (six layers, 384 channels, 256 context, six heads, dropout 0.2, larger batch) <strong>validation loss near 1.48</strong>, down from roughly the low 2.0s before that scale-up. Initial bigram cross-entropy before training is about <strong>4.87</strong> with 65 classes versus a uniform baseline of <strong>ln(65)≈4.17</strong>.</p></div>
+<div class="comparison">
+  <div class="card"><h3>Diagnostic</h3><p>Initial loss above ln(<code>vocab_size</code>) ⇒ logits are not a flat distribution; wiring is plausibly correct.</p></div>
+  <div class="card"><h3>Goal</h3><p>As capacity and training time increase, validation loss should descend and samples should pick up local statistics (names, commas, line breaks) before global semantics.</p></div>
+</div>
+<div class="jupyter-cell">
+<div class="cell-header"><span class="cell-label">In [12]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+<pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">for</span> step <span class="kw">in</span> <span class="fn">range</span>(max_iters):</span>
+<code><span class="line"><span class="ln">2</span>    xb, yb = <span class="fn">get_batch</span>(<span class="str">'train'</span>)</span>
+<code><span class="line hl"><span class="ln">3</span>    logits, loss = <span class="fn">model</span>(xb, yb)</span>
+<code><span class="line"><span class="ln">4</span>    optimizer.<span class="fn">zero_grad</span>(<span class="kw">True</span>)</span>
+<code><span class="line"><span class="ln">5</span>    loss.<span class="fn">backward</span>()</span>
+<code><span class="line"><span class="ln">6</span>    optimizer.<span class="fn">step</span>()</span>
+</code></pre>
+<div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [12]</span><pre class="output-text">bigram (many steps):     train ~2.48  val ~2.50
++ 1-head attention:      val ~2.40
++ 4-head attention:      val ~2.28
++ FFN block:               val ~2.24
++ residual + 4× FFN:       val ~2.08  (train may lead val)
++ LayerNorm + ln_f:        val ~2.06
+scaled 6×384, ctx 256:    val ~1.48  (train ~1.52)</pre></div>
+</div>
+<div class="interactive-panel">
+<h3>Demo: training loss curve (synthetic but typical shape)</h3>
+<canvas id="lossCanvas" width="560" height="200"></canvas>
+<p class="step-caption">Loss drops quickly, then enters a long tail — scaling width/depth/data extends how far you can push it.</p>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s17">
+  <div class="container">
+    <span class="section-num">17</span>
+    <h2>Generating text autoregressively</h2>
+    
+<p>Start from a context tensor <code>idx</code> of shape <code>(B,T)</code>. Repeat: forward pass with <code>targets=None</code>, take logits at final time, apply softmax, sample (multinomial or top-p), append sampled id, <strong>crop</strong> the sequence to at most <code>block_size</code> tokens from the end if needed, then concatenate along time. Cropping matters because learned positional embeddings only cover indices <code>0…block_size−1</code>; feeding longer streams would index past the table.</p>
+<p>Training taught a distribution; generation is sequential draws from the learned conditionals — not retrieval from the corpus, though small models partially memorize. For inspection, dumping <strong>tens of thousands</strong> of characters to a file makes the rhythm obvious: line breaks and speaker-like phrasing emerge long before coherent plot.</p>
+<div class="callout"><p><strong>Sample flavor at ~1.48 val loss (character Shakespeare):</strong> locally the text mirrors punctuation, capitalization, and clause length of the training file, yet long-range sense remains absent—lines such as fragmented stage speech (“…every crimp tap be a house…”) illustrate the gap between statistical texture and understanding.</p></div>
+<div class="jupyter-cell">
+<div class="cell-header"><span class="cell-label">In [20]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+<pre class="code-block"><code><span class="line"><span class="ln">1</span>context = torch.<span class="fn">zeros</span>((<span class="num">1</span>,<span class="num">1</span>), dtype=torch.long, device=device)</span>
+<code><span class="line hl"><span class="ln">2</span>print(<span class="fn">decode</span>(<span class="fn">generate</span>(model, context, max_new_tokens=<span class="num">500</span>)[<span class="num">0</span>].<span class="fn">tolist</span>()))</span>
+</code></pre>
+<div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [20]</span><pre class="output-text">KING RICHARD III:
+Doth press the heavens with thy bold accuse,
+And stir the tempest of this perilous hour ...
+(illustrative Shakespeare-like continuation — nonsensical globally but locally plausible)</pre></div>
+</div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s18">
+  <div class="container">
+    <span class="section-num">18</span>
+    <h2>Encoder vs decoder transformers</h2>
+    
+<div class="comparison">
+  <div class="card"><h3 style="color:var(--accent3);">Encoder (bidirectional)</h3><p>No causal mask: every token may attend to every other token. Useful when the full input is observed at once (classification, encoding for retrieval).</p></div>
+  <div class="card"><h3 style="color:var(--accent2);">Decoder (causal)</h3><p>Lower-triangular mask preserves autoregressive factorization; suitable for generation and language modeling.</p></div>
+</div>
+<p><strong>Encoder–decoder</strong> models (original translation setup) use an encoder stack to build representations of a source sentence and a decoder stack that attends <em>cross</em> to encoder states while masking its own future. <strong>Cross-attention</strong> uses queries from the decoder and keys/values from the encoder.</p>
+<p>Our Shakespeare model is <strong>decoder-only</strong> like GPT — no separate encoder because there is no external conditioning signal beyond the growing prefix.</p>
+<p>Machine translation needs to <em>read</em> a source sentence in full (French tokens, say) while <em>writing</em> English left-to-right. The encoder stack applies <strong>bidirectional</strong> self-attention without a causal mask so every source token can attend to every other source token; the decoder stack keeps the triangular mask for autoregressive generation and adds <strong>cross-attention</strong> layers where queries come from the decoder states and keys/values come from encoder outputs. Unconditional character modeling has no parallel source stream — only one tape of text — so the encoder and cross-attention blocks disappear. What remains is a decoder-shaped stack that models the training distribution, which is exactly the GPT family recipe.</p>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s19">
+  <div class="container">
+    <span class="section-num">19</span>
+    <h2>Connection to GPT-2 and GPT-3 scale</h2>
+    
+<p>Architecturally, a frontier decoder-only Transformer resembles what you coded: pre-norm, multi-head causal attention, MLP expansion ~4×, residuals, dropout, final layer norm, linear logits. What changes is <strong>scale</strong>: embedding dimension in the thousands, dozens of layers, dozens of heads, context windows in the thousands to hundreds of thousands of tokens after modern extensions.</p>
+<p>The Shakespeare exercise lands near <strong>~10⁷ parameters</strong> on ~10⁶ character tokens—roughly <strong>300k subword tokens</strong> if you imagined packing the same corpus with a ~50k OpenAI-style vocabulary. GPT-3’s largest reported model is on the order of <strong>175×10⁹ parameters</strong> trained on hundreds of <strong>billions</strong> of tokens (the GPT-3 paper highlights ~300B tokens in its largest regimes). That is roughly a <strong>million-fold</strong> data increase relative to the toy corpus, and parameter counts can span four to six orders of magnitude depending on how you count—before even reaching contemporary trillion-token schedules.</p>
+<p>Training stacks of that size are an infrastructure problem: thousands of GPUs, checkpointing, distributed data loading, and careful learning-rate schedules. The reference <strong>nanoGPT</strong>-style codebase keeps the same mathematical skeleton in roughly <strong>two files of ~300 lines each</strong>—one for the model, one for the training loop—while scaling the loop to checkpoint resume, learning-rate decay, compilation, and multi-GPU distribution. On datasets such as <strong>OpenWebText</strong>, that minimal stack is enough to reproduce behavior of the smallest public <strong>GPT-2</strong> checkpoint (~124M parameters) and verify correctness against released weights. Production versions swap toy <code>ReLU</code> MLPs for <strong>GELU</strong> activations to match OpenAI checkpoints byte-for-byte when loading state dicts. The conceptual map from the model you built here to those files should read almost line-for-line.</p>
+<p>Parameter counts move from <strong>millions</strong> in toy runs to <strong>billions</strong> (GPT-2–class models) and <strong>hundreds of billions</strong> (largest GPT-3–class models on release). Compute shifts from minutes on one GPU to weeks on clusters.</p>
+<div class="callout"><p><strong>Pre-training vs. assistants:</strong> The decoder-only stage produces a <em>document completer</em>: it continues whatever prefix looks like the training mixture—questions with more questions, half-finished blog posts with more blog post, etc. Turning that into a helpful assistant is a separate <strong>fine-tuning</strong> story: (1) supervised fine-tuning on curated prompt–answer pairs so the format looks like a user message followed by an assistant reply; (2) preference collection where human raters rank multiple model samples; (3) training a reward model to predict those preferences; (4) reinforcement-learning-style policy optimization (policy-gradient methods such as PPO) to steer generation toward higher reward. Much of that data and infrastructure is proprietary, but the pre-training core you built is stage zero of the pipeline.</p></div>
+
+  </div>
+</section>
+
+<section class="section fade-in" id="s20">
+  <div class="container">
+    <span class="section-num">20</span>
+    <h2>Playground</h2>
+    <p>Experiment with softmax logits, temperature, and a toy “architecture depth” readout. This is a sandbox over synthetic numbers — not a live PyTorch session — but it reinforces the interfaces you will implement.</p>
+    <div class="interactive-panel">
+      <h3>Five-logit softmax + temperature</h3>
+      <p>Adjust logits with the sliders. Temperature scales how peaked the distribution becomes.</p>
+      <div id="pgSliders"></div>
+      <div class="bar-row" id="pgBars" style="height:180px;"></div>
+      <p class="step-caption" id="pgEntropy"></p>
+    </div>
+    <div class="interactive-panel">
+      <h3>Model capacity estimator (toy)</h3>
+      <p>Rough order-of-magnitude parameter sketch: <code>~ 12 * n_layer * n_embd^2</code> dominates when vocabulary and MLP expansion are included — use this slider to feel how depth and width explode compute.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:520px;">
+        <label style="color:var(--text-dim);">n_layer <span class="slider-value" id="nlOut">6</span><input type="range" id="nlR" min="1" max="48" value="6" style="width:100%;max-width:none;"></label>
+        <label style="color:var(--text-dim);">n_embd <span class="slider-value" id="neOut">384</span><input type="range" id="neR" min="64" max="2048" step="64" value="384" style="width:100%;max-width:none;"></label>
+      </div>
+      <p class="step-caption" id="paramEst" style="margin-top:16px;"></p>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Neural Networks: Zero to Hero · Chapter 07 · Single-file interactive tutorial</p>
+</footer>
+
+<script>
+function toggleOut(btn) {
+  const cell = btn.closest('.jupyter-cell');
+  const out = cell.querySelector('.cell-output');
+  const on = out.style.display !== 'block';
+  out.style.display = on ? 'block' : 'none';
+  btn.textContent = on ? 'Hide Output ▲' : 'Show Output ▼';
+}
+
+function gptStep(btn, id) {
+  const root = btn.closest('.code-progression');
+  root.querySelectorAll('.code-block').forEach(e => e.style.display = 'none');
+  root.querySelector('#'+id).style.display = 'block';
+  root.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const cap = ['Start from embeddings; stack depth; decode to vocabulary.', 'Add Sequential blocks + final LayerNorm.', 'Forward: embeddings → blocks → ln_f → lm_head logits'];
+  const idx = id === 'g1' ? 0 : id === 'g2' ? 1 : 2;
+  document.getElementById('gptCap').textContent = cap[idx];
+  document.getElementById('gptStepLabel').textContent = 'Step ' + (idx+1) + ' of 3';
+}
+
+function archStep(n) {
+  const boxes = [document.getElementById('ab0'),document.getElementById('ab1'),document.getElementById('ab2'),document.getElementById('ab3'),document.getElementById('ab4')];
+  const arrows = [document.getElementById('aa01'),document.getElementById('aa12'),document.getElementById('aa23'),document.getElementById('aa34')];
+  boxes.forEach((b,i) => b.classList.toggle('show', i <= n));
+  arrows.forEach((a,i) => a.classList.toggle('show', i < n));
+  document.querySelectorAll('#archBtns .btn').forEach((b,idx) => b.classList.toggle('active', idx === n));
+}
+
+// --- softmax helpers ---
+function softmax(arr) {
+  const m = Math.max(...arr);
+  const ex = arr.map(z => Math.exp(z - m));
+  const s = ex.reduce((a,b)=>a+b,0);
+  return ex.map(e => e/s);
+}
+
+// Temperature demo
+(function() {
+  const slider = document.getElementById('tempSlider');
+  const val = document.getElementById('tempVal');
+  const bars = document.getElementById('tempBars');
+  const cap = document.getElementById('tempCaption');
+  const logits = [2.0, 1.0, 0.2, -0.5, -1.2];
+  const labs = ['the','and','of','to','a'];
+  function draw() {
+    const T = slider.value / 100;
+    val.textContent = T.toFixed(2);
+    const scaled = logits.map(z => z / T);
+    const p = softmax(scaled);
+    bars.innerHTML = '';
+    p.forEach((pi,i) => {
+      const d = document.createElement('div');
+      d.className = 'bar-item';
+      d.innerHTML = '<div class="bar-fill" style="height:'+(pi*300)+'px"></div><span class="bar-label">'+labs[i]+'</span>';
+      bars.appendChild(d);
+    });
+    const ent = -p.reduce((a,x)=>a+x*Math.log(x+1e-12),0);
+    cap.textContent = 'Entropy = ' + ent.toFixed(3) + ' nats';
+  }
+  slider.addEventListener('input', draw);
+  draw();
+})();
+
+// Heatmap random causal weights
+(function() {
+  const grid = document.getElementById('heatmapGrid');
+  if (!grid) return;
+  const cells = grid.querySelectorAll('.heatmap-cell');
+  const W = 8;
+  let wei = [];
+  for (let i=0;i<W;i++) {
+    const row = [];
+    for (let j=0;j<W;j++) {
+      if (j>i) { row.push(0); continue; }
+      row.push(Math.random());
+    }
+    const s = row.reduce((a,b)=>a+b,0) || 1;
+    wei.push(row.map(x => x/s));
+  }
+  function color(a) {
+    const t = Math.max(0, Math.min(1, a));
+    const r = Math.floor(20 + 180*(1-t));
+    const g = Math.floor(40 + 120*t);
+    const b = Math.floor(60 + 180*t);
+    return 'rgb('+r+','+g+','+b+')';
+  }
+  cells.forEach((cell) => {
+    const i = +cell.dataset.i, j = +cell.dataset.j;
+    const v = wei[i][j];
+    cell.style.background = i<j ? '#111' : color(v);
+    cell.addEventListener('mouseenter', () => {
+      document.getElementById('heatmapLegend').textContent =
+        'query t='+i+' ← key t='+j+'   weight≈ '+ (i<j?'—':v.toFixed(3));
+    });
+  });
+})();
+
+// wei viz grid build
+(function() {
+  const g = document.getElementById('weiVizGrid');
+  if (!g) return;
+  const W = 8;
+  for (let i=0;i<W;i++) for (let j=0;j<W;j++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'heatmap-cell';
+    b.style.width='24px'; b.style.height='24px';
+    const v = j<=i ? Math.random() : 0;
+    b.style.background = j>i ? '#0d0d12' : 'rgba(108,140,255,'+(0.15+0.85*v)+')';
+    b.addEventListener('mouseenter', () => {
+      document.getElementById('weiVizTip').textContent =
+        'row (query) '+i+', col (key) '+j+' → weight '+(j>i?'masked':v.toFixed(3));
+    });
+    g.appendChild(b);
+  }
+  g.style.gridTemplateColumns = 'repeat(8, 24px)';
+})();
+
+// Positional encoding canvas
+(function() {
+  const c = document.getElementById('peCanvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const d = 32, maxPos = 128;
+  ctx.fillStyle = '#12121a'; ctx.fillRect(0,0,W,H);
+  for (let dim=0; dim<4; dim++) {
+    ctx.beginPath();
+    ctx.strokeStyle = ['#6c8cff','#a78bfa','#34d399','#f472b6'][dim];
+    for (let pos=0; pos<maxPos; pos++) {
+      const angle = pos / Math.pow(10000, 2*dim / d);
+      const y = H/2 + (H/2-10) * Math.sin(angle);
+      const x = pos / maxPos * (W-20) + 10;
+      if (pos===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px monospace';
+  ctx.fillText('sin curves for dims 0..3 (illustrative)', 12, 16);
+})();
+
+// Multi-head canvas
+(function() {
+  const c = document.getElementById('multiHeadCanvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#12121a'; ctx.fillRect(0,0,c.width,c.height);
+  const heads = [
+    [0.6,0.3,0.08,0.02],
+    [0.15,0.5,0.25,0.1],
+  ];
+  const colors = ['#6c8cff','#34d399'];
+  const labels = ['Head A (local)','Head B (medium)'];
+  heads.forEach((h,hi) => {
+    let x = 40 + hi*260;
+    h.forEach((v,i) => {
+      ctx.fillStyle = colors[hi];
+      ctx.fillRect(x, 180 - v*160, 40, v*160);
+      ctx.fillStyle = '#8888a0';
+      ctx.font = '10px monospace';
+      ctx.fillText('t-'+i, x+8, 198);
+      x += 52;
+    });
+    ctx.fillStyle = '#e0e0e8';
+    ctx.font = '12px monospace';
+    ctx.fillText(labels[hi], 40+hi*260, 24);
+  });
+})();
+
+// Loss curve
+(function() {
+  const c = document.getElementById('lossCanvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.fillStyle = '#12121a'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = '#2a2a3a';
+  for (let i=0;i<=4;i++) { ctx.beginPath(); ctx.moveTo(40,30+i*(H-60)/4); ctx.lineTo(W-20,30+i*(H-60)/4); ctx.stroke(); }
+  ctx.beginPath();
+  ctx.strokeStyle = '#6c8cff';
+  for (let t=0;t<=200;t++) {
+    const x = 40 + (W-60)*t/200;
+    const L = 4.8 * Math.pow(0.985, t) + 1.45 + 0.08*Math.sin(t/11);
+    const y = 30 + (H-60)*(L-1.2)/(4.8-1.2);
+    if (t===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px monospace';
+  ctx.fillText('train loss (illustrative)', 48, 20);
+})();
+
+// Playground sliders
+(function() {
+  const wrap = document.getElementById('pgSliders');
+  const bars = document.getElementById('pgBars');
+  const entEl = document.getElementById('pgEntropy');
+  if (!wrap) return;
+  const logits = [1.2, 0.4, -0.2, 0.8, -0.5];
+  const ids = [];
+  logits.forEach((lv,i) => {
+    const lab = document.createElement('label');
+    lab.className = 'softmax-sliders';
+    lab.innerHTML = 'logit '+i+' <span class="slider-value" id="pgv'+i+'">'+lv.toFixed(2)+'</span>';
+    const r = document.createElement('input');
+    r.type = 'range'; r.min = '-300'; r.max = '300'; r.value = String(Math.round(lv*100));
+    r.style.width = '100%'; r.style.maxWidth = '420px';
+    r.addEventListener('input', draw);
+    lab.appendChild(r);
+    wrap.appendChild(lab);
+    ids.push(r);
+  });
+  function draw() {
+    const ls = ids.map(r => parseInt(r.value,10)/100);
+    ids.forEach((r,i) => document.getElementById('pgv'+i).textContent = ls[i].toFixed(2));
+    const p = softmax(ls);
+    bars.innerHTML = '';
+    p.forEach((pi,i) => {
+      const d = document.createElement('div');
+      d.className = 'bar-item';
+      d.innerHTML = '<div class="bar-fill" style="height:'+(pi*340)+'px"></div><span class="bar-label">p'+i+'</span>';
+      bars.appendChild(d);
+    });
+    const ent = -p.reduce((a,x)=>a+x*Math.log(x+1e-12),0);
+    entEl.textContent = 'Entropy: '+ent.toFixed(3)+' nats · argmax token '+p.indexOf(Math.max(...p));
+  }
+  draw();
+})();
+
+// Param estimator
+(function() {
+  const nlR = document.getElementById('nlR');
+  const neR = document.getElementById('neR');
+  const nlOut = document.getElementById('nlOut');
+  const neOut = document.getElementById('neOut');
+  const out = document.getElementById('paramEst');
+  if (!nlR) return;
+  function f() {
+    const L = +nlR.value, E = +neR.value;
+    nlOut.textContent = L; neOut.textContent = E;
+    const approx = L * (12 * E * E);
+    out.textContent = 'Rough transformer parameter ballpark (attention+MLP dominant term): ~ ' +
+      approx.toLocaleString() + ' (+ embeddings, head projections, vocabulary head)';
+  }
+  nlR.addEventListener('input', f);
+  neR.addEventListener('input', f);
+  f();
+})();
+
+// Nav + fade
+(function() {
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('visible', window.scrollY > 380);
+  }, { passive: true });
+  const obs = new IntersectionObserver(es => {
+    es.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+})();
+
+archStep(0);
+
+function progGpt(btn, id) {
+  const r = btn.closest('.code-progression');
+  r.querySelectorAll('.code-block').forEach(e => e.style.display = 'none');
+  r.querySelector('#'+id).style.display = 'block';
+  r.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const lab = {p1:'Stage 1: bigram-style logits',p2:'Stage 2: + causal self-attention',p3:'Stage 3: + stacked blocks'};
+  document.getElementById('progLab').textContent = lab[id];
+}
+(function(){
+  const pre = document.getElementById('annTrain');
+  if (!pre) return;
+  const note = document.getElementById('annTrainNote');
+  pre.querySelectorAll('.ln.anno').forEach(ln => {
+    ln.addEventListener('click', () => {
+      const line = ln.closest('.line');
+      const t = ln.getAttribute('data-note') || '';
+      note.innerHTML = '<strong>Line '+ln.textContent.trim()+':</strong> '+t;
+    });
+  });
+})();
+
+
+(function(){
+  const vocab = 'abcdefghijklmnopqrstuvwxyz ';
+  let ctx = '';
+  const out = document.getElementById('tokStream');
+  const cap = document.getElementById('tokCaption');
+  let autoId = null;
+  function draw(){ out.textContent = ctx || '(empty)'; cap.textContent = 'Length T = '+ctx.length; }
+  function step(){
+    const logits = Array.from({length:vocab.length},()=>Math.random()*2-0.5);
+    const m = Math.max(...logits);
+    const ex = logits.map(z=>Math.exp(z-m));
+    const s = ex.reduce((a,b)=>a+b,0);
+    const p = ex.map(e=>e/s);
+    let r = Math.random(), acc = 0, idx = 0;
+    for (let i=0;i<p.length;i++){ acc += p[i]; if (r<=acc){ idx=i; break; } }
+    ctx += vocab[idx];
+    draw();
+  }
+  document.getElementById('tokReset').addEventListener('click',()=>{ ctx=''; if(autoId)clearInterval(autoId); autoId=null; draw(); });
+  document.getElementById('tokNext').addEventListener('click',step);
+  document.getElementById('tokAuto').addEventListener('click',()=>{
+    if (autoId) { clearInterval(autoId); autoId=null; return; }
+    autoId = setInterval(step, 350);
+  });
+  draw();
+})();
+
+</script>
+</body>
+</html>

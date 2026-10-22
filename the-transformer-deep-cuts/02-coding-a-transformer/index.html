@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coding a Transformer from Scratch in PyTorch — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 92vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 72px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.14) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.12rem; color: var(--text-dim); max-width: 760px; margin: 0 auto 36px; }
+.stats { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.4rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.82rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 20px 0; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; margin: 28px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 14px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.82rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.btn-sm { font-size: 0.72rem; padding: 4px 10px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; max-width: 300px; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.88rem; color: var(--accent); margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; margin: 14px 0; font-family: var(--mono); font-size: 0.92rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.fade-in { opacity: 0; transform: translateY(18px); transition: all 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.88); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.88rem; }
+.nav-links { display: flex; gap: 8px; overflow-x: auto; max-width: 68%; }
+.nav-links a { font-size: 0.68rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; margin: 28px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 76px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.78rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 14px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.52; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; color: inherit; }
+.ln { display: inline-block; width: 34px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 12px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.09); border-left: 2px solid var(--accent); margin-left: -14px; padding-left: 12px; }
+.line.new { background: rgba(52, 211, 153, 0.09); border-left: 2px solid var(--accent3); margin-left: -14px; padding-left: 12px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.9; text-decoration: underline dotted; }
+.code-note { padding: 12px 14px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.84rem; color: var(--text-dim); line-height: 1.5; min-height: 2.5em; }
+.code-note strong { color: var(--accent); }
+.code-progression { margin: 24px 0; }
+.step-caption { margin-top: 10px; font-size: 0.88rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 18px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 14px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.82rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+canvas.dchart { border-radius: var(--radius); display: block; max-width: 100%; height: auto; background: var(--bg-card-alt); border: 1px solid var(--border); }
+.heatmap-wrap { overflow: auto; max-height: 380px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card-alt); padding: 8px; }
+table.heat { border-collapse: collapse; font-family: var(--mono); font-size: 0.68rem; margin: 0 auto; }
+table.heat td { width: 34px; height: 30px; text-align: center; border: 1px solid var(--border); color: #0a0a0f; }
+.token-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.token { padding: 4px 8px; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 4px; font-family: var(--mono); font-size: 0.74rem; }
+.token.active { border-color: var(--accent3); box-shadow: 0 0 0 1px var(--accent3); }
+.pe-canvas-wrap { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+.mask-demo-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; max-width: 280px; font-family: var(--mono); font-size: 0.72rem; }
+.mask-cell { padding: 8px; text-align: center; border-radius: 6px; border: 1px solid var(--border); }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
+@media (max-width: 600px) { .section { padding: 48px 0; } .stats { gap: 22px; } }
+.footer { text-align: center; padding: 40px 24px; color: var(--text-dim); font-size: 0.82rem; }
+.qa-panel { background: rgba(167,139,250,0.06); border: 1px solid rgba(167,139,250,0.2); border-radius: var(--radius); padding: 22px; margin: 24px 0; }
+.qa-panel h3 { color: var(--accent2); margin-bottom: 16px; font-size: 1.05rem; }
+.qa-item { margin: 12px 0; padding: 12px 14px; background: var(--bg-card-alt); border-radius: 8px; border-left: 3px solid var(--accent2); }
+.qa-item.user-q { border-left-color: var(--accent3); }
+.qa-label { font-size: 0.7rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px; display: block; }
+.qa-label.ai { color: var(--accent2); }
+.qa-label.user { color: var(--accent3); }
+.qa-text { font-size: 0.88rem; color: var(--text); line-height: 1.55; margin: 0; }
+.qa-answer { font-size: 0.84rem; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
+.qa-toggle { cursor: pointer; font-size: 0.78rem; color: var(--accent2); font-family: var(--mono); margin-top: 8px; display: inline-block; }
+.qa-spoiler { display: none; }
+.qa-spoiler.show { display: block; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Coding a Transformer from Scratch</span></nav>
+
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Advanced NLP V2</a>
+  <div class="nav-links">
+    <a href="#s00">00</a><a href="#s01">01</a><a href="#s02">02</a><a href="#s03">03</a><a href="#s04">04</a><a href="#s05">05</a><a href="#s06">06</a><a href="#s07">07</a><a href="#s08">08</a><a href="#s09">09</a><a href="#s10">10</a><a href="#s11">11</a><a href="#s12">12</a><a href="#s13">13</a><a href="#s14">14</a><a href="#s15">Play</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Coding a Transformer from Scratch in PyTorch</h1>
+    <p class="subtitle">A seq2seq encoder–decoder Transformer: <code>InputEmbeddings</code> with √<code>d_model</code> scaling, sinusoidal <code>PositionalEncoding</code>, <code>MultiHeadAttentionBlock</code> with masks, <code>Encoder</code> / <code>Decoder</code> stacks, <code>build_transformer</code> with Xavier init, Opus Books EN→IT data, <code>BilingualDataset</code>, training with Adam and label smoothing, <code>greedy_decode</code>, and attention visualization.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">16</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">8</span><span class="stat-label">Interactives</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="section fade-in" id="s00">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Roadmap: tensors, masks, and a trainable seq2seq stack</h2>
+    <p>This chapter follows the same implementation arc as a from-scratch PyTorch translation system: you map parallel sentences to tensors, build an <code>Encoder</code> that sees the full source with a <strong>padding mask</strong>, and a <code>Decoder</code> that predicts Italian tokens left-to-right with a <strong>causal mask</strong> plus cross-attention into encoder memory. Every shape comment below uses <code>(batch, seq, d_model)</code> unless noted.</p>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">Model core</h3><p><code>InputEmbeddings</code>, <code>PositionalEncoding</code>, <code>LayerNormalization</code>, <code>FeedForwardBlock</code>, <code>MultiHeadAttentionBlock</code>, <code>ResidualConnection</code>, <code>EncoderBlock</code>, <code>DecoderBlock</code>, <code>ProjectionLayer</code>, and the composite <code>Transformer</code> with <code>encode</code> / <code>decode</code> / <code>project</code>.</p></div>
+      <div class="card"><h3 style="color:var(--accent2);">Training loop</h3><p>Opus Books via <code>load_dataset</code>, word-level tokenizers, <code>BilingualDataset</code> with <code>&lt;sos&gt;</code>, <code>&lt;eos&gt;</code>, <code>&lt;pad&gt;</code>, <code>Adam</code>, cross-entropy with <code>label_smoothing</code>, <code>TensorBoard</code>, and <code>greedy_decode</code> for inference.</p></div>
+    </div>
+    <div class="callout"><p><strong>Convention:</strong> <code>src_mask</code> hides padding on the encoder side (and in cross-attention keys). <code>tgt_mask</code> combines padding visibility with a lower-triangular causal mask so position <code>t</code> never attends to <code>t+1</code>. The goal is a <strong>relocatable mental model</strong> you can diff against your own <code>model.py</code>, <code>dataset.py</code>, and <code>train.py</code>.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s01">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>InputEmbeddings and √d_model scaling</h2>
+    <p>Token IDs index rows of a learned matrix <code>nn.Embedding(vocab_size, d_model)</code>. As in Chapter 1, multiply by <code>math.sqrt(d_model)</code> so embedding magnitudes stay on the same scale as the sinusoidal position vectors added next.</p>
+    <div class="formula">output = Embedding(ids) × √d_model</div>
+    <div class="interactive-panel">
+      <h3>Demo: embedding magnitude vs dimension</h3>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Random unit-scale draws per dimension; compare raw norm to norm after <code>×√d_model</code>.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:12px 0;">
+        <label style="color:var(--text-dim);">d_model <input type="range" id="emb-d" min="32" max="512" step="32" value="128" /><span class="slider-value" id="emb-d-lbl">128</span></label>
+        <button type="button" class="btn" id="emb-reroll">Resample</button>
+      </div>
+      <canvas class="dchart" id="emb-canvas" width="780" height="200"></canvas>
+      <p id="emb-stats" style="font-family:var(--mono);font-size:0.8rem;color:var(--accent3);margin-bottom:0;"></p>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>What the module stores</h3>
+        <p><code>forward</code> only does lookup and scale; there is no positional information yet. Vocabulary tensors stay <code>long</code> on input; the embedding table holds <code>float</code> rows of length <code>d_model</code>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L12–24 / ~420</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">12</span><span class="kw">class</span> <span class="fn">InputEmbeddings</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">13</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>: <span class="fn">int</span>, <span class="arg">vocab_size</span>: <span class="fn">int</span>):</span></code>
+<code><span class="line"><span class="ln">14</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line"><span class="ln">15</span>        <span class="arg">self</span>.d_model = d_model</span></code>
+<code><span class="line hl"><span class="ln">16</span>        <span class="arg">self</span>.embedding = nn.<span class="fn">Embedding</span>(vocab_size, d_model)</span></code>
+<code><span class="line"><span class="ln">17</span></span></code>
+<code><span class="line"><span class="ln">18</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">19</span>        <span class="kw">return</span> <span class="arg">self</span>.embedding(x) <span class="op">*</span> math.<span class="fn">sqrt</span>(<span class="arg">self</span>.d_model)</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s02">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>PositionalEncoding: sinusoids in log-space</h2>
+    <p>Attention is permutation-equivariant without positions. Chapter 1 derives the sinusoidal PE formula; here we implement it with <code>exp(arange * (-log(10000)/d_model))</code> for numerical stability—mathematically identical to <code>1 / 10000^{2i/d_model}</code>.</p>
+    <div class="formula">PE<sub>(pos,2i)</sub> = sin(pos / 10000<sup>2i/d</sup>) &nbsp;·&nbsp; PE<sub>(pos,2i+1)</sub> = cos(pos / 10000<sup>2i/d</sup>)</div>
+    <p>Register <code>pe</code> with <code>register_buffer</code> so it moves with <code>.to(device)</code> and saves in <code>state_dict</code>, but stays non-trainable. <code>requires_grad_(False)</code> makes the intent explicit. <code>nn.Dropout</code> after the add regularizes the sum of embedding and position channels.</p>
+    <div class="interactive-panel">
+      <h3>Demo: sine vs cosine traces</h3>
+      <div class="pe-canvas-wrap"><canvas id="pe-canvas" width="560" height="220"></canvas></div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;">
+        <label style="color:var(--text-dim);">pos <input type="range" id="pe-pos" min="0" max="49" value="5" /><span class="slider-value" id="pe-pos-lbl">5</span></label>
+        <label style="color:var(--text-dim);">dim pair start <input type="range" id="pe-d0" min="0" max="60" step="2" value="0" /><span class="slider-value" id="pe-d0-lbl">0</span></label>
+      </div>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Broadcasting over batch</h3>
+        <p><code>pe</code> has shape <code>(1, seq_len, d_model)</code>. Adding to <code>x</code> with shape <code>(batch, seq_len, d_model)</code> broadcasts the same position curve to every sentence in the batch.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L26–58 / ~420</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">26</span><span class="kw">class</span> <span class="fn">PositionalEncoding</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">27</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">seq_len</span>, <span class="arg">dropout</span>):</span></code>
+<code><span class="line"><span class="ln">28</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">29</span>        <span class="arg">self</span>.dropout = nn.<span class="fn">Dropout</span>(dropout)</span></code>
+<code><span class="line"><span class="ln">30</span>        pe = torch.<span class="fn">zeros</span>(seq_len, d_model)</span></code>
+<code><span class="line"><span class="ln">31</span>        pos = torch.<span class="fn">arange</span>(<span class="num">0</span>, seq_len, dtype=torch.float).<span class="fn">unsqueeze</span>(<span class="num">1</span>)</span></code>
+<code><span class="line hl"><span class="ln">32</span>        div = torch.<span class="fn">exp</span>(torch.<span class="fn">arange</span>(<span class="num">0</span>, d_model, <span class="num">2</span>).float() <span class="op">*</span> (-math.<span class="fn">log</span>(<span class="num">10000.0</span>) <span class="op">/</span> d_model))</span></code>
+<code><span class="line"><span class="ln">33</span>        pe[:, <span class="num">0</span>::<span class="num">2</span>] = torch.<span class="fn">sin</span>(pos <span class="op">*</span> div)</span></code>
+<code><span class="line"><span class="ln">34</span>        pe[:, <span class="num">1</span>::<span class="num">2</span>] = torch.<span class="fn">cos</span>(pos <span class="op">*</span> div)</span></code>
+<code><span class="line hl"><span class="ln">35</span>        <span class="arg">self</span>.<span class="fn">register_buffer</span>(<span class="str">'pe'</span>, pe.<span class="fn">unsqueeze</span>(<span class="num">0</span>), persistent=<span class="kw">True</span>)</span></code>
+<code><span class="line"><span class="ln">36</span></span></code>
+<code><span class="line"><span class="ln">37</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">38</span>        x = x <span class="op">+</span> (<span class="arg">self</span>.pe[:, :x.size(<span class="num">1</span>), :]).<span class="fn">requires_grad_</span>(<span class="kw">False</span>)</span></code>
+<code><span class="line"><span class="ln">39</span>        <span class="kw">return</span> <span class="arg">self</span>.dropout(x)</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s03">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>LayerNormalization</h2>
+    <p>For each token vector, subtract mean and divide by standard deviation <strong>across the last dimension</strong>, then apply learnable gain <code>alpha</code> and bias <code>bias</code>. <code>eps</code> prevents blow-ups when variance is near zero. This differs from batch normalization: statistics are per-token, not pooled across the batch dimension.</p>
+    <div class="formula">ŷ = α ⊙ (x − μ) / √(σ² + ε) + β</div>
+    <div class="interactive-panel">
+      <h3>Demo: three values through manual LayerNorm</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;">
+        <label style="color:var(--text-dim);">v0 <input type="range" id="ln0" min="-300" max="300" value="120" /></label>
+        <label style="color:var(--text-dim);">v1 <input type="range" id="ln1" min="-300" max="300" value="-40" /></label>
+        <label style="color:var(--text-dim);">v2 <input type="range" id="ln2" min="-300" max="300" value="80" /></label>
+      </div>
+      <canvas class="dchart" id="ln-canvas" width="780" height="200"></canvas>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>keepdim=True</code></h3>
+        <p>Means and variances must broadcast back onto <code>x</code> for elementwise subtraction and division. Forgetting <code>keepdim</code> is a classic shape bug.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L60–78 / ~420</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">60</span><span class="kw">class</span> <span class="fn">LayerNormalization</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">61</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">eps</span>=<span class="num">1e-6</span>):</span></code>
+<code><span class="line"><span class="ln">62</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line"><span class="ln">63</span>        <span class="arg">self</span>.eps = eps</span></code>
+<code><span class="line hl"><span class="ln">64</span>        <span class="arg">self</span>.alpha = nn.<span class="fn">Parameter</span>(torch.<span class="fn">ones</span>(d_model))</span></code>
+<code><span class="line hl"><span class="ln">65</span>        <span class="arg">self</span>.bias = nn.<span class="fn">Parameter</span>(torch.<span class="fn">zeros</span>(d_model))</span></code>
+<code><span class="line"><span class="ln">66</span></span></code>
+<code><span class="line"><span class="ln">67</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">68</span>        mean = x.<span class="fn">mean</span>(dim=-<span class="num">1</span>, keepdim=<span class="kw">True</span>)</span></code>
+<code><span class="line"><span class="ln">69</span>        std = x.<span class="fn">std</span>(dim=-<span class="num">1</span>, keepdim=<span class="kw">True</span>)</span></code>
+<code><span class="line hl"><span class="ln">70</span>        <span class="kw">return</span> <span class="arg">self</span>.alpha <span class="op">*</span> (x <span class="op">-</span> mean) <span class="op">/</span> (std <span class="op">+</span> <span class="arg">self</span>.eps) <span class="op">+</span> <span class="arg">self</span>.bias</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>FeedForwardBlock: local computation after mixing</h2>
+    <p>After attention redistributes information across positions, each position applies the same two-layer MLP: expand to <code>d_ff</code> (paper default 2048 when <code>d_model</code>=512), <code>ReLU</code>, dropout, then project back. PyTorch <code>nn.Linear</code> applies to the last dimension, so <code>(B, T, d_model)</code> flows through without explicit loops.</p>
+    <div class="formula">FFN(x) = W₂ · ReLU(W₁x + b₁) + b₂</div>
+    <div class="interactive-panel">
+      <h3>Demo: width and parameter count</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px;">
+        <label style="color:var(--text-dim);">d_model <input type="range" id="ff-dm" min="64" max="512" step="64" value="512" /><span class="slider-value" id="ff-dm-lbl">512</span></label>
+        <label style="color:var(--text-dim);">d_ff <input type="range" id="ff-dff" min="512" max="4096" step="256" value="2048" /><span class="slider-value" id="ff-dff-lbl">2048</span></label>
+      </div>
+      <canvas class="dchart" id="ffn-canvas" width="780" height="180"></canvas>
+      <p id="ffn-params" style="font-family:var(--mono);font-size:0.78rem;color:var(--accent5);margin:0;"></p>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Why so wide?</h3>
+        <p>The inner dimension is a per-token scratch space. Attention is global communication; <code>FeedForwardBlock</code> is where each position nonlinearly recombines its own vector.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L80–98 / ~420</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">80</span><span class="kw">class</span> <span class="fn">FeedForwardBlock</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">81</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">d_ff</span>, <span class="arg">dropout</span>):</span></code>
+<code><span class="line"><span class="ln">82</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">83</span>        <span class="arg">self</span>.linear1 = nn.<span class="fn">Linear</span>(d_model, d_ff)</span></code>
+<code><span class="line hl"><span class="ln">84</span>        <span class="arg">self</span>.dropout = nn.<span class="fn">Dropout</span>(dropout)</span></code>
+<code><span class="line hl"><span class="ln">85</span>        <span class="arg">self</span>.linear2 = nn.<span class="fn">Linear</span>(d_ff, d_model)</span></code>
+<code><span class="line"><span class="ln">86</span></span></code>
+<code><span class="line"><span class="ln">87</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">88</span>        <span class="kw">return</span> <span class="arg">self</span>.linear2(<span class="arg">self</span>.dropout(torch.<span class="fn">relu</span>(<span class="arg">self</span>.linear1(x))))</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s05">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>MultiHeadAttentionBlock: Q, K, V, scale, mask, merge</h2>
+    <p>Using the scaled dot-product attention formula from Chapter 1, project hidden states with <code>w_q</code>, <code>w_k</code>, <code>w_v</code> (each <code>d_model → d_model</code>), reshape to <code>(B, h, T, d_k)</code> with <code>d_k = d_model // h</code>, run attention per head, concatenate heads, then apply <code>w_o</code>. Store <code>attention_scores</code> when you need heatmaps.</p>
+    <div class="formula">head = softmax(QK<sup>T</sup> / √d<sub>k</sub> + mask) V &nbsp;·&nbsp; multi-head = W<sub>o</sub> concat(head₁…head<sub>h</sub>)</div>
+    <div class="callout warn"><p><strong>Constraint:</strong> <code>d_model % h == 0</code>. Otherwise equal head splits are impossible.</p></div>
+    <div class="interactive-panel">
+      <h3>Demo: causal mask + softmax row</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px;">
+        <label style="color:var(--text-dim);"><input type="checkbox" id="causal-on" checked /> causal mask</label>
+        <label style="color:var(--text-dim);">query row <input type="range" id="attn-row" min="0" max="4" value="2" /><span class="slider-value" id="attn-row-lbl">2</span></label>
+      </div>
+      <div class="heatmap-wrap"><table class="heat" id="attn-table"></table></div>
+      <p id="attn-softmax" style="font-family:var(--mono);font-size:0.78rem;color:var(--accent3);margin-top:10px;"></p>
+    </div>
+    <div class="interactive-panel">
+      <h3>Demo: head split geometry</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;">
+        <label style="color:var(--text-dim);">d_model <input type="range" id="hd-dm" min="256" max="1024" step="64" value="512" /><span class="slider-value" id="hd-dm-lbl">512</span></label>
+        <label style="color:var(--text-dim);">h <input type="range" id="hd-h" min="1" max="16" value="8" /><span class="slider-value" id="hd-h-lbl">8</span></label>
+      </div>
+      <p id="hd-out" style="font-family:var(--mono);font-size:0.85rem;color:var(--accent5);"></p>
+      <canvas class="dchart" id="hd-canvas" width="780" height="120"></canvas>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Click line numbers (left)</h3>
+        <p>The static <code>attention</code> helper returns both context and probabilities so training and visualization share one path. Masking uses the same <code>−∞</code> trick from Chapter 1: <code>masked_fill</code> with a large negative value before <code>softmax</code> so forbidden positions get weight ≈0.</p>
+      </div>
+      <div class="code-panel" id="annMha">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L100–168 / ~420</span></div>
+        <pre class="code-block" id="preMha"><code><span class="line"><span class="ln">100</span><span class="kw">class</span> <span class="fn">MultiHeadAttentionBlock</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">101</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">h</span>, <span class="arg">dropout</span>):</span></code>
+<code><span class="line"><span class="ln">102</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">103</span>        <span class="kw">assert</span> d_model <span class="op">%</span> h == <span class="num">0</span></span></code>
+<code><span class="line"><span class="ln">104</span>        <span class="arg">self</span>.d_model = d_model; <span class="arg">self</span>.h = h</span></code>
+<code><span class="line hl"><span class="ln">105</span>        <span class="arg">self</span>.d_k = d_model <span class="op">//</span> h</span></code>
+<code><span class="line"><span class="ln">106</span>        <span class="arg">self</span>.w_q = nn.<span class="fn">Linear</span>(d_model, d_model)</span></code>
+<code><span class="line"><span class="ln">107</span>        <span class="arg">self</span>.w_k = nn.<span class="fn">Linear</span>(d_model, d_model)</span></code>
+<code><span class="line"><span class="ln">108</span>        <span class="arg">self</span>.w_v = nn.<span class="fn">Linear</span>(d_model, d_model)</span></code>
+<code><span class="line hl"><span class="ln">109</span>        <span class="arg">self</span>.w_o = nn.<span class="fn">Linear</span>(d_model, d_model)</span></code>
+<code><span class="line"><span class="ln">110</span>        <span class="arg">self</span>.dropout = nn.<span class="fn">Dropout</span>(dropout)</span></code>
+<code><span class="line"><span class="ln">111</span></span></code>
+<code><span class="line"><span class="ln">112</span>    <span class="kw">@staticmethod</span></span></code>
+<code><span class="line"><span class="ln">113</span>    <span class="kw">def</span> <span class="fn">attention</span>(<span class="arg">query</span>, <span class="arg">key</span>, <span class="arg">value</span>, <span class="arg">mask</span>, <span class="arg">dropout</span>):</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Last tensor dim is d_k; scaling keeps pre-softmax logits tame as width grows.">114</span>        d_k = query.shape[-<span class="num">1</span>]</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="(B,h,T,d_k) @ (B,h,d_k,T) → (B,h,T,T) attention logits per head.">115</span>        scores = (query <span class="op">@</span> key.<span class="fn">transpose</span>(-<span class="num">2</span>, -<span class="num">1</span>)) <span class="op">/</span> math.<span class="fn">sqrt</span>(d_k)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Mask is 1 for allowed, 0 for forbidden; -1e9 approximates −∞ into softmax.">116</span>        <span class="kw">if</span> mask <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span>:</span></code>
+<code><span class="line"><span class="ln">117</span>            scores = scores.<span class="fn">masked_fill</span>(mask == <span class="num">0</span>, -<span class="num">1e9</span>)</span></code>
+<code><span class="line"><span class="ln">118</span>        scores = scores.<span class="fn">softmax</span>(dim=-<span class="num">1</span>)</span></code>
+<code><span class="line"><span class="ln">119</span>        scores = dropout(scores)</span></code>
+<code><span class="line hl"><span class="ln">120</span>        <span class="kw">return</span> scores <span class="op">@</span> value, scores</span></code>
+<code><span class="line"><span class="ln">121</span></span></code>
+<code><span class="line"><span class="ln">122</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, <span class="arg">q</span>, <span class="arg">k</span>, <span class="arg">v</span>, <span class="arg">mask</span>):</span></code>
+<code><span class="line hl"><span class="ln">123</span>        q = <span class="arg">self</span>.w_q(q); k = <span class="arg">self</span>.w_k(k); v = <span class="arg">self</span>.w_v(v)</span></code>
+<code><span class="line"><span class="ln">124</span>        B, T, _ = q.shape</span></code>
+<code><span class="line hl"><span class="ln">125</span>        q = q.<span class="fn">view</span>(B, T, <span class="arg">self</span>.h, <span class="arg">self</span>.d_k).<span class="fn">transpose</span>(<span class="num">1</span>, <span class="num">2</span>)</span></code>
+<code><span class="line new"><span class="ln">126</span>        k = k.<span class="fn">view</span>(B, -<span class="num">1</span>, <span class="arg">self</span>.h, <span class="arg">self</span>.d_k).<span class="fn">transpose</span>(<span class="num">1</span>, <span class="num">2</span>)</span></code>
+<code><span class="line new"><span class="ln">127</span>        v = v.<span class="fn">view</span>(B, -<span class="num">1</span>, <span class="arg">self</span>.h, <span class="arg">self</span>.d_k).<span class="fn">transpose</span>(<span class="num">1</span>, <span class="num">2</span>)</span></code>
+<code><span class="line hl"><span class="ln">128</span>        x, <span class="arg">self</span>.attention_scores = <span class="fn">MultiHeadAttentionBlock.attention</span>(q,k,v,mask,<span class="arg">self</span>.dropout)</span></code>
+<code><span class="line"><span class="ln">129</span>        x = x.<span class="fn">transpose</span>(<span class="num">1</span>, <span class="num">2</span>).<span class="fn">contiguous</span>().<span class="fn">view</span>(B, T, <span class="arg">self</span>.d_model)</span></code>
+<code><span class="line hl"><span class="ln">130</span>        <span class="kw">return</span> <span class="arg">self</span>.w_o(x)</span></code>
+</pre>
+        <div class="code-note" data-panel="mha">Click an annotated line number for a note.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>ResidualConnection: pre-norm sublayer wrapper</h2>
+    <p>Many educational implementations apply <code>LayerNormalization</code> <em>before</em> the sublayer, then add the sublayer output to the residual stream: <code>x + dropout(sublayer(norm(x)))</code>. The original diagram in the paper is post-norm; both families train successfully if you stay consistent.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Shared template</h3>
+        <p>Passing <code>sublayer</code> as a callable avoids duplicating dropout and add logic for attention and FFN branches.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L132–145 / ~420</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">132</span><span class="kw">class</span> <span class="fn">ResidualConnection</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">133</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">dropout</span>):</span></code>
+<code><span class="line"><span class="ln">134</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">135</span>        <span class="arg">self</span>.dropout = nn.<span class="fn">Dropout</span>(dropout)</span></code>
+<code><span class="line hl"><span class="ln">136</span>        <span class="arg">self</span>.norm = <span class="fn">LayerNormalization</span>(d_model)</span></code>
+<code><span class="line"><span class="ln">137</span></span></code>
+<code><span class="line"><span class="ln">138</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x, <span class="arg">sublayer</span>):</span></code>
+<code><span class="line hl"><span class="ln">139</span>        <span class="kw">return</span> x <span class="op">+</span> <span class="arg">self</span>.dropout(<span class="fn">sublayer</span>(<span class="arg">self</span>.norm(x)))</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>EncoderBlock and Encoder stack</h2>
+    <p>The encoder uses <strong>self-attention</strong>: <code>q</code>, <code>k</code>, and <code>v</code> all come from the same tensor. The only masking is padding on the source side so pad tokens do not attend or get attended to meaningfully.</p>
+    <div class="code-progression">
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="encStep(this,'eb1')">1 · Shell</button>
+        <button type="button" class="btn" onclick="encStep(this,'eb2')">2 · Modules</button>
+        <button type="button" class="btn" onclick="encStep(this,'eb3')">3 · Forward</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines code-lines-prog">L147–153 / ~420 · Step 1 of 3</span></div>
+        <pre class="code-block" id="eb1"><code><span class="line"><span class="ln">147</span><span class="kw">class</span> <span class="fn">EncoderBlock</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">148</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">self_attn</span>, <span class="arg">feed_forward</span>, <span class="arg">dropout</span>):</span></code>
+<code><span class="line"><span class="ln">149</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">150</span>        <span class="arg">self</span>.self_attention_block = self_attn</span></code>
+<code><span class="line hl"><span class="ln">151</span>        <span class="arg">self</span>.feed_forward_block = feed_forward</span></code>
+<code><span class="line"><span class="ln">152</span>        <span class="arg">self</span>.residual = nn.<span class="fn">ModuleList</span>([ResidualConnection(d_model, dropout) <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(<span class="num">2</span>)])</span></code>
+<code><span class="line"><span class="ln">153</span>    <span class="cmt"># forward wires masks next</span></span></code>
+</pre>
+        <pre class="code-block" id="eb2" style="display:none"><code><span class="line"><span class="ln">140</span><span class="cmt"># In build_transformer: inject concrete sublayers</span></span></code>
+<code><span class="line new hl"><span class="ln">141</span>enc_layers.<span class="fn">append</span>(<span class="fn">EncoderBlock</span>(</span></code>
+<code><span class="line new"><span class="ln">142</span>    d_model,</span></code>
+<code><span class="line new hl"><span class="ln">143</span>    <span class="fn">MultiHeadAttentionBlock</span>(d_model, h, dropout),</span></code>
+<code><span class="line new hl"><span class="ln">144</span>    <span class="fn">FeedForwardBlock</span>(d_model, d_ff, dropout),</span></code>
+<code><span class="line new"><span class="ln">145</span>    dropout))</span></code>
+</pre>
+        <pre class="code-block" id="eb3" style="display:none"><code><span class="line"><span class="ln">158</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x, <span class="arg">src_mask</span>):</span></code>
+<code><span class="line hl"><span class="ln">159</span>        x = <span class="arg">self</span>.residual[<span class="num">0</span>](x, <span class="kw">lambda</span> x: <span class="arg">self</span>.self_attention_block(x, x, x, src_mask))</span></code>
+<code><span class="line hl"><span class="ln">160</span>        x = <span class="arg">self</span>.residual[<span class="num">1</span>](x, <span class="arg">self</span>.feed_forward_block)</span></code>
+<code><span class="line"><span class="ln">161</span>        <span class="kw">return</span> x</span></code>
+<code><span class="line"><span class="ln">162</span></span></code>
+<code><span class="line"><span class="ln">163</span><span class="kw">class</span> <span class="fn">Encoder</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">164</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">layers</span>):</span></code>
+<code><span class="line hl"><span class="ln">165</span>        <span class="kw">super</span>().<span class="fn">__init__</span>(); <span class="arg">self</span>.layers = layers; <span class="arg">self</span>.norm = LayerNormalization(d_model)</span></code>
+<code><span class="line"><span class="ln">166</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x, <span class="arg">mask</span>):</span></code>
+<code><span class="line hl"><span class="ln">167</span>        <span class="kw">for</span> layer <span class="kw">in</span> <span class="arg">self</span>.layers: x = layer(x, mask)</span></code>
+<code><span class="line hl"><span class="ln">168</span>        <span class="kw">return</span> <span class="arg">self</span>.norm(x)</span></code>
+</pre>
+      </div>
+      <p class="step-caption">Grow from empty wiring to masked self-attention + FFN, then stack into <code>Encoder</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s08">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>DecoderBlock and Decoder: causal self-attn + cross-attn</h2>
+    <p>The decoder runs three sublayers: masked self-attention on <code>tgt</code> (causal mask from Chapter 1), cross-attention where <code>q</code> is decoder state and <code>k</code>,<code>v</code> are encoder output, then <code>FeedForwardBlock</code>. Pass <code>src_mask</code> into cross-attention so padding keys are suppressed; pass <code>tgt_mask</code> into self-attention for causality and pad.</p>
+    <div class="interactive-panel">
+      <h3>Demo: pad vs causal on a 6×6 mask</h3>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.88rem;">Toy grid: pad hides bottom-right; causal hides upper triangle. Real code combines with <code>&amp;</code> on booleans before <code>masked_fill</code>.</p>
+      <label style="color:var(--text-dim);margin-right:16px;"><input type="checkbox" id="mask-pad" checked /> pad region masked</label>
+      <label style="color:var(--text-dim);"><input type="checkbox" id="mask-causal" checked /> causal (no future)</label>
+      <div class="mask-demo-grid" id="mask-demo" style="margin-top:12px;"></div>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Cross-attention call shape</h3>
+        <p><code>self.cross_attention_block(q, enc_out, enc_out, src_mask)</code> — note three arguments for keys/values are identical encoder memory.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L170–212 / ~420</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">170</span><span class="kw">class</span> <span class="fn">DecoderBlock</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">171</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">self_attn</span>, <span class="arg">cross_attn</span>, <span class="arg">feed_forward</span>, <span class="arg">dropout</span>):</span></code>
+<code><span class="line"><span class="ln">172</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line hl"><span class="ln">173</span>        <span class="arg">self</span>.self_attention_block = self_attn</span></code>
+<code><span class="line hl"><span class="ln">174</span>        <span class="arg">self</span>.cross_attention_block = cross_attn</span></code>
+<code><span class="line hl"><span class="ln">175</span>        <span class="arg">self</span>.feed_forward_block = feed_forward</span></code>
+<code><span class="line"><span class="ln">176</span>        <span class="arg">self</span>.residual = nn.<span class="fn">ModuleList</span>([ResidualConnection(d_model, dropout) <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(<span class="num">3</span>)])</span></code>
+<code><span class="line"><span class="ln">177</span></span></code>
+<code><span class="line"><span class="ln">178</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x, <span class="arg">enc_out</span>, <span class="arg">src_mask</span>, <span class="arg">tgt_mask</span>):</span></code>
+<code><span class="line hl"><span class="ln">179</span>        x = <span class="arg">self</span>.residual[<span class="num">0</span>](x, <span class="kw">lambda</span> x: <span class="arg">self</span>.self_attention_block(x,x,x,tgt_mask))</span></code>
+<code><span class="line hl"><span class="ln">180</span>        x = <span class="arg">self</span>.residual[<span class="num">1</span>](x, <span class="kw">lambda</span> x: <span class="arg">self</span>.cross_attention_block(x,enc_out,enc_out,src_mask))</span></code>
+<code><span class="line hl"><span class="ln">181</span>        x = <span class="arg">self</span>.residual[<span class="num">2</span>](x, <span class="arg">self</span>.feed_forward_block)</span></code>
+<code><span class="line"><span class="ln">182</span>        <span class="kw">return</span> x</span></code>
+<code><span class="line"><span class="ln">183</span></span></code>
+<code><span class="line"><span class="ln">184</span><span class="kw">class</span> <span class="fn">Decoder</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">185</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">layers</span>):</span></code>
+<code><span class="line hl"><span class="ln">186</span>        <span class="kw">super</span>().<span class="fn">__init__</span>(); <span class="arg">self</span>.layers = layers; <span class="arg">self</span>.norm = LayerNormalization(d_model)</span></code>
+<code><span class="line"><span class="ln">187</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x, enc_out, src_mask, tgt_mask):</span></code>
+<code><span class="line hl"><span class="ln">188</span>        <span class="kw">for</span> layer <span class="kw">in</span> <span class="arg">self</span>.layers:</span></code>
+<code><span class="line"><span class="ln">189</span>            x = layer(x, enc_out, src_mask, tgt_mask)</span></code>
+<code><span class="line hl"><span class="ln">190</span>        <span class="kw">return</span> <span class="arg">self</span>.norm(x)</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s09">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>ProjectionLayer and Transformer façade</h2>
+    <p><code>ProjectionLayer</code> maps <code>d_model → tgt_vocab</code>. Training often uses raw logits with <code>nn.CrossEntropyLoss</code>; some codebases apply <code>log_softmax</code> and <code>NLLLoss</code> for numerical stability. Expose <code>encode</code>, <code>decode</code>, and <code>project</code> separately so inference reuses <code>enc_out</code> while the decoder grows one token at a time.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Why not one giant <code>forward</code>?</h3>
+        <p><code>greedy_decode</code> calls <code>encode</code> once, then loops <code>decode → project → argmax</code>. A monolithic forward would either re-encode each step or need awkward flags.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines">L214–268 / ~420</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">214</span><span class="kw">class</span> <span class="fn">ProjectionLayer</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">215</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">d_model</span>, <span class="arg">vocab_size</span>):</span></code>
+<code><span class="line"><span class="ln">216</span>        <span class="kw">super</span>().<span class="fn">__init__</span>(); <span class="arg">self</span>.proj = nn.<span class="fn">Linear</span>(d_model, vocab_size)</span></code>
+<code><span class="line"><span class="ln">217</span>    <span class="kw">def</span> <span class="fn">forward</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">218</span>        <span class="kw">return</span> torch.<span class="fn">log_softmax</span>(<span class="arg">self</span>.proj(x), dim=-<span class="num">1</span>)</span></code>
+<code><span class="line"><span class="ln">219</span></span></code>
+<code><span class="line"><span class="ln">220</span><span class="kw">class</span> <span class="fn">Transformer</span>(nn.Module):</span></code>
+<code><span class="line"><span class="ln">221</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, enc, dec, src_emb, tgt_emb, src_pos, tgt_pos, proj):</span></code>
+<code><span class="line hl"><span class="ln">222</span>        <span class="kw">super</span>().<span class="fn">__init__</span>()</span></code>
+<code><span class="line"><span class="ln">223</span>        <span class="arg">self</span>.encoder, <span class="arg">self</span>.decoder = enc, dec</span></code>
+<code><span class="line"><span class="ln">224</span>        <span class="arg">self</span>.src_embed, <span class="arg">self</span>.tgt_embed = src_emb, tgt_emb</span></code>
+<code><span class="line"><span class="ln">225</span>        <span class="arg">self</span>.src_pos, <span class="arg">self</span>.tgt_pos = src_pos, tgt_pos</span></code>
+<code><span class="line hl"><span class="ln">226</span>        <span class="arg">self</span>.project_layer = proj</span></code>
+<code><span class="line"><span class="ln">227</span></span></code>
+<code><span class="line"><span class="ln">228</span>    <span class="kw">def</span> <span class="fn">encode</span>(<span class="arg">self</span>, src, src_mask):</span></code>
+<code><span class="line hl"><span class="ln">229</span>        x = <span class="arg">self</span>.src_embed(src); x = <span class="arg">self</span>.src_pos(x)</span></code>
+<code><span class="line hl"><span class="ln">230</span>        <span class="kw">return</span> <span class="arg">self</span>.encoder(x, src_mask)</span></code>
+<code><span class="line"><span class="ln">231</span></span></code>
+<code><span class="line"><span class="ln">232</span>    <span class="kw">def</span> <span class="fn">decode</span>(<span class="arg">self</span>, enc, src_mask, tgt, tgt_mask):</span></code>
+<code><span class="line hl"><span class="ln">233</span>        x = <span class="arg">self</span>.tgt_embed(tgt); x = <span class="arg">self</span>.tgt_pos(x)</span></code>
+<code><span class="line hl"><span class="ln">234</span>        <span class="kw">return</span> <span class="arg">self</span>.decoder(x, enc, src_mask, tgt_mask)</span></code>
+<code><span class="line"><span class="ln">235</span></span></code>
+<code><span class="line"><span class="ln">236</span>    <span class="kw">def</span> <span class="fn">project</span>(<span class="arg">self</span>, x):</span></code>
+<code><span class="line hl"><span class="ln">237</span>        <span class="kw">return</span> <span class="arg">self</span>.project_layer(x)</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>build_transformer and Xavier uniform init</h2>
+
+    <p>The <code>build_transformer</code> factory function takes all hyperparameters and wires together every component we've built. It creates:</p>
+
+    <div class="card">
+      <p><strong>Two InputEmbeddings tables</strong> — one for the source vocabulary, one for the target vocabulary. They must be separate because English and Italian have different words and different vocabulary sizes.</p>
+      <p style="margin-top:8px;"><strong>Two PositionalEncoding modules</strong> — we could technically reuse one since positional encodings are the same regardless of language, but using two keeps the code explicit and gives each its own dropout random number stream.</p>
+      <p style="margin-top:8px;"><strong>N encoder blocks</strong> — each with its own <code>MultiHeadAttentionBlock</code> and <code>FeedForwardBlock</code> (fresh weights, no sharing between layers).</p>
+      <p style="margin-top:8px;"><strong>N decoder blocks</strong> — each with a self-attention block, a cross-attention block, and a feed-forward block.</p>
+      <p style="margin-top:8px;"><strong>One ProjectionLayer</strong> — maps from d_model to the <em>target</em> vocabulary size, since we're translating into the target language.</p>
+    </div>
+
+    <h3>Xavier Initialization</h3>
+
+    <p><code>nn.init.xavier_uniform_</code> initializes weight matrices so that activations and gradients maintain a healthy scale through the network. Without it, weights start at PyTorch's defaults (scaled by fan-in), which can lead to slow initial training. Xavier considers both the number of input and output units, producing weights from a uniform distribution with carefully chosen bounds. The <code>if p.dim() > 1</code> check skips 1D parameters — those are biases (already zeros) and LayerNorm gains (already ones), which are well-initialized by default.</p>
+    <div class="code-progression">
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="buildStep(this,'bf1')">1 · Signature</button>
+        <button type="button" class="btn" onclick="buildStep(this,'bf2')">2 · Stack blocks</button>
+        <button type="button" class="btn" onclick="buildStep(this,'bf3')">3 · Init + return</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines code-lines-build">L240–244 / ~420 · Step 1 of 3</span></div>
+        <pre class="code-block" id="bf1"><code><span class="line"><span class="ln">240</span><span class="kw">def</span> <span class="fn">build_transformer</span>(src_vs, tgt_vs, src_seq, tgt_seq, d_model, N, h, dropout, d_ff):</span></code>
+<code><span class="line hl"><span class="ln">241</span>    src_emb = <span class="fn">InputEmbeddings</span>(d_model, src_vs)</span></code>
+<code><span class="line hl"><span class="ln">242</span>    tgt_emb = <span class="fn">InputEmbeddings</span>(d_model, tgt_vs)</span></code>
+<code><span class="line"><span class="ln">243</span>    src_pos = <span class="fn">PositionalEncoding</span>(d_model, src_seq, dropout)</span></code>
+<code><span class="line"><span class="ln">244</span>    tgt_pos = <span class="fn">PositionalEncoding</span>(d_model, tgt_seq, dropout)</span></code>
+</pre>
+        <pre class="code-block" id="bf2" style="display:none"><code><span class="line new hl"><span class="ln">245</span>    enc_layers = []</span></code>
+<code><span class="line new"><span class="ln">246</span>    <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(N):</span></code>
+<code><span class="line new hl"><span class="ln">247</span>        enc_layers.<span class="fn">append</span>(<span class="fn">EncoderBlock</span>(d_model, <span class="fn">MultiHeadAttentionBlock</span>(d_model,h,dropout),</span></code>
+<code><span class="line new"><span class="ln">248</span>            <span class="fn">FeedForwardBlock</span>(d_model,d_ff,dropout), dropout))</span></code>
+<code><span class="line new"><span class="ln">249</span>    dec_layers = []</span></code>
+<code><span class="line new hl"><span class="ln">250</span>    <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(N):</span></code>
+<code><span class="line new"><span class="ln">251</span>        dec_layers.<span class="fn">append</span>(<span class="fn">DecoderBlock</span>(d_model,</span></code>
+<code><span class="line new"><span class="ln">252</span>            <span class="fn">MultiHeadAttentionBlock</span>(d_model,h,dropout),</span></code>
+<code><span class="line new hl"><span class="ln">253</span>            <span class="fn">MultiHeadAttentionBlock</span>(d_model,h,dropout),</span></code>
+<code><span class="line new"><span class="ln">254</span>            <span class="fn">FeedForwardBlock</span>(d_model,d_ff,dropout), dropout))</span></code>
+<code><span class="line new hl"><span class="ln">255</span>    encoder = <span class="fn">Encoder</span>(d_model, nn.<span class="fn">ModuleList</span>(enc_layers))</span></code>
+<code><span class="line new hl"><span class="ln">256</span>    decoder = <span class="fn">Decoder</span>(d_model, nn.<span class="fn">ModuleList</span>(dec_layers))</span></code>
+<code><span class="line new"><span class="ln">257</span>    proj = <span class="fn">ProjectionLayer</span>(d_model, tgt_vs)</span></code>
+</pre>
+        <pre class="code-block" id="bf3" style="display:none"><code><span class="line hl"><span class="ln">258</span>    model = <span class="fn">Transformer</span>(encoder, decoder, src_emb, tgt_emb, src_pos, tgt_pos, proj)</span></code>
+<code><span class="line"><span class="ln">259</span>    <span class="kw">for</span> p <span class="kw">in</span> model.<span class="fn">parameters</span>():</span></code>
+<code><span class="line hl"><span class="ln">260</span>        <span class="kw">if</span> p.<span class="fn">dim</span>() <span class="op">&gt;</span> <span class="num">1</span>: nn.init.<span class="fn">xavier_uniform_</span>(p)</span></code>
+<code><span class="line"><span class="ln">261</span>    <span class="kw">return</span> model</span></code>
+</pre>
+      </div>
+      <p class="step-caption build-cap">Embeddings and positions first; then stacked blocks; finally Xavier on 2D+ tensors.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Opus Books and word-level tokenizers</h2>
+    <p>We use the <strong>Opus Books</strong> dataset from HuggingFace — a collection of parallel sentence pairs extracted from famous books. Each data item is a pair: one sentence in English, one in Italian (or whichever language pair you choose). For example: "There was no possibility of taking a walk that day" paired with its Italian translation.</p>
+
+    <h3>The Tokenizer</h3>
+
+    <p>Before the model sees any text, we need a <strong>tokenizer</strong> — the component that sits before the input embeddings. Its job: split a sentence into tokens and map each token to a number (input ID). There are many tokenizer strategies (BPE, WordPiece, sub-word), but we use the simplest: a <strong>word-level tokenizer</strong> that splits by whitespace. Each space defines a word boundary.</p>
+
+    <p>We build one tokenizer per language (source and target), because English and Italian have different vocabularies. The tokenizer training uses the HuggingFace <code>tokenizers</code> library with a <code>WordLevelTrainer</code> and <code>WhitespacePre tokenizer</code>. We set <strong>min_frequency=2</strong>, meaning a word must appear at least twice in the dataset to earn its own vocabulary entry. Words below this threshold are mapped to the special <code>&lt;unk&gt;</code> (unknown) token.</p>
+
+    <p>Four <strong>special tokens</strong> are registered in every vocabulary:</p>
+    <div class="card">
+      <p><strong>&lt;unk&gt;</strong> — unknown word (not in vocabulary)</p>
+      <p><strong>&lt;pad&gt;</strong> — padding (filler to reach fixed sequence length)</p>
+      <p><strong>&lt;sos&gt;</strong> — start of sentence (signals the decoder to begin generating)</p>
+      <p><strong>&lt;eos&gt;</strong> — end of sentence (signals generation is complete)</p>
+    </div>
+
+    <p>The tokenizer is built once and saved to disk. On subsequent runs, it loads from the saved file rather than retraining.</p>
+
+    <h3>Train / Val Split and Sequence Length</h3>
+
+    <p>The Opus Books dataset only provides a <code>train</code> split. We split it ourselves: <strong>90%</strong> for training, <strong>10%</strong> for validation, using <code>torch.utils.data.random_split</code>. Before training, we also scan every sentence to find the maximum token count in both languages — this helps choose an appropriate <strong>sequence length</strong> (350 tokens is more than enough for this dataset).</p>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Data loading code</h3>
+        <p>The subset string (e.g. <code>'en-it'</code>) is built dynamically from configuration so you can switch languages by changing two config values.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">L18–55 / ~240</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">18</span><span class="kw">from</span> datasets <span class="kw">import</span> load_dataset</span></code>
+<code><span class="line hl"><span class="ln">19</span>raw = load_dataset(<span class="str">'opus_books'</span>, <span class="str">'en-it'</span>, split=<span class="str">'train'</span>)</span></code>
+<code><span class="line"><span class="ln">20</span>tokenizer_src = get_or_build_tokenizer(config, raw, config[<span class="str">'lang_src'</span>])</span></code>
+<code><span class="line hl"><span class="ln">21</span>tokenizer_tgt = get_or_build_tokenizer(config, raw, config[<span class="str">'lang_tgt'</span>])</span></code>
+<code><span class="line"><span class="ln">22</span>train_ds, val_ds = random_split(raw, [<span class="num">0.9</span>, <span class="num">0.1</span>])</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>BilingualDataset: padding, masks, shifted labels</h2>
+
+    <p>The <code>BilingualDataset</code> class transforms raw sentence pairs into the tensors the Transformer expects. For each pair, it produces three tensors:</p>
+
+    <div class="card">
+      <p><strong>Encoder input:</strong> <code>[SOS] + src_tokens + [EOS] + PAD * N</code> — the full source sentence wrapped in special tokens, padded to the fixed sequence length. We need <code>seq_len - len(src_tokens) - 2</code> padding tokens (minus 2 for SOS and EOS).</p>
+      <p style="margin-top:8px;"><strong>Decoder input:</strong> <code>[SOS] + tgt_tokens + PAD * N</code> — only SOS is prepended (no EOS). We need <code>seq_len - len(tgt_tokens) - 1</code> padding tokens (minus 1 for SOS only).</p>
+      <p style="margin-top:8px;"><strong>Label:</strong> <code>tgt_tokens + [EOS] + PAD * N</code> — only EOS is appended (no SOS). Same padding count as decoder input. This creates the shifted alignment: decoder sees <code>[SOS] te amo molto</code>, label expects <code>te amo molto [EOS]</code>.</p>
+    </div>
+
+    <p>The code asserts that the number of padding tokens never goes negative — if it does, the chosen sequence length is too small for this sentence. All tensors use <code>torch.long</code> (64-bit integers) because vocabulary sizes can exceed 32-bit range.</p>
+
+    <h3>Building the Masks</h3>
+
+    <p>The <strong>encoder mask</strong> marks non-padding tokens as 1 and padding as 0 (shape <code>(1, 1, seq_len)</code>, broadcasting across heads and query positions). The <strong>decoder mask</strong> combines that padding mask with the lower-triangular causal mask from Chapter 1 — use <code>torch.triu</code> and keep positions on and below the diagonal. Combine both with logical AND before <code>masked_fill</code>.</p>
+
+    <p>Use <code>ignore_index=pad_id</code> in the loss so padding positions do not contribute to gradients.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Click annotated lines</h3>
+        <p>Mask tensors broadcast to attention logits: <code>1</code> allows, <code>0</code> forbids. Combine causal and pad with logical <code>&amp;</code> for decoder self-attention.</p>
+      </div>
+      <div class="code-panel" id="annBilingual">
+        <div class="code-header"><span class="code-filename">dataset.py</span><span class="code-lines">L32–95 / ~160</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">32</span><span class="kw">class</span> <span class="fn">BilingualDataset</span>(Dataset):</span></code>
+<code><span class="line"><span class="ln">33</span>    <span class="kw">def</span> <span class="fn">__getitem__</span>(<span class="arg">self</span>, idx):</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Fetch parallel pair; tokenize each side with its own vocabulary.">34</span>        pair = <span class="arg">self</span>.ds[idx]</span></code>
+<code><span class="line"><span class="ln">35</span>        src = pair[<span class="arg">self</span>.lang_src]; tgt = pair[<span class="arg">self</span>.lang_tgt]</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Fixed seq_len tensors; pad_id fills unused tail for batching.">36</span>        enc_in = build_tensor(src, <span class="arg">self</span>.tok_src, <span class="arg">self</span>.seq_len, <span class="arg">self</span>.sos, <span class="arg">self</span>.eos, <span class="arg">self</span>.pad)</span></code>
+<code><span class="line"><span class="ln">37</span>        dec_in = build_tensor_tgt_in(tgt, ...)</span></code>
+<code><span class="line"><span class="ln">38</span>        label = build_tensor_tgt_out(tgt, ...)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Encoder mask: suppress pad keys; decoder mask: causal ∧ pad for self-attention.">39</span>        src_mask = (enc_in <span class="op">!=</span> <span class="arg">self</span>.pad).<span class="fn">unsqueeze</span>(<span class="num">0</span>).<span class="fn">unsqueeze</span>(<span class="num">0</span>)</span></code>
+<code><span class="line"><span class="ln">40</span>        tgt_mask = causal_mask(dec_in.size(<span class="num">0</span>)) <span class="op">&amp;</span> pad_mask(dec_in, <span class="arg">self</span>.pad)</span></code>
+<code><span class="line hl"><span class="ln">41</span>        <span class="kw">return</span> {<span class="str">'encoder_input'</span>: enc_in, <span class="str">'decoder_input'</span>: dec_in,</span></code>
+<code><span class="line"><span class="ln">42</span>                <span class="str">'label'</span>: label, <span class="str">'encoder_mask'</span>: src_mask, <span class="str">'decoder_mask'</span>: tgt_mask}</span></code>
+</pre>
+        <div class="code-note" data-panel="bi">Click an annotated line number.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Training: Adam, label smoothing, TensorBoard</h2>
+
+    <h3>Configuration</h3>
+
+    <p>The default hyperparameters follow the paper closely: <strong>d_model = 512</strong>, <strong>N = 6</strong> layers (both encoder and decoder), <strong>h = 8</strong> heads, <strong>d_ff = 2048</strong>, <strong>dropout = 0.1</strong>. For training: <strong>batch_size = 8</strong> (increase if your GPU allows), <strong>epochs = 20</strong>, <strong>learning_rate = 10<sup>-4</sup></strong>, and <strong>seq_len = 350</strong> for the English→Italian dataset. If the model is too large for your GPU, try reducing the number of heads or layers — given the relatively small dataset, this shouldn't hurt quality significantly.</p>
+
+    <h3>Loss Function and Label Smoothing</h3>
+
+    <p>The loss function is <code>CrossEntropyLoss</code> with two important settings. First, <code>ignore_index</code> is set to the padding token ID so padding positions contribute zero to the loss. Second, <code>label_smoothing = 0.1</code>: instead of placing 100% probability on the correct token, we take 10% of that mass and spread it evenly across all other tokens. This makes the model <strong>less overconfident</strong> in its predictions and generally improves generalization.</p>
+
+    <p>To compare logits with labels, we flatten: logits from <code>(batch, seq, vocab)</code> to <code>(batch * seq, vocab)</code>, and labels from <code>(batch, seq)</code> to <code>(batch * seq)</code>. This is the shape <code>CrossEntropyLoss</code> expects.</p>
+
+    <h3>Checkpointing and Resume</h3>
+
+    <p>At the end of every epoch, we save not just the model's <code>state_dict</code> but also the <strong>optimizer's state</strong>. The Adam optimizer maintains per-weight statistics (running means and variances of gradients) that took many steps to accumulate. Without saving these, resuming training forces the optimizer to start from scratch — even with a pre-trained model, it must re-learn how to move each weight. The optimizer dictionary can be quite large, but it is essential for proper training resumption.</p>
+
+    <p>Loss values are logged to <strong>TensorBoard</strong> via <code>SummaryWriter</code>, enabling real-time visualization of training progress as loss curves.</p>
+
+    <h3>Resuming Training from a Checkpoint</h3>
+
+    <p>To resume after a crash or interruption, the code checks if a <code>preload</code> path exists in the configuration. If so, it loads the checkpoint file with <code>torch.load</code>, then calls <code>model.load_state_dict</code> and <code>optimizer.load_state_dict</code> to restore both. The saved <code>global_step</code> ensures TensorBoard logging continues from the correct position. Without restoring the optimizer state, training effectively restarts — the optimizer must re-learn its per-weight statistics (running means/variances), which can cause large, unstable updates.</p>
+
+    <h3>Learning Rate Scheduling</h3>
+
+    <p>A common practice is to start with a high learning rate and decay it gradually across epochs. We intentionally skip this here to keep the code focused on the Transformer itself. A fixed <code>lr = 10<sup>-4</sup></code> works well enough for this dataset size.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [1]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <div class="code-header" style="border-top:none;"><span class="code-filename">train.py</span><span class="code-lines">L96–104 / ~240</span></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">from</span> torch.utils.tensorboard <span class="kw">import</span> SummaryWriter</span></code>
+<code><span class="line"><span class="ln">2</span>loss_fn = nn.<span class="fn">CrossEntropyLoss</span>(ignore_index=tokenizer_tgt.token_to_id(<span class="str">'&lt;pad&gt;'</span>), label_smoothing=<span class="num">0.1</span>)</span></code>
+<code><span class="line hl"><span class="ln">3</span>optimizer = torch.optim.<span class="fn">Adam</span>(model.<span class="fn">parameters</span>(), lr=config[<span class="str">'lr'</span>], betas=(<span class="num">0.9</span>,<span class="num">0.98</span>), eps=<span class="num">1e-9</span>)</span></code>
+<code><span class="line"><span class="ln">4</span>writer = SummaryWriter(config[<span class="str">'experiment_name'</span>])</span></code>
+<code><span class="line hl"><span class="ln">5</span>logits = model.<span class="fn">project</span>(model.<span class="fn">decode</span>(enc_out, m_enc, dec_in, m_dec))</span></code>
+<code><span class="line"><span class="ln">6</span>loss = loss_fn(logits.<span class="fn">view</span>(-<span class="num">1</span>, tgt_vs), label.<span class="fn">view</span>(-<span class="num">1</span>))</span></code>
+</pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [1]</span><pre class="output-text">global_step 1200  loss 4.182  (Opus-style run, illustrative)
+TensorBoard scalar 'train_loss' updated</pre></div>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [2]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <div class="code-header" style="border-top:none;"><span class="code-filename">train.py</span><span class="code-lines">L140–143 / ~240</span></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>loss.<span class="fn">backward</span>()</span></code>
+<code><span class="line"><span class="ln">2</span>optimizer.<span class="fn">step</span>(); optimizer.<span class="fn">zero_grad</span>(set_to_none=<span class="kw">True</span>)</span></code>
+<code><span class="line hl"><span class="ln">3</span>writer.<span class="fn">add_scalar</span>(<span class="str">'train_loss'</span>, loss.<span class="fn">item</span>(), global_step)</span></code>
+</pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [2]</span><pre class="output-text">step 1200  lr 1e-4  grad_norm ~1.2</pre></div>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Teacher forcing</h3>
+        <p>During training, teacher forcing (Chapter 1) feeds ground-truth decoder prefixes; at inference you feed model predictions. The loss compares logits to shifted labels token-wise.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">L110–138 / ~240</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">110</span>enc_out = model.<span class="fn">encode</span>(batch[<span class="str">'encoder_input'</span>], batch[<span class="str">'encoder_mask'</span>])</span></code>
+<code><span class="line hl"><span class="ln">111</span>dec_out = model.<span class="fn">decode</span>(enc_out, batch[<span class="str">'encoder_mask'</span>],</span></code>
+<code><span class="line"><span class="ln">112</span>    batch[<span class="str">'decoder_input'</span>], batch[<span class="str">'decoder_mask'</span>])</span></code>
+<code><span class="line hl"><span class="ln">113</span>logits = model.<span class="fn">project</span>(dec_out)</span></code>
+</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s14">
+  <div class="container">
+    <span class="section-num">14</span>
+    <h2>Greedy decode, validation, attention maps</h2>
+
+    <h3>Greedy Decoding: Step by Step</h3>
+
+    <p>Set <code>model.eval()</code> and wrap everything in <code>torch.no_grad()</code> to disable gradient computation. The process mirrors inference from the theory chapter:</p>
+
+    <div class="card">
+      <p><strong>Step 1:</strong> Pre-compute the encoder output once — it never changes because the source sentence is fixed.</p>
+      <p style="margin-top:8px;"><strong>Step 2:</strong> Initialize decoder input with only the SOS token: <code>torch.full((1, 1), sos_id)</code>.</p>
+      <p style="margin-top:8px;"><strong>Step 3 (loop):</strong> Build a causal mask for the current decoder input length. Run <code>model.decode</code> with the cached encoder output. Project only the <strong>last position</strong> (<code>out[:, -1]</code>) — this is the prediction for the next token. Take <code>argmax</code> to get the token with the highest probability (greedy search). Append this token to the decoder input. If it equals EOS, stop.</p>
+    </div>
+
+    <p>During validation, we run this greedy decode on a few sample sentences from the validation set (batch size = 1) and compare the model's output with the expected translation. We use <code>tqdm</code>'s built-in <code>write</code> method for printing so the output doesn't interfere with the training progress bar.</p>
+
+    <h3>Three Types of Attention to Visualize</h3>
+
+    <p>Every <code>MultiHeadAttentionBlock</code> stores its <code>attention_scores</code> after each forward pass. We can extract these from any layer and any head to create attention heatmaps. There are three distinct attention types to examine:</p>
+
+    <div class="card">
+      <p><strong>1. Encoder self-attention:</strong> Each source word attending to other source words. We expect high diagonal values (word attending to itself) and interesting off-diagonal patterns showing syntactic relationships.</p>
+      <p style="margin-top:8px;"><strong>2. Decoder self-attention:</strong> Each target word attending to previous target words (causal — upper triangle is zeroed). Shows how the model builds the translation sequence.</p>
+      <p style="margin-top:8px;"><strong>3. Cross-attention (encoder-decoder):</strong> The most revealing — it shows how each target word attends to the source sentence. This is where the actual translation alignment happens. Rows are source words, columns are target words. Bright cells reveal which English words the model focused on when producing each Italian word.</p>
+    </div>
+
+    <p>Different heads and different layers learn different relationship patterns, which is exactly why multi-head attention is so powerful. Between one layer and the next, we also have different W<sup>Q</sup>, W<sup>K</sup>, W<sup>V</sup> matrices, so they learn different inter-word relationships.</p>
+
+    <h3>Implementing Attention Visualization</h3>
+
+    <p>To visualize attention, we create a dedicated notebook. The workflow: load the pre-trained model, run inference on a sample sentence, then extract <code>attention_scores</code> from the model's internal layers. Each <code>MultiHeadAttentionBlock</code> stores the softmax output as <code>self.attention_scores</code> — we retrieve it by navigating the model hierarchy: <code>model.encoder.layers[layer_idx].self_attention_block.attention_scores</code>.</p>
+
+    <p>For each layer and head, we build a heatmap grid. The rows and columns are the tokens of the sentence (or source/target sentences for cross-attention). Each cell's intensity represents the attention score between two tokens. When hovering over cells, we can read exact score values. The SOS and EOS tokens typically show weak connections to real words (especially in early layers), while content words show the strongest diagonal and syntactic patterns.</p>
+
+    <p>The <strong>cross-attention heatmap</strong> is particularly revealing — it shows how the model learned to align the source and target languages. This is where the actual translation relationship is visible.</p>
+
+    <div class="callout">
+      <p><strong>Greedy decode note:</strong> During autoregressive decoding, the growing decoder sequence has <strong>no padding tokens</strong> — it's just [SOS] → [SOS, te] → [SOS, te, amo], etc. So only the causal mask is needed, not the padding mask. The padding mask is a training concern (where we batch fixed-length sequences).</p>
+    </div>
+    <div class="interactive-panel">
+      <h3>Demo: greedy steps (toy Italian tokens)</h3>
+      <button type="button" class="btn" id="greedy-step">One step</button>
+      <button type="button" class="btn" id="greedy-reset" style="margin-left:8px;">Reset</button>
+      <div class="token-row" id="greedy-tokens"></div>
+      <p id="greedy-msg" style="font-family:var(--mono);font-size:0.8rem;color:var(--accent3);margin:0;"></p>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [3]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <div class="code-header" style="border-top:none;"><span class="code-filename">inference.py</span><span class="code-lines">L42–44 / ~80</span></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>out = <span class="fn">greedy_decode</span>(model, enc_in, enc_mask, tokenizer_tgt, max_len=<span class="num">64</span>)</span></code>
+<code><span class="line hl"><span class="ln">2</span>print(tokenizer_tgt.<span class="fn">decode</span>(out.<span class="fn">squeeze</span>().<span class="fn">tolist</span>()))</span></code>
+</pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [3]</span><pre class="output-text">il gatto è dolce &lt;eos&gt;
+(source: "the cat is sweet" — illustrative)</pre></div>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Annotated decode loop</h3>
+        <p>Only the newest logits matter; earlier positions were teacher-forced during training but here are frozen history.</p>
+      </div>
+      <div class="code-panel" id="annGreedy">
+        <div class="code-header"><span class="code-filename">inference.py</span><span class="code-lines">L8–40 / ~80</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">8</span><span class="kw">def</span> <span class="fn">greedy_decode</span>(model, src, src_mask, tokenizer_tgt, max_len):</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Run encoder once; reuse enc_out for every decode step.">9</span>    enc = model.<span class="fn">encode</span>(src, src_mask)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Start with SOS id only; tensor grows along seq dim.">10</span>    dec = torch.<span class="fn">full</span>((<span class="num">1</span>,<span class="num">1</span>), sos_id, dtype=torch.long, device=device)</span></code>
+<code><span class="line"><span class="ln">11</span>    <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(max_len <span class="op">-</span> <span class="num">1</span>):</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Causal mask width matches current dec length; pad mask trivial for growing prefix.">12</span>        m = causal_pad_mask(dec, pad_id)</span></code>
+<code><span class="line"><span class="ln">13</span>        out = model.<span class="fn">decode</span>(enc, src_mask, dec, m)</span></code>
+<code><span class="line hl"><span class="ln">14</span>        prob = model.<span class="fn">project</span>(out[:, -<span class="num">1</span>])</span></code>
+<code><span class="line hl"><span class="ln">15</span>        next_id = prob.<span class="fn">argmax</span>(dim=-<span class="num">1</span>).<span class="fn">unsqueeze</span>(<span class="num">0</span>)</span></code>
+<code><span class="line"><span class="ln">16</span>        dec = torch.<span class="fn">cat</span>([dec, next_id], dim=<span class="num">1</span>)</span></code>
+<code><span class="line"><span class="ln">17</span>        <span class="kw">if</span> next_id.<span class="fn">item</span>() == eos_id: <span class="kw">break</span></span></code>
+<code><span class="line"><span class="ln">18</span>    <span class="kw">return</span> dec</span></code>
+</pre>
+        <div class="code-note" data-panel="gd">Click an annotated line number.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s15">
+  <div class="container">
+    <span class="section-num">15</span>
+    <h2>Playground: cross-attention column softmax</h2>
+    <p>Each decoder column is one target timestep attending over source rows (keys). After softmax, brighter cells receive more mass. This mirrors one column of encoder–decoder attention when queries come from the decoder state.</p>
+    <div class="interactive-panel">
+      <h3>Synthetic alignment grid</h3>
+      <button type="button" class="btn" id="pg-randomize">Randomize scores</button>
+      <div class="heatmap-wrap" style="margin-top:12px;"><table class="heat" id="pg-table"></table></div>
+      <p id="pg-info" style="font-family:var(--mono);font-size:0.78rem;color:var(--accent3);"></p>
+    </div>
+  </div>
+</section>
+
+<footer class="footer"><p>Advanced NLP V2 · Chapter 02 · Interactive tutorial</p></footer>
+
+<script>
+function toggleOut(btn) {
+  const cell = btn.closest('.jupyter-cell');
+  const out = cell.querySelector('.cell-output');
+  const on = out.style.display !== 'block';
+  out.style.display = on ? 'block' : 'none';
+  btn.textContent = on ? 'Hide Output ▲' : 'Show Output ▼';
+}
+function encStep(btn, id) {
+  const root = btn.closest('.code-progression');
+  root.querySelectorAll('.code-block').forEach(e => { e.style.display = 'none'; });
+  root.querySelector('#'+id).style.display = 'block';
+  root.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const caps = ['EncoderBlock stores injected MHA + FFN and two ResidualConnection modules.', 'build_transformer appends EncoderBlock(...) with concrete sublayers.', 'forward applies masked self-attention λ, FFN residual, then Encoder stack.'];
+  const labels = ['Step 1 of 3', 'Step 2 of 3', 'Step 3 of 3'];
+  const ranges = ['L147–153 / ~420', 'L140–145 / ~420', 'L158–168 / ~420'];
+  const idx = id === 'eb1' ? 0 : id === 'eb2' ? 1 : 2;
+  const capEl = root.querySelector('.step-caption');
+  if (capEl) capEl.textContent = caps[idx];
+  const lab = root.querySelector('.code-lines-prog');
+  if (lab) lab.textContent = ranges[idx] + ' · ' + labels[idx];
+}
+function buildStep(btn, id) {
+  const root = btn.closest('.code-progression');
+  if (!root || !root.querySelector('#'+id)) return;
+  root.querySelectorAll('.code-block').forEach(e => { e.style.display = 'none'; });
+  root.querySelector('#'+id).style.display = 'block';
+  root.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const caps = ['Allocate embeddings and positional modules from vocabulary sizes + seq lengths.', 'Stack N EncoderBlock and DecoderBlock layers; add ProjectionLayer.', 'Wrap Transformer; Xavier init on rank≥2 tensors; return model.'];
+  const labels = ['Step 1 of 3', 'Step 2 of 3', 'Step 3 of 3'];
+  const ranges = ['L240–244 / ~420', 'L245–257 / ~420', 'L258–261 / ~420'];
+  const idx = id === 'bf1' ? 0 : id === 'bf2' ? 1 : 2;
+  const capEl = root.querySelector('.build-cap');
+  if (capEl) capEl.textContent = caps[idx];
+  const lab = root.querySelector('.code-lines-build');
+  if (lab) lab.textContent = ranges[idx] + ' · ' + labels[idx];
+}
+function attachAnno(rootSel) {
+  const root = document.querySelector(rootSel);
+  if (!root) return;
+  const note = root.querySelector('.code-note');
+  root.querySelectorAll('.ln.anno').forEach(ln => {
+    ln.addEventListener('click', () => {
+      const t = ln.getAttribute('data-note') || '';
+      note.innerHTML = '<strong>Line '+ln.textContent.trim()+':</strong> '+t;
+    });
+  });
+}
+attachAnno('#annMha');
+attachAnno('#annBilingual');
+attachAnno('#annGreedy');
+
+(function(){
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('visible', window.scrollY > 320);
+  }, { passive: true });
+  const obs = new IntersectionObserver(es => {
+    es.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.1, rootMargin: '0px 0px -36px 0px' });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+})();
+
+function drawGrid(ctx, w, h) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = '#2a2a3a';
+  for (var i = 0; i <= 10; i++) {
+    var x = (i / 10) * w;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  for (var j = 0; j <= 4; j++) {
+    var yy = (j / 4) * h;
+    ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(w, yy); ctx.stroke();
+  }
+}
+
+var embD = document.getElementById('emb-d');
+var embLbl = document.getElementById('emb-d-lbl');
+var embCanvas = document.getElementById('emb-canvas');
+var embCtx = embCanvas && embCanvas.getContext('2d');
+var embStats = document.getElementById('emb-stats');
+var embVec = [];
+function resampleEmb() {
+  var d = parseInt(embD.value, 10);
+  embVec = [];
+  for (var i = 0; i < d; i++) embVec.push((Math.random() * 2 - 1));
+  drawEmb();
+}
+function norm(v) {
+  var s = 0; for (var i = 0; i < v.length; i++) s += v[i] * v[i]; return Math.sqrt(s);
+}
+function drawEmb() {
+  if (!embCtx) return;
+  var d = parseInt(embD.value, 10);
+  embLbl.textContent = String(d);
+  var w = embCanvas.width, h = embCanvas.height;
+  drawGrid(embCtx, w, h);
+  var raw = embVec.slice(0, d);
+  while (raw.length < d) raw.push(0);
+  var scaled = raw.map(function (x) { return x * Math.sqrt(d); });
+  embStats.textContent = 'L2 ||e|| = ' + norm(raw).toFixed(3) + '   ||e·√d|| = ' + norm(scaled).toFixed(3);
+  var maxBars = Math.min(d, 64);
+  var bw = (w - 40) / maxBars;
+  for (var i = 0; i < maxBars; i++) {
+    var rv = raw[i], sv = scaled[i];
+    var h0 = (h / 2 - 20) * (0.5 + rv * 0.5);
+    var h1 = (h / 2 - 20) * (0.5 + Math.tanh(sv) * 0.5);
+    embCtx.fillStyle = '#6c8cff';
+    embCtx.fillRect(20 + i * bw, h / 2 - h0, bw * 0.45, h0);
+    embCtx.fillStyle = '#34d399';
+    embCtx.fillRect(20 + i * bw + bw * 0.5, h / 2 - h1, bw * 0.45, h1);
+  }
+  embCtx.fillStyle = '#8888a0';
+  embCtx.font = '11px monospace';
+  embCtx.fillText('raw', 20, 14);
+  embCtx.fillText('×√d_model', 70, 14);
+}
+if (embD) {
+  embD.addEventListener('input', drawEmb);
+  document.getElementById('emb-reroll').addEventListener('click', resampleEmb);
+  resampleEmb();
+}
+
+var pePos = document.getElementById('pe-pos');
+var peD0 = document.getElementById('pe-d0');
+var pePosLbl = document.getElementById('pe-pos-lbl');
+var peD0Lbl = document.getElementById('pe-d0-lbl');
+var peCanvas = document.getElementById('pe-canvas');
+var peCtx = peCanvas && peCanvas.getContext('2d');
+function peSinCosAtPair(pos, dModel, pairStartDim) {
+  var i = pairStartDim / 2;
+  var div = Math.exp(i * 2 * (-Math.log(10000) / dModel));
+  return { sin: Math.sin(pos * div), cos: Math.cos(pos * div) };
+}
+function drawPE() {
+  if (!peCtx) return;
+  var dModel = 128, maxPos = 50;
+  var d0 = parseInt(peD0.value, 10);
+  var mark = parseInt(pePos.value, 10);
+  var pairStart = d0 - (d0 % 2);
+  pePosLbl.textContent = String(mark);
+  peD0Lbl.textContent = String(d0);
+  var w = peCanvas.width, h = peCanvas.height;
+  peCtx.clearRect(0, 0, w, h);
+  peCtx.strokeStyle = '#2a2a3a';
+  peCtx.strokeRect(28, 18, w - 46, h - 36);
+  for (var p = 0; p <= maxPos; p++) {
+    var x = 28 + (p / maxPos) * (w - 46);
+    var sc = peSinCosAtPair(p, dModel, pairStart);
+    peCtx.fillStyle = '#6c8cff';
+    peCtx.fillRect(x - 1, h/2 - sc.sin * (h/2 - 36) - 1, 2, 2);
+    peCtx.fillStyle = '#f472b6';
+    peCtx.fillRect(x - 1, h/2 - sc.cos * (h/2 - 36) - 1, 2, 2);
+  }
+  var xm = 28 + (mark / maxPos) * (w - 46);
+  peCtx.strokeStyle = '#fbbf24';
+  peCtx.beginPath(); peCtx.moveTo(xm, 18); peCtx.lineTo(xm, h - 18); peCtx.stroke();
+}
+if (pePos) {
+  pePos.addEventListener('input', drawPE);
+  peD0.addEventListener('input', drawPE);
+  drawPE();
+}
+
+var ln0 = document.getElementById('ln0');
+var ln1 = document.getElementById('ln1');
+var ln2 = document.getElementById('ln2');
+var lnCanvas = document.getElementById('ln-canvas');
+var lnCtx = lnCanvas && lnCanvas.getContext('2d');
+var eps = 1e-6;
+function drawLN() {
+  if (!lnCtx) return;
+  var v = [parseFloat(ln0.value)/100, parseFloat(ln1.value)/100, parseFloat(ln2.value)/100];
+  var m = (v[0]+v[1]+v[2])/3;
+  var s2 = ((v[0]-m)*(v[0]-m)+(v[1]-m)*(v[1]-m)+(v[2]-m)*(v[2]-m))/3;
+  var sd = Math.sqrt(s2 + eps);
+  var n = v.map(function(x){ return (x-m)/sd; });
+  var w = lnCanvas.width, h = lnCanvas.height;
+  drawGrid(lnCtx, w, h);
+  for (var i = 0; i < 3; i++) {
+    var x = 70 + i * 210;
+    var bh = (h - 56) * Math.min(1, Math.abs(v[i]) / 3);
+    lnCtx.fillStyle = '#6c8cff';
+    lnCtx.fillRect(x, h/2 - (v[i] >= 0 ? bh : 0), 38, Math.max(bh, 2));
+    var nh = (h - 56) * Math.min(1, Math.abs(n[i]) / 3);
+    lnCtx.fillStyle = '#34d399';
+    lnCtx.fillRect(x + 48, h/2 - (n[i] >= 0 ? nh : 0), 38, Math.max(nh, 2));
+  }
+}
+if (ln0) {
+  [ln0, ln1, ln2].forEach(function(el){ el.addEventListener('input', drawLN); });
+  drawLN();
+}
+
+var ffDm = document.getElementById('ff-dm');
+var ffDff = document.getElementById('ff-dff');
+var ffDmLbl = document.getElementById('ff-dm-lbl');
+var ffDffLbl = document.getElementById('ff-dff-lbl');
+var ffnCanvas = document.getElementById('ffn-canvas');
+var ffnCtx = ffnCanvas && ffnCanvas.getContext('2d');
+var ffnParams = document.getElementById('ffn-params');
+function drawFFN() {
+  if (!ffnCtx) return;
+  var dm = parseInt(ffDm.value, 10), dff = parseInt(ffDff.value, 10);
+  ffDmLbl.textContent = String(dm);
+  ffDffLbl.textContent = String(dff);
+  ffnParams.textContent = 'Params (2 Linear + bias): ' + (dm*dff+dff + dff*dm+dm).toLocaleString();
+  var w = ffnCanvas.width, h = ffnCanvas.height;
+  ffnCtx.clearRect(0,0,w,h);
+  var cx = [70, w/2, w-70], cy = [h/2, h/2, h/2];
+  var r = [26+dm/28, 26+dff/75, 26+dm/28];
+  var cols = ['#6c8cff','#a78bfa','#34d399'];
+  for (var i = 0; i < 3; i++) {
+    ffnCtx.beginPath();
+    ffnCtx.arc(cx[i], cy[i], r[i], 0, Math.PI*2);
+    ffnCtx.fillStyle = cols[i];
+    ffnCtx.globalAlpha = 0.35;
+    ffnCtx.fill();
+    ffnCtx.globalAlpha = 1;
+    ffnCtx.strokeStyle = '#2a2a3a';
+    ffnCtx.stroke();
+  }
+  ffnCtx.strokeStyle = '#8888a0';
+  ffnCtx.beginPath();
+  ffnCtx.moveTo(cx[0]+r[0], cy[0]); ffnCtx.lineTo(cx[1]-r[1], cy[1]);
+  ffnCtx.moveTo(cx[1]+r[1], cy[1]); ffnCtx.lineTo(cx[2]-r[2], cy[2]);
+  ffnCtx.stroke();
+}
+if (ffDm) {
+  ffDm.addEventListener('input', drawFFN);
+  ffDff.addEventListener('input', drawFFN);
+  drawFFN();
+}
+
+var attnTable = document.getElementById('attn-table');
+var causalOn = document.getElementById('causal-on');
+var attnRow = document.getElementById('attn-row');
+var attnRowLbl = document.getElementById('attn-row-lbl');
+var attnSoftmax = document.getElementById('attn-softmax');
+var baseScores = [[2.1,0.3,-0.5,0.8,0.1],[0.2,2.0,0.4,-0.2,0.6],[-0.3,0.5,1.8,0.9,0.2],[0.7,0.1,0.3,2.2,0.0],[0.0,-0.4,0.6,0.2,1.9]];
+function softmaxVec(arr) {
+  var m = Math.max.apply(null, arr);
+  var ex = arr.map(function(x){ return Math.exp(x-m); });
+  var s = ex.reduce(function(a,b){ return a+b; }, 0);
+  return ex.map(function(x){ return x/s; });
+}
+function heatColor(t) {
+  return 'rgb('+(40+t*180)+','+(30+(1-t)*100)+','+(60+t*160)+')';
+}
+function drawAttn() {
+  if (!attnTable) return;
+  var n = 5, row = parseInt(attnRow.value, 10);
+  attnRowLbl.textContent = String(row);
+  var tbody = document.createElement('tbody');
+  for (var i = 0; i < n; i++) {
+    var tr = document.createElement('tr');
+    for (var j = 0; j < n; j++) {
+      var td = document.createElement('td');
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  attnTable.innerHTML = '';
+  attnTable.appendChild(tbody);
+  var rows = attnTable.querySelectorAll('tr');
+  for (var ii = 0; ii < n; ii++) {
+    var tds = rows[ii].querySelectorAll('td');
+    var logits = [];
+    for (var jj = 0; jj < n; jj++) logits.push(causalOn.checked && jj > ii ? -1e9 : baseScores[ii][jj]);
+    var sm = softmaxVec(logits);
+    for (var kk = 0; kk < n; kk++) {
+      tds[kk].style.background = heatColor(sm[kk]);
+      tds[kk].textContent = sm[kk].toFixed(2);
+    }
+  }
+  var lr = [];
+  for (var j = 0; j < n; j++) lr.push(causalOn.checked && j > row ? -1e9 : baseScores[row][j]);
+  attnSoftmax.textContent = 'Softmax row (query) '+row+': ['+softmaxVec(lr).map(function(x){return x.toFixed(3);}).join(', ')+']';
+}
+if (causalOn) {
+  causalOn.addEventListener('change', drawAttn);
+  attnRow.addEventListener('input', drawAttn);
+  drawAttn();
+}
+
+var hdDm = document.getElementById('hd-dm');
+var hdH = document.getElementById('hd-h');
+var hdDmLbl = document.getElementById('hd-dm-lbl');
+var hdHLbl = document.getElementById('hd-h-lbl');
+var hdOut = document.getElementById('hd-out');
+var hdCanvas = document.getElementById('hd-canvas');
+var hdCtx = hdCanvas && hdCanvas.getContext('2d');
+function drawHeads() {
+  if (!hdCtx) return;
+  var dm = parseInt(hdDm.value, 10), h = parseInt(hdH.value, 10);
+  hdDmLbl.textContent = String(dm);
+  hdHLbl.textContent = String(h);
+  var ok = dm % h === 0;
+  hdOut.textContent = ok ? ('d_k = d_model / h = '+(dm/h)) : 'd_model must divide h';
+  var w = hdCanvas.width, hc = hdCanvas.height;
+  hdCtx.clearRect(0,0,w,hc);
+  if (!ok) return;
+  var bw = (w - 36) / h;
+  for (var i = 0; i < h; i++) {
+    hdCtx.fillStyle = i % 2 ? '#6c8cff' : '#a78bfa';
+    hdCtx.fillRect(18 + i*bw, 24, bw - 3, hc - 44);
+    hdCtx.fillStyle = '#e0e0e8';
+    hdCtx.font = '9px monospace';
+    hdCtx.fillText('h'+i, 20 + i*bw + 2, hc - 10);
+  }
+}
+if (hdDm) {
+  hdDm.addEventListener('input', drawHeads);
+  hdH.addEventListener('input', drawHeads);
+  drawHeads();
+}
+
+var gstep = 0, gseq = ['<sos>'];
+var greedyTokens = document.getElementById('greedy-tokens');
+var greedyMsg = document.getElementById('greedy-msg');
+var fakeNext = ['il','gatto','è','dolce','<eos>'];
+function renderGreedy() {
+  if (!greedyTokens) return;
+  greedyTokens.innerHTML = '';
+  gseq.forEach(function(t, idx) {
+    var span = document.createElement('span');
+    span.className = 'token' + (idx === gseq.length-1 ? ' active' : '');
+    span.textContent = t;
+    greedyTokens.appendChild(span);
+  });
+  greedyMsg.textContent = 'Step '+gstep+' — argmax at last position';
+}
+if (document.getElementById('greedy-reset')) {
+  document.getElementById('greedy-reset').addEventListener('click', function(){ gstep=0; gseq=['<sos>']; renderGreedy(); });
+  document.getElementById('greedy-step').addEventListener('click', function(){
+    if (gseq[gseq.length-1] === '<eos>') return;
+    gseq.push(fakeNext[Math.min(gstep, fakeNext.length-1)]);
+    gstep++;
+    renderGreedy();
+  });
+  renderGreedy();
+}
+
+var pgTable = document.getElementById('pg-table');
+var pgInfo = document.getElementById('pg-info');
+var srcTok = ['The','cat','sleeps','<pad>'];
+var tgtTok = ['Il','gatto','dorme','<pad>'];
+var pgScores = [];
+function randPG() {
+  pgScores = [];
+  for (var i = 0; i < srcTok.length; i++) {
+    var row = [];
+    for (var j = 0; j < tgtTok.length; j++) row.push(Math.random()*2-0.5);
+    pgScores.push(row);
+  }
+}
+function renderPG() {
+  if (!pgTable) return;
+  var colSoft = [];
+  for (var j = 0; j < tgtTok.length; j++) {
+    var colLogits = [];
+    for (var ii = 0; ii < srcTok.length; ii++) colLogits.push(pgScores[ii][j]);
+    colSoft.push(softmaxVec(colLogits));
+  }
+  var tbody = document.createElement('tbody');
+  var head = document.createElement('tr');
+  var c0 = document.createElement('td'); c0.textContent = 'src\\tgt'; head.appendChild(c0);
+  tgtTok.forEach(function(t){ var th = document.createElement('td'); th.textContent = t; head.appendChild(th); });
+  tbody.appendChild(head);
+  for (var i = 0; i < srcTok.length; i++) {
+    var tr = document.createElement('tr');
+    var rh = document.createElement('td'); rh.textContent = srcTok[i]; tr.appendChild(rh);
+    for (var j = 0; j < tgtTok.length; j++) {
+      var td = document.createElement('td');
+      var smij = colSoft[j][i];
+      td.textContent = smij.toFixed(2);
+      td.style.background = heatColor(smij);
+      td.style.cursor = 'pointer';
+      (function(ii,jj){ td.addEventListener('click', function(){
+        pgInfo.textContent = 'tgt['+jj+'] attends to src['+ii+'] with p='+colSoft[jj][ii].toFixed(4);
+      }); })(i,j);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  pgTable.innerHTML = '';
+  pgTable.appendChild(tbody);
+  pgInfo.textContent = 'Column softmax over source rows (cross-attention toy).';
+}
+if (document.getElementById('pg-randomize')) {
+  document.getElementById('pg-randomize').addEventListener('click', function(){ randPG(); renderPG(); });
+  randPG();
+  renderPG();
+}
+
+function updateMaskDemo() {
+  var pad = document.getElementById('mask-pad').checked;
+  var cau = document.getElementById('mask-causal').checked;
+  var el = document.getElementById('mask-demo');
+  if (!el) return;
+  el.innerHTML = '';
+  for (var i = 0; i < 6; i++) for (var j = 0; j < 6; j++) {
+    var isPad = pad && (i > 3 || j > 3);
+    var isFut = cau && j > i;
+    var ok = !isPad && !isFut;
+    var d = document.createElement('div');
+    d.className = 'mask-cell';
+    d.style.background = ok ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.2)';
+    d.textContent = ok ? '1' : '0';
+    el.appendChild(d);
+  }
+}
+var mp = document.getElementById('mask-pad');
+if (mp) {
+  mp.addEventListener('change', updateMaskDemo);
+  document.getElementById('mask-causal').addEventListener('change', updateMaskDemo);
+  updateMaskDemo();
+}
+</script>
+</body>
+</html>

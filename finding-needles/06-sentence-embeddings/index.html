@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sentence Embeddings — Sentence-BERT &amp; Contrastive Learning | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c8cff;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(52, 211, 153, 0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(108, 140, 255, 0.1), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.85rem, 5vw, 3rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 820px; color: var(--text-dim); font-size: 1.08rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .num { font-size: 1.75rem; font-weight: 700; color: var(--accent2); font-family: var(--mono); }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
+    .section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--border);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      scroll-margin-top: 96px;
+    }
+    .section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    .section h2 {
+      font-size: 1.55rem;
+      margin: 0 0 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .section-num { font-family: var(--mono); font-size: 0.9rem; color: var(--accent2); font-weight: 600; }
+    .section p { margin: 0 0 1em; color: var(--text); }
+    .section p:last-child { margin-bottom: 0; }
+    .section ul, .section ol { margin: 0 0 1em; padding-left: 1.35em; color: var(--text); }
+    .section li { margin-bottom: 0.45em; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .card h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      color: var(--accent3);
+    }
+    .formula.formula-lg { font-size: 0.95rem; text-align: center; color: var(--accent5); line-height: 1.55; }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 22px 0;
+    }
+    @media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.92rem;
+    }
+    .interactive-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel h3 { margin: 0 0 14px; font-size: 1rem; color: var(--accent2); }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.active { background: rgba(108, 140, 255, 0.15); border-color: var(--accent); color: var(--accent); }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    .slider-row input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+    .slider-row output { font-family: var(--mono); min-width: 52px; color: var(--accent5); }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 16px 0;
+    }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    table.data th { background: var(--bg-card-alt); color: var(--text-dim); font-weight: 600; }
+    table.data td { font-family: var(--mono); font-size: 0.8rem; }
+    table.data .num { text-align: right; }
+    textarea.input-block, input.input-line, select.input-line {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin: 8px 0;
+    }
+    textarea.input-block { min-height: 88px; resize: vertical; }
+    .demo-out {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--accent3);
+      margin-top: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 0.12em 0.45em;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .play-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .play-tabs .btn.active { background: rgba(167, 139, 250, 0.18); border-color: var(--accent2); color: var(--accent2); }
+    canvas.embed-canvas, canvas.loss-canvas {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      cursor: crosshair;
+      touch-action: none;
+    }
+    .loss-legend { font-size: 0.82rem; color: var(--text-dim); margin-top: 10px; }
+    .loss-legend span { display: inline-block; margin-right: 16px; }
+    .dot-a { color: var(--accent5); }
+    .dot-p { color: var(--accent3); }
+    .dot-n { color: var(--danger); }
+    .progress-bar {
+      height: 10px;
+      border-radius: 5px;
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-bar > i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 5px;
+      transition: width 0.2s ease;
+    }
+    .small-note { font-size: 0.86rem; color: var(--text-dim); margin-top: 8px; }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <style class="breadcrumb-styles">
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+  </style>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a><span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a><span class="bc-sep">›</span>
+    <span class="bc-current">Sentence Embeddings</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="Chapter sections">
+    <a href="#s0">§0 Words → sentences</a>
+    <a href="#s1">§1 Sentence-BERT</a>
+    <a href="#s2">§2 Contrastive learning</a>
+    <a href="#s3">§3 MTEB</a>
+    <a href="#s4">§4 Matryoshka (MRL)</a>
+    <a href="#s5">§5 Quantization</a>
+    <a href="#s6">§6 Fine-tuning</a>
+    <a href="#s7">§7 Playground</a>
+  </nav>
+
+  <header class="hero">
+    <h1>Sentence Embeddings — Sentence-BERT &amp; Contrastive Learning</h1>
+    <p class="subtitle">
+      Word-level vectors help with lexical similarity, but search and matching usually need <strong>sentence-</strong> and <strong>passage-level</strong> meaning.
+      Averaging word vectors is only a baseline. <code>Sentence-BERT</code> (<code>SBERT</code>) turns <code>BERT</code> into a fast similarity encoder,
+      <code>contrastive</code> objectives shape embedding geometry, and benchmarks, <code>Matryoshka</code> training, and <code>quantization</code> determine what you ship in production.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">Siamese</div><div class="lbl">Shared encoder, dual forward</div></div>
+      <div class="hero-stat"><div class="num">cos θ</div><div class="lbl">Pre-compute, then retrieve</div></div>
+      <div class="hero-stat"><div class="num">MNRL</div><div class="lbl">In-batch negatives at scale</div></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section fade-in" id="s0">
+      <h2><span class="section-num">§0</span> From words to sentences</h2>
+      <p>
+        Static <code>word embeddings</code> such as those from <code>Word2Vec</code> or <code>GloVe</code> place individual word types into a vector space where cosine similarity
+        correlates with substitutability and topical relatedness. That is already useful for query expansion, soft lexical matching, and feature engineering.
+        Yet the object we usually rank in search is not a single token: it is a <strong>span of text</strong>—a sentence, a paragraph, a product description, a code comment.
+        The natural question is how to go from word vectors to a single vector that represents a longer unit of meaning.
+      </p>
+      <p>
+        The simplest widely used baseline is to <strong>average</strong> (or weighted-average) the embeddings of all content words in the span, optionally dropping
+        stopwords. This trick is surprisingly decent. Averaging cancels some noise, pulls the vector toward a “topic centroid,” and keeps inference trivially cheap.
+        Many production systems have shipped exactly this pattern as <code>v_doc = mean({ v_w : w in document })</code> because it requires no neural model beyond a lookup table.
+      </p>
+      <div class="callout">
+        <strong>Order blindness.</strong> A mean treats the bag of words as exchangeable. The classic failure mode is that <code>"dog bites man"</code> and <code>"man bites dog"</code>
+        contain the same multiset of tokens, so any representation that depends only on per-word vectors and permutation-invariant pooling assigns them <em>identical</em>
+        embeddings. Humans read these as very different events; a search engine that conflates them will return the wrong story under a literal bag-of-embeddings model.
+      </div>
+      <p>
+        The deeper issue is <strong>compositionality</strong>. Predicate–argument structure, negation, quantifiers, and long-range dependencies all change meaning while reusing
+        the same vocabulary. Pooling static word vectors has no mechanism to privilege which token should dominate when interactions are non-linear. You can patch this
+        with character n-grams (<code>FastText</code>-style), learned idf-style weights, or by moving to contextual word vectors—but the moment you need faithful sentence-level
+        semantics for paraphrase, entailment, or answerability, you typically want a <strong>sequence model</strong> that reads tokens in order and builds a representation of the whole.
+      </p>
+      <p>
+        Sentence embeddings are that next step: a function <code>f(text) → ℝ<sup>d</sup></code> trained so that semantic nearness in language becomes geometric nearness under
+        cosine similarity or Euclidean distance. Fine-tuning <code>BERT</code>-class encoders with contrastive objectives—<code>Sentence-BERT</code>—is the dominant approach;
+        <code>MTEB</code> scores, <code>Matryoshka</code> prefixes, and <code>quantization</code> determine what you can deploy at scale.
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s1">
+      <h2><span class="section-num">§1</span> Sentence-BERT (<code>SBERT</code>)</h2>
+      <p>
+        <code>BERT</code> and its relatives produce <em>contextual</em> token representations. A naive approach to a sentence vector is to take the final hidden state of the
+        special <code>[CLS]</code> token, or to mean-pool the token vectors of the content subsequence. That already beats static averaging in many semantic tasks because the
+        network can disambiguate <code>"bank"</code> as riverbank versus financial bank using context. The problem is training: vanilla <code>BERT</code> is optimized for masked
+        language modeling and next-sentence prediction—not for making cosine distances between arbitrary sentences correlate with human judgments of similarity.
+      </p>
+      <p>
+        <strong>Sentence-BERT</strong> fine-tunes a transformer encoder so its pooled output behaves like a similarity embedding. Architecturally, it uses a
+        <strong>Siamese network</strong>: two sentences pass through <strong>the same</strong> <code>BERT</code> weights (parameter sharing), each producing a pooled vector.
+        During training, a loss compares the two outputs; at deployment, you run the encoder once per text chunk, cache vectors in an index, and answer similarity queries
+        with cheap vector math instead of re-running a heavy cross-attention model for every pair.
+      </p>
+      <div class="formula formula-lg">
+        sentence A → BERT → pool → <strong>u</strong> &nbsp;&nbsp;|&nbsp;&nbsp; sentence B → BERT → pool → <strong>v</strong>
+      </div>
+      <p>
+        <strong>Pooling strategies</strong> matter because <code>BERT</code>’s token sequence includes subword pieces and special tokens. Common choices include:
+      </p>
+      <ul>
+        <li><code>[CLS]</code> pooling: use the top-layer hidden state of the classifier token. Simple, but not always the best semantic summary of the full span.</li>
+        <li><strong>Mean pooling</strong> over the token representations of the actual words (masking out padding) is the common default in many <code>sentence-transformers</code> checkpoints.</li>
+        <li><strong>Max pooling</strong> over the time dimension takes a coordinate-wise maximum; it can emphasize salient features but is less standard for general sentence similarity.</li>
+      </ul>
+      <div class="comparison">
+        <div>
+          <strong>Bi-encoder (SBERT-style)</strong><br />
+          Encode <code>A</code> and <code>B</code> independently; score with <code>cos(u, v)</code>. Pre-compute corpus vectors once, then answer each query with one forward pass plus vector search.
+        </div>
+        <div>
+          <strong>Cross-encoder</strong><br />
+          Concatenate <code>A</code> and <code>B</code> with separators; cross-attention reads both sides. More accurate for pairwise scoring, but one heavy forward pass per pair—
+          impractical for exhaustive search over large corpora without a bi-encoder first stage.
+        </div>
+      </div>
+      <div class="card">
+        <h3>Why Siamese weight sharing?</h3>
+        <p style="margin:0">
+          Sharing parameters guarantees that <code>u</code> and <code>v</code> live in the <em>same</em> semantic coordinate system. Two independent encoders could each learn arbitrary rotations
+          of space; similarity would be meaningless without careful alignment. A single encoder ensures that a cached embedding from last week is comparable to one computed today.
+        </p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s2">
+      <h2><span class="section-num">§2</span> Training objectives — contrastive learning</h2>
+      <p>
+        <strong>Contrastive learning</strong> is the family of losses that reward agreement between positive pairs and penalize confusion with negatives. For embeddings, pull
+        synonyms, paraphrases, and entailed sentences together while pushing unrelated or contradictory neighbors apart. The geometry you get is only as good as your definition
+        of positive and negative, which is why data curation rivals architecture in importance.
+      </p>
+      <p>
+        <strong>Triplet loss</strong> is the classic formulation. Given an <em>anchor</em> <code>a</code>, a <em>positive</em> <code>p</code> that should be close, and a <em>negative</em> <code>n</code> that should be farther away,
+        you define a margin <code>m</code> and penalize violations:
+      </p>
+      <div class="formula">L_triplet = max(0, ||a − p||² − ||a − n||² + m)</div>
+      <p>
+        If <code>a</code> is already closer to <code>p</code> than to <code>n</code> by at least the margin, the loss is zero. Otherwise the model is pushed to shorten <code>||a − p||</code> and/or lengthen <code>||a − n||</code>.
+        In cosine space, variants replace Euclidean distance with angular distance or combine normalization explicitly.
+      </p>
+      <p>
+        <strong>InfoNCE</strong> (noise-contrastive estimation; a popular instance is <code>NT-Xent</code> with temperature) turns classification on its head: for each anchor in a mini-batch, treat the
+        paired positive as the correct class among many negatives. The “trick” is to use <strong>other in-batch examples as negatives</strong> for free. Larger batches yield more negatives and often
+        sharper learning signals—at the cost of memory.
+      </p>
+      <div class="formula">L_InfoNCE = −log exp(sim(a,p)/τ) / (exp(sim(a,p)/τ) + Σ<sub>k</sub> exp(sim(a,n<sub>k</sub>)/τ))</div>
+      <p>
+        <strong>Multiple Negatives Ranking Loss</strong> (<code>MNRL</code>) is the workhorse default in the <code>sentence-transformers</code> ecosystem for retrieval-style training. Given a mini-batch of
+        <code>(query, passage)</code> pairs, each query should rank its paired passage above all other passages in the batch. Like <code>InfoNCE</code>, it exploits in-batch negatives; unlike hand-authored
+        triplets, construction scales to enormous supervised datasets as long as you trust the pairing labels.
+      </p>
+      <p>
+        <strong>Hard negative mining</strong> addresses a limitation of uniform random negatives: they are often too easy. If negatives are almost orthogonal already, gradients vanish and the model
+        stops improving at the decision boundary you care about. Strong systems mix mined hard negatives (top results from a baseline retriever that are not actually relevant),
+        sometimes with controlled ratios to avoid collapse where everything is pushed apart infinitely.
+      </p>
+      <p>
+        Typical <strong>training sources</strong> include natural language inference corpora such as <code>SNLI</code> and <code>MultiNLI</code> (entailment as a strong positive class), large paraphrase collections,
+        and internal click or human relevance judgments formatted as labeled pairs or triplets. The mapping from business logs to contrastive labels is itself a design problem:
+        clicks are noisy positives; non-clicks are not reliable negatives.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: drag points, watch triplet-style loss</h3>
+        <p class="small-note" style="margin-top:0">
+          Anchor <span class="dot-a">●</span> is fixed at the origin. Drag <span class="dot-p">positive</span> and <span class="dot-n">negative</span> in 2D. We plot
+          <code>L = max(0, ||a−p||² − ||a−n||² + m)</code> with margin <code>m = 0.35</code> (scaled coordinates).
+        </p>
+        <canvas class="loss-canvas" id="lossCanvas" width="720" height="360" aria-label="Contrastive loss visualization"></canvas>
+        <div class="loss-legend">
+          <span class="dot-a">● anchor (0,0)</span>
+          <span class="dot-p">● positive</span>
+          <span class="dot-n">● negative</span>
+        </div>
+        <p class="demo-out" id="lossOut"></p>
+      </div>
+
+      <div class="callout">
+        <strong>Batch size and temperature.</strong> For <code>InfoNCE</code>-style losses, the number of negatives per anchor is tied to batch construction. A larger batch supplies harder contrasts;
+        the temperature <code>τ</code> sharpens or softens the softmax, trading gradient variance against peakiness. Training recipes often tune both jointly.
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s3">
+      <h2><span class="section-num">§3</span> The <code>MTEB</code> benchmark</h2>
+      <p>
+        <strong>Massive Text Embedding Benchmark</strong> (<code>MTEB</code>) standardizes how embedding models are compared across many task types. Instead of declaring victory on a single
+        semantic textual similarity set, <code>MTEB</code> aggregates performance over a menu of evaluations that stress different capabilities: pairwise similarity, classification,
+        clustering, retrieval, reranking, bitext mining, and more.
+      </p>
+      <p>
+        Representative <strong>task families</strong> include:
+      </p>
+      <ul>
+        <li><code>STS</code> — semantic textual similarity: predict relatedness scores for sentence pairs; Spearman correlation to human judgments is a common metric.</li>
+        <li><strong>Classification</strong> — embed training examples, train a linear classifier (or kNN) on frozen vectors; measures whether clusters are linearly separable for known labels.</li>
+        <li><strong>Clustering</strong> — group embeddings with algorithms like k-means; evaluate with V-measure or similar against gold partitions.</li>
+        <li><strong>Retrieval</strong> — given a query embedding, rank a corpus of passages; <code>nDCG</code>, <code>MRR</code>, and <code>Recall@k</code> quantify whether the right items float to the top.</li>
+        <li><strong>Reranking</strong> — score candidate lists more finely than pure vector search typically allows; still tests geometry, but often with shorter lists and richer supervision.</li>
+        <li><strong>Pair classification</strong> — threshold cosine similarity or train a shallow head to predict duplicate vs not-duplicate.</li>
+        <li><strong>Summarization / long-document tasks</strong> — stress pooling and context length behavior when inputs exceed a single sentence.</li>
+      </ul>
+      <p>
+        <strong>No single winner</strong> is an empirical regularity: a model that dominates short paraphrase similarity might underperform on bitext retrieval or clustering. Latent causes include
+        training data mixture, sequence length limits, pooling choices, and whether the model was instruction-tuned for asymmetric retrieval (<code>query</code> vs <code>document</code> prefixes). <code>MTEB</code> makes those
+        tradeoffs visible instead of collapsing them into one marketing number.
+      </p>
+      <table class="data" aria-label="Representative embedding families">
+        <thead>
+          <tr><th>Model family</th><th>Typical use</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>all-MiniLM-L6-v2</code></td><td>Fast default bi-encoder</td><td>Small, fast, strong baseline on many English tasks</td></tr>
+          <tr><td><code>E5</code></td><td>Retrieval with prefixes</td><td>Trained with weak supervision at scale; check query/doc templates</td></tr>
+          <tr><td><code>BGE</code></td><td>General retrieval / STS</td><td>Popular open checkpoints; multilingual variants exist</td></tr>
+          <tr><td><code>GTE</code></td><td>General text embeddings</td><td>Competitive quality; various sizes</td></tr>
+          <tr><td>Commercial APIs</td><td>Managed latency &amp; ops</td><td>Examples include Cohere embed and OpenAI <code>text-embedding-3-*</code> lines</td></tr>
+        </tbody>
+      </table>
+      <p>
+        <strong>Choosing a model</strong> is engineering, not astrology. Increase dimension and width when recall quality is the bottleneck; shrink them when latency, memory, or cost dominate.
+        Always validate on <em>your</em> distribution: a leaderboard aggregate is a prior, not a substitute for measuring end-to-end retrieval on your corpus and query stream.
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s4">
+      <h2><span class="section-num">§4</span> Matryoshka Representation Learning (<code>MRL</code>)</h2>
+      <p>
+        Classical sentence embeddings pick a fixed width <code>d ∈ {384, 768, 1024, …}</code>. That commitment propagates to vector databases, caching layers, and mobile clients. Often you do not
+        need all dimensions for a first-stage filter, yet training a separate model per width is wasteful. <strong>Matryoshka Representation Learning</strong> attacks the rigidity directly: train the
+        vector so that <strong>any prefix</strong> <code>[u₁, …, u<sub>k</sub>]</code> is itself a useful embedding for smaller <code>k</code>.
+      </p>
+      <p>
+        The <strong>training trick</strong> is multi-head supervision. Instead of applying the contrastive or ranking loss only on the full <code>d</code>-dimensional output, apply the same family of losses
+        simultaneously on truncated prefixes—say at <code>k ∈ {64, 128, 256, … , d}</code>—with shared trunk parameters. The network learns to pack the most discriminative information into early
+        coordinates, like progressive JPEG coefficients but for semantics.
+      </p>
+      <p>
+        Reported benefits include <strong>storage efficiency</strong>: a 256-dimensional prefix can approach the quality of a full 768-dimensional standard embedding from a non-Matryoshka model,
+        reducing footprint by a multiplicative factor. When combined with <strong>scalar</strong> or <strong>binary quantization</strong>, the savings compound: shorter vectors mean fewer bytes per passage even before
+        aggressive compression.
+      </p>
+      <div class="interactive-panel">
+        <h3>Interactive: quality vs. effective dimension</h3>
+        <p class="small-note" style="margin-top:0">
+          Relative quality vs. prefix length (synthetic curve). After <code>MRL</code> training, early dimensions typically carry disproportionate signal, with diminishing returns in the tail.
+        </p>
+        <div class="slider-row">
+          <label for="mrlDim">Prefix dimension <code>k</code></label>
+          <input type="range" id="mrlDim" min="32" max="768" step="16" value="256" />
+          <output id="mrlDimOut">256</output>
+        </div>
+        <div class="progress-bar" aria-hidden="true"><i id="mrlBar" style="width:33%"></i></div>
+        <p class="demo-out" id="mrlOut"></p>
+      </div>
+      <div class="callout">
+        <strong>Binary quantization on top.</strong> After <code>MRL</code> gives you a short float vector, product quantization or per-dimension binarization can map each dimension to one bit, yielding
+        extremely compact sketches. A 256-float vector at 4 bytes per coordinate is 1 KiB; 256 bits is 32 bytes—a <em>32×</em> reduction before accounting for metadata. The cost is approximation error;
+        hybrid pipelines use compressed vectors for candidate generation and fall back to higher precision for rescoring.
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s5">
+      <h2><span class="section-num">§5</span> Scalar and binary quantization for embeddings</h2>
+      <p>
+        Uncompressed <code>float32</code> storage allocates four bytes per coordinate. A <code>768</code>-dimensional embedding therefore costs about <code>768 × 4 = 3072</code> bytes before compression or alignment overhead.
+        Multiply by a billion documents and you are planning datacenter footprints, not notebook demos.
+      </p>
+      <p>
+        <strong>Scalar quantization</strong> maps each float to a lower-bitwidth type. <code>float16</code> halves storage; <code>bfloat16</code> trades precision range differently on hardware accelerators.
+        <code>int8</code> quantization stores one byte per dimension, often with per-vector or per-channel scales and zero-points so that dot products approximate the full-precision inner product.
+        These schemes keep vectors in floating-friendly formats for SIMD while shrinking bandwidth.
+      </p>
+      <p>
+        <strong>Binary quantization</strong> goes further: each dimension becomes a single bit (or blocks are encoded with compact codes), reducing inner products to popcount-friendly operations.
+        A <code>768</code>-dimensional binary sketch uses <code>768 bits = 96 bytes</code>—about <strong>32×</strong> smaller than <code>float32</code> for the same nominal width. The representational capacity collapses, so recall@k
+        for pure binary distance may dip unless you widen dimensions or add rescoring.
+      </p>
+      <div class="comparison">
+        <div>
+          <strong>When scalar <code>int8</code> shines</strong><br />
+          You want a smaller memory footprint but still need graded similarity for top-<code>k</code> vector search with minimal changes to scoring code beyond scale factors.
+        </div>
+        <div>
+          <strong>When binary sketches shine</strong><br />
+          You need extreme compression for first-stage hashing or on-device caches, and you can afford a second stage with higher precision or a cross-encoder.
+        </div>
+      </div>
+      <p>
+        <strong>Rescoring pattern:</strong> retrieve candidates with quantized inner products or Hamming distance, then re-evaluate the short list with <code>float32</code> dot products—or even a cross-encoder—
+        to reorder. The expensive operator runs on tens or hundreds of items, not millions.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: embedding memory for corpus scale</h3>
+        <p class="small-note" style="margin-top:0">
+          Pick embedding dimension <code>d</code>, encoding, and corpus cardinality <code>N</code>. We report raw vector payload only (index overhead not included).
+        </p>
+        <div class="slider-row">
+          <label for="qcDim"><code>d</code></label>
+          <input type="range" id="qcDim" min="128" max="1024" step="64" value="384" />
+          <output id="qcDimOut">384</output>
+        </div>
+        <div class="slider-row">
+          <label for="qcN">Corpus size <code>N</code></label>
+          <input type="range" id="qcN" min="0" max="2" step="1" value="1" />
+          <output id="qcNOut">10M</output>
+        </div>
+        <div class="btn-group" id="qcFmt">
+          <button type="button" class="btn active" data-bytes="4">float32</button>
+          <button type="button" class="btn" data-bytes="2">float16</button>
+          <button type="button" class="btn" data-bytes="1">int8</button>
+          <button type="button" class="btn" data-bits="1">binary (1 bit/dim)</button>
+        </div>
+        <p class="demo-out" id="qcOut"></p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s6">
+      <h2><span class="section-num">§6</span> Fine-tuning your own embedding model</h2>
+      <p>
+        Off-the-shelf checkpoints are trained on web-scale mixtures that may not respect your jargon, SKUs, regulatory language, or code idioms. When in-domain errors cluster systematically—
+        confounding library names, legal clauses, or sensor telemetry labels—it is time to <strong>fine-tune</strong> rather than endlessly prompt-engineer a frozen encoder.
+      </p>
+      <p>
+        <strong>Data formats</strong> mirror the losses above. The minimal supervised unit for ranking losses is a <code>(query, positive passage)</code> pair. Triplets add explicit <code>(query, positive, negative)</code>
+        tuples; negatives may be random in-batch, mined hard negatives, or both. Some teams augment with synthetic pairs from smaller language models with human spot-checking; others distill
+        from a slower teacher cross-encoder that labels hard pairs for the student bi-encoder.
+      </p>
+      <p>
+        The <code>sentence-transformers</code> training loop, at a high level, is: sample a batch of texts, tokenize with the model’s word-piece vocabulary, run the transformer trunk, pool to vectors,
+        compute a batch-wise contrastive or ranking loss, backpropagate into shared weights, and step the optimizer. Mixed-precision training and gradient accumulation are common when effective
+        batch sizes need to be large for <code>MNRL</code>.
+      </p>
+      <p>
+        <strong>Evaluation during training</strong> should track both in-domain retrieval metrics (perhaps on a held-out click log formatted as <code>qrels</code>) and a stable external sentinel such as a small
+        <code>STS</code> subset. Watching only loss curves is risky: contrastive objectives can overfit to batch negatives without improving real recall. Periodic full-index evaluations are expensive
+        but catch regressions early.
+      </p>
+      <div class="card">
+        <h3>Practical knobs</h3>
+        <ul style="margin-bottom:0">
+          <li><strong>Batch size</strong> — directly controls how many negatives each query sees in <code>MNRL</code>; often the first lever to pull when learning stalls.</li>
+          <li><strong>Temperature</strong> — sharpens softmax contrasts; interacts with batch size and learning rate.</li>
+          <li><strong>Learning rate &amp; schedule</strong> — transformer fine-tuning is sensitive; cosine decay with warmup is a frequent default.</li>
+          <li><strong>Hard negatives</strong> — add difficulty as the model improves; curriculum schedules can stabilize early training.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s7">
+      <h2><span class="section-num">§7</span> Playground</h2>
+      <p>
+        Three tools for cosine similarity between sentence vectors, truncation effects on prefix alignment, and storage under different numeric encodings. Numbers come from
+        deterministic hashed synthetic embeddings—swap in your own encoder outputs for production use.
+      </p>
+
+      <div class="interactive-panel">
+        <div class="play-tabs" id="playTabs">
+          <button type="button" class="btn active" data-tab="sim">Sentence similarity</button>
+          <button type="button" class="btn" data-tab="trunc">Dimension explorer</button>
+          <button type="button" class="btn" data-tab="mem">Quantization calculator</button>
+        </div>
+
+        <div id="tab-sim">
+          <h3 style="margin-top:0;color:var(--accent2);font-size:1rem">Cosine similarity between phrases</h3>
+          <p class="small-note">Pick two canned sentences (deterministic 64-D hashed embeddings, L2-normalized).</p>
+          <label for="simA">Sentence A</label>
+          <select class="input-line" id="simA"></select>
+          <label for="simB">Sentence B</label>
+          <select class="input-line" id="simB"></select>
+          <button type="button" class="btn" id="simBtn">Compute cosine</button>
+          <p class="demo-out" id="simOut"></p>
+        </div>
+
+        <div id="tab-trunc" style="display:none">
+          <h3 style="margin-top:0;color:var(--accent2);font-size:1rem">How truncation affects alignment</h3>
+          <p class="small-note">
+            Take the first <code>k</code> dimensions, renormalize, and measure cosine to the full 64-D vector. Lower scores mean the prefix misses information carried in tail coordinates.
+          </p>
+          <label for="truncSent">Sentence</label>
+          <select class="input-line" id="truncSent"></select>
+          <div class="slider-row">
+            <label for="truncK">Keep <code>k</code> dims</label>
+            <input type="range" id="truncK" min="2" max="64" step="1" value="64" />
+            <output id="truncKOut">64</output>
+          </div>
+          <p class="demo-out" id="truncOut"></p>
+        </div>
+
+        <div id="tab-mem" style="display:none">
+          <h3 style="margin-top:0;color:var(--accent2);font-size:1rem">Corpus memory estimator</h3>
+          <p class="small-note">Independent from §5 panel: type custom <code>N</code>, <code>d</code>, and encoding.</p>
+          <label for="memN">Vectors <code>N</code></label>
+          <input class="input-line" type="number" id="memN" min="1" value="1000000" />
+          <label for="memD">Dimension <code>d</code></label>
+          <input class="input-line" type="number" id="memD" min="8" value="768" />
+          <label for="memFmt">Encoding</label>
+          <select class="input-line" id="memFmt">
+            <option value="f32">float32 (4 bytes/dim)</option>
+            <option value="f16">float16 (2 bytes/dim)</option>
+            <option value="i8">int8 (1 byte/dim)</option>
+            <option value="bin">binary (1 bit/dim)</option>
+          </select>
+          <button type="button" class="btn" id="memBtn">Estimate</button>
+          <p class="demo-out" id="memOut"></p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Replace the demo hash with your encoder.</strong> In production, swap the synthetic <code>sentenceVec</code> function for a call to your serving endpoint or local ONNX session, and log
+        offline metrics on frozen evaluation sets whenever you change checkpoints or pooling rules.
+      </div>
+    </section>
+  </main>
+
+  <script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  const navToggle = $('navToggle');
+  const mainNav = $('mainNav');
+  navToggle.addEventListener('click', () => {
+    const open = mainNav.classList.toggle('visible');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  const io = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    },
+    { threshold: 0.08, rootMargin: '0px 0px -8% 0px' }
+  );
+  document.querySelectorAll('.section.fade-in').forEach((sec) => io.observe(sec));
+
+  function fmtBytes(n) {
+    if (n >= 1e12) return (n / 1e12).toFixed(2) + ' TB';
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GB';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MB';
+    if (n >= 1e3) return (n / 1e3).toFixed(2) + ' KB';
+    return n.toFixed(0) + ' B';
+  }
+
+  /* ---------- Contrastive canvas (triplet-style) ---------- */
+  const canvas = $('lossCanvas');
+  const ctx = canvas.getContext('2d');
+  const margin = 0.35;
+  let pos = { x: 1.1, y: 0.35 };
+  let neg = { x: -0.9, y: 0.55 };
+  let drag = null;
+
+  function dist2(a, b) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return dx * dx + dy * dy;
+  }
+  function tripletLoss() {
+    const ap = dist2({ x: 0, y: 0 }, pos);
+    const an = dist2({ x: 0, y: 0 }, neg);
+    return Math.max(0, ap - an + margin);
+  }
+
+  function toCanvas(p) {
+    const pad = 36;
+    const w = canvas.width - pad * 2;
+    const h = canvas.height - pad * 2;
+    const cx = pad + w * 0.5 + p.x * (w * 0.22);
+    const cy = pad + h * 0.5 - p.y * (h * 0.22);
+    return { cx, cy };
+  }
+  function fromCanvas(cx, cy) {
+    const pad = 36;
+    const w = canvas.width - pad * 2;
+    const h = canvas.height - pad * 2;
+    const x = (cx - pad - w * 0.5) / (w * 0.22);
+    const y = -(cy - pad - h * 0.5) / (h * 0.22);
+    return { x, y };
+  }
+
+  function drawLossCanvas() {
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    const pad = 36;
+    ctx.beginPath();
+    ctx.moveTo(pad, canvas.height / 2);
+    ctx.lineTo(canvas.width - pad, canvas.height / 2);
+    ctx.moveTo(canvas.width / 2, pad);
+    ctx.lineTo(canvas.width / 2, canvas.height - pad);
+    ctx.stroke();
+    ctx.fillStyle = '#555';
+    ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText('2D projection (pedagogical)', pad, 22);
+
+    const A = { x: 0, y: 0 };
+    const pts = [
+      { p: A, color: '#fbbf24', label: 'anchor' },
+      { p: pos, color: '#34d399', label: 'positive' },
+      { p: neg, color: '#f87171', label: 'negative' }
+    ];
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#3a3a55';
+    ctx.beginPath();
+    const ca = toCanvas(A);
+    const cp = toCanvas(pos);
+    const cn = toCanvas(neg);
+    ctx.moveTo(ca.cx, ca.cy);
+    ctx.lineTo(cp.cx, cp.cy);
+    ctx.moveTo(ca.cx, ca.cy);
+    ctx.lineTo(cn.cx, cn.cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    pts.forEach(({ p, color }) => {
+      const c = toCanvas(p);
+      ctx.beginPath();
+      ctx.fillStyle = color;
+      ctx.arc(c.cx, c.cy, p === A ? 8 : 10, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    const L = tripletLoss();
+    $('lossOut').textContent =
+      '||a−p||² = ' +
+      dist2(A, pos).toFixed(3) +
+      '   ||a−n||² = ' +
+      dist2(A, neg).toFixed(3) +
+      '   margin m = ' +
+      margin.toFixed(2) +
+      '\nL_triplet = max(0, ||a−p||² − ||a−n||² + m) = ' +
+      L.toFixed(4) +
+      (L === 0 ? '  (satisfied — no gradient from margin term)' : '  (active — training would push points)');
+  }
+
+  function hitTest(mx, my) {
+    const cp = toCanvas(pos);
+    const cn = toCanvas(neg);
+    const rp = 14;
+    if (Math.hypot(mx - cp.cx, my - cp.cy) <= rp) return 'p';
+    if (Math.hypot(mx - cn.cx, my - cn.cy) <= rp) return 'n';
+    return null;
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / r.width;
+    const scaleY = canvas.height / r.height;
+    const mx = (e.clientX - r.left) * scaleX;
+    const my = (e.clientY - r.top) * scaleY;
+    drag = hitTest(mx, my);
+  });
+  window.addEventListener('mouseup', () => {
+    drag = null;
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / r.width;
+    const scaleY = canvas.height / r.height;
+    const mx = (e.clientX - r.left) * scaleX;
+    const my = (e.clientY - r.top) * scaleY;
+    const p = fromCanvas(mx, my);
+    p.x = Math.max(-4, Math.min(4, p.x));
+    p.y = Math.max(-3, Math.min(3, p.y));
+    if (drag === 'p') pos = p;
+    if (drag === 'n') neg = p;
+    drawLossCanvas();
+  });
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const r = canvas.getBoundingClientRect();
+    const mx = (t.clientX - r.left) * (canvas.width / r.width);
+    const my = (t.clientY - r.top) * (canvas.height / r.height);
+    drag = hitTest(mx, my);
+  });
+  canvas.addEventListener('touchend', () => {
+    drag = null;
+  });
+  canvas.addEventListener('touchmove', (e) => {
+    if (!drag) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    const r = canvas.getBoundingClientRect();
+    const mx = (t.clientX - r.left) * (canvas.width / r.width);
+    const my = (t.clientY - r.top) * (canvas.height / r.height);
+    const p = fromCanvas(mx, my);
+    p.x = Math.max(-4, Math.min(4, p.x));
+    p.y = Math.max(-3, Math.min(3, p.y));
+    if (drag === 'p') pos = p;
+    if (drag === 'n') neg = p;
+    drawLossCanvas();
+  });
+  drawLossCanvas();
+
+  /* ---------- MRL slider ---------- */
+  function mrlQuality(k) {
+    const d = 768;
+    const x = k / d;
+    return 0.62 + 0.38 * Math.pow(x, 0.42);
+  }
+  function updateMrl() {
+    const k = +$('mrlDim').value;
+    $('mrlDimOut').textContent = String(k);
+    const q = mrlQuality(k);
+    $('mrlBar').style.width = (100 * q).toFixed(1) + '%';
+    $('mrlOut').textContent =
+      'Illustrative relative quality (0–1 scale): ' +
+      q.toFixed(3) +
+      '\nAt k=' +
+      k +
+      ', a Matryoshka-trained model is often competitive with far fewer coordinates than a non-nested baseline of the same full width.';
+  }
+  $('mrlDim').addEventListener('input', updateMrl);
+  updateMrl();
+
+  /* ---------- Quant corpus panel §5 ---------- */
+  const qcSizes = [1e6, 1e7, 1e8];
+
+  function updateQc() {
+    const d = +$('qcDim').value;
+    $('qcDimOut').textContent = String(d);
+    const N = qcSizes[+$('qcN').value];
+    const labels = ['1M', '10M', '100M'];
+    $('qcNOut').textContent = labels[+$('qcN').value];
+
+    const active = $('qcFmt').querySelector('.active');
+    let bytesPerVec;
+    if (active && active.dataset.bits === '1') bytesPerVec = d / 8;
+    else bytesPerVec = d * (+((active && active.dataset.bytes) || 4));
+
+    const total = bytesPerVec * N;
+    $('qcOut').textContent =
+      'Vectors: N=' +
+      N.toExponential(0).replace('+', '') +
+      ', d=' +
+      d +
+      '\nBytes per vector ≈ ' +
+      fmtBytes(bytesPerVec) +
+      '\nTotal raw embedding payload ≈ ' +
+      fmtBytes(total);
+  }
+  $('qcDim').addEventListener('input', updateQc);
+  $('qcN').addEventListener('input', updateQc);
+  $('qcFmt').addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn');
+    if (!btn || btn.parentElement !== $('qcFmt')) return;
+    $('qcFmt').querySelectorAll('.btn').forEach((x) => x.classList.remove('active'));
+    btn.classList.add('active');
+    updateQc();
+  });
+  updateQc();
+
+  /* ---------- Sentence vectors (deterministic hash → 64 dims) ---------- */
+  const SENTENCES = [
+    'dog bites man',
+    'man bites dog',
+    'a dog bit a man in the park',
+    'the man was bitten by a dog',
+    'stock market closed higher today',
+    'equities rallied and indices gained',
+    'how do I reset my password',
+    'forgot login password need help',
+    'python asyncio tutorial',
+    'async event loop in Python',
+    'the cat sat on the mat',
+    'a cat was sitting on a mat',
+    'quantum computing introduction',
+    'introduction to quantum computation',
+    'best sushi restaurant in Tokyo',
+    'Tokyo has great sushi restaurants',
+    'error 404 page not found',
+    'HTTP not found status code',
+    'neural networks for sentence embeddings',
+    'dense vectors encode text meaning',
+    'invoice total due upon receipt',
+    'payment is required when you receive the invoice'
+  ];
+
+  function mulberry32(a) {
+    return function () {
+      let t = (a += 0x6d2b79f5);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function sentenceVec(text, dim) {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const rand = mulberry32(h >>> 0);
+    const v = [];
+    for (let j = 0; j < dim; j++) v.push(rand() - 0.5 + rand() * 0.001);
+    let s = 0;
+    for (let j = 0; j < dim; j++) s += v[j] * v[j];
+    s = Math.sqrt(s) || 1;
+    for (let j = 0; j < dim; j++) v[j] /= s;
+    return v;
+  }
+
+  const DIM = 64;
+  const EMB = {};
+  SENTENCES.forEach((s) => {
+    EMB[s] = sentenceVec(s, DIM);
+  });
+
+  function cosine(u, v) {
+    let d = 0;
+    for (let i = 0; i < u.length; i++) d += u[i] * v[i];
+    return d;
+  }
+
+  function fillSentenceSelects() {
+    const opts = SENTENCES.map((s) => '<option value="' + s.replace(/"/g, '&quot;') + '">' + s + '</option>').join('');
+    $('simA').innerHTML = opts;
+    $('simB').innerHTML = opts;
+    $('truncSent').innerHTML = opts;
+    $('simA').value = SENTENCES[0];
+    $('simB').value = SENTENCES[3];
+    $('truncSent').value = SENTENCES[8];
+  }
+  fillSentenceSelects();
+
+  function runSim() {
+    const a = $('simA').value;
+    const b = $('simB').value;
+    const s = cosine(EMB[a], EMB[b]);
+    $('simOut').textContent = 'cosine(emb(A), emb(B)) = ' + s.toFixed(6) + '\nA: "' + a + '"\nB: "' + b + '"';
+  }
+  $('simBtn').addEventListener('click', runSim);
+  $('simA').addEventListener('change', runSim);
+  $('simB').addEventListener('change', runSim);
+  runSim();
+
+  function truncVec(full, k) {
+    const t = full.slice(0, k);
+    let s = 0;
+    for (let i = 0; i < t.length; i++) s += t[i] * t[i];
+    s = Math.sqrt(s) || 1;
+    return t.map((x) => x / s);
+  }
+
+  function updateTrunc() {
+    const sent = $('truncSent').value;
+    const k = +$('truncK').value;
+    $('truncKOut').textContent = String(k);
+    const full = EMB[sent];
+    const tk = truncVec(full, k);
+    const padded = full.map((x, i) => (i < k ? tk[i] : 0));
+    let sn = 0;
+    for (let i = 0; i < padded.length; i++) sn += padded[i] * padded[i];
+    sn = Math.sqrt(sn) || 1;
+    for (let i = 0; i < padded.length; i++) padded[i] /= sn;
+    const align = cosine(full, padded);
+    $('truncOut').textContent =
+      'Full vs. truncated-prefix (renormalized to k, zero-padded to compare in R^64):\n' +
+      'alignment cosine ≈ ' +
+      align.toFixed(6) +
+      '\nInterpretation: smaller k removes tail coordinates; alignment drops when those tails matter for direction.';
+  }
+  $('truncK').addEventListener('input', updateTrunc);
+  $('truncSent').addEventListener('change', updateTrunc);
+  updateTrunc();
+
+  /* ---------- Playground tabs ---------- */
+  const tabs = $('playTabs').querySelectorAll('.btn');
+  function showTab(name) {
+    tabs.forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    $('tab-sim').style.display = name === 'sim' ? 'block' : 'none';
+    $('tab-trunc').style.display = name === 'trunc' ? 'block' : 'none';
+    $('tab-mem').style.display = name === 'mem' ? 'block' : 'none';
+  }
+  tabs.forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+  $('memBtn').addEventListener('click', () => {
+    const N = Math.max(1, Math.floor(+$('memN').value || 0));
+    const d = Math.max(1, Math.floor(+$('memD').value || 0));
+    const fmt = $('memFmt').value;
+    let bpv;
+    if (fmt === 'f32') bpv = 4 * d;
+    else if (fmt === 'f16') bpv = 2 * d;
+    else if (fmt === 'i8') bpv = d;
+    else bpv = d / 8;
+    const total = bpv * N;
+    $('memOut').textContent =
+      'N=' +
+      N.toLocaleString() +
+      ', d=' +
+      d +
+      ', encoding=' +
+      fmt +
+      '\nBytes per vector ≈ ' +
+      fmtBytes(bpv) +
+      '\nTotal raw payload ≈ ' +
+      fmtBytes(total);
+  });
+})();
+  </script>
+</body>
+</html>

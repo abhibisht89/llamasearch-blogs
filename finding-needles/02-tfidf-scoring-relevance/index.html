@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TF-IDF — Scoring Relevance with Term Statistics | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c8cff;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .main-nav a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+    .main-nav a:hover { color: var(--accent); }
+
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108, 140, 255, 0.18), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(167, 139, 250, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.85rem, 5vw, 3rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle {
+      max-width: 720px;
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      margin-bottom: 36px;
+    }
+    .hero-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+    }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .num {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+
+    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
+    .section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--border);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      scroll-margin-top: 96px;
+    }
+    .section.fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .section h2 {
+      font-size: 1.55rem;
+      margin: 0 0 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .section-num {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--accent2);
+      font-weight: 600;
+    }
+    .section p { margin: 0 0 1em; color: var(--text); }
+    .section p:last-child { margin-bottom: 0; }
+    .section ul, .section ol { margin: 0 0 1em; padding-left: 1.35em; color: var(--text); }
+    .section li { margin-bottom: 0.45em; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .card h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      color: var(--accent3);
+    }
+    .formula.formula-lg { font-size: 1.05rem; text-align: center; color: var(--accent5); }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 22px 0;
+    }
+    @media (max-width: 640px) {
+      .comparison { grid-template-columns: 1fr; }
+    }
+    .comparison > div {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.92rem;
+    }
+    .interactive-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel h3 {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      color: var(--accent2);
+    }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.active {
+      background: rgba(108, 140, 255, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .tag {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      color: var(--accent4);
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+
+    .bar-chart { margin: 16px 0; }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 100px 1fr 52px;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+    }
+    .bar-row .label { color: var(--text-dim); font-family: var(--mono); }
+    .bar-track {
+      height: 22px;
+      background: var(--bg-card-alt);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.35s ease;
+    }
+    .bar-fill.df { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+    .bar-fill.idf { background: linear-gradient(90deg, var(--accent3), var(--accent5)); }
+    .bar-val { font-family: var(--mono); color: var(--text-dim); text-align: right; }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    .slider-row input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+    .slider-row output {
+      font-family: var(--mono);
+      min-width: 48px;
+      color: var(--accent5);
+    }
+
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 16px 0;
+    }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+    table.data th { background: var(--bg-card-alt); color: var(--text-dim); font-weight: 600; }
+    table.data td { font-family: var(--mono); font-size: 0.82rem; }
+    table.data .num { text-align: right; }
+
+    textarea.input-block, input.input-line {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin: 8px 0;
+    }
+    textarea.input-block { min-height: 100px; resize: vertical; }
+
+    canvas.drawing {
+      width: 100%;
+      max-width: 100%;
+      height: 320px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+    canvas.drawing.drag-cos { cursor: grab; }
+    canvas.drawing.drag-cos:active { cursor: grabbing; }
+
+    .legend-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      margin-top: 10px;
+    }
+    .legend-inline span::before {
+      content: '';
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 6px;
+    }
+    .lg-q::before { background: var(--accent5); }
+    .lg-d1::before { background: var(--accent); }
+    .lg-d2::before { background: var(--accent3); }
+    .lg-d3::before { background: var(--accent4); }
+
+    .playground-results { margin-top: 20px; }
+    .doc-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      background: var(--bg-card-alt);
+    }
+    .doc-card .rank {
+      font-family: var(--mono);
+      color: var(--accent5);
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+    .term-breakdown {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-top: 8px;
+      font-family: var(--mono);
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      color: var(--accent3);
+    }
+
+    .kbd { font-family: var(--mono); font-size: 0.85em; }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <style class="breadcrumb-styles">
+    .breadcrumb-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+      background: #111118; border-bottom: 1px solid #23232f;
+      padding: 10px 24px; font-size: 0.82rem; color: #8888a0;
+    }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+  </style>
+
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">TF-IDF</span>
+  </nav>
+
+  <nav class="main-nav" id="mainNav" aria-label="On this page">
+    <a href="#s0">Beyond Boolean</a>
+    <a href="#s1">Term Frequency</a>
+    <a href="#s2">IDF</a>
+    <a href="#s3">TF-IDF</a>
+    <a href="#s4">Vector Space</a>
+    <a href="#s5">Cosine</a>
+    <a href="#s6">Pipeline</a>
+    <a href="#s7">Playground</a>
+  </nav>
+
+  <header class="hero">
+    <h1>TF-IDF — Scoring Relevance with Term Statistics</h1>
+    <p class="subtitle">
+      Move from “does this document match?” to “how strongly does it match, and in what order should we show results?”
+      <code>TF-IDF</code> turns token counts into comparable vectors for the <code>vector space model</code> and
+      <code>cosine similarity</code> ranking.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">8</div><div class="lbl">Sections</div></div>
+      <div class="hero-stat"><div class="num">6+</div><div class="lbl">Interactive demos</div></div>
+      <div class="hero-stat"><div class="num">N</div><div class="lbl">Dimensions in term-space</div></div>
+    </div>
+  </header>
+
+  <main>
+    <section id="s0" class="section fade-in">
+      <h2><span class="section-num">00</span> Beyond Boolean — The Need for Ranking</h2>
+      <p>
+        In a purely <code>boolean retrieval</code> system, the index answers a simple membership question: does document <code>d</code>
+        satisfy the query’s logical conditions? Every surviving document is treated as equally good. There is no notion of “more relevant”
+        versus “barely relevant,” which is awkward for people who scan a short list of results and expect the best match at the top.
+      </p>
+      <p>
+        Real search interfaces almost always <code>rank</code> results. Ranking requires a <code>score</code>: a real number (or at least
+        an ordering) that summarizes how well a document aligns with an information need. Once you have scores, you can sort descending,
+        apply thresholds, blend with other signals, or explain “why this result” using contributing terms.
+      </p>
+      <p>
+        The <code>vector space model</code> turns unstructured text into numbers we can compare by fixing a <code>vocabulary</code> of terms
+        (dimensions). Each document becomes a vector: component <code>i</code> describes how important term <code>i</code> is in that
+        document. The query becomes another vector in the same space. Similarity between vectors approximates relevance.
+      </p>
+      <p>
+        Raw counts are a start, but they are skewed by document length and by how common a term is in the whole collection.
+        <code>TF-IDF</code> combines a <code>term frequency (TF)</code> factor with an <code>inverse document frequency (IDF)</code> factor
+        so that frequent-but-meaningless words like <code>the</code> do not drown out rare, specific words like <code>superconductor</code>.
+      </p>
+    </section>
+
+    <section id="s1" class="section fade-in">
+      <h2><span class="section-num">01</span> Term Frequency (<code>TF</code>)</h2>
+      <p>
+        The simplest measure of how much a term <code>t</code> appears in a document <code>d</code> is the <code>raw term frequency</code>:
+        count how many times <code>t</code> occurs in <code>d</code>. This is easy to compute and interpret, and it correlates with the
+        intuition that a document that mentions <code>diabetes</code> ten times is probably more about diabetes than one that mentions it once.
+      </p>
+      <p>
+        Raw counts are not fair across documents of different lengths. A 5,000-word article naturally accumulates larger counts than a
+        200-word abstract, even when both are “about” the topic to the same degree. Longer documents are not inherently more relevant;
+        they simply have more tokens. Any scoring function that uses raw counts without adjustment tends to <code>bias</code> toward long texts.
+      </p>
+      <div class="comparison">
+        <div>
+          <strong>Log-frequency</strong><br />
+          <code>1 + log(tf)</code> for <code>tf &gt; 0</code>, else <code>0</code>. Each additional occurrence matters less than the previous
+          one: the first hit is a big jump; the twentieth hit adds only a little. This dampens runaway scores in long documents.
+        </div>
+        <div>
+          <strong>Augmented frequency</strong><br />
+          Divide by the most frequent term in the document: <code>tf / max_tf</code>. This normalizes within the document so all weights
+          lie in <code>[0, 1]</code> relative to that document’s own term distribution.
+        </div>
+      </div>
+      <p>
+        Another useful variant is <code>boolean frequency</code>: <code>1</code> if the term appears at least once, <code>0</code> otherwise.
+        Boolean <code>TF</code> throws away intensity entirely and is common when you care only about presence in structured fields or when
+        combining with other binary features.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: how <code>TF</code> formulas reshape raw counts</h3>
+        <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;">
+          Drag the slider to change raw <code>tf</code>. Compare raw, log, augmented (assuming <code>max_tf = 20</code>), and boolean.
+        </p>
+        <div class="slider-row">
+          <label for="tfRaw">Raw <code>tf</code></label>
+          <input type="range" id="tfRaw" min="0" max="50" value="12" />
+          <output id="tfRawOut">12</output>
+        </div>
+        <div class="bar-chart" id="tfBarChart"></div>
+      </div>
+    </section>
+
+    <section id="s2" class="section fade-in">
+      <h2><span class="section-num">02</span> Document Frequency and <code>IDF</code></h2>
+      <p>
+        <code>Document frequency</code>, written <code>df_t</code>, is the number of documents in the collection that contain term
+        <code>t</code> at least once (definitions sometimes differ on counting; consistency matters more than the exact convention).
+        If <code>df_t</code> is large, the term is <code>common</code> across the corpus. If <code>df_t</code> is small, the term is
+        <code>rare</code> and often more <code>discriminative</code>: it narrows the set of plausible documents sharply.
+      </p>
+      <p>
+        The word <code>the</code> appears in nearly every English document, so seeing <code>the</code> in a document tells you almost
+        nothing about the subject. The token <code>quantum</code> appears in far fewer documents, so its presence is a stronger hint about
+        topic. <code>IDF</code> formalizes “how surprising is it to see this term?”
+      </p>
+      <div class="formula">
+        Classic <code>IDF</code> (smooth variants exist):<br />
+        <code>IDF(t) = log(N / df_t)</code><br />
+        where <code>N</code> is the total number of documents and <code>df_t ≥ 1</code> for terms in the vocabulary.
+      </div>
+      <p>
+        The logarithm is not decorative. Without compression, a term that appears in only one document could receive an enormous multiplier
+        relative to a term that appears in two documents; the gap grows explosively as rarity increases. The <code>log</code> reduces dynamic
+        range so rare terms matter more, but not so much that a single odd token can dominate every score. Different bases change scale only;
+        ranking with cosine similarity is often invariant to a constant factor applied to all components. Production systems also add
+        <code>smoothing</code> to avoid division by zero and to tame outliers, e.g. <code>log((N + 1) / (df_t + 1)) + 1</code>. The demos here
+        use the classic form with <code>df ≥ 1</code>.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: <code>DF</code> versus <code>IDF</code> for example terms</h3>
+        <p style="margin-bottom:12px;color:var(--text-dim);font-size:0.9rem;">
+          Assumes <code>N = 1000</code> documents. Bar lengths are scaled separately for readability (two charts).
+        </p>
+        <div id="idfDemo"></div>
+      </div>
+    </section>
+
+    <section id="s3" class="section fade-in">
+      <h2><span class="section-num">03</span> <code>TF-IDF</code> — The Full Formula</h2>
+      <p>
+        <code>TF-IDF</code> multiplies how strongly a term shows up in a specific document (<code>TF</code>) by how informative that term is
+        across the collection (<code>IDF</code>). The product rewards terms that are both locally prominent and globally rare.
+      </p>
+      <div class="formula formula-lg">
+        TF-IDF(<code>t</code>, <code>d</code>) = TF(<code>t</code>, <code>d</code>) × IDF(<code>t</code>)
+      </div>
+      <p>
+        There is no single official <code>TF</code> or <code>IDF</code>; research papers and search engines pick combinations that behave
+        well on their data. What matters is the pattern: local frequency times a collection-level rarity weight. The rest is engineering.
+      </p>
+
+      <div class="card">
+        <h3>Worked example (toy corpus, by hand)</h3>
+        <p>Collection: three documents. Vocabulary terms for illustration: <code>cat</code>, <code>dog</code>, <code>park</code>.</p>
+        <ul>
+          <li><code>d1</code>: “cat cat dog”</li>
+          <li><code>d2</code>: “dog park”</li>
+          <li><code>d3</code>: “cat park park”</li>
+        </ul>
+        <p>Let <code>N = 3</code>. Document frequencies: <code>cat</code> appears in <code>d1</code> and <code>d3</code> → <code>df=2</code>.
+          <code>dog</code> in <code>d1</code>, <code>d2</code> → <code>df=2</code>. <code>park</code> in <code>d2</code>, <code>d3</code> → <code>df=2</code>.</p>
+        <p>Use raw <code>TF</code> and <code>IDF = log₂(N/df)</code> (base 2 here for tidy numbers): <code>IDF = log₂(3/2) ≈ 0.585</code> for each term.</p>
+        <p>Query <code>q</code>: “cat park”. Treat the query as a mini-document: <code>TF(cat)=1</code>, <code>TF(park)=1</code>, others 0.</p>
+        <table class="data">
+          <thead><tr><th>Doc</th><th>Vector (cat, dog, park) TF-IDF</th></tr></thead>
+          <tbody>
+            <tr><td><code>d1</code></td><td>(2×0.585, 1×0.585, 0) ≈ (1.17, 0.585, 0)</td></tr>
+            <tr><td><code>d2</code></td><td>(0, 1×0.585, 1×0.585) ≈ (0, 0.585, 0.585)</td></tr>
+            <tr><td><code>d3</code></td><td>(1×0.585, 0, 2×0.585) ≈ (0.585, 0, 1.17)</td></tr>
+            <tr><td><code>q</code></td><td>(0.585, 0, 0.585)</td></tr>
+          </tbody>
+        </table>
+        <p>
+          Both <code>d1</code> and <code>d3</code> share two query terms with non-zero mass; <code>d2</code> matches only <code>park</code>.
+          Cosine similarity ranks <code>d3</code> and <code>d1</code> above <code>d2</code> for this query. The exact order between
+          <code>d1</code> and <code>d3</code> depends on vector direction, not just raw dot product, because lengths differ.
+        </p>
+      </div>
+
+      <p>
+        <code>TF</code> captures topical focus within the document; <code>IDF</code> down-weights terms that fail to separate documents.
+        Together they approximate “this document emphasizes the same unusual words the query emphasizes.”
+      </p>
+      <p>
+        Common variants include <code>sublinear TF</code> (<code>1 + log(tf)</code>), <code>smoothed IDF</code>, and <code>L2 normalization</code>
+        of document vectors before similarity. <code>BM25</code> applies the same ideas with probabilistic term weighting and stronger length
+        normalization.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: editable <code>TF-IDF</code> calculator</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:10px;">
+          Enter one document per line. Enter a query. Tokenization is lowercase alphanumeric splits (same as playground).
+        </p>
+        <label>Documents</label>
+        <textarea id="calcDocs" class="input-block">the quick brown fox
+the lazy dog sleeps
+brown dog in the sun</textarea>
+        <label>Query</label>
+        <input id="calcQuery" class="input-line" type="text" value="brown dog" />
+        <div class="btn-group">
+          <button type="button" class="btn active" data-tf="raw">Raw TF</button>
+          <button type="button" class="btn" data-tf="log">1+log TF</button>
+          <button type="button" class="btn" data-tf="aug">Augmented TF</button>
+        </div>
+        <div id="calcOut" class="card" style="margin-top:14px;"></div>
+      </div>
+    </section>
+
+    <section id="s4" class="section fade-in">
+      <h2><span class="section-num">04</span> The Vector Space Model</h2>
+      <p>
+        Fix an ordered vocabulary <code>{t₁, …, tₙ}</code>. A document <code>d</code> maps to <code>ℝⁿ</code> by choosing a weight for each
+        term. With <code>TF-IDF</code>, weight <code>i</code> is zero if term <code>tᵢ</code> is absent (depending on <code>TF</code> definition),
+        otherwise it reflects prominence times rarity. The <code>query</code> is embedded using the same vocabulary and weighting scheme so
+        that “closeness” in space means “overlap on important terms.”
+      </p>
+      <p>
+        This representation is a <code>bag of words</code>: word order is ignored. Two permutations of the same multiset of tokens are
+        identical vectors. That limitation is severe for phrases and negation, but it keeps computation tractable and makes inverted indexes
+        practical.
+      </p>
+      <p>
+        Full visualization of <code>ℝⁿ</code> is impractical for large <code>n</code>, but low-dimensional projections still clarify the
+        geometry. Each document is a point (or arrow from the origin); the query is another arrow. Neighboring directions correspond to shared
+        vocabulary emphasis. In <code>3D</code>, pick three terms as axes and place every document and the query at coordinates
+        <code>(w₁, w₂, w₃)</code>, where each <code>wᵢ</code> is the <code>TF-IDF</code> weight for that term. Distance from the origin
+        reflects overall weighted mass; direction reflects which terms dominate. The demo below projects onto two terms for readability; the
+        same geometry extends to arbitrary dimension.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: <code>2D</code> projection of <code>TF-IDF</code> vectors</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;">
+          Axes are two selected terms from the mini-corpus. Points are documents; the star is the query vector (scaled for display).
+        </p>
+        <canvas id="vecCanvas" class="drawing" width="860" height="320" aria-label="2D vector scatter"></canvas>
+        <div class="legend-inline">
+          <span class="lg-q">Query</span>
+          <span class="lg-d1">Doc 1</span>
+          <span class="lg-d2">Doc 2</span>
+          <span class="lg-d3">Doc 3</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="s5" class="section fade-in">
+      <h2><span class="section-num">05</span> Cosine Similarity</h2>
+      <p>
+        Euclidean distance between raw count vectors often punishes long documents: they sit far away in space simply because their vectors
+        have larger magnitude, even when the topic mix is similar. Cosine similarity measures the angle between vectors, intentionally
+        discarding magnitude to a large extent.
+      </p>
+      <div class="formula formula-lg">
+        cos(θ) = (<strong>A</strong> · <strong>B</strong>) / (‖<strong>A</strong>‖ × ‖<strong>B</strong>‖)
+      </div>
+      <p>
+        If vectors are non-negative (typical for <code>TF-IDF</code>), cosine similarity ranges from <code>0</code> (orthogonal, no shared
+        weighted terms) to <code>1</code> (same direction). Negative values appear if you allow negative weights (some embeddings), but
+        classical <code>TF-IDF</code> stays in <code>[0, 1]</code> for the usual setups.
+      </p>
+
+      <div class="card">
+        <h3>Worked cosine example (query vs three documents)</h3>
+        <p>Use the same vectors as in the toy table (already TF-IDF weighted):</p>
+        <ul>
+          <li><strong>q</strong> = (0.585, 0, 0.585)</li>
+          <li><strong>d1</strong> = (1.17, 0.585, 0)</li>
+          <li><strong>d2</strong> = (0, 0.585, 0.585)</li>
+          <li><strong>d3</strong> = (0.585, 0, 1.17)</li>
+        </ul>
+        <p>
+          Dot products: <code>q·d1 = 0.685</code>, <code>q·d2 = 0.343</code>, <code>q·d3 = 1.37</code>.
+          Norms: <code>‖q‖ ≈ 0.827</code>, <code>‖d1‖ ≈ 1.31</code>, <code>‖d2‖ ≈ 0.827</code>, <code>‖d3‖ ≈ 1.31</code>.
+          Cosines: <code>sim(q,d1) ≈ 0.63</code>, <code>sim(q,d2) ≈ 0.50</code>, <code>sim(q,d3) ≈ 0.79</code>.
+          Ranking: <code>d3</code>, then <code>d1</code>, then <code>d2</code>.
+        </p>
+      </div>
+
+      <p>
+        <strong>DAAT vs TAAT.</strong> <code>Document-at-a-time (DAAT)</code> walks postings for each query term in parallel pointers,
+        accumulating a score per document as you go—friendly to block-max pruning. <code>Term-at-a-time (TAAT)</code> processes one term’s
+        postings fully before moving to the next, maintaining per-document accumulators—simpler to implement but often harder on cache for
+        wide queries. Both compute the same dot products when scoring is decomposable per term.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: drag vectors in <code>2D</code>, watch cosine update</h3>
+        <p style="color:var(--text-dim);font-size:0.9rem;">
+          Drag colored handles. Vectors are from the origin; cosine uses full <code>ℝ²</code> coordinates (not just the first quadrant).
+        </p>
+        <canvas id="cosCanvas" class="drawing drag-cos" width="860" height="320" aria-label="Cosine similarity drag demo"></canvas>
+        <p id="cosReadout" class="formula" style="margin-top:12px;">cos(θ) = …</p>
+      </div>
+    </section>
+
+    <section id="s6" class="section fade-in">
+      <h2><span class="section-num">06</span> Putting It All Together — A Scored Search</h2>
+      <p>
+        End-to-end retrieval with <code>TF-IDF</code> and cosine ranking follows a repeatable pipeline. First, normalize text:
+        <code>tokenize</code>, optionally <code>stem</code> or leave tokens raw, filter stopwords if desired (some systems keep them for phrases).
+        Build the vocabulary from the indexed corpus (or use a fixed lexicon). For each document, compute term frequencies, attach
+        collection statistics for <code>IDF</code>, and form the document vector. At query time, form the query vector with the same formula.
+      </p>
+      <p>
+        Scoring is then vector similarity—most often cosine. Sort documents by descending similarity and return the top <code>k</code>.
+        The same machinery supports thresholding, snippet highlighting (terms with high query contribution), and diagnostic displays.
+      </p>
+
+      <p>
+        <code>TF-IDF</code> is simple to implement, fast to score with inverted indexes, easy to explain, and requires no labeled training
+        data. It remains a strong baseline in many domains. Its limits are familiar: bag-of-words models discard order and syntax;
+        <code>vocabulary mismatch</code> hurts recall when a query says <code>cars</code> but documents say <code>automobile</code>; identical
+        tokens can carry different meanings (<code>Java</code> the island versus the language); and naive <code>IDF</code> can still over-weight
+        rare tokens.
+      </p>
+      <p>
+        Later rankers and dense <code>embeddings</code> address synonymy, context, and length effects differently, but the term-space vectors
+        defined here remain the reference point for how lexical similarity is computed.
+      </p>
+    </section>
+
+    <section id="s7" class="section fade-in">
+      <h2><span class="section-num">07</span> Playground — Full <code>TF-IDF</code> search</h2>
+      <p>
+        Add your own documents, type a query, and inspect ranked results. Each row shows cosine similarity to the query and a per-term
+        breakdown: local <code>TF</code>, global <code>IDF</code>, and their product <code>TF-IDF</code> for terms that appear in either the
+        document or the query (zeros omitted for readability).
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Build your corpus</h3>
+        <label>Documents (one per line)</label>
+        <textarea id="pgDocs" class="input-block">machine learning on text data
+learning to rank search results
+text search with inverted indexes
+deep learning embeddings for semantic search</textarea>
+        <label>Query</label>
+        <input id="pgQuery" class="input-line" type="text" value="learning text search" />
+        <div class="btn-group">
+          <button type="button" class="btn active" id="pgTfRaw">TF: raw</button>
+          <button type="button" class="btn" id="pgTfLog">TF: 1+log</button>
+        </div>
+        <button type="button" class="btn" id="pgRun" style="margin-top:8px;background:rgba(52,211,153,0.12);border-color:var(--accent3);color:var(--accent3);">Compute ranking</button>
+        <div id="pgOut" class="playground-results"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+(function () {
+  'use strict';
+
+  // --- Small utilities shared across demos ---
+  function tokenize(text) {
+    return String(text).toLowerCase().match(/[a-z0-9]+/g) || [];
+  }
+
+  function uniqueSorted(arr) {
+    return Array.from(new Set(arr)).sort();
+  }
+
+  /** Raw term frequency map for one document's tokens */
+  function termFreqMap(tokens) {
+    const m = Object.create(null);
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      m[t] = (m[t] || 0) + 1;
+    }
+    return m;
+  }
+
+  /** Document frequency: count docs containing term at least once */
+  function computeDf(docTokenLists) {
+    const df = Object.create(null);
+    for (let i = 0; i < docTokenLists.length; i++) {
+      const seen = Object.create(null);
+      const toks = docTokenLists[i];
+      for (let j = 0; j < toks.length; j++) seen[toks[j]] = true;
+      for (const t in seen) df[t] = (df[t] || 0) + 1;
+    }
+    return df;
+  }
+
+  function idfClassic(N, df) {
+    return Math.log(N / df);
+  }
+
+  /** Apply TF variant given raw count, maxTf in doc, and mode */
+  function tfWeight(raw, maxTf, mode) {
+    if (raw <= 0) return 0;
+    if (mode === 'log') return 1 + Math.log(raw);
+    if (mode === 'aug') return maxTf ? raw / maxTf : 0;
+    if (mode === 'bool') return 1;
+    return raw;
+  }
+
+  /** Build TF-IDF vector for tokens against vocabulary; returns Float64Array aligned to vocab */
+  function tfidfVector(tokens, vocab, df, N, tfMode) {
+    const tfm = termFreqMap(tokens);
+    let maxTf = 0;
+    for (const t in tfm) if (tfm[t] > maxTf) maxTf = tfm[t];
+
+    const vec = new Float64Array(vocab.length);
+    for (let i = 0; i < vocab.length; i++) {
+      const term = vocab[i];
+      const raw = tfm[term] || 0;
+      const tw = tfWeight(raw, maxTf, tfMode);
+      const dfc = df[term] || 0;
+      if (dfc <= 0 || tw === 0) {
+        vec[i] = 0;
+        continue;
+      }
+      vec[i] = tw * idfClassic(N, dfc);
+    }
+    return vec;
+  }
+
+  function dot(a, b) {
+    let s = 0;
+    for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+    return s;
+  }
+
+  function norm(a) {
+    return Math.sqrt(dot(a, a));
+  }
+
+  function cosineSim(a, b) {
+    const na = norm(a);
+    const nb = norm(b);
+    if (na === 0 || nb === 0) return 0;
+    return dot(a, b) / (na * nb);
+  }
+
+  // --- Section 1: TF bar chart ---
+  const tfRawSlider = document.getElementById('tfRaw');
+  const tfRawOut = document.getElementById('tfRawOut');
+  const tfBarChart = document.getElementById('tfBarChart');
+  const MAX_TF_ASSUME = 20;
+
+  function renderTfBars(raw) {
+    const logTf = raw > 0 ? 1 + Math.log(raw) : 0;
+    const aug = MAX_TF_ASSUME ? raw / MAX_TF_ASSUME : 0;
+    const boolTf = raw > 0 ? 1 : 0;
+    const rows = [
+      { label: 'raw', val: raw, cls: 'df' },
+      { label: '1+log', val: logTf, cls: 'idf' },
+      { label: 'tf/max', val: aug, cls: 'df' },
+      { label: 'bool', val: boolTf, cls: 'idf' }
+    ];
+    const maxV = Math.max(1e-6, ...rows.map(function (r) { return r.val; }));
+    tfBarChart.innerHTML = rows.map(function (r) {
+      const pct = (r.val / maxV) * 100;
+      return (
+        '<div class="bar-row">' +
+          '<span class="label">' + r.label + '</span>' +
+          '<div class="bar-track"><div class="bar-fill ' + r.cls + '" style="width:' + pct.toFixed(1) + '%"></div></div>' +
+          '<span class="bar-val">' + (Math.round(r.val * 1000) / 1000) + '</span>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  if (tfRawSlider && tfBarChart) {
+    tfRawSlider.addEventListener('input', function () {
+      tfRawOut.textContent = tfRawSlider.value;
+      renderTfBars(+tfRawSlider.value);
+    });
+    tfRawOut.textContent = tfRawSlider.value;
+    renderTfBars(+tfRawSlider.value);
+  }
+
+  // --- Section 2: DF vs IDF demo ---
+  const idfDemoEl = document.getElementById('idfDemo');
+  if (idfDemoEl) {
+    const N = 1000;
+    const terms = [
+      { t: 'the', df: 980 },
+      { t: 'data', df: 120 },
+      { t: 'search', df: 45 },
+      { t: 'quantum', df: 8 },
+      { t: 'hapaxish', df: 1 }
+    ];
+    const maxDf = N;
+    const idfs = terms.map(function (x) {
+      return idfClassic(N, x.df);
+    });
+    const maxIdf = Math.max.apply(null, idfs);
+
+    function bars(title, key, cls) {
+      let html = '<h4 style="margin:16px 0 8px;color:var(--text-dim);font-size:0.9rem;">' + title + '</h4>';
+      for (let i = 0; i < terms.length; i++) {
+        const v = key === 'df' ? terms[i].df : idfs[i];
+        const maxV = key === 'df' ? maxDf : maxIdf;
+        const pct = (v / maxV) * 100;
+        html +=
+          '<div class="bar-row">' +
+            '<span class="label">' + terms[i].t + '</span>' +
+            '<div class="bar-track"><div class="bar-fill ' + cls + '" style="width:' + pct.toFixed(2) + '%"></div></div>' +
+            '<span class="bar-val">' + (key === 'df' ? v : (Math.round(v * 1000) / 1000)) + '</span>' +
+          '</div>';
+      }
+      return html;
+    }
+    idfDemoEl.innerHTML = bars('Document frequency DF (count of docs containing term)', 'df', 'df')
+      + bars('Inverse document frequency IDF = log(N/df)', 'idf', 'idf');
+  }
+
+  // --- Section 3: calculator ---
+  const calcDocs = document.getElementById('calcDocs');
+  const calcQuery = document.getElementById('calcQuery');
+  const calcOut = document.getElementById('calcOut');
+  let calcTfMode = 'raw';
+
+  document.querySelectorAll('[data-tf]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('[data-tf]').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      calcTfMode = btn.getAttribute('data-tf');
+      if (calcTfMode === 'log') calcTfMode = 'log';
+      else if (calcTfMode === 'aug') calcTfMode = 'aug';
+      else calcTfMode = 'raw';
+      runCalc();
+    });
+  });
+
+  function runCalc() {
+    if (!calcDocs || !calcQuery || !calcOut) return;
+    const lines = calcDocs.value.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    const docToks = lines.map(tokenize);
+    const qTok = tokenize(calcQuery.value);
+    if (!docToks.length || !qTok.length) {
+      calcOut.textContent = 'Add at least one document and a non-empty query.';
+      return;
+    }
+    const allToks = docToks.flat().concat(qTok);
+    const vocab = uniqueSorted(allToks);
+    const N = docToks.length;
+    const df = computeDf(docToks);
+    const qVec = tfidfVector(qTok, vocab, df, N, calcTfMode);
+
+    let html = '<table class="data"><thead><tr><th>Doc</th><th class="num">cos(q,d)</th></tr></thead><tbody>';
+    for (let i = 0; i < docToks.length; i++) {
+      const dVec = tfidfVector(docToks[i], vocab, df, N, calcTfMode);
+      const sim = cosineSim(qVec, dVec);
+      html += '<tr><td>' + (i + 1) + ': ' + lines[i].replace(/</g, '&lt;') + '</td><td class="num">' + sim.toFixed(4) + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    html += '<p style="margin-top:12px;color:var(--text-dim);font-size:0.88rem;">Vocabulary size: ' + vocab.length + '</p>';
+    calcOut.innerHTML = html;
+  }
+
+  if (calcDocs) {
+    calcDocs.addEventListener('input', runCalc);
+    calcQuery.addEventListener('input', runCalc);
+    runCalc();
+  }
+
+  // --- Section 4: 2D scatter of TF-IDF ---
+  const vecCanvas = document.getElementById('vecCanvas');
+
+  function drawVecScatter() {
+    if (!vecCanvas) return;
+    const ctx = vecCanvas.getContext('2d');
+    const W = vecCanvas.width;
+    const H = vecCanvas.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, W, H);
+
+    const lines = [
+      'cat cat dog',
+      'dog park',
+      'cat park park'
+    ];
+    const docToks = lines.map(tokenize);
+    const qTok = tokenize('cat park');
+    const allToks = docToks.flat().concat(qTok);
+    const vocab = uniqueSorted(allToks);
+    const N = docToks.length;
+    const df = computeDf(docToks);
+    const tfMode = 'raw';
+
+    // Pick two terms for axes: first two alphabetically that appear in vocab
+    const ax = vocab.indexOf('cat') >= 0 ? 'cat' : vocab[0];
+    const ay = vocab.find(function (t) { return t !== ax; }) || vocab[1];
+
+    function vec2d(tokens) {
+      const v = tfidfVector(tokens, vocab, df, N, tfMode);
+      const ix = vocab.indexOf(ax);
+      const iy = vocab.indexOf(ay);
+      return { x: v[ix], y: v[iy] };
+    }
+
+    const pts = docToks.map(function (dt, i) {
+      const p = vec2d(dt);
+      return { ...p, label: 'd' + (i + 1), hue: i };
+    });
+    const qp = vec2d(qTok);
+
+    const xs = pts.map(function (p) { return p.x; }).concat([qp.x]);
+    const ys = pts.map(function (p) { return p.y; }).concat([qp.y]);
+    let minX = Math.min.apply(null, xs);
+    let maxX = Math.max.apply(null, xs);
+    let minY = Math.min.apply(null, ys);
+    let maxY = Math.max.apply(null, ys);
+    const pad = 0.15;
+    const dx = maxX - minX || 1;
+    const dy = maxY - minY || 1;
+    minX -= dx * pad; maxX += dx * pad;
+    minY -= dy * pad; maxY += dy * pad;
+
+    function CX(x) {
+      return 60 + ((x - minX) / (maxX - minX || 1)) * (W - 120);
+    }
+    function CY(y) {
+      return H - 50 - ((y - minY) / (maxY - minY || 1)) * (H - 100);
+    }
+
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(50, CY(0)); ctx.lineTo(W - 50, CY(0));
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(CX(0), 30); ctx.lineTo(CX(0), H - 30);
+    ctx.stroke();
+
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px ' + getComputedStyle(document.documentElement).getPropertyValue('--mono').trim();
+    ctx.fillText(ax + ' (TF-IDF)', CX(maxX) - 80, H - 14);
+    ctx.save();
+    ctx.translate(16, H / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(ay + ' (TF-IDF)', 0, 0);
+    ctx.restore();
+
+    const colors = ['#6c8cff', '#34d399', '#f472b6'];
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.beginPath();
+      ctx.arc(CX(p.x), CY(p.y), 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e0e0e8';
+      ctx.fillText(p.label, CX(p.x) + 10, CY(p.y) + 4);
+    }
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(CX(qp.x) + 10, CY(qp.y));
+    ctx.lineTo(CX(qp.x) - 6, CY(qp.y) - 8);
+    ctx.lineTo(CX(qp.x) - 6, CY(qp.y) + 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText('q', CX(qp.x) + 14, CY(qp.y) + 4);
+  }
+
+  drawVecScatter();
+
+  // --- Section 5: draggable cosine demo ---
+  const cosCanvas = document.getElementById('cosCanvas');
+  const cosReadout = document.getElementById('cosReadout');
+
+  if (cosCanvas && cosReadout) {
+    const ctx2 = cosCanvas.getContext('2d');
+    let ax = 180;
+    let ay = 120;
+    let bx = 420;
+    let by = 80;
+    let drag = null;
+
+    function toCanvasCoords(clientX, clientY) {
+      const r = cosCanvas.getBoundingClientRect();
+      const scaleX = cosCanvas.width / r.width;
+      const scaleY = cosCanvas.height / r.height;
+      return {
+        x: (clientX - r.left) * scaleX,
+        y: (clientY - r.top) * scaleY
+      };
+    }
+
+    function drawCos() {
+      const W = cosCanvas.width;
+      const H = cosCanvas.height;
+      ctx2.clearRect(0, 0, W, H);
+      ctx2.fillStyle = '#181825';
+      ctx2.fillRect(0, 0, W, H);
+
+      const ox = W / 2;
+      const oy = H / 2;
+      const scale = 1.2;
+
+      const vx = (ax - ox) * scale;
+      const vy = -(ay - oy) * scale;
+      const wx = (bx - ox) * scale;
+      const wy = -(by - oy) * scale;
+
+      const dotv = vx * wx + vy * wy;
+      const nv = Math.sqrt(vx * vx + vy * vy);
+      const nw = Math.sqrt(wx * wx + wy * wy);
+      const cos = nv && nw ? dotv / (nv * nw) : 0;
+
+      ctx2.strokeStyle = '#2a2a3a';
+      ctx2.lineWidth = 1;
+      ctx2.beginPath();
+      ctx2.moveTo(0, oy); ctx2.lineTo(W, oy);
+      ctx2.moveTo(ox, 0); ctx2.lineTo(ox, H);
+      ctx2.stroke();
+
+      ctx2.strokeStyle = '#6c8cff';
+      ctx2.lineWidth = 3;
+      ctx2.beginPath();
+      ctx2.moveTo(ox, oy);
+      ctx2.lineTo(ax, ay);
+      ctx2.stroke();
+
+      ctx2.strokeStyle = '#34d399';
+      ctx2.lineWidth = 3;
+      ctx2.beginPath();
+      ctx2.moveTo(ox, oy);
+      ctx2.lineTo(bx, by);
+      ctx2.stroke();
+
+      ctx2.fillStyle = '#6c8cff';
+      ctx2.beginPath();
+      ctx2.arc(ax, ay, 10, 0, Math.PI * 2);
+      ctx2.fill();
+
+      ctx2.fillStyle = '#34d399';
+      ctx2.beginPath();
+      ctx2.arc(bx, by, 10, 0, Math.PI * 2);
+      ctx2.fill();
+
+      ctx2.fillStyle = '#e0e0e8';
+      ctx2.font = '13px sans-serif';
+      ctx2.fillText('A', ax + 12, ay);
+      ctx2.fillText('B', bx + 12, by);
+
+      cosReadout.textContent =
+        'cos(θ) = (A·B) / (||A||·||B||) = ' + (Math.round(cos * 10000) / 10000) +
+        '   ·  angle θ ≈ ' + (Math.round((Math.acos(Math.min(1, Math.max(-1, cos))) * 180 / Math.PI) * 10) / 10) + '°';
+    }
+
+    function hit(x, y, px, py) {
+      return Math.hypot(x - px, y - py) <= 14;
+    }
+
+    cosCanvas.addEventListener('pointerdown', function (e) {
+      const p = toCanvasCoords(e.clientX, e.clientY);
+      if (hit(p.x, p.y, ax, ay)) drag = 'a';
+      else if (hit(p.x, p.y, bx, by)) drag = 'b';
+      if (drag) cosCanvas.setPointerCapture(e.pointerId);
+    });
+
+    cosCanvas.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      const p = toCanvasCoords(e.clientX, e.clientY);
+      if (drag === 'a') {
+        ax = p.x;
+        ay = p.y;
+      } else {
+        bx = p.x;
+        by = p.y;
+      }
+      drawCos();
+    });
+
+    cosCanvas.addEventListener('pointerup', function (e) {
+      drag = null;
+      try { cosCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    drawCos();
+  }
+
+  // --- Section 7: playground ---
+  const pgDocs = document.getElementById('pgDocs');
+  const pgQuery = document.getElementById('pgQuery');
+  const pgOut = document.getElementById('pgOut');
+  const pgRun = document.getElementById('pgRun');
+  let pgTfMode = 'raw';
+
+  document.getElementById('pgTfRaw').addEventListener('click', function () {
+    pgTfMode = 'raw';
+    document.getElementById('pgTfRaw').classList.add('active');
+    document.getElementById('pgTfLog').classList.remove('active');
+    runPlayground();
+  });
+  document.getElementById('pgTfLog').addEventListener('click', function () {
+    pgTfMode = 'log';
+    document.getElementById('pgTfLog').classList.add('active');
+    document.getElementById('pgTfRaw').classList.remove('active');
+    runPlayground();
+  });
+
+  function breakdownLine(tokens, vocab, df, N, tfMode) {
+    const tfm = termFreqMap(tokens);
+    let maxTf = 0;
+    for (const t in tfm) if (tfm[t] > maxTf) maxTf = tfm[t];
+    const parts = [];
+    for (let i = 0; i < vocab.length; i++) {
+      const term = vocab[i];
+      const raw = tfm[term] || 0;
+      if (raw === 0) continue;
+      const tw = tfWeight(raw, maxTf, tfMode);
+      const dfc = df[term] || 0;
+      if (dfc <= 0) continue;
+      const idf = idfClassic(N, dfc);
+      parts.push(term + ': TF=' + (Math.round(tw * 1000) / 1000) + ', IDF=' + (Math.round(idf * 1000) / 1000) + ', TF×IDF=' + (Math.round(tw * idf * 1000) / 1000));
+    }
+    return parts.join(' · ');
+  }
+
+  function runPlayground() {
+    if (!pgDocs || !pgQuery || !pgOut) return;
+    const lines = pgDocs.value.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    const docToks = lines.map(tokenize);
+    const qTok = tokenize(pgQuery.value);
+    if (!docToks.length) {
+      pgOut.innerHTML = '<p class="callout">Add at least one document line.</p>';
+      return;
+    }
+    if (!qTok.length) {
+      pgOut.innerHTML = '<p class="callout">Query is empty after tokenization.</p>';
+      return;
+    }
+
+    const allToks = docToks.flat().concat(qTok);
+    const vocab = uniqueSorted(allToks);
+    const N = docToks.length;
+    const df = computeDf(docToks);
+    const qVec = tfidfVector(qTok, vocab, df, N, pgTfMode);
+
+    const scored = docToks.map(function (dt, i) {
+      const dVec = tfidfVector(dt, vocab, df, N, pgTfMode);
+      return {
+        i: i,
+        line: lines[i],
+        sim: cosineSim(qVec, dVec),
+        dVec: dVec,
+        br: breakdownLine(dt, vocab, df, N, pgTfMode)
+      };
+    });
+    scored.sort(function (a, b) { return b.sim - a.sim; });
+
+    let html = '';
+    for (let r = 0; r < scored.length; r++) {
+      const s = scored[r];
+      html +=
+        '<div class="doc-card">' +
+          '<div class="rank">#' + (r + 1) + ' · cosine(q, d) = ' + (Math.round(s.sim * 10000) / 10000) + '</div>' +
+          '<div>' + s.line.replace(/</g, '&lt;') + '</div>' +
+          '<div class="term-breakdown">' + (s.br || '(no overlapping weighted terms)') + '</div>' +
+        '</div>';
+    }
+    html += '<p style="color:var(--text-dim);font-size:0.85rem;margin-top:14px;">Query terms breakdown: ' + breakdownLine(qTok, vocab, df, N, pgTfMode) + '</p>';
+    pgOut.innerHTML = html;
+  }
+
+  if (pgRun) {
+    pgRun.addEventListener('click', runPlayground);
+    // Re-rank as the user types so the panel stays in sync with the calculator-style demos above.
+    pgDocs.addEventListener('input', runPlayground);
+    pgQuery.addEventListener('input', runPlayground);
+  }
+  runPlayground();
+
+  // --- Scroll: show main nav, fade-in sections ---
+  const mainNav = document.getElementById('mainNav');
+  window.addEventListener('scroll', function () {
+    if (!mainNav) return;
+    if (window.scrollY > 120) mainNav.classList.add('visible');
+    else mainNav.classList.remove('visible');
+  });
+
+  const io = new IntersectionObserver(
+    function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) en.target.classList.add('visible');
+      });
+    },
+    { threshold: 0.08, rootMargin: '0px 0px -8% 0px' }
+  );
+  document.querySelectorAll('.section.fade-in').forEach(function (sec) {
+    io.observe(sec);
+  });
+})();
+  </script>
+</body>
+</html>

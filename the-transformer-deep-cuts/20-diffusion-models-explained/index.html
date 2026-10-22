@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diffusion Models: How DDPM Works — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #5eead4;
+  --accent2: #818cf8;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); margin-bottom: 20px; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+.nav-wrap {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav-wrap.visible { transform: translateY(0); }
+.nav-inner {
+  max-width: 920px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.nav-back { font-weight: 700; color: var(--accent2); white-space: nowrap; font-size: 0.85rem; }
+.nav-toggle {
+  margin-left: auto; display: none;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.75rem; cursor: pointer; font-family: inherit;
+}
+.nav-toggle:hover { border-color: var(--accent); }
+.nav-links {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  font-size: 0.78rem;
+}
+.nav-links a { color: var(--text-dim); }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: block; }
+  .nav-links {
+    display: none; width: 100%; flex-direction: column; align-items: flex-start;
+    padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px;
+  }
+  .nav-wrap.open .nav-links { display: flex; }
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 88px 24px 64px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+  width: 620px; height: 620px;
+  background: radial-gradient(circle, rgba(129,140,248,0.14) 0%, transparent 68%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 14px; position: relative; z-index: 1; }
+.subtitle {
+  font-size: 1.12rem; color: var(--text-dim);
+  max-width: 700px; margin: 0 auto 28px; position: relative; z-index: 1;
+}
+.stats {
+  display: flex; gap: 28px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 28px; position: relative; z-index: 1;
+}
+.stat { text-align: center; }
+.stat-val {
+  display: block; font-size: 1.85rem; font-weight: 700;
+  color: var(--accent); font-family: var(--mono);
+}
+.stat-label {
+  font-size: 0.72rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 18px 0;
+}
+.grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;
+}
+@media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; margin: 18px 0;
+  font-family: var(--mono); font-size: 0.88rem; color: var(--accent3);
+  text-align: center; overflow-x: auto;
+  line-height: 1.5;
+}
+
+.callout {
+  background: rgba(94,234,212,0.06); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 20px; margin: 20px 0;
+}
+.callout p:last-child { margin-bottom: 0; }
+.callout.warn {
+  background: rgba(251,191,36,0.08);
+  border-left-color: var(--accent5);
+}
+.callout.ok {
+  background: rgba(52,211,153,0.08);
+  border-left-color: var(--accent3);
+}
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin: 22px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+.qa-box p:last-child { margin-bottom: 0; }
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 22px 0;
+}
+.comparison .card { margin: 0; }
+.comparison .card h3 { margin-top: 0; color: var(--accent2); font-size: 1.05rem; }
+@media (max-width: 720px) {
+  .comparison { grid-template-columns: 1fr; }
+}
+
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 22px 0;
+}
+.interactive-panel h4 {
+  font-size: 0.95rem; color: var(--text); margin-bottom: 14px; font-weight: 600;
+}
+
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.88rem; cursor: pointer; margin: 4px 6px 4px 0;
+  font-family: inherit;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: rgba(94,234,212,0.15); border-color: var(--accent); color: var(--accent); }
+
+input[type="range"] { width: 100%; max-width: 360px; }
+label.lbl { font-size: 0.8rem; color: var(--text-dim); display: block; margin-top: 8px; }
+
+ul.clean { margin: 12px 0 12px 1.2em; color: var(--text-dim); }
+ul.clean li { margin-bottom: 0.5em; }
+
+.fade-in { opacity: 0; transform: translateY(28px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent4); }
+
+.dem-canvas-wrap {
+  position: relative; width: 100%; max-width: 420px; margin: 16px auto;
+  aspect-ratio: 1; background: var(--bg-card-alt);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.dem-canvas-wrap canvas { display: block; width: 100%; height: 100%; border-radius: var(--radius); }
+
+.chart-wrap {
+  width: 100%; max-width: 520px; margin: 16px auto;
+  height: 220px; background: var(--bg-card-alt);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  position: relative;
+}
+.chart-wrap canvas { display: block; width: 100%; height: 100%; border-radius: var(--radius); }
+
+.unet-svg { width: 100%; max-width: 640px; margin: 16px auto; display: block; }
+.unet-svg .blk { fill: var(--bg-card-alt); stroke: var(--border); stroke-width: 2; cursor: pointer; transition: stroke 0.2s, fill 0.2s; }
+.unet-svg .blk:hover, .unet-svg .blk.on { stroke: var(--accent); fill: rgba(94,234,212,0.12); }
+.unet-svg text { fill: var(--text-dim); font-family: var(--mono); font-size: 11px; }
+.unet-svg .lbl { fill: var(--text); font-size: 12px; font-weight: 600; }
+.unet-legend { font-size: 0.82rem; color: var(--text-dim); margin-top: 12px; min-height: 3em; }
+
+.landscape-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px; margin: 18px 0;
+}
+.land-tile {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; background: var(--bg-card-alt);
+}
+.land-tile h4 { color: var(--accent2); font-size: 0.9rem; margin-bottom: 8px; }
+
+.play-readout {
+  font-family: var(--mono); font-size: 0.85rem; color: var(--accent3);
+  margin-top: 12px; padding: 12px; background: var(--bg-card-alt);
+  border-radius: 8px; border: 1px solid var(--border);
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Diffusion Models: DDPM</span></nav>
+
+
+<nav class="nav-wrap" id="navWrap" aria-label="Chapter navigation">
+  <div class="nav-inner">
+    <a class="nav-back" href="../">← Advanced NLP V2</a>
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#s00">00</a>
+      <a href="#s01">01</a>
+      <a href="#s02">02</a>
+      <a href="#s03">03</a>
+      <a href="#s04">04</a>
+      <a href="#s05">05</a>
+      <a href="#s06">06</a>
+      <a href="#s07">Playground</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>Diffusion Models: How DDPM Works</h1>
+    <p class="subtitle">
+      Denoising diffusion probabilistic models (DDPM) learn a reverse process that turns pure noise into structured data.
+      The forward path is a fixed Markov chain that adds Gaussian noise; training teaches a network to predict that noise.
+    </p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">q</span><span class="stat-label">Forward (fixed)</span></div>
+      <div class="stat"><span class="stat-val">p<sub>θ</sub></span><span class="stat-label">Reverse (learned)</span></div>
+      <div class="stat"><span class="stat-val">ε<sub>θ</sub></span><span class="stat-label">Noise predictor</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00 — Generative landscape</span>
+  <h2>Where diffusion sits</h2>
+  <p>Generative modeling aims to learn a distribution over high-dimensional data—images, audio, text latents—so new samples can be drawn. Several families have been explored; each makes different trade-offs between sample quality, mode coverage, and training stability.</p>
+  <div class="landscape-row">
+    <div class="land-tile">
+      <h4>GANs</h4>
+      <p style="margin:0;font-size:0.92rem">Adversarial training: a generator faces a discriminator. Sharp samples, but optimization can be brittle and mode dropping is a known issue.</p>
+    </div>
+    <div class="land-tile">
+      <h4>VAEs</h4>
+      <p style="margin:0;font-size:0.92rem">Encoder–decoder with a latent prior (often Gaussian). Stable likelihood-based training; samples can be blurrier than GANs.</p>
+    </div>
+    <div class="land-tile">
+      <h4>Normalizing flows</h4>
+      <p style="margin:0;font-size:0.92rem">Invertible transforms with tractable Jacobian determinants give exact likelihoods. Expressive but architecture constraints apply.</p>
+    </div>
+    <div class="land-tile">
+      <h4>Diffusion</h4>
+      <p style="margin:0;font-size:0.92rem">Gradually destroy structure with noise, then learn to undo it. Strong empirical results; training reduces to regressing noise under Gaussian assumptions.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <p style="margin:0;color:var(--text-dim)"><strong style="color:var(--text)">DDPM</strong> (2020) popularized the discrete-time Gaussian diffusion formulation used throughout this chapter: a fixed forward noising process and a learned reverse denoising process. Earlier work by <strong>Sohl-Dickstein et al.</strong> framed learning as reversing a gradual noising process using nonequilibrium statistical mechanics; <strong>Ho et al.</strong> gave the practical discrete Gaussian recipe—clear notation, stable training objective, and strong image samples—that most codebases follow today.</p>
+  </div>
+  <p>Diffusion extends the generative goal from variational autoencoders (<a href="../19-variational-autoencoders/">Chapter 19</a>): instead of one latent vector, it uses a <strong>Markov chain</strong> of noisy states. This chapter covers the DDPM forward schedule, noise-prediction objective, and sampling loop.</p>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01 — From latents to a noise trajectory</span>
+  <h2>Beyond a single latent vector</h2>
+  <p>The latent-variable intuition from <a href="../19-variational-autoencoders/">Chapter 19</a> applies here: we posit hidden structure behind observed data <code class="inline">x₀</code>. Diffusion replaces one draw <code class="inline">z</code> with a <strong>Markov chain</strong> of increasingly noisy states <code class="inline">x₁, …, x_T</code>, ending near isotropic Gaussian noise. Clean data is <code class="inline">t = 0</code>; the terminal state at <code class="inline">T</code> (often ~1000 steps) is pure noise—that sequence is the <strong>forward process</strong>.</p>
+  <p>The <strong>reverse process</strong> walks backward one step at a time: from <code class="inline">x_T</code>, infer something useful about <code class="inline">x_{T−1}</code>, and repeat. Each transition depends only on its neighbor. Learning fills in the reverse kernels <code class="inline">p<sub>θ</sub></code>; the fixed corruption schedule is <code class="inline">q</code>.</p>
+  <div class="interactive-panel">
+    <h4>Demo: latent sampling vs diffusion trajectory</h4>
+    <p style="font-size:0.9rem;margin-bottom:12px">VAE: one draw from a low-dimensional Gaussian. Diffusion: <code class="inline">T</code> stochastic transitions from noise back to data.</p>
+    <canvas id="demoLatentCanvas" width="520" height="120" style="width:100%;max-width:520px;height:auto;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-card-alt);display:block;margin:0 auto;"></canvas>
+    <div style="text-align:center;margin-top:12px;">
+      <button type="button" class="btn primary" id="latentReplay">Replay animation</button>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02 — Forward and reverse intuition</span>
+  <h2>Forward and reverse intuition</h2>
+  <p>Each forward step adds a small Gaussian perturbation. After many steps—often on the order of <strong>a thousand</strong> in the classic DDPM setup—the signal resembles isotropic Gaussian noise. That iterative corruption is the <strong>forward process</strong>.</p>
+  <p>The <strong>reverse process</strong> asks the harder question: given noise at timestep <code class="inline">T</code>, can you infer the state at <code class="inline">T − 1</code>? Each step only talks to its neighbor—no skipping—so the chain is Markov.</p>
+  <div class="comparison">
+    <div class="card">
+      <h3>Forward (easy)</h3>
+      <p style="margin:0">Adding noise is something you can always do. Hand the <strong>Mona Lisa</strong> to a three-year-old with crayons and you will get all the corruption you could want. The forward kernel is <strong>chosen</strong> by us; it involves no learnable weights.</p>
+    </div>
+    <div class="card">
+      <h3>Reverse (hard)</h3>
+      <p style="margin:0">Removing noise to recover a coherent real-world object—without ever having seen that exact trajectory—is the hard direction. Because it is hard, we <strong>train a neural network</strong> to approximate the reverse transitions.</p>
+    </div>
+  </div>
+  <p>Mathematically, write the clean datum as <code class="inline">x₀</code>. Imagine a chain of latent-style variables: <code class="inline">x₀</code> depends on <code class="inline">z₁</code>, which depends on <code class="inline">z₂</code>, which depends on <code class="inline">z₃</code>, and so on until the terminal variable is <strong>pure noise</strong>. The forward direction is <strong>noiseification</strong>; the reverse direction is <strong>denoising</strong> (recovering structure from chaos).</p>
+  <p>Notation: <code class="inline">t = 0</code> is the clean data <code class="inline">x₀</code>; larger <code class="inline">t</code> means more noise, and <code class="inline">T</code> denotes the noisiest state (≈ pure noise). The forward chain is <strong>fixed</strong>—we know how to move from less noise to more—whereas we <strong>do not</strong> initially know how to move from more noise to less. That missing knowledge is exactly what <code class="inline">θ</code> must supply.</p>
+  <div class="interactive-panel">
+    <h4>Demo: forward noise animation</h4>
+    <p style="font-size:0.9rem;margin-bottom:10px">A synthetic “image” (smooth pattern) corrupted toward Gaussian noise as time increases.</p>
+    <div class="dem-canvas-wrap"><canvas id="forwardCanvas" width="400" height="400"></canvas></div>
+    <label class="lbl">Time step t: <span id="forwardTVal">0</span> / <span id="forwardTMax">100</span></label>
+    <input type="range" id="forwardSlider" min="0" max="100" value="0" aria-label="Forward diffusion time">
+    <div style="margin-top:10px;">
+      <button type="button" class="btn" id="forwardAnim">Animate forward</button>
+      <button type="button" class="btn" id="forwardReset">Reset</button>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03 — Gaussian forward process and schedules</span>
+  <h2>Markov chain, β<sub>t</sub>, and one-step jumps</h2>
+  <p>The discrete-time Gaussian formulation used throughout this chapter is the one introduced in the DDPM paper by <strong>Ho et al.</strong> (2020). There the forward distribution is written <code class="inline">q</code>. Crucially, it is <strong>not</strong> <code class="inline">q<sub>θ</sub></code>: forward transition rules carry <strong>no learned parameters</strong>. The reverse distribution is written <code class="inline">p<sub>θ</sub></code>; the subscript reminds you that a network must learn how to step from noisy to cleaner states.</p>
+  <div class="comparison">
+    <div class="card">
+      <h3>q — forward</h3>
+      <p style="margin:0">Fixed Markov transitions from a <strong>less noisy</strong> state (smaller <code class="inline">t</code>) to a <strong>more noisy</strong> state (larger <code class="inline">t</code>). Means and variances are dictated by a predetermined schedule, not by gradient descent.</p>
+    </div>
+    <div class="card">
+      <h3>p<sub>θ</sub> — reverse</h3>
+      <p style="margin:0">Learned Gaussian transitions from <strong>more noise</strong> toward <strong>less noise</strong>. Training discovers the means and covariances (or equivalent parameterizations) that best invert the corruption.</p>
+    </div>
+  </div>
+  <p>Each step applies a Gaussian perturbation; the whole forward process is a <strong>Markov chain of Gaussian variables</strong> whose moments you can write down. One-step notation matches the paper: conditioning on the immediately previous state, the mean shrinks the signal and adds fresh noise according to a variance hyperparameter <code class="inline">β<sub>t</sub></code> fixed for that step.</p>
+  <div class="formula">
+    q(x<sub>t</sub> | x<sub>t−1</sub>) = 𝒩( √(1 − β<sub>t</sub>) · x<sub>t−1</sub> ,&nbsp; β<sub>t</sub> · I )
+  </div>
+  <p>In sampling form, that is <code class="inline">x<sub>t</sub> = √(1 − β<sub>t</sub>) · x<sub>t−1</sub> + √β<sub>t</sub> · ε</code> with <code class="inline">ε ~ 𝒩(0, I)</code>. The sequence <code class="inline">β₁, …, β<sub>T</sub></code> is the <strong>noise schedule</strong>: you decide it before training. Each <code class="inline">β<sub>t</sub></code> is small enough that the chain is gradual, but their cumulative effect drives the final state toward standard Gaussian noise.</p>
+  <h3>Step-by-step: one forward transition with explicit numbers</h3>
+  <p>Take a toy <strong>scalar</strong> image pixel <code class="inline">x<sub>t−1</sub> = 1.00</code> and a schedule choice <code class="inline">β<sub>t</sub> = 0.02</code> for this step. Then <code class="inline">α<sub>t</sub> = 1 − β<sub>t</sub> = 0.98</code>, and <code class="inline">√(1 − β<sub>t</sub>) = √0.98 ≈ 0.9899</code>, while <code class="inline">√β<sub>t</sub> = √0.02 ≈ 0.1414</code>. Draw a concrete noise sample <code class="inline">ε = 0.50</code> (in practice it is random; we fix it here to show the arithmetic).</p>
+  <div class="formula">
+    x<sub>t</sub> = √(1 − β<sub>t</sub>) · x<sub>t−1</sub> + √β<sub>t</sub> · ε<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;≈ 0.9899 · (1.00) + 0.1414 · (0.50)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;≈ 0.9899 + 0.0707 = 1.0606
+  </div>
+  <p>So a single forward step nudges the value and injects stochasticity. Repeating this for hundreds or thousands of indices with different <code class="inline">β<sub>t</sub></code> values is what erases semantic content.</p>
+  <h3>Skipping intermediate steps: α, ᾱ, and closed-form noise</h3>
+  <p>Because the forward kernel is linear-Gaussian, you never need to materialize every link in the chain during training. Define <code class="inline">α<sub>t</sub> = 1 − β<sub>t</sub></code> and the cumulative product <code class="inline">ᾱ<sub>t</sub> = ∏<sub>s=1</sub><sup>t</sup> α<sub>s</sub></code>. Then the marginal at time <code class="inline">t</code> given clean <code class="inline">x₀</code> is</p>
+  <div class="formula">
+    q(x<sub>t</sub> | x₀) = 𝒩( √ᾱ<sub>t</sub> · x₀ ,&nbsp; (1 − ᾱ<sub>t</sub>) · I )
+  </div>
+  <p>Equivalently, <code class="inline">x<sub>t</sub> = √ᾱ<sub>t</sub> · x₀ + √(1 − ᾱ<sub>t</sub>) · ε</code> with <code class="inline">ε ~ 𝒩(0, I)</code>. Here is a second micro-walkthrough with numbers. Suppose after accumulating several betas you have <code class="inline">ᾱ<sub>t</sub> = 0.25</code>. Then <code class="inline">√ᾱ<sub>t</sub> = 0.5</code> and <code class="inline">√(1 − ᾱ<sub>t</sub>) = √0.75 ≈ 0.8660</code>. If <code class="inline">x₀ = 1.00</code> and again <code class="inline">ε = 0.50</code>,</p>
+  <div class="formula">
+    x<sub>t</sub> = 0.5 · (1.00) + 0.8660 · (0.50) ≈ 0.5000 + 0.4330 = 0.9330
+  </div>
+  <p>The <strong>signal weight</strong> <code class="inline">√ᾱ<sub>t</sub></code> shrinks toward zero as <code class="inline">t</code> grows; the <strong>noise weight</strong> <code class="inline">√(1 − ᾱ<sub>t</sub>)</code> approaches one. At the terminal <code class="inline">T</code>, the clean component has effectively vanished—consistent with “pure noise” at the end of the forward chain.</p>
+  <div class="callout ok">
+    <p style="margin:0;color:var(--text-dim)">Training exploits this closure property: pick a random <code class="inline">t</code>, draw fresh <code class="inline">ε</code>, build <code class="inline">x<sub>t</sub></code> in <strong>one shot</strong> from <code class="inline">x₀</code>, and supervise a network to predict the same <code class="inline">ε</code>. No loop over all intermediate states is required in the innermost loss.</p>
+  </div>
+  <p>This reparameterization is what makes training efficient: sample <code class="inline">t</code>, sample <code class="inline">ε</code>, build <code class="inline">x<sub>t</sub></code>, and supervise the network to predict <code class="inline">ε</code>.</p>
+  <div class="interactive-panel">
+    <h4>Demo: noise schedule visualization</h4>
+    <p style="font-size:0.9rem;margin-bottom:10px">Compare linear β schedule vs a cosine-style schedule (common in improved samplers). Curves show β<sub>t</sub> (normalized) over timestep.</p>
+    <div class="chart-wrap"><canvas id="scheduleCanvas" width="520" height="220"></canvas></div>
+    <div style="margin-top:10px;">
+      <button type="button" class="btn primary" id="schedLinear">Linear β</button>
+      <button type="button" class="btn" id="schedCosine">Cosine ᾱ</button>
+    </div>
+  </div>
+  <div class="interactive-panel">
+    <h4>Demo: closed-form noise level (ᾱ<sub>t</sub>)</h4>
+    <p style="font-size:0.9rem;margin-bottom:10px">Signal-to-noise ratio shrinks as ᾱ<sub>t</sub> decays. Drag the slider to see effective scaling of the clean component vs noise.</p>
+    <label class="lbl">t / T: <span id="alphaBarVal">0.00</span></label>
+    <input type="range" id="alphaBarSlider" min="0" max="1000" value="0" aria-label="Timestep for alpha bar">
+    <div class="formula" id="alphaBarReadout" style="margin-top:14px;font-size:0.82rem;">ᾱ<sub>t</sub> = 1.000 &nbsp;|&nbsp; √(ᾱ<sub>t</sub>) x₀ weight &nbsp;|&nbsp; √(1-ᾱ<sub>t</sub>) noise weight</div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04 — Training objective</span>
+  <h2>ELBO and noise prediction</h2>
+  <p>As in VAE training (<a href="../19-variational-autoencoders/">Chapter 19</a>), direct maximization of <code class="inline">log p<sub>θ</sub>(x₀)</code> is intractable for rich neural <code class="inline">p<sub>θ</sub></code>. The latent chain <code class="inline">x₁, …, x<sub>T</sub></code> plays the role of VAE latents <code class="inline">z</code>, but with Gaussian Markov dynamics. Training maximizes a variational lower bound (ELBO); DDPM reduces the practical objective to noise prediction.</p>
+  <div class="callout warn">
+    <p style="margin:0;color:var(--text-dim)">The full algebraic path from the ELBO to the simplified <strong>noise-prediction</strong> loss is in the DDPM paper. Gaussian identities let you re-express reverse means in terms of <code class="inline">ε</code>; optimizing that surrogate is stable in practice.</p>
+  </div>
+  <p>A key simplification in DDPM is that the learned reverse mean can be rewritten in terms of predicting the noise <code class="inline">ε</code> that was used to construct <code class="inline">x<sub>t</sub></code> from <code class="inline">x₀</code>. Because the forward map <code class="inline">x₀ ↦ x<sub>t</sub></code> is closed form, you always know which Gaussian draw <code class="inline">ε</code> you injected at the sampled time index. The network <code class="inline">ε<sub>θ</sub></code> sees the corrupted image <strong>and</strong> the index <code class="inline">t</code> (or an embedding of it) so it knows the noise level; its target is the exact same noise tensor you added.</p>
+  <p>The training loop, aligned with the paper’s description, is:</p>
+  <ul class="clean">
+    <li><strong>Step 1:</strong> Draw a minibatch of real images <code class="inline">x₀</code> from the training distribution.</li>
+    <li><strong>Step 2:</strong> For <em>each</em> image independently, sample a corruption index <code class="inline">t</code> uniformly from <code class="inline">{1, …, T}</code> (the discrete noise levels).</li>
+    <li><strong>Step 3:</strong> Sample Gaussian noise <code class="inline">ε ~ 𝒩(0, I)</code> and construct <code class="inline">x<sub>t</sub> = √ᾱ<sub>t</sub> x₀ + √(1 − ᾱ<sub>t</sub>) ε</code> using the precomputed schedule.</li>
+    <li><strong>Step 4:</strong> Forward through the U-Net (or any architecture) to obtain <code class="inline">ε<sub>θ</sub>(x<sub>t</sub>, t)</code>.</li>
+    <li><strong>Step 5:</strong> Compute mean squared error between the predicted noise <code class="inline">ε<sub>θ</sub></code> and the ground-truth <code class="inline">ε</code> you used to build <code class="inline">x<sub>t</sub></code>. Backpropagate.</li>
+  </ul>
+  <div class="formula">
+    ℒ<sub>simple</sub> = 𝔼<sub>t,x₀,ε</sub> [ ‖ ε - ε<sub>θ</sub>(x<sub>t</sub>, t) ‖² ]
+  </div>
+  <p>Gaussian conditioning identities let you translate between predicting noise, predicting the reverse mean, and predicting the clean signal—they are reparameterizations under fixed forward schedules. The ε-parameterization matches the closed-form corruption <code class="inline">x<sub>t</sub></code>, which is why implementations emphasize it.</p>
+  <p>The network’s job is not to reconstruct <code class="inline">x₀</code> in one shot but to estimate the noise component at the chosen noise level—across all <code class="inline">t</code>—which indirectly shapes the reverse transitions and thereby the generative distribution <code class="inline">p<sub>θ</sub>(x₀)</code>.</p>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05 — Sampling (generation)</span>
+  <h2>Start from noise, walk backward</h2>
+  <p><strong>Sampling</strong>—in the generative sense—means drawing a fresh example from the learned model, not retrieving a database row. Initialize <code class="inline">x<sub>T</sub> ~ 𝒩(0, I)</code>, then iteratively apply the learned reverse transition for timesteps <code class="inline">T, T−1, …, 1</code> until you reach <code class="inline">t = 0</code>. Each update asks the network how to shave off a thin slice of noise consistent with the schedule. After the full trajectory, the tensor you hold is an <code class="inline">x₀</code> the model synthesizes on the fly.</p>
+  <p>That output generally does <strong>not</strong> coincide with any single training image: you are decoding a particular random noise draw through the same computational pathway a VAE decodes a latent vector—except the “latent” here is the entire stack of noisy states traversed backward. The latent space is doing double duty: it must remain easy to sample from (start anywhere in broad Gaussian noise) and it must encode enough structure that the denoising trajectory lands on plausible data. The resulting <code class="inline">x₀</code> is a <strong>new</strong> draw—not a memorized training point.</p>
+  <h3>Reverse process, step by step</h3>
+  <p>The sampling routine in the DDPM paper is the mirror image of training: instead of jumping from <code class="inline">x₀</code> to <code class="inline">x<sub>t</sub></code> with a known <code class="inline">ε</code>, you begin where the forward chain ends and peel noise away one layer at a time.</p>
+  <ul class="clean">
+    <li><strong>Step 1:</strong> Sample the initial state <code class="inline">x<sub>T</sub> ~ 𝒩(0, I)</code>—pure isotropic noise matching the forward limit.</li>
+    <li><strong>Step 2 (inner loop):</strong> For <code class="inline">t = T, T−1, …, 1</code>, evaluate <code class="inline">ε<sub>θ</sub>(x<sub>t</sub>, t)</code>. Combine that prediction with the fixed schedule constants <code class="inline">α<sub>t</sub></code>, <code class="inline">β<sub>t</sub></code>, and <code class="inline">ᾱ<sub>t</sub></code> to form the Gaussian mean of the reverse kernel, add the prescribed variance (optionally scaled stochasticity at small <code class="inline">t</code>), and draw <code class="inline">x<sub>t−1</sub></code>. This is the denoising move the network was trained to support.</li>
+    <li><strong>Step 3:</strong> After the final update, read off <code class="inline">x₀</code> as the generated sample.</li>
+  </ul>
+  <p>One convenient ancestral-sampling parameterization (matching the usual DDPM code) expresses the mean of <code class="inline">p<sub>θ</sub>(x<sub>t−1</sub> | x<sub>t</sub>)</code> directly in terms of the predicted noise. Let <code class="inline">z ~ 𝒩(0, I)</code> for stochastic sampling (or set <code class="inline">z = 0</code> for a deterministic denoising trajectory). With schedule terms <code class="inline">α<sub>t</sub> = 1 − β<sub>t</sub></code> and cumulative <code class="inline">ᾱ<sub>t</sub></code>, a standard update is:</p>
+  <div class="formula">
+    x<sub>t−1</sub> = <span style="font-size:1.05em">1</span>⁄<span style="font-size:1.05em">√α<sub>t</sub></span> ( x<sub>t</sub> − <span style="font-size:1.05em">β<sub>t</sub></span>⁄<span style="font-size:1.05em">√(1 − ᾱ<sub>t</sub>)</span> · ε<sub>θ</sub>(x<sub>t</sub>, t) ) + σ<sub>t</sub> · z
+  </div>
+  <p>Here <code class="inline">σ<sub>t</sub></code> is fixed by the forward variance schedule (the paper discusses tying it to <code class="inline">β<sub>t</sub></code> or learning it). <strong>Numeric check of the algebraic skeleton:</strong> suppose (only for order-of-magnitude intuition) <code class="inline">α<sub>t</sub> = 0.98</code>, so <code class="inline">1/√α<sub>t</sub> ≈ 1.010</code>; <code class="inline">β<sub>t</sub> = 0.02</code>; and at some late time <code class="inline">ᾱ<sub>t</sub> = 0.09</code>, so <code class="inline">√(1 − ᾱ<sub>t</sub>) = √0.91 ≈ 0.954</code> and <code class="inline">β<sub>t</sub>/√(1 − ᾱ<sub>t</sub>) ≈ 0.0210</code>. If the network predicts <code class="inline">ε<sub>θ</sub> = 0.4</code> and the current state is <code class="inline">x<sub>t</sub> = 0.3</code>, the bracketed correction is <code class="inline">0.3 − 0.0210 × 0.4 ≈ 0.2916</code>, and scaling by <code class="inline">1/√α<sub>t</sub></code> yields roughly <code class="inline">0.2945</code> before adding the <code class="inline">σ<sub>t</sub> z</code> term. The exact posterior mean uses the full DDPM coefficients; the point is to see how <strong>ε<sub>θ</sub></strong> enters linearly and how <strong>schedule constants</strong> set the step size.</p>
+  <p>You do not need to memorize every coefficient to read code: repositories implement the paper’s sampling algorithm verbatim—often an <strong>outer</strong> setup (draw <code class="inline">x<sub>T</sub></code>) and an <strong>inner</strong> <code class="inline">for</code>-loop over timesteps whose body matches the equation block in Ho et al. Variable names frequently mirror the symbols so you can move between PDF and source without a glossary.</p>
+  <div class="interactive-panel">
+    <h4>Demo: denoising step-by-step (schematic)</h4>
+    <p style="font-size:0.9rem;margin-bottom:10px">Illustrative animation: pure noise gradually structured into the same synthetic pattern used in the forward demo (not a trained model).</p>
+    <div class="dem-canvas-wrap"><canvas id="reverseCanvas" width="400" height="400"></canvas></div>
+    <div style="text-align:center;margin-top:12px;">
+      <button type="button" class="btn primary" id="reversePlay">Play reverse</button>
+      <button type="button" class="btn" id="reverseStep">Single step</button>
+      <button type="button" class="btn" id="reverseRewind">Back to noise</button>
+    </div>
+    <p class="lbl" style="text-align:center;margin-top:8px;">Step: <span id="reverseStepVal">100</span> (high = noisy)</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06 — U-Net backbone and score matching</span>
+  <h2>Architecture and a continuous-time link</h2>
+  <p>The DDPM paper adopts a <strong>U-Net</strong> because that architecture already had a track record on dense prediction tasks. Originally introduced around <strong>2015</strong> for <strong>biomedical image segmentation</strong>, the classic U-Net compresses an input through an encoder tower until a tight bottleneck, then expands back to full resolution with skip connections that preserve fine spatial detail. Visually and functionally it resembles an autoencoder with wired shortcuts—exactly the inductive bias you want when predicting a field (here, a noise residual) aligned pixel-for-pixel with the corrupted input.</p>
+  <p>Two modifications matter relative to an off-the-shelf segmentation U-Net:</p>
+  <ul class="clean">
+    <li><strong>Timestep conditioning:</strong> the denoiser must know <em>how noisy</em> its input is. Following the Transformer literature, sinusoidal <strong>positional encodings</strong> (or closely related Fourier features) represent the integer timestep <code class="inline">t</code>. Those vectors are <strong>concatenated</strong> (or added after projection) at <strong>each</strong> downsampling and upsampling stage so <code class="inline">ε<sub>θ</sub></code> truly acts as a function of both <code class="inline">x<sub>t</sub></code> and <code class="inline">t</code>, not of pixels alone.</li>
+    <li><strong>Self-attention:</strong> at lower spatial resolutions—where memory is affordable—<strong>self-attention</strong> layers mix information across distant image regions. That helps capture global layout while convolutions handle local texture.</li>
+  </ul>
+  <div class="callout warn">
+    <p style="margin:0;color:var(--text-dim)">Educational repositories sometimes strip attention blocks, channel widths, or residual depth to keep files short. That is excellent for reading the training loop, but the resulting U-Net may no longer match the capacity profile used in the benchmark DDPM experiments. Treat minimalist code as <strong>pedagogical scaffolding</strong>, not as the final word on architecture fidelity.</p>
+  </div>
+  <p>Nothing in the diffusion <em>math</em> mandates a U-Net. Ho et al. chose it because it <strong>works well</strong> for predicting spatially aligned noise fields. Any model class that accepts <code class="inline">x<sub>t</sub></code> and <code class="inline">t</code> and emits a tensor the same shape as <code class="inline">ε</code> is fair game—from tiny convnets for toy data to heavier backbones for high-resolution media. What matters is the conditional mapping <code class="inline">(x<sub>t</sub>, t) ↦ ε</code>, not a trademarked skip-network diagram.</p>
+  <div class="interactive-panel">
+    <h4>Demo: U-Net schematic (hover blocks)</h4>
+    <svg class="unet-svg" id="unetSvg" viewBox="0 0 640 280" aria-label="U-Net diagram">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="var(--text-dim)"/>
+        </marker>
+      </defs>
+      <rect class="blk" data-desc="Input: noisy x_t at resolution H×W. Concatenate timestep embedding after convolution." x="20" y="110" width="70" height="60" rx="6"/>
+      <text class="lbl" x="55" y="125" text-anchor="middle">in</text>
+      <text x="55" y="158" text-anchor="middle">x_t</text>
+
+      <rect class="blk" data-desc="Down path: Residual blocks + downsampling. Spatial size shrinks; channels grow." x="120" y="90" width="70" height="100" rx="6"/>
+      <text class="lbl" x="155" y="115" text-anchor="middle">down</text>
+      <text x="155" y="168" text-anchor="middle">↓ res</text>
+
+      <rect class="blk" data-desc="Bottleneck: smallest spatial grid; may include attention for global context." x="220" y="115" width="80" height="50" rx="6"/>
+      <text class="lbl" x="260" y="135" text-anchor="middle">bottleneck</text>
+      <text x="260" y="158" text-anchor="middle">+ attn</text>
+
+      <rect class="blk" data-desc="Up path: upsample and concatenate skip features from encoder (gray skip lines)." x="330" y="90" width="70" height="100" rx="6"/>
+      <text class="lbl" x="365" y="115" text-anchor="middle">up</text>
+      <text x="365" y="168" text-anchor="middle">skip</text>
+
+      <rect class="blk" data-desc="Output head: 1×1 or final conv producing noise prediction ε_θ same shape as x_t." x="430" y="110" width="90" height="60" rx="6"/>
+      <text class="lbl" x="475" y="132" text-anchor="middle">out</text>
+      <text x="475" y="158" text-anchor="middle">ε_θ</text>
+
+      <line x1="90" y1="140" x2="118" y2="140" stroke="var(--text-dim)" marker-end="url(#arr)"/>
+      <line x1="190" y1="140" x2="218" y2="140" stroke="var(--text-dim)" marker-end="url(#arr)"/>
+      <line x1="300" y1="140" x2="328" y2="140" stroke="var(--text-dim)" marker-end="url(#arr)"/>
+      <line x1="400" y1="140" x2="428" y2="140" stroke="var(--text-dim)" marker-end="url(#arr)"/>
+
+      <path d="M155,90 L365,90" stroke="rgba(129,140,248,0.5)" stroke-dasharray="6 4" fill="none"/>
+      <path d="M155,190 L365,190" stroke="rgba(129,140,248,0.5)" stroke-dasharray="6 4" fill="none"/>
+      <text x="250" y="82" text-anchor="middle" fill="var(--accent2)" font-family="var(--mono)" font-size="10px">skip connections</text>
+    </svg>
+    <p class="unet-legend" id="unetLegend">Hover a block for a short description.</p>
+  </div>
+  <div class="card">
+    <h3>Connection to score matching</h3>
+    <p style="margin-bottom:0.6em">For a Gaussian perturbation kernel, the score <code class="inline">∇<sub>x</sub> log p<sub>t</sub>(x)</code> of the noisy density is proportional to the noise used to create <code class="inline">x<sub>t</sub></code> from <code class="inline">x₀</code>. Predicting <code class="inline">ε</code> is therefore related to <strong>score matching</strong> and Langevin-like updates: the network learns vector fields that point toward higher-density regions at each noise level. Diffusion sampling can be read as discretely integrating these score estimates from pure noise down to the data manifold.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07 — Playground</span>
+  <h2>Tick through the DDPM training mental model</h2>
+  <p>Align the pieces: schedule, timestep, predicted noise, and MSE. This playground is symbolic—it does not train a real model—but it mirrors the algebraic relationship used in code.</p>
+  <div class="interactive-panel">
+    <h4>Playground: one training step simulator</h4>
+    <p style="font-size:0.9rem;margin-bottom:12px">Pick <code class="inline">t</code> and a random seed; “corrupt” a tiny 1-D signal and compare true ε to a noisy guess. Adjust the guess with the slider to see the squared error change.</p>
+    <div class="grid-2">
+      <div>
+        <label class="lbl">Timestep t (1–100)</label>
+        <input type="range" id="pgT" min="1" max="100" value="40">
+        <span id="pgTVal" class="lbl">40</span>
+      </div>
+      <div>
+        <label class="lbl">Guess scaling (ε̂ = k · ε_random)</label>
+        <input type="range" id="pgK" min="-200" max="200" value="100">
+        <span id="pgKVal" class="lbl">k = 1.00</span>
+      </div>
+    </div>
+    <button type="button" class="btn primary" id="pgResample">New noise / resample</button>
+    <div class="play-readout" id="pgReadout"></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="container" style="padding:48px 24px 80px;text-align:center;border-top:1px solid var(--border);">
+  <p style="font-size:0.88rem;color:var(--text-dim);margin:0"><a href="../">Advanced NLP V2</a> · Chapter 20 · DDPM / diffusion fundamentals</p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  const T_SCHED = 1000;
+
+  function linearBetas(T) {
+    const b = [];
+    const start = 0.0001, end = 0.02;
+    for (let i = 0; i < T; i++) {
+      b.push(start + (end - start) * (i / (T - 1)));
+    }
+    return b;
+  }
+
+  function alphasFromBetas(b) {
+    return b.map(function (x) { return 1 - x; });
+  }
+
+  function alphaBarFromAlphas(a) {
+    const out = [];
+    let prod = 1;
+    for (let i = 0; i < a.length; i++) {
+      prod *= a[i];
+      out.push(prod);
+    }
+    return out;
+  }
+
+  /** Cosine ᾱ schedule (improved DDPM style): ᾱ_t = f(t)/f(0), f(t)=cos²(((t/T)+s)/(1+s)·π/2). */
+  function cosineAlphaBarSchedule(T) {
+    const s = 0.008;
+    const denom = Math.cos((s / (1 + s)) * (Math.PI / 2)) ** 2;
+    const out = [];
+    for (let t = 1; t <= T; t++) {
+      const num = Math.cos(((t / T) + s) / (1 + s) * (Math.PI / 2)) ** 2;
+      out.push(num / denom);
+    }
+    return out;
+  }
+
+  const betasLin = linearBetas(T_SCHED);
+  const alphasLin = alphasFromBetas(betasLin);
+  const alphaBarLin = alphaBarFromAlphas(alphasLin);
+
+  const alphaBarCos = cosineAlphaBarSchedule(T_SCHED);
+  const betasCos = [];
+  betasCos.push(Math.min(0.999, Math.max(1e-6, 1 - alphaBarCos[0])));
+  for (let i = 1; i < T_SCHED; i++) {
+    const ratio = alphaBarCos[i] / alphaBarCos[i - 1];
+    betasCos.push(Math.min(0.999, Math.max(1e-6, 1 - ratio)));
+  }
+
+  function makePattern(w, h) {
+    const d = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const nx = x / w, ny = y / h;
+        d[y * w + x] = 0.5 + 0.5 * Math.sin(nx * 12) * Math.cos(ny * 10 + nx * 4);
+      }
+    }
+    return d;
+  }
+
+  function drawNoisyPattern(canvas, clean, w, h, t, Tmax, alphaBarArr) {
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(w, h);
+    const idx = Math.min(Tmax, Math.max(0, Math.round(t / Tmax * (alphaBarArr.length - 1))));
+    const ab = alphaBarArr[idx];
+    const sn = Math.sqrt(ab);
+    const nn = Math.sqrt(1 - ab);
+    let seed = 42;
+    function rnd() {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return (seed / 4294967296) * 2 - 1;
+    }
+    for (let i = 0; i < w * h; i++) {
+      const eps = rnd();
+      const v = sn * clean[i] + nn * eps;
+      const c = Math.max(0, Math.min(255, Math.floor(v * 255)));
+      const p = i * 4;
+      img.data[p] = c;
+      img.data[p + 1] = Math.floor(c * 0.85);
+      img.data[p + 2] = Math.floor(c * 1.05);
+      img.data[p + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  const W = 400, H = 400;
+  const cleanPattern = makePattern(W, H);
+  const forwardCanvas = document.getElementById('forwardCanvas');
+  const forwardSlider = document.getElementById('forwardSlider');
+  const forwardTVal = document.getElementById('forwardTVal');
+  const forwardTMax = document.getElementById('forwardTMax');
+  const Tdemo = 100;
+  forwardTMax.textContent = String(Tdemo);
+  forwardSlider.max = String(Tdemo);
+
+  const alphaBarDemo = [];
+  for (let i = 0; i <= Tdemo; i++) {
+    const j = Math.floor(i / Tdemo * (alphaBarLin.length - 1));
+    alphaBarDemo.push(alphaBarLin[j]);
+  }
+
+  function updateForward() {
+    const t = parseInt(forwardSlider.value, 10);
+    forwardTVal.textContent = String(t);
+    drawNoisyPattern(forwardCanvas, cleanPattern, W, H, t, Tdemo, alphaBarDemo);
+  }
+  forwardSlider.addEventListener('input', updateForward);
+  updateForward();
+
+  let forwardInt = null;
+  document.getElementById('forwardAnim').addEventListener('click', function () {
+    if (forwardInt) clearInterval(forwardInt);
+    let t = 0;
+    forwardInt = setInterval(function () {
+      t += 2;
+      if (t > Tdemo) { clearInterval(forwardInt); forwardInt = null; t = Tdemo; }
+      forwardSlider.value = String(t);
+      updateForward();
+    }, 40);
+  });
+  document.getElementById('forwardReset').addEventListener('click', function () {
+    if (forwardInt) clearInterval(forwardInt);
+    forwardInt = null;
+    forwardSlider.value = '0';
+    updateForward();
+  });
+
+  const reverseCanvas = document.getElementById('reverseCanvas');
+  const reverseStepVal = document.getElementById('reverseStepVal');
+  let revT = Tdemo;
+
+  function drawReverse() {
+    drawNoisyPattern(reverseCanvas, cleanPattern, W, H, revT, Tdemo, alphaBarDemo);
+    reverseStepVal.textContent = String(revT);
+  }
+  drawReverse();
+
+  let revInt = null;
+  document.getElementById('reversePlay').addEventListener('click', function () {
+    if (revInt) clearInterval(revInt);
+    revT = Tdemo;
+    drawReverse();
+    revInt = setInterval(function () {
+      revT = Math.max(0, revT - 2);
+      drawReverse();
+      if (revT <= 0) { clearInterval(revInt); revInt = null; }
+    }, 45);
+  });
+  document.getElementById('reverseStep').addEventListener('click', function () {
+    revT = Math.max(0, revT - 5);
+    drawReverse();
+  });
+  document.getElementById('reverseRewind').addEventListener('click', function () {
+    if (revInt) clearInterval(revInt);
+    revInt = null;
+    revT = Tdemo;
+    drawReverse();
+  });
+
+  const schedCanvas = document.getElementById('scheduleCanvas');
+  let schedMode = 'linear';
+
+  function drawSchedule() {
+    const c = schedCanvas;
+    const ctx = c.getContext('2d');
+    const Wc = c.width, Hc = c.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, Wc, Hc);
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.strokeRect(40, 20, Wc - 60, Hc - 50);
+    const n = T_SCHED;
+    const arr = schedMode === 'linear' ? betasLin : betasCos;
+    let mx = 0;
+    for (let i = 0; i < n; i++) if (arr[i] > mx) mx = arr[i];
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x = 40 + (i / (n - 1)) * (Wc - 60);
+      const y = 20 + (Hc - 50) * (1 - arr[i] / mx);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = schedMode === 'linear' ? '#5eead4' : '#f472b6';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px SF Mono, Fira Code, monospace';
+    ctx.fillText(schedMode === 'linear' ? 'β_t linear' : 'β_t from cosine ᾱ', 48, Hc - 18);
+  }
+  document.getElementById('schedLinear').addEventListener('click', function () { schedMode = 'linear'; drawSchedule(); });
+  document.getElementById('schedCosine').addEventListener('click', function () { schedMode = 'cosine'; drawSchedule(); });
+  drawSchedule();
+
+  const alphaBarSlider = document.getElementById('alphaBarSlider');
+  const alphaBarVal = document.getElementById('alphaBarVal');
+  const alphaBarReadout = document.getElementById('alphaBarReadout');
+  function updateAlphaBarDemo() {
+    const ti = parseInt(alphaBarSlider.value, 10);
+    const ab = alphaBarLin[ti];
+    const srt = Math.sqrt(ab);
+    const srn = Math.sqrt(1 - ab);
+    alphaBarVal.textContent = (ti / T_SCHED).toFixed(3);
+    alphaBarReadout.innerHTML = 't = ' + ti + ' &nbsp;|&nbsp; ᾱ<sub>t</sub> = ' + ab.toFixed(6) +
+      ' &nbsp;|&nbsp; √(ᾱ<sub>t</sub>) = ' + srt.toFixed(4) + ' &nbsp;|&nbsp; √(1−ᾱ<sub>t</sub>) = ' + srn.toFixed(4);
+  }
+  alphaBarSlider.addEventListener('input', updateAlphaBarDemo);
+  updateAlphaBarDemo();
+
+  const latentCanvas = document.getElementById('demoLatentCanvas');
+  function drawLatentAnim() {
+    const ctx = latentCanvas.getContext('2d');
+    const Wl = latentCanvas.width, Hl = latentCanvas.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, Wl, Hl);
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px monospace';
+    ctx.fillText('VAE: sample z → decode (one vector)', 20, 35);
+    ctx.fillText('Diffusion: x_T → … → x_0 (many steps)', 20, 95);
+    let frame = 0;
+    const id = setInterval(function () {
+      frame++;
+      ctx.fillStyle = '#181825';
+      ctx.fillRect(10, 45, 230, 28);
+      ctx.fillRect(10, 105, Wl - 20, 12);
+      const z = Math.sin(frame * 0.08) * 80 + 130;
+      ctx.fillStyle = '#818cf8';
+      ctx.beginPath();
+      ctx.arc(z, 58, 6, 0, Math.PI * 2);
+      ctx.fill();
+      const steps = 12;
+      const prog = (frame % 120) / 120;
+      for (let i = 0; i < steps; i++) {
+        const t = i / (steps - 1);
+        const x = 20 + t * (Wl - 40);
+        const noisy = Math.abs(t - (1 - prog)) < 0.08 ? '#5eead4' : '#2a2a3a';
+        ctx.fillStyle = noisy;
+        ctx.fillRect(x - 2, 108 + Math.sin(t * 6 + frame * 0.05) * 4, 4, 4);
+      }
+      if (frame > 400) clearInterval(id);
+    }, 35);
+    return id;
+  }
+  let latentId = null;
+  function replayLatent() {
+    if (latentId) clearInterval(latentId);
+    const ctx = latentCanvas.getContext('2d');
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, latentCanvas.width, latentCanvas.height);
+    latentId = drawLatentAnim();
+  }
+  document.getElementById('latentReplay').addEventListener('click', replayLatent);
+  replayLatent();
+
+  const unetLegend = document.getElementById('unetLegend');
+  document.querySelectorAll('#unetSvg .blk').forEach(function (el) {
+    el.addEventListener('mouseenter', function () {
+      document.querySelectorAll('#unetSvg .blk').forEach(function (b) { b.classList.remove('on'); });
+      el.classList.add('on');
+      unetLegend.textContent = el.getAttribute('data-desc') || '';
+    });
+    el.addEventListener('mouseleave', function () {
+      el.classList.remove('on');
+      unetLegend.textContent = 'Hover a block for a short description.';
+    });
+  });
+
+  const pgT = document.getElementById('pgT');
+  const pgK = document.getElementById('pgK');
+  const pgTVal = document.getElementById('pgTVal');
+  const pgKVal = document.getElementById('pgKVal');
+  const pgReadout = document.getElementById('pgReadout');
+  let pgEps = 0, pgX0 = 0.7;
+
+  function pgUpdate() {
+    const t = parseInt(pgT.value, 10);
+    const j = Math.max(0, Math.min(alphaBarLin.length - 1, Math.floor(t / 100 * (alphaBarLin.length - 1))));
+    const ab = alphaBarLin[j];
+    const sn = Math.sqrt(ab);
+    const nn = Math.sqrt(1 - ab);
+    const k = parseInt(pgK.value, 10) / 100;
+    pgTVal.textContent = String(t);
+    pgKVal.textContent = 'k = ' + k.toFixed(2);
+    const xt = sn * pgX0 + nn * pgEps;
+    const epsHat = k * pgEps;
+    const mse = (epsHat - pgEps) * (epsHat - pgEps);
+    pgReadout.innerHTML =
+      'x₀ = ' + pgX0.toFixed(3) + ' &nbsp;|&nbsp; ε_true = ' + pgEps.toFixed(3) +
+      ' &nbsp;|&nbsp; x_t = √(ᾱ)x₀ + √(1−ᾱ)ε = ' + xt.toFixed(4) +
+      '<br>ε̂ = ' + epsHat.toFixed(3) + ' &nbsp;|&nbsp; MSE(ε̂, ε) = ' + mse.toFixed(6);
+  }
+
+  function pgResample() {
+    pgEps = Math.random() * 2 - 1;
+    pgX0 = 0.4 + Math.random() * 0.5;
+    pgUpdate();
+  }
+  pgT.addEventListener('input', pgUpdate);
+  pgK.addEventListener('input', pgUpdate);
+  document.getElementById('pgResample').addEventListener('click', pgResample);
+  pgResample();
+
+  const navWrap = document.getElementById('navWrap');
+  const navToggle = document.getElementById('navToggle');
+  const navLinks = document.getElementById('navLinks');
+
+  navToggle.addEventListener('click', function () {
+    const open = navWrap.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.querySelectorAll('#navLinks a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      navWrap.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  window.addEventListener('scroll', function () {
+    const y = window.scrollY;
+    navWrap.classList.toggle('visible', y > 220);
+    document.querySelectorAll('.fade-in:not(.visible)').forEach(function (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 50) el.classList.add('visible');
+    });
+  }, { passive: true });
+  window.dispatchEvent(new Event('scroll'));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inside the Transformer — The Life of a Token Through a Modern Dense Transformer</title>
+<style>
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 12px; }
+h2 { font-size: 1.35rem; font-weight: 700; margin: 0 0 16px; color: var(--text); }
+h3 { font-size: 1.1rem; font-weight: 600; margin: 0 0 12px; color: var(--text); }
+.lead { color: var(--text-dim); font-size: 1.05rem; max-width: 640px; margin: 0 auto; }
+p { color: var(--text-dim); font-size: 0.95rem; margin: 0 0 12px; }
+p:last-child { margin-bottom: 0; }
+strong { color: var(--text); }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+
+/* Hero */
+.hero { min-height: 70vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 72px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(167,139,250,0.14) 0%, transparent 70%); pointer-events: none; }
+.stats { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
+.stat-val { font-size: 2.4rem; font-weight: 800; background: linear-gradient(135deg, var(--accent2), var(--accent4)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.82rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* Card styles */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 20px 0; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout-warn { background: rgba(251,191,36,0.08); border-left-color: var(--accent5); }
+.callout-success { background: rgba(52,211,153,0.08); border-left-color: var(--accent3); }
+.callout-danger { background: rgba(248,113,113,0.08); border-left-color: var(--danger); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; margin: 14px 0; font-family: var(--mono); font-size: 0.88rem; text-align: center; color: var(--text); overflow-x: auto; }
+
+/* Figure / image */
+.figure { margin: 28px 0; }
+.figure img { width: 100%; border-radius: var(--radius); border: 1px solid var(--border); display: block; background: #fff; }
+.figure-caption { font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); margin-top: 10px; text-align: center; }
+
+/* Step cards */
+.step-cards { display: flex; flex-direction: column; gap: 16px; margin: 20px 0; }
+.step-card { display: flex; gap: 16px; align-items: flex-start; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.step-num { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; color: #fff; flex-shrink: 0; }
+.step-content { min-width: 0; }
+.step-content h4 { font-size: 0.95rem; font-weight: 700; margin: 0 0 4px; color: var(--text); }
+.step-content p { font-size: 0.88rem; margin: 0; }
+
+/* Flow diagram */
+.flow { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+.flow-step { display: flex; gap: 16px; align-items: stretch; position: relative; }
+.flow-connector { width: 24px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.flow-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 6px; }
+.flow-step:nth-child(2) .flow-dot { background: var(--accent2); }
+.flow-step:nth-child(3) .flow-dot { background: var(--accent3); }
+.flow-step:nth-child(4) .flow-dot { background: var(--accent4); }
+.flow-step:nth-child(5) .flow-dot { background: var(--accent5); }
+.flow-step:nth-child(6) .flow-dot { background: var(--accent); }
+.flow-step:nth-child(7) .flow-dot { background: var(--accent2); }
+.flow-line { flex: 1; width: 2px; background: var(--border); }
+.flow-step:last-child .flow-line { display: none; }
+.flow-content { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; flex: 1; }
+.flow-content h4 { font-size: 0.95rem; font-weight: 700; margin: 0 0 6px; color: var(--text); }
+.flow-content p { font-size: 0.88rem; margin: 0; }
+
+/* Tags */
+.tag { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 3px 8px; border-radius: 4px; margin: 2px; }
+.tag-blue { background: rgba(108,140,255,0.12); color: var(--accent); border: 1px solid rgba(108,140,255,0.2); }
+.tag-green { background: rgba(52,211,153,0.12); color: var(--accent3); border: 1px solid rgba(52,211,153,0.2); }
+.tag-purple { background: rgba(167,139,250,0.12); color: var(--accent2); border: 1px solid rgba(167,139,250,0.2); }
+.tag-pink { background: rgba(244,114,182,0.12); color: var(--accent4); border: 1px solid rgba(244,114,182,0.2); }
+.tag-yellow { background: rgba(251,191,36,0.12); color: var(--accent5); border: 1px solid rgba(251,191,36,0.2); }
+
+/* QA box */
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin: 20px 0; }
+.qa-box .question { color: var(--accent); font-weight: 600; font-size: 0.95rem; margin-bottom: 10px; }
+.qa-box .answer { color: var(--text-dim); font-size: 0.9rem; }
+
+/* Comparison */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+
+/* Two column */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* Fade in */
+.fade-in { opacity: 0; transform: translateY(18px); transition: all 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* Navigation */
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 600; color: var(--text); text-decoration: none; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.nav-links a { color: var(--text-dim); text-decoration: none; font-family: var(--mono); font-size: 0.75rem; padding: 2px 4px; border-radius: 4px; }
+.nav-links a:hover { color: var(--accent); background: rgba(108,140,255,0.1); }
+
+/* Breadcrumb */
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: rgba(10, 10, 15, 0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid #2a2a3a; font-family: var(--sans); }
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px !important; }
+
+.footer { text-align: center; padding: 48px 24px 64px; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); }
+.footer a { color: var(--accent); }
+
+/* Source badge */
+.source-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim); margin-top: 20px; }
+.source-badge a { color: var(--accent); }
+
+/* Code panels */
+.code-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 20px 0; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.78rem; }
+.code-filename { color: var(--accent); }
+.code-block { padding: 14px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.52; color: var(--text); background: transparent; white-space: pre-wrap; word-wrap: break-word; }
+.kw { color: var(--accent4); }
+.fn { color: var(--accent); }
+.str { color: var(--accent5); }
+.num { color: var(--accent3); }
+.cmt { color: var(--text-dim); font-style: italic; }
+.op { color: var(--accent2); }
+
+/* Chapter nav */
+.chapter-nav { display: flex; justify-content: space-between; padding: 24px; max-width: 900px; margin: 0 auto; }
+.chapter-nav a { color: var(--accent); text-decoration: none; font-family: var(--mono); font-size: 0.85rem; }
+.chapter-nav a:hover { text-decoration: underline; }
+
+/* Reference list */
+.ref-list { list-style: none; padding: 0; margin: 16px 0; counter-reset: ref; }
+.ref-list li { counter-increment: ref; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); }
+.ref-list li::before { content: "[" counter(ref) "]"; font-family: var(--mono); font-size: 0.75rem; color: var(--accent); margin-right: 8px; }
+.ref-list li a { color: var(--accent); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">The Training Ground</a><span class="bc-sep">›</span><span class="bc-current">Inside the Transformer</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="#" class="nav-title" style="text-decoration:none;color:inherit;">Inside the Transformer</a>
+  <div class="nav-links">
+    <a href="#s01">01</a><a href="#s02">02</a><a href="#s03">03</a><a href="#s04">04</a><a href="#s05">05</a><a href="#s06">06</a><a href="#s07">07</a><a href="#s08">08</a><a href="#s09">09</a><a href="#s10">10</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <p class="section-num" style="margin-bottom:8px;letter-spacing:3px;">THE TRAINING GROUND · 01</p>
+  <h1>Inside the Transformer</h1>
+  <p class="lead">The life of a token through a modern dense transformer — from raw text through tokenization, embedding, RMSNorm, GeGLU MLP, multi-head attention with YaRN positional embeddings, hybrid attention masks, to the final logits. Every component unpacked with visuals.</p>
+
+  <div class="stats">
+    <div><span class="stat-val">7</span><span class="stat-label">Components</span></div>
+    <div><span class="stat-val">21</span><span class="stat-label">Visual Diagrams</span></div>
+    <div><span class="stat-val">32</span><span class="stat-label">Transformer Layers</span></div>
+  </div>
+
+  <div class="source-badge">Based on <a href="https://www.aleksagordic.com/blog/transformer" target="_blank">Aleksa Gordić — Inside the Transformer: The Life of a Token</a></div>
+</header>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════ s01 ═══════════ -->
+<section class="section fade-in" id="s01">
+  <div class="container">
+    <span class="section-num">01 · OVERVIEW</span>
+    <h2>What this tutorial covers</h2>
+
+    <p>In the <a href="../../beyond-the-forward-pass/01-life-of-a-prompt/">Life of a Prompt</a> blog, we traced a prompt through the vLLM inference engine — tokenization, KV cache, paged attention, and continuous batching. We treated the transformer model itself as a black box.</p>
+
+    <p>Now we open that black box.</p>
+
+    <p>This tutorial follows Aleksa Gordić's excellent visual deep-dive into a <strong>modern dense transformer</strong>, using the architecture of <strong>Rnj 1.5</strong> (built at Ashish Vaswani's AI Lab, Essential AI Labs) as a running example. Rnj 1.5 is a long-context model that extends from 32k to 160k tokens, scoring 79% on RULER at a 128k context window.</p>
+
+    <p>We will trace a single token through <strong>every component</strong> of the forward pass:</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Tokenization & Embedding</h4>
+          <p>Text → token IDs → 4096-dimensional vectors</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>32 Transformer Blocks (the for loop)</h4>
+          <p>Each block: RMSNorm → Attention → RMSNorm → MLP, with residual connections</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>RMSNorm</h4>
+          <p>Lightweight normalization that stabilizes training</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>GeGLU MLP</h4>
+          <p>GELU-gated feedforward network that learns non-linear relationships</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Multi-Head Attention + YaRN</h4>
+          <p>Self-attention with Group Query Attention and rotary positional embeddings for long context</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Core Attention & Hybrid Masking</h4>
+          <p>Block-local + global attention with causal and segmentation masks</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Logits → Output</h4>
+          <p>Project to vocabulary size, softmax, sample or compute loss</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Running example</h3>
+      <p>Throughout this tutorial, we use:</p>
+      <ul style="color:var(--text-dim);font-size:0.9rem;margin:8px 0 0 20px;">
+        <li><strong>Batch size</strong> = 1</li>
+        <li><strong>Sequence length</strong> = 16 (two documents packed together)</li>
+        <li><strong>Model dimension</strong> = 4,096</li>
+        <li><strong>Transformer layers</strong> = 32</li>
+        <li><strong>Attention heads</strong> = 32 (Q), with GQA for K/V</li>
+        <li><strong>Data type</strong> = bf16</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s02 ═══════════ -->
+<section class="section fade-in" id="s02">
+  <div class="container">
+    <span class="section-num">02 · TOKENIZATION</span>
+    <h2>From raw text to integer sequences</h2>
+
+    <p>Every forward pass begins here. The tokenizer is a black-box component that takes raw text and maps it to a sequence of integers, where each integer represents a sub-word token from a fixed vocabulary.</p>
+
+    <p>In practice, modern tokenizers are "trained" on a large corpus using algorithms like <strong>BPE (Byte Pair Encoding)</strong>. The algorithm learns a vocabulary by repeatedly merging frequent character or byte sequences. Good tokenizer design has measurable impact — for example, representing digits as individual tokens helps with numerical reasoning.</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/flow_pre.png" alt="Figure 1: Tokenization stage — two documents are tokenized and packed into a single sequence">
+      <p class="figure-caption">Figure 1: Tokenization stage — two documents are tokenized into sequences of integers, then packed into a single sequence. Alongside the tokens, we construct input positions (for positional embeddings) and a segmentation mask (for attention masking).</p>
+    </div>
+
+    <p>Notice three key things in this diagram:</p>
+
+    <div class="step-cards">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Document packing</h4>
+          <p>Two separate documents are packed into a single sequence. This is an efficiency trick — instead of padding short documents to the max length, we concatenate them. This maximizes GPU utilization during training.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Input positions reset per document</h4>
+          <p>Each document gets its own position indices starting from 0. This is critical for positional embeddings — we don't want the model to think document 2 starts at position 10.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Segmentation mask</h4>
+          <p>A mask that tells the attention mechanism which tokens belong to the same document. Without this, tokens from document 1 could attend to tokens from document 2, which would corrupt training.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> In practice, all of this preprocessing happens <em>before</em> training starts. A Spark data pipeline tokenizes and packs documents into chunks, and the data loader feeds these preprocessed structures directly into the training loop. The model never sees raw strings.</p>
+    </div>
+
+    <div class="callout-warn callout">
+      <p><strong>Special tokens:</strong> Tokens like <code>&lt;FIM_PRE&gt;</code>, <code>&lt;FIM_SUF&gt;</code>, <code>&lt;FIM_MID&gt;</code> don't appear naturally during tokenization. They are injected during training for capabilities like <strong>Fill-in-the-Middle (FIM)</strong>. During FIM training, a document is split into prefix, middle, and suffix, then rearranged as: <code>&lt;FIM_PRE&gt; prefix &lt;FIM_SUF&gt; suffix &lt;FIM_MID&gt; middle</code>. This teaches the model to complete gaps — the exact capability used by code autocomplete in IDEs.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s03 ═══════════ -->
+<section class="section fade-in" id="s03">
+  <div class="container">
+    <span class="section-num">03 · EMBEDDING</span>
+    <h2>From integers to high-dimensional vectors</h2>
+
+    <p>The next step converts our sequence of integers into vectors that the transformer can actually process. This is done by <strong>indexing into an embedding table</strong>.</p>
+
+    <p>Think of the embedding table as the vocabulary of the LLM. It's a giant matrix of shape <strong>(vocab_size × model_dim)</strong>. Each row corresponds to one token ID, and that row <em>is</em> the token's learned representation — a 4,096-dimensional vector in bf16.</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/flow_pro.png" alt="Figure 2: Embedding stage — token IDs are used to index into the embedding table">
+      <p class="figure-caption">Figure 2: Embedding stage — each token ID is used to look up its corresponding row in the embedding table, producing a sequence of 16 vectors, each 4,096-dimensional in bf16.</p>
+    </div>
+
+    <p>After this step, our input has been transformed from a sequence of 16 integers into a <strong>(1 × 16 × 4096)</strong> tensor of bf16 vectors. These vectors are now ready to flow through the transformer layers.</p>
+
+    <div class="qa-box">
+      <p class="question">A common question is: why 4,096 dimensions? Isn't that a lot?</p>
+      <p class="answer">Higher dimensions give the model more "space" to encode nuanced relationships between tokens. The choice of dimension is a trade-off: too small and the model can't represent complex patterns, too large and you waste compute. 4,096 is a common sweet spot for models in the 1-8B parameter range. Larger models like LLaMA 70B use 8,192 dimensions.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s04 ═══════════ -->
+<section class="section fade-in" id="s04">
+  <div class="container">
+    <span class="section-num">04 · THE TRANSFORMER BLOCK</span>
+    <h2>The repeating unit — 32 times</h2>
+
+    <p>Now we enter the core of the transformer. The model has <strong>32 transformer layers</strong>, and the input vectors pass through each one sequentially. You can think of this as a <code>for</code> loop, but each layer has its <strong>own learnable weights</strong>.</p>
+
+    <p>Every transformer block has the same high-level structure:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/flow_main.png" alt="Figure 3: Forward pass through transformer blocks">
+      <p class="figure-caption">Figure 3: The full forward pass through a transformer block. Four RMSNorm submodules, one MLP, one attention module, two residual connections, and two sum operations.</p>
+    </div>
+
+    <p>Let's unpack what this diagram is showing:</p>
+
+    <div class="step-cards">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Residual connections (the highway)</h4>
+          <p>The input vectors are copied and <strong>added back</strong> after each sub-layer (attention and MLP). This means information can "skip" a layer entirely if the layer's output is close to zero. Residual connections are the single most important architectural trick that enables deep networks — without them, gradients vanish and training collapses.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>RMSNorm before each sub-layer</h4>
+          <p>Normalization stabilizes training by keeping vector magnitudes in check. Rnj 1.5 uses <strong>pre-norm</strong> (normalize before the sub-layer, not after). There are also post-attention and post-MLP norms.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>All submodules operate on individual vectors, <em>except attention</em></h4>
+          <p>RMSNorm and MLP process each vector independently — they don't look at other positions. Attention is the only component that mixes information <em>between</em> positions. This is why attention is special.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> The transformer block can be summarized as: <strong>normalize → attend (mix across positions) → normalize → transform (process each position independently) → add residuals</strong>. This pattern repeats 32 times, with each layer refining the representations further.</p>
+    </div>
+
+    <p>Now let's dive into each component, from simplest to most complex.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s05 ═══════════ -->
+<section class="section fade-in" id="s05">
+  <div class="container">
+    <span class="section-num">05 · RMSNORM</span>
+    <h2>Root Mean Square Layer Normalization</h2>
+
+    <p>RMSNorm is the simplest component in the transformer block. Its job is to <strong>normalize the magnitude of each vector</strong> so that training remains stable. Without normalization, vector magnitudes can explode or vanish across layers, making optimization impossible.</p>
+
+    <p>RMSNorm operates on <strong>individual vectors</strong> — it doesn't look at other positions in the sequence. For a single 4,096-dimensional bf16 vector, here's what happens:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/RMSNorm.png" alt="Figure 5: RMSNorm normalization">
+      <p class="figure-caption">Figure 5: RMSNorm — takes a single 4,096-dim bf16 vector, normalizes it using the root mean square, then scales by a learned parameter γ. Output has the same shape and dtype.</p>
+    </div>
+
+    <p>The operation in three steps:</p>
+
+    <div class="formula">
+      RMS(x) = √(1/d · Σ x<sub>i</sub>²)  →  x̂ = x / RMS(x)  →  output = γ · x̂
+    </div>
+
+    <div class="step-cards">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Compute RMS</h4>
+          <p>Calculate the root mean square of all 4,096 elements. This is a single scalar value that represents the "average magnitude" of the vector.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Normalize</h4>
+          <p>Divide every element by the RMS value. After this, the vector has unit RMS — its magnitude is controlled.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Scale</h4>
+          <p>Multiply element-wise by a learned parameter vector γ (same dimension as the input). This lets the model learn the "right" scale for each dimension after normalization.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="qa-box">
+      <p class="question">How is RMSNorm different from LayerNorm?</p>
+      <p class="answer">LayerNorm computes both the mean <em>and</em> variance, then normalizes using both. RMSNorm skips the mean computation entirely — it only divides by the root mean square. This makes it <strong>faster</strong> (one less reduction operation) while being empirically just as effective. Most modern transformers (LLaMA, Mistral, Gemma, DeepSeek) use RMSNorm over LayerNorm.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s06 ═══════════ -->
+<section class="section fade-in" id="s06">
+  <div class="container">
+    <span class="section-num">06 · GeGLU MLP</span>
+    <h2>The gated feedforward network</h2>
+
+    <p>The MLP (Multi-Layer Perceptron) is a pointwise feedforward network that processes each vector <strong>independently</strong>. Its job is to learn complex non-linear relationships between features within each position.</p>
+
+    <p>Rnj 1.5 uses a <strong>GeGLU (GELU-Gated Linear Unit)</strong> variant. The gating mechanism uses GELU activation and takes the form:</p>
+
+    <div class="formula">
+      output = W<sub>2</sub> × (GELU(W<sub>0</sub> × x) ⊙ (W<sub>1</sub> × x))
+    </div>
+
+    <p>where ⊙ is element-wise multiplication.</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/MLP.png" alt="Figure 6: GeGLU MLP">
+      <p class="figure-caption">Figure 6: GeGLU MLP — the input vector is projected through two parallel paths (W<sub>0</sub> and W<sub>1</sub>), one of which passes through GELU. The results are element-wise multiplied (gating), then projected back down by W<sub>2</sub>.</p>
+    </div>
+
+    <p>Let's break down what's happening step by step:</p>
+
+    <div class="step-cards">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Up-projection (expand)</h4>
+          <p>The 4,096-dim input is projected to a <strong>higher dimension</strong> (typically 4× larger, so ~16,384) through two separate weight matrices W<sub>0</sub> and W<sub>1</sub>. This expansion gives the model more room to represent features.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Gating with GELU</h4>
+          <p>One path goes through <strong>GELU activation</strong>, producing values that can be positive, slightly negative, or near-zero. This is multiplied element-wise with the other path, effectively "gating" which features pass through. Think of it as a learned filter that selectively amplifies or suppresses different features.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Down-projection (compress)</h4>
+          <p>W<sub>2</sub> projects the result back to 4,096 dimensions. The output has the same shape as the input — ready for the residual connection.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> The gating mechanism is what makes GeGLU more powerful than a standard MLP. With a vanilla MLP (just W<sub>2</sub> × ReLU(W<sub>1</sub> × x)), every feature goes through the same activation. With gating, the model can learn to <strong>selectively route information</strong> — some features get amplified, others get suppressed, all based on the input itself.</p>
+    </div>
+
+    <div class="qa-box">
+      <p class="question">Why does the MLP expand to 4× the model dimension and then compress back?</p>
+      <p class="answer">The expansion creates a higher-dimensional "workspace" where the model can learn more complex feature interactions. The compression back to the original dimension ensures the output is compatible with the residual connection. This expand-then-compress pattern (also called a "bottleneck in reverse") is universal across transformer architectures. The 4× ratio is a common default, but some models use different ratios.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s07 ═══════════ -->
+<section class="section fade-in" id="s07">
+  <div class="container">
+    <span class="section-num">07 · MULTI-HEAD ATTENTION</span>
+    <h2>The only component that mixes information across positions</h2>
+
+    <p>This is the most important and most complex component. Attention is the <strong>only mechanism</strong> in the transformer that allows tokens at different positions to exchange information. Without attention, each position would be processed in total isolation.</p>
+
+    <p>Rnj 1.5 uses <strong>GQA (Grouped Query Attention)</strong> — a variant where the number of Key/Value heads is reduced compared to Query heads. Multiple query heads share the same key-value pair, saving memory and compute without sacrificing much quality.</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/MHA.png" alt="Figure 7: Multi-Head Attention">
+      <p class="figure-caption">Figure 7: Multi-Head Attention — each vector is independently projected into Query, Key, and Value vectors. After reshaping into heads, QK normalization, and YaRN positional embeddings, core attention mixes information across positions. A final linear projection produces the output.</p>
+    </div>
+
+    <p>The high-level flow of attention:</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Project into Q, K, V</h4>
+          <p>Each input vector (4,096-dim) is independently projected into Query, Key, and Value vectors through learned weight matrices. These projections are the "questions" (Q), "labels" (K), and "content" (V) of each position.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Reshape into heads</h4>
+          <p>The vectors are split into multiple attention heads. Each head operates on a lower-dimensional slice of the full vector, allowing the model to attend to different aspects of the input simultaneously.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>QK normalization</h4>
+          <p>Queries and keys are normalized to prevent attention scores from becoming too large, which would cause softmax to produce near-one-hot distributions (losing nuance).</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>YaRN positional embeddings</h4>
+          <p>Rotary positional embeddings inject position information through rotation. This is how the model knows <em>where</em> each token is in the sequence.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Core attention</h4>
+          <p>The actual mixing: Q × K<sup>T</sup> → attention scores → mask → softmax → multiply by V → context vectors.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Output projection</h4>
+          <p>A final linear layer combines all heads back into a single 4,096-dim vector.</p>
+        </div>
+      </div>
+    </div>
+
+    <p>Let's now dive into the two most interesting parts: <strong>YaRN positional embeddings</strong> and <strong>core attention</strong>.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s08 ═══════════ -->
+<section class="section fade-in" id="s08">
+  <div class="container">
+    <span class="section-num">08 · YaRN — POSITIONAL EMBEDDINGS</span>
+    <h2>Teaching the model where tokens live</h2>
+
+    <p>Here's a fundamental problem: attention computes Q × K<sup>T</sup> — a dot product between queries and keys. But <strong>dot products are permutation-invariant</strong>. If you shuffle the order of tokens, the dot products don't change. The model would have no idea that "the cat sat on the mat" is different from "mat the on sat cat the."</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/yarn_intro.png" alt="Figure 8: Why we need positional embeddings">
+      <p class="figure-caption">Figure 8: The WHY behind positional embeddings — without positional information, the attention mechanism treats all orderings of tokens as identical. The model would be unable to understand word order.</p>
+    </div>
+
+    <p>This is why we need <strong>positional embeddings</strong>. They inject position information directly into the query and key vectors, so the dot product becomes position-aware.</p>
+
+    <h3>How RoPE works</h3>
+
+    <p><strong>RoPE (Rotary Position Embeddings)</strong> is the foundational technique. Instead of adding position vectors (like the original Transformer), RoPE <strong>rotates</strong> pairs of dimensions by angles that depend on position. Different pairs rotate at different frequencies — some fast, some slow.</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/yarn2.png" alt="Figure 9: YaRN frequency table">
+      <p class="figure-caption">Figure 9: YaRN frequency table — each pair of dimensions is assigned a rotation frequency. Lower-frequency pairs encode coarse position (long-range), higher-frequency pairs encode fine position (local).</p>
+    </div>
+
+    <p>Here is a visualization showing how different YaRN frequencies behave across positions. Notice the dramatic range — the slowest frequency completes one full cycle every <strong>1.088 million positions</strong>:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/yarn3.png" alt="Figure 10: YaRN frequencies visualization">
+      <p class="figure-caption">Figure 10: YaRN frequencies — high-frequency dimensions capture fine-grained local position, while low-frequency dimensions provide a "global clock" that spans millions of positions.</p>
+    </div>
+
+    <h3>YaRN: Extending RoPE for longer contexts</h3>
+
+    <p><strong>YaRN (Yet another RoPE extensioN)</strong> modifies RoPE in a clever way to enable better extrapolation to longer context lengths. The key insight is that not all frequency bands need the same treatment when extending context:</p>
+
+    <ul style="color:var(--text-dim);font-size:0.9rem;margin:12px 0 12px 20px;">
+      <li><strong>High-frequency</strong> dimensions (local patterns) — keep unchanged</li>
+      <li><strong>Low-frequency</strong> dimensions (global position) — scale down the frequencies</li>
+      <li><strong>Mid-frequency</strong> dimensions — interpolate between the two strategies</li>
+    </ul>
+
+    <p>Here is how positional embeddings are actually injected during the forward pass:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/yarn4.png" alt="Figure 11: YaRN forward pass">
+      <p class="figure-caption">Figure 11: YaRN forward pass — for each token position, we compute rotation angles (cos θ, sin θ) and apply pairwise coordinate rotations to the query and key vectors. The rotation is applied to pairs of dimensions (x<sub>0</sub>, x<sub>1</sub>), (x<sub>2</sub>, x<sub>3</sub>), etc.</p>
+    </div>
+
+    <h3>How rotation encodes relative position</h3>
+
+    <p>The beautiful property of RoPE is that when you compute Q × K<sup>T</sup>, the rotations combine in a way that depends only on the <strong>relative distance</strong> between the two positions, not their absolute positions. This is exactly what we want — the model should care about "how far apart are these two tokens," not "what is the exact position number."</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/yarn5.png" alt="Figure 12: How RoPE encodes relative positional information">
+      <p class="figure-caption">Figure 12: How RoPE encodes relative positional information — when query at position m and key at position n are dot-producted, the rotation angles cancel except for the difference (m - n). The attention score depends only on relative distance.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> RoPE/YaRN achieves something elegant — it injects absolute position information into queries and keys through rotation, but the resulting attention scores depend only on <em>relative</em> positions. You get the best of both worlds: position-awareness without absolute position dependence.</p>
+    </div>
+
+    <div class="qa-box">
+      <p class="question">Why do we need YaRN if RoPE already works?</p>
+      <p class="answer">RoPE works great within the training context length, but performance degrades when you try to use the model on sequences longer than it was trained on. YaRN modifies the frequency bands to enable better extrapolation — Rnj 1.5 extends from 32k to 160k tokens using this technique, achieving 79% on RULER at 128k context.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s09 ═══════════ -->
+<section class="section fade-in" id="s09">
+  <div class="container">
+    <span class="section-num">09 · CORE ATTENTION & MASKING</span>
+    <h2>Computing attention scores and applying masks</h2>
+
+    <p>Now we arrive at the heart of the transformer — the actual attention computation. In practice, this uses <strong>FlashAttention</strong> for efficiency, but let's walk through vanilla attention to understand the logic.</p>
+
+    <h3>Computing the attention matrix</h3>
+
+    <p>For each attention head, we compute the <strong>(seqlen × seqlen)</strong> matrix of attention scores:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/attn1.png" alt="Figure 13: Computing attention scores">
+      <p class="figure-caption">Figure 13: Computing the attention score matrix — each cell (i, j) represents how much token i should attend to token j. This is the Q × K<sup>T</sup> operation, producing a 16×16 matrix for our 16-token sequence.</p>
+    </div>
+
+    <p>At this point, every token can attend to every other token. But this creates two problems:</p>
+
+    <ol style="color:var(--text-dim);font-size:0.9rem;margin:12px 0 12px 20px;">
+      <li><strong>Cross-document attention:</strong> Tokens from document 1 can attend to tokens from document 2 (and vice versa). This would contaminate training.</li>
+      <li><strong>Future token attention:</strong> Token at position i can attend to token at position i+1. This breaks causality — during generation, the model shouldn't be able to "see the future."</li>
+    </ol>
+
+    <p>The solution is <strong>masking</strong>:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/attn2.png" alt="Figure 14: Attention masking and value aggregation">
+      <p class="figure-caption">Figure 14: Attention masking & value vector aggregation — the causal mask (lower triangle) prevents attending to future tokens. The segmentation mask prevents attending across documents. After masking, softmax is applied row-wise, and the result is multiplied by V to produce context vectors.</p>
+    </div>
+
+    <h3>Hybrid attention: block-local + global</h3>
+
+    <p>Here is where Rnj 1.5 gets interesting. For longer sequences (imagine 32,768 tokens instead of 16), a full causal mask would be enormous and computationally expensive. Rnj 1.5 uses <strong>hybrid attention</strong> — most layers use <strong>block-local attention</strong> (each token only attends to a local window of ~4,096 tokens), while a few layers use <strong>global attention</strong> (full causal mask).</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/attn3.png" alt="Figure 15: Hybrid attention — block local + global">
+      <p class="figure-caption">Figure 15: Hybrid attention for a 32,768-token sequence — the block-local mask (left) restricts attention to a window of 4,096, while the global mask (right) allows full causal attention. Rnj 1.5 uses 24 block-local layers and 8 global layers.</p>
+    </div>
+
+    <p>Here's another way to visualize the hybrid layout, focusing on two specific token positions:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/attn4.png" alt="Figure 16: Hybrid attention layout">
+      <p class="figure-caption">Figure 16: Hybrid attention layout — tokens at positions 9,000 and 10,000 can only attend within a 4,096-token window in block-local layers (most layers), but can attend all the way back to position 0 in the 8 global layers.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Hybrid attention is a cost-quality trade-off. Full global attention is O(n²) in sequence length — prohibitively expensive for 160k tokens. By making most layers block-local (O(n × window_size)) and only a few layers global, Rnj 1.5 achieves long-context capability at a fraction of the cost. The global layers provide the "long-range wires" that connect distant parts of the sequence.</p>
+    </div>
+
+    <div class="qa-box">
+      <p class="question">Why not make all layers global?</p>
+      <p class="answer">For a 160k sequence, a full causal attention matrix would be 160k × 160k = 25.6 billion cells per head, per layer, per forward pass. That's computationally infeasible. Block-local attention reduces this dramatically — each token only attends to ~4,096 positions. The 8 global layers (out of 32) provide enough long-range connectivity for tasks like needle-in-a-haystack retrieval, while the 24 local layers handle the heavy lifting of local language understanding.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s10 ═══════════ -->
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10 · FROM LOGITS TO OUTPUT & TRANSFORMER MATH</span>
+    <h2>The final projection and the numbers that matter</h2>
+
+    <p>After passing through all 32 transformer blocks, the output vectors are projected into a <strong>128,256-dimensional space</strong> — one dimension per vocabulary token — via a final matrix multiplication. These raw scores are called <strong>logits</strong>.</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/flow_epi.png" alt="Figure 4: From final transformer block to logits and output">
+      <p class="figure-caption">Figure 4: The output stage — vectors exit the final transformer block, pass through a final RMSNorm, then are projected to vocabulary size (128,256). Softmax converts logits into probabilities. During inference, we sample. During training, we compute cross-entropy loss.</p>
+    </div>
+
+    <p>During <strong>inference</strong>, we sample from this probability distribution (using temperature, top-p, etc.) to select the next token. During <strong>training</strong>, we compute the cross-entropy loss between the predicted distribution and the actual next token, then backpropagate.</p>
+
+    <h3>KV cache: the inference memory tax</h3>
+
+    <p>As we covered in <a href="../../beyond-the-forward-pass/01-life-of-a-prompt/">Life of a Prompt</a>, during inference the model generates one token at a time. Recomputing keys and values for all previous tokens at every step would be wasteful. Instead, we store them in a <strong>KV cache</strong>.</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/calc1.png" alt="Figure 17: KV cache calculation">
+      <p class="figure-caption">Figure 17: KV cache storage requirements — the amount of memory needed scales with sequence length, number of layers, number of KV heads, head dimension, and data type. For large models with long contexts, this can easily consume tens of gigabytes.</p>
+    </div>
+
+    <h3>Counting parameters</h3>
+
+    <p>How many learnable parameters does the model have? We just need to account for all weight matrices:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/calc2.png" alt="Figure 18: Number of learnable parameters">
+      <p class="figure-caption">Figure 18: Parameter count calculation — the 3 matrices inside the MLP and 4 matrices inside attention account for nearly all parameters. Everything else (normalization, embeddings) is relatively small.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Quick mental math:</strong> For a rough parameter count, you only need to account for the <strong>3 MLP matrices</strong> (W<sub>0</sub>, W<sub>1</sub>, W<sub>2</sub>) and <strong>4 attention matrices</strong> (Q, K, V, O projections) per layer. Everything else is negligible.</p>
+    </div>
+
+    <h3>FLOPs per token</h3>
+
+    <p>How much compute does each token require? This is critical for planning how many GPUs you need and how long training will take.</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/calc3.png" alt="Figure 19: FLOPs per token calculation">
+      <p class="figure-caption">Figure 19: FLOPs per token — the famous <strong>6N</strong> approximation. For a model with N parameters, each token requires approximately 6N FLOPs (2N for the forward pass, 4N for the backward pass). This holds when sequence length is much smaller than the model dimension.</p>
+    </div>
+
+    <div class="formula">
+      FLOPs/token ≈ 6 × N (parameters) — the rule of thumb to remember
+    </div>
+
+    <h3>Cluster sizing: from FLOPs to GPU-hours</h3>
+
+    <p>Once you know the FLOPs per token, you can calculate how many GPUs you need and how long training takes. This is the practical calculation every AI lab does before starting a training run:</p>
+
+    <div class="figure">
+      <img src="https://www.aleksagordic.com/blog/transformer/calc4.png" alt="Figure 20: Cluster sizing calculation">
+      <p class="figure-caption">Figure 20: Cluster sizing — given total tokens, FLOPs/token, GPU FLOP/s, and MFU (Model FLOP Utilization), you can compute the total GPU-hours needed. This directly translates to cost.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ CLOSING ═══════ -->
+<section class="section fade-in" id="s-closing">
+  <div class="container">
+    <span class="section-num">CLOSING · THE COMPLETE PICTURE</span>
+    <h2>The life of a token, end to end</h2>
+
+    <p>Let's retrace the full journey one final time:</p>
+
+    <div class="step-cards">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Tokenize</h4>
+          <p>Raw text → integer token IDs via BPE tokenizer. Documents packed, positions and segmentation masks constructed.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Embed</h4>
+          <p>Token IDs → 4,096-dim bf16 vectors via embedding table lookup.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>32× Transformer blocks</h4>
+          <p>Each block: RMSNorm → Multi-Head Attention (GQA + YaRN + hybrid masking) → RMSNorm → GeGLU MLP. Residual connections throughout.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>Project to vocabulary</h4>
+          <p>Final RMSNorm → linear projection to 128,256 dims → softmax → probabilities.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h4>Output</h4>
+          <p>Sample (inference) or compute loss and backpropagate (training).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout-success callout">
+      <p><strong>Connecting the dots:</strong> In <a href="../../beyond-the-forward-pass/01-life-of-a-prompt/">Life of a Prompt</a>, we traced a prompt through the <em>inference engine</em> — the wrapper that manages tokenization, batching, KV cache, and memory. In this blog, we opened the transformer itself — the actual model that those infrastructure pieces serve. Together, they form the complete picture: the engine manages <em>how</em> tokens flow, and the transformer determines <em>what</em> happens to them.</p>
+    </div>
+
+    <h3>What's next</h3>
+
+    <p>This tutorial covered the <strong>dense transformer</strong> — where every parameter is active for every token. The next frontier is <strong>conditional computation</strong>:</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:16px 0;">
+      <span class="tag tag-purple">Mixture of Experts (MoE)</span>
+      <span class="tag tag-pink">Sparse Routing</span>
+      <span class="tag tag-yellow">Speculative Decoding</span>
+      <span class="tag tag-green">MLA (Multi-Head Latent Attention)</span>
+      <span class="tag tag-blue">Multi-Token Prediction</span>
+    </div>
+
+    <h3 style="margin-top:28px;">References</h3>
+
+    <ol class="ref-list">
+      <li>Vaswani et al. — <a href="https://arxiv.org/abs/1706.03762" target="_blank">"Attention Is All You Need"</a> (2017)</li>
+      <li>Essential AI Labs — <a href="https://essential.ai/research/rnj-1" target="_blank">Rnj 1.0</a></li>
+      <li>Bavarian et al. — <a href="https://arxiv.org/abs/2207.14255" target="_blank">"Efficient Training of Language Models to Fill in the Middle"</a> (2022)</li>
+      <li>He et al. — <a href="https://arxiv.org/abs/2603.15031" target="_blank">"Attention Residual Learning"</a> (2026)</li>
+      <li>DeepSeek-AI — <a href="https://arxiv.org/abs/2405.04434" target="_blank">"DeepSeek-V2: A Strong, Economical, and Efficient MoE Language Model"</a> (2024)</li>
+      <li>Kimi Team — <a href="https://arxiv.org/abs/2510.26692" target="_blank">"Kimi Linear: An Expressive, Efficient Attention Architecture"</a> (2025)</li>
+      <li>Zhang & Sennrich — <a href="https://arxiv.org/abs/1910.07467" target="_blank">"Root Mean Square Layer Normalization"</a> (2019)</li>
+      <li>Shazeer — <a href="https://arxiv.org/abs/2002.05202" target="_blank">"GLU Variants Improve Transformer"</a> (2020)</li>
+      <li>Peng et al. — <a href="https://arxiv.org/abs/2309.00071" target="_blank">"YaRN: Efficient Context Window Extension of LLMs"</a> (2023)</li>
+      <li>Su et al. — <a href="https://arxiv.org/abs/2104.09864" target="_blank">"RoFormer: Enhanced Transformer with Rotary Position Embedding"</a> (2021)</li>
+      <li>Gordić — <a href="https://gordicaleksa.medium.com/eli5-flash-attention-5c44017022ad" target="_blank">"Eli5 Flash Attention"</a> (2023)</li>
+      <li>Jordan — <a href="https://kellerjordan.github.io/posts/muon/" target="_blank">Muon optimizer</a></li>
+      <li>Li et al. — <a href="https://arxiv.org/abs/2512.02556" target="_blank">"Dissecting Sparsity in LLMs"</a> (2025)</li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<div class="chapter-nav">
+  <span></span>
+  <span></span>
+</div>
+
+<footer class="footer">
+  <p><a href="../">← The Training Ground</a></p>
+  <p style="margin-top:8px;">Based on <a href="https://www.aleksagordic.com/blog/transformer" target="_blank">Aleksa Gordić — Inside the Transformer: The Life of a Token</a> (May 2026)</p>
+</footer>
+
+<script>
+// Fade-in on scroll
+const faders = document.querySelectorAll('.fade-in');
+const obsOpts = { threshold: 0.12 };
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, obsOpts);
+faders.forEach(f => observer.observe(f));
+
+// Sticky nav on scroll
+const nav = document.getElementById('nav');
+const heroEnd = document.querySelector('.hero').offsetHeight;
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > heroEnd - 80);
+});
+</script>
+</body>
+</html>

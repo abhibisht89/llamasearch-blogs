@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building a WaveNet — Neural Networks: Zero to Hero</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.12) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 720px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.btn-sm { font-size: 0.75rem; padding: 4px 10px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; max-width: 340px; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.qa-box { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin: 24px 0; }
+.qa-box .q { font-weight: 700; color: var(--text); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.9rem; text-align: center; color: var(--text); overflow-x: auto; line-height: 1.5; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 80px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; }
+.ln { display: inline-block; width: 32px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 14px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.08); border-left: 2px solid var(--accent); margin-left: -16px; padding-left: 14px; }
+.line.new { background: rgba(52, 211, 153, 0.08); border-left: 2px solid var(--accent3); margin-left: -16px; padding-left: 14px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.85; text-decoration: underline dotted; }
+.ln.anno:hover { opacity: 1; }
+.code-note { padding: 12px 16px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; display: none; }
+.code-note strong { color: var(--accent); }
+.code-progression { margin: 28px 0; }
+.step-caption { margin-top: 12px; font-size: 0.9rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 16px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 16px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+canvas { border-radius: var(--radius); display: block; max-width: 100%; height: auto; background: var(--bg-card-alt); border: 1px solid var(--border); }
+.arch-diagram { min-height: 220px; padding: 20px; background: var(--bg-card-alt); border-radius: var(--radius); border: 1px dashed var(--border); position: relative; }
+.arch-layer { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 12px 0; opacity: 0.25; transition: opacity 0.4s, transform 0.4s; transform: translateY(8px); }
+.arch-layer.on { opacity: 1; transform: translateY(0); }
+.arch-box { padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); font-family: var(--mono); font-size: 0.78rem; color: var(--text); }
+.arch-arrow { color: var(--text-dim); font-size: 1.2rem; }
+.dil-grid { display: flex; gap: 4px; align-items: flex-end; min-height: 120px; padding: 16px; flex-wrap: wrap; justify-content: center; }
+.dil-cell { width: 28px; height: 40px; border-radius: 4px; background: var(--border); transition: all 0.25s; }
+.dil-cell.active { background: var(--accent); box-shadow: 0 0 12px rgba(108,140,255,0.5); }
+.dil-cell.skip { opacity: 0.35; }
+.pair-viz { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 16px 0; font-family: var(--mono); font-size: 0.85rem; }
+.pair-token { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--accent2); background: rgba(167,139,250,0.12); }
+.fusion-stage { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; min-height: 100px; margin: 16px 0; }
+.fusion-node { width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--accent3); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.75rem; background: var(--bg-card); transition: transform 0.35s, border-color 0.35s; }
+.fusion-node.merge { border-color: var(--accent); transform: scale(1.08); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+.matmul-viz { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin: 20px 0; font-family: var(--mono); font-size: 0.78rem; }
+.mat-tensor { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-dim); }
+.mat-tensor strong { color: var(--accent3); }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">NN Zero to Hero</a><span class="bc-sep">›</span><span class="bc-current">Building a WaveNet</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Neural Networks: Zero to Hero</a>
+  <div class="nav-links">
+    <a href="#s0">Recap</a><a href="#s1">Goal</a><a href="#s2">WaveNet</a><a href="#s3">Hierarchy</a><a href="#s4">Flat→Tree</a>
+    <a href="#s5">block_size</a><a href="#s6">Modules</a><a href="#s7">Flatten</a><a href="#s8">Tree</a><a href="#s9">Train</a>
+    <a href="#s10">Compare</a><a href="#s11">Sequential</a><a href="#s12">PyTorch</a><a href="#s13">Results</a><a href="#s14">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Building a WaveNet</h1>
+    <p class="subtitle">From a flat character MLP to a hierarchical, WaveNet-style autoregressive model: more context, progressive fusion, modular <code>torch.nn</code>-like layers, and the shape gymnastics that make it work.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">14</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">8</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:760px;margin:0 auto;">
+      This chapter extends the makemore-style character model: you recap the three-character MLP, widen context to eight characters, then replace “squash everything at once” with a binary tree of fusions—<code>FlattenConsecutive</code>, batched linear layers, a fixed <code>BatchNorm1d</code> for 3D tensors, and a <code>Sequential</code> container so <code>logits = model(x)</code> reads like real PyTorch.
+    </p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Recap: flat MLP, three characters → fourth</h2>
+    <p>Earlier chapters built a flat character MLP: three context characters embedded, flattened, then <code>Linear → BatchNorm → tanh → Linear</code> for next-character logits (see <a href="../03-multilayer-perceptrons/">Multilayer Perceptrons</a> and <a href="../04-activations-gradients-batchnorm/">BatchNorm</a>). The same sliding-window <code>(X, Y)</code> builder and training loop carry forward here—only <code>block_size</code> and the layer stack change.</p>
+    <div class="callout">
+      <p><strong>Core constraint of the flat design:</strong> every bit of context is multiplied by one large weight matrix in the <em>first</em> linear layer. Adding context length grows that matrix quickly; more importantly, the model has no structured way to combine local patterns before mixing everything globally.</p>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Forward path (conceptual)</h3>
+        <p>Integers <code>xb</code> with shape <code>(batch, block_size)</code> become <code>(batch, block_size, n_embed)</code> after <code>Embedding</code>, then <code>(batch, block_size * n_embed)</code> after flatten, then <code>(batch, n_hidden)</code> after the first linear layer.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">forward sketch</span><span class="code-lines">shapes</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span>xb: (B, T)   <span class="cmt"># T = block_size, integer token ids</span></code>
+<code><span class="line"><span class="ln">2</span>emb: (B, T, C)   <span class="cmt"># C = n_embed</span></code>
+<code><span class="line hl"><span class="ln">3</span>flat: (B, T*C)   <span class="cmt"># one vector per example</span></code>
+<code><span class="line"><span class="ln">4</span>h: (B, n_hidden)</code>
+<code><span class="line"><span class="ln">5</span>logits: (B, vocab_size)</code></pre>
+      </div>
+    </div>
+    <div class="callout warn">
+      <p><strong>BatchNorm and “state”:</strong> running mean and variance update on every forward pass via an exponential moving average, outside the usual gradient update. You must respect <code>training</code> vs <code>eval</code>; you often need running statistics to <em>settle</em>; and because normalization pools over the minibatch, examples are no longer statistically independent inside a step. Stateful layers are powerful—and easy to misuse when the net is left in the wrong mode during validation or sampling.</p>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">In [0]</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>g = torch.Generator().manual_seed(<span class="num">2147483647</span>)</code>
+<code><span class="line hl"><span class="ln">2</span>C = torch.randn((vocab_size, n_embed), generator=g)</code>
+<code><span class="line"><span class="ln">3</span><span class="cmt"># layers use the same global g for reproducible inits</span></code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out [0]</span>
+        <pre class="output-text"># Centralized RNG avoids per-layer generator objects while iterating on the model.</pre>
+      </div>
+    </div>
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Train time</h3>
+        <p><code>BatchNorm</code> uses minibatch mean/variance (with running updates). Dropout (if present) would randomize. Gradients flow normally.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2);">Eval / sample</h3>
+        <p>Switch modules to evaluation: use running statistics, deterministic forward. For single-example batches, training-mode batch norm is especially dangerous.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Goal: more context, deeper fusion</h2>
+    <p>Two ambitions drive the redesign. First, <strong>use more than three characters</strong> of context so predictions can depend on a longer prefix. Second, <strong>avoid crushing all positions into one layer immediately</strong>—instead, build a <em>deeper</em> network that <strong>progressively fuses</strong> information: local pairs, then pairs of pairs, and so on, until a single vector is ready for the final prediction.</p>
+    <p>That inductive bias matches how hierarchical structure appears in sequences: bigrams inform trigrams, which inform longer spans. A single huge linear map from “all embeddings concatenated” can still learn, but it allocates parameters less structurally; the hierarchical layout makes the computation tree explicit.</p>
+    <p>You can always add more ordinary hidden layers <em>after</em> the giant first projection, but that does not fix the basic issue: <strong>all eight (or more) character embeddings are still combined in one shot</strong> at the shallowest level. Making that first matrix wider adds neurons; it does not change the fact that the network waits until the bottom of the stack to mix long-range context in a structured way. The WaveNet-style picture instead <strong>fuses two at a time</strong>, then fuses the resulting pairs, then fuses those groups—so depth buys you a schedule of who talks to whom, not only a deeper sandwich after a single flatten.</p>
+    <p>You might wonder whether “deeper” always beats “wider.” Not automatically: depth changes <em>how</em> representations compose; width changes how many features exist at each stage. The WaveNet picture motivates depth with locality—each stage mixes only neighboring summaries, so the network must build longer-range structure through repeated fusion rather than one abrupt projection.</p>
+    <div class="interactive-panel">
+      <h3>Hierarchical fusion animation</h3>
+      <p>Press <strong>Next step</strong> to fuse pairs bottom-up (eight leaves → four → two → one). This mirrors the “tree” processing pattern, independent of how you implement it efficiently later.</p>
+      <div class="btn-group">
+        <button type="button" class="btn" id="fusionReset">Reset</button>
+        <button type="button" class="btn active" id="fusionNext">Next step</button>
+      </div>
+      <div class="fusion-stage" id="fusionStage" aria-live="polite"></div>
+      <p class="step-caption" id="fusionCaption">Stage 0: eight character embeddings as leaves.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>WaveNet (2016): same autoregressive job, different modality</h2>
+    <p>The <strong>WaveNet</strong> architecture (van den Oord et al., DeepMind, 2016) models raw audio waveforms autoregressively—<code>P(x_t | x_{&lt;t})</code>—the same next-step objective as character-level name modeling, only the symbols are acoustic samples instead of letters. The published diagram shows a <strong>tree-like hierarchy</strong>: merge past information in stages rather than one fat input projection. <strong>Dilated causal convolutions</strong> widen the receptive field exponentially while preserving causality (no peeking at future samples); they are an efficient implementation of repeated local fusion, not a separate conceptual story.</p>
+    <div class="formula">y_t = f(x_{t-L}, …, x_{t-1})&nbsp;&nbsp;with causal masks so ∂y_t/∂x_s = 0 for s ≥ t</div>
+    <p class="step-caption" style="margin-top:8px;">Autoregressive = predict next element from a finite past; “causal” enforces that past-only dependence.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Hierarchical structure and dilated convolutions</h2>
+    <p>In a dilated causal stack, each layer can attend to inputs spaced farther apart—<strong>dilation</strong> inserts gaps between taps of the filter. Stacking layers with dilation 1, 2, 4, 8, … yields a wide receptive field with depth logarithmic in the window size. That is the “scary name” for a simple idea: <strong>combine neighbors, then neighbors of neighbors</strong>, at increasing distance.</p>
+    <div class="formula">(a *_{d} k)_i = Σ_j a_{i - d·j} · k_j&nbsp;&nbsp;<span class="cmt" style="font-style:normal;color:var(--text-dim)">(causal 1-D, dilation d)</span></div>
+    <div class="interactive-panel">
+      <h3>Dilated convolution visualizer (1-D causal taps)</h3>
+      <p>Each cell is a timestep. <strong>Active</strong> cells contribute to the output at the rightmost position. Adjust dilation to see how the pattern skips inputs.</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="color:var(--text-dim);">dilation =</label>
+        <input type="range" id="dilSlider" min="1" max="4" value="1" aria-label="dilation">
+        <span class="slider-value" id="dilVal">1</span>
+      </div>
+      <div class="dil-grid" id="dilGrid" role="img" aria-label="dilation pattern"></div>
+      <p class="step-caption" id="dilCaption"></p>
+    </div>
+    <div class="callout warn">
+      <p><strong>Implementation note:</strong> The full WaveNet uses gating, residuals, and specialized layers. This tutorial implements the <em>hierarchical fusion tree</em> and <em>batched linear</em> view first; matching the paper’s full forward pass is a separate step.</p>
+    </div>
+    <div class="callout">
+      <p><strong>Diagram vs code context length:</strong> Many WaveNet diagrams show enough fusion levels that the receptive field spans <strong>sixteen</strong> past positions (four levels of pairwise fusion). This chapter fixes <code>block_size = 8</code>, which needs <strong>three</strong> fusion stages (<code>8 → 4 → 2 → 1</code>). The geometry is the same; only depth—and therefore how far back the tree can see—changes when you add levels or change context length.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>From flat MLP to hierarchical fusion</h2>
+    <p>The implementation path is deliberate: keep <code>Embedding</code> and activations familiar, replace full flatten with <strong>pairwise grouping</strong>, and use the fact that <code>torch.matmul</code> applies the matrix on the <strong>last dimension</strong> while leaving leading dimensions as batch axes. That lets you fuse <em>all adjacent pairs in parallel</em> across both batch and position.</p>
+    <div class="code-progression" id="progFlatTree">
+      <div class="btn-group">
+        <button type="button" class="btn active" data-step="flat">Step A: Flatten all</button>
+        <button type="button" class="btn" data-step="pair">Step B: Pair flatten</button>
+        <button type="button" class="btn" data-step="depth">Step C: Stack depth</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">shapes.py</span><span class="code-lines" id="progLines">Step A</span></div>
+        <pre class="code-block" id="preFlat"><code><span class="line"><span class="ln">1</span><span class="cmt"># A: classic flat MLP input</span></code>
+<code><span class="line hl"><span class="ln">2</span>e = emb(x)                 <span class="cmt"># (B, T, C)</span></code>
+<code><span class="line"><span class="ln">3</span>h = linear(e.view(B, T*C))  <span class="cmt"># (B, T*C) @ W → (B, H)</span></code></pre>
+        <pre class="code-block" id="prePair" style="display:none"><code><span class="line"><span class="ln">1</span><span class="cmt"># B: keep time grouped by pairs</span></code>
+<code><span class="line new hl"><span class="ln">2</span>e = emb(x)                 <span class="cmt"># (B, T, C)</span></code>
+<code><span class="line new"><span class="ln">3</span>e = e.view(B, T//2, 2*C)    <span class="cmt"># (B, T/2, 2C)</span></code>
+<code><span class="line new"><span class="ln">4</span>h = linear(e)               <span class="cmt"># last dim 2C → H</span></code></pre>
+        <pre class="code-block" id="preDepth" style="display:none"><code><span class="line"><span class="ln">1</span><span class="cmt"># C: repeat fuse until one group</span></code>
+<code><span class="line new hl"><span class="ln">2</span>... FlattenConsecutive(2) → Linear → BN → tanh</code>
+<code><span class="line new"><span class="ln">3</span>... repeat while time dimension &gt; 1</code>
+<code><span class="line new"><span class="ln">4</span>... final Linear → logits</code></pre>
+      </div>
+      <p class="step-caption" id="progCaption">Step A: one large matrix maps the full concatenated embedding.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Increasing <code>block_size</code> from 3 to 8</h2>
+    <p>Changing <code>block_size</code> rebuilds the dataset: each example now provides <strong>eight</strong> context characters and asks for the ninth. Parameter count jumps because the first linear layer’s input dimension scales with <code>block_size * n_embed</code> in the flat layout—even before you switch to hierarchical fusion. On a typical names corpus, bumping context from three to eight characters increases the first-layer fan-in and can add on the order of <strong>~10&nbsp;000</strong> extra parameters in that matrix alone compared to the three-character setup—before you change hidden width or depth.</p>
+    <p>On a typical names corpus, the sliding window over words produces on the order of <strong>~182k</strong> training tuples when <code>block_size = 3</code>; increasing <code>block_size</code> changes how many partial windows each word contributes, so <code>N</code> moves accordingly (see the MLP chapters for the full <code>(X, Y)</code> builder).</p>
+    <p>Empirically, simply giving the flat MLP more context often <strong>improves validation loss</strong> before any architectural fancy footwork: the model has more signal about the prefix. Treat that as a <strong>baseline</strong>: scaling context is a legitimate win; the hierarchical design is about <em>how</em> you spend parameters and compute on that wider window.</p>
+    <p>Concrete numbers from a typical run: with three-character context, validation loss might sit around <strong>2.10</strong>. After rebuilding the dataset with eight characters but <em>keeping</em> the flat MLP, validation can drop to about <strong>2.02</strong>—a clear gain from context alone. Qualitatively, samples usually look <strong>more name-like</strong> at that point. The hierarchical rebuild is then compared against this stronger baseline, not against the old three-character model.</p>
+    <p>Row counts move when you change <code>block_size</code>: one representative build produced <code>X.shape[0] == 228&nbsp;146</code> for eight-character contexts, while the three-character build on the same corpus sat near <strong>182&nbsp;000</strong> rows. The relationship is not monotonic in a simple closed form—it depends on word lengths, how start tokens pad short prefixes, and how you count boundary positions—so always print <code>X.shape</code> after rebuilding the dataset rather than assuming.</p>
+    <p>A useful performance log keeps a few scalars per experiment: <code>block_size</code>, parameter count, best validation loss, and qualitative samples. Without a harness, you still learn—but comparisons across runs stay fuzzy. Later chapters can formalize sweeps; here the focus stays on architecture and tensor shapes.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">In [1]</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>BLOCK_SIZE = <span class="num">8</span></code>
+<code><span class="line"><span class="ln">2</span><span class="cmt"># build X, Y from names: each row length BLOCK_SIZE</span></code>
+<code><span class="line hl"><span class="ln">3</span><span class="fn">print</span>(X.shape, Y.shape)  <span class="cmt"># (N, 8), (N,)</span></code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out [1]</span>
+        <pre class="output-text">torch.Size([228146, 8]) torch.Size([228146])
+# example counts depend on corpus; ~182k+ for typical name lists</pre>
+      </div>
+    </div>
+    <div class="interactive-panel">
+      <h3>Token pairing visualization</h3>
+      <p>Eight characters are grouped into four consecutive pairs—the first stage of the tree. Drag <strong>pair width</strong> to see how <code>n</code> in <code>FlattenConsecutive(n)</code> would pack embeddings (demo uses letters).</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="color:var(--text-dim);">chars per group =</label>
+        <input type="range" id="pairSlider" min="2" max="4" value="2" aria-label="group size">
+        <span class="slider-value" id="pairVal">2</span>
+      </div>
+      <div class="pair-viz" id="pairViz"></div>
+      <p class="step-caption">With group size 2 and eight tokens, you obtain four groups—ready for parallel linear maps.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Modular layers: <code>Linear</code>, <code>BatchNorm1d</code>, <code>Tanh</code>, <code>Embedding</code>, <code>FlattenConsecutive</code>, <code>Sequential</code></h2>
+    <p>Each building block exposes <code>parameters()</code> and a <code>forward</code> method, mirroring <code>torch.nn.Module</code> ergonomics. <code>Linear</code> wraps <code>matmul</code> plus optional bias; <code>BatchNorm1d</code> tracks running mean and variance; <code>Tanh</code> is elementwise; <code>Embedding</code> is a lookup table; <code>FlattenConsecutive</code> reshapes without copying memory.</p>
+    <p><code>Sequential</code> is a <strong>container</strong>: it holds an ordered list of layers and forwards input through each in turn, aggregating parameters from children. Once the model is a <code>Sequential</code>, training and sampling both become <code>logits = model(x)</code>—provided you remember <code>training</code> flags for batch norm.</p>
+    <div class="callout warn">
+      <p><strong>Gotcha after the refactor:</strong> if you rename <code>layers</code> to <code>model</code> but reuse a stale object from before the rebuild, weights may not match the code you are editing—and batch norm may stay in the wrong mode. After any structural change, reconstruct the model and set evaluation flags before trusting loss or samples.</p>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>Sequential</code> container</h3>
+        <p><code>Sequential</code> is a container module: it composes child layers and aggregates their parameters. A plain Python list is not enough—a list does not recurse into children for <code>parameters()</code> or nest cleanly inside other containers.</p>
+      </div>
+      <div class="code-panel" id="panelSequential">
+        <div class="code-header"><span class="code-filename">makemore.py</span><span class="code-lines">Sequential</span></div>
+        <pre class="code-block annotated"><code><span class="line" data-note="Store ordered child layers; often a list, could be generalized."><span class="ln anno" title="Click for note">1</span><span class="kw">class</span> <span class="fn">Sequential</span>:</code>
+<code><span class="line" data-note="Forward = compose: x passes through each layer left to right."><span class="ln anno" title="Click for note">2</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">layers</span>):</code>
+<code><span class="line"><span class="ln">3</span>        self.layers = layers</code>
+<code><span class="line hl" data-note="This is exactly model(x) in PyTorch — call forward."><span class="ln anno" title="Click for note">4</span>    <span class="kw">def</span> <span class="fn">__call__</span>(<span class="arg">self</span>, <span class="arg">x</span>):</code>
+<code><span class="line"><span class="ln">5</span>        <span class="kw">for</span> layer <span class="kw">in</span> self.layers:</code>
+<code><span class="line"><span class="ln">6</span>            x = layer(x)</code>
+<code><span class="line"><span class="ln">7</span>        <span class="kw">return</span> x</code>
+<code><span class="line"><span class="ln">8</span>    <span class="kw">def</span> <span class="fn">parameters</span>(<span class="arg">self</span>):</code>
+<code><span class="line"><span class="ln">9</span>        <span class="kw">return</span> [p <span class="kw">for</span> layer <span class="kw">in</span> self.layers <span class="kw">for</span> p <span class="kw">in</span> layer.parameters()]</code></pre>
+        <div class="code-note" id="seqNote"></div>
+      </div>
+    </div>
+    <p>Initializing a single global <code>torch.Generator</code> (instead of ad-hoc generators inside each layer) keeps seeding predictable while you iterate on the model. The pattern mirrors how small libraries centralize RNG state before scaling up training code.</p>
+    <p>Pulling the embedding table <code>C</code> and the old manual <code>view</code> into modules is mostly housekeeping: <code>Embedding</code> wraps the integer index lookup; <code>Flatten</code> (or the full-sequence flatten you had before <code>FlattenConsecutive</code>) wraps the reshape that <strong>concatenates</strong> character vectors along the last axis for free when memory is contiguous. Once those sit in the layer list, the training loop’s forward pass can start from raw <code>xb</code> integers and become a single composed call—same numerics, fewer lines, fewer places to forget a step.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>Embedding</code>: table lookup</h3>
+        <p>The embedding matrix has shape <code>(vocab_size, n_embed)</code>. Integer indices in <code>x</code> select rows; the output preserves all leading dimensions and appends <code>n_embed</code>. In PyTorch, <code>nn.Embedding</code> wraps the same idea with additional options (padding indices, sparse gradients, etc.).</p>
+      </div>
+      <div class="code-panel" id="panelEmbed">
+        <div class="code-header"><span class="code-filename">makemore.py</span><span class="code-lines">Embedding · L1–12</span></div>
+        <pre class="code-block annotated"><code><span class="line" data-note="num_embeddings × embedding_dim, same as nn.Embedding(num, dim)."><span class="ln anno" title="Click for note"> 1</span><span class="kw">class</span> <span class="fn">Embedding</span>:</code>
+<code><span class="line"><span class="ln"> 2</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">num_embeddings</span>, <span class="arg">embedding_dim</span>):</code>
+<code><span class="line hl"><span class="ln"> 3</span>        self.weight = torch.randn((num_embeddings, embedding_dim))</code>
+<code><span class="line"><span class="ln"> 4</span>    <span class="kw">def</span> <span class="fn">__call__</span>(<span class="arg">self</span>, <span class="arg">IX</span>):</code>
+<code><span class="line"><span class="ln"> 5</span>        self.out = self.weight[IX]</code>
+<code><span class="line"><span class="ln"> 6</span>        <span class="kw">return</span> self.out</code>
+<code><span class="line"><span class="ln"> 7</span>    <span class="kw">def</span> <span class="fn">parameters</span>(<span class="arg">self</span>):</code>
+<code><span class="line"><span class="ln"> 8</span>        <span class="kw">return</span> [self.weight]</code></pre>
+        <div class="code-note" id="embedNote"></div>
+      </div>
+    </div>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3><code>Linear</code>: last-axis multiply</h3>
+        <p>Weights <code>(fan_in, fan_out)</code> multiply the last dimension of the input. Bias broadcasts over all batch axes. Scaling initialization down on the final logits layer avoids starting confidently wrong when the vocabulary is large.</p>
+      </div>
+      <div class="code-panel" id="panelLinear">
+        <div class="code-header"><span class="code-filename">makemore.py</span><span class="code-lines">Linear · forward</span></div>
+        <pre class="code-block annotated"><code><span class="line hl" data-note="@ reduces only the last dim; all leading dims batch together."><span class="ln anno" title="Click for note">1</span>self.out = x @ self.weight + self.bias</code>
+<code><span class="line" data-note="bias shape (fan_out,) broadcasts to every row/group."><span class="ln anno" title="Click for note">2</span><span class="kw">return</span> self.out</code></pre>
+        <div class="code-note" id="linNote"></div>
+      </div>
+    </div>
+    <div class="callout warn">
+      <p><strong>BatchNorm quirks (recap):</strong> running statistics update outside plain backprop; train vs eval behavior differs; and the layer couples examples within a minibatch to estimate variance. State in modules is powerful—and easy to get wrong when you forget <code>model.eval()</code> or reuse a cell that left <code>training=True</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2><code>FlattenConsecutive</code>: pack neighbors on the last axis</h2>
+    <p>Given <code>(B, T, C)</code>, the old <code>Flatten</code> did <code>view(B, T*C)</code>. <code>FlattenConsecutive(n)</code> instead forms <code>(B, T/n, n*C)</code> when <code>n</code> divides <code>T</code>, treating each group of <code>n</code> consecutive positions as a single fat feature vector for the next linear layer.</p>
+    <p>If <code>T/n == 1</code>, the middle dimension is a <strong>spurious</strong> 1 and can be <code>squeeze</code>d back to <code>(B, n*C)</code> so the API stays compatible with earlier two-dimensional tensors. When <code>block_size</code> was <strong>three</strong>, the old flatten concatenated <strong>all three</strong> embeddings at once—equivalent to <code>FlattenConsecutive</code> with <code>n == block_size</code>. Naming the general layer <code>FlattenConsecutive</code> avoids confusion with <code>torch.nn.Flatten</code>: PyTorch’s version takes <code>start_dim</code> / <code>end_dim</code> and behaves slightly differently, so the APIs are <strong>not</strong> drop-in identical.</p>
+    <p>For debugging shapes, prefer explicit <code>T // n</code> in the <code>view</code> instead of leaning on <code>-1</code> everywhere: you want a clear error the moment a dimension does not divide evenly, rather than a silent reshape that scrambles time and batch.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Why <code>view</code> matches explicit even/odd stacking</h3>
+        <p>For evenly spaced rows in memory, <code>view(B, T//n, n*C)</code> places the same elements you would get from splitting even and odd indices and <code>cat</code> along the feature axis—without an extra copy. That is the same trick as viewing a length-10 vector as <code>(2,5)</code> versus <code>(5,2)</code>: layout determines meaning.</p>
+      </div>
+      <div class="code-panel" id="panelFlat">
+        <div class="code-header"><span class="code-filename">makemore.py</span><span class="code-lines">FlattenConsecutive</span></div>
+        <pre class="code-block annotated"><code><span class="line" data-note="n = how many consecutive time steps to fuse into the last dim."><span class="ln anno" title="Click for note"> 1</span><span class="kw">class</span> <span class="fn">FlattenConsecutive</span>:</code>
+<code><span class="line"><span class="ln"> 2</span>    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="arg">self</span>, <span class="arg">n</span>):</code>
+<code><span class="line"><span class="ln"> 3</span>        self.n = n</code>
+<code><span class="line hl" data-note="B=batch, T=time, C=channels per token embedding."><span class="ln anno" title="Click for note"> 4</span>    <span class="kw">def</span> <span class="fn">__call__</span>(<span class="arg">self</span>, <span class="arg">x</span>):</code>
+<code><span class="line"><span class="ln"> 5</span>        B, T, C = x.shape</code>
+<code><span class="line"><span class="ln"> 6</span>        x = x.view(B, T//self.n, C*self.n)</code>
+<code><span class="line" data-note="If only one group remains, drop the middle dim of size 1."><span class="ln anno" title="Click for note"> 7</span>        <span class="kw">if</span> x.shape[<span class="num">1</span>] == <span class="num">1</span>:</code>
+<code><span class="line"><span class="ln"> 8</span>            x = x.squeeze(<span class="num">1</span>)</code>
+<code><span class="line"><span class="ln"> 9</span>        <span class="kw">return</span> x</code></pre>
+        <div class="code-note" id="flatNote"></div>
+      </div>
+    </div>
+    <p>Indexing tricks in pure Python preview the same grouping: even positions <code>0::2</code> and odd positions <code>1::2</code>, then concatenating along the feature axis, reproduces the pair packing that <code>view(B, T//2, 2*C)</code> achieves without copies when memory is contiguous.</p>
+    <div class="callout">
+      <p><strong>Same idea as slicing a Python list:</strong> take <code>list(range(10))</code>. Indices <code>[0::2]</code> pick <code>0,2,4,6,8</code>; indices <code>[1::2]</code> pick <code>1,3,5,7,9</code>. Stack those two halves along the feature axis and you have explicitly separated <em>even</em> and <em>odd</em> time positions. On a contiguous embedding tensor <code>e</code> with shape <code>(B, T, C)</code>, the operations <code>e[:, 0::2, :]</code>, <code>e[:, 1::2, :]</code>, and <code>torch.cat(..., dim=2)</code> build the same <code>(B, T/2, 2C)</code> layout that <code>e.view(B, T//2, 2*C)</code> produces—use the explicit version once to build intuition, then keep the <code>view</code> for speed.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">scratch.py</span><span class="code-lines">explicit pairs</span></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>even = e[:, <span class="num">0</span>::<span class="num">2</span>, :]   <span class="cmt"># (B, T/2, C)</span></code>
+<code><span class="line"><span class="ln">2</span>odd  = e[:, <span class="num">1</span>::<span class="num">2</span>, :]</code>
+<code><span class="line hl"><span class="ln">3</span>explicit = torch.cat([even, odd], dim=<span class="num">2</span>)  <span class="cmt"># (B, T/2, 2C)</span></code>
+<code><span class="line"><span class="ln">4</span><span class="fn">assert</span> torch.all(explicit == e.view(B, T//<span class="num">2</span>, <span class="num">2</span>*C))</code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Tree structure: pairs of two, then again, then predict</h2>
+    <p>With <code>block_size = 8</code> and <code>n = 2</code> at each stage, tensor time lengths go <code>8 → 4 → 2 → 1</code>. After each fusion, a linear layer maps <code>2*channels → hidden</code>, batch norm and nonlinearity stabilize and break symmetry, and the next <code>FlattenConsecutive(2)</code> prepares the following pairwise merge.</p>
+    <p>A full WaveNet diagram may show more layers and a longer receptive field; the code you build for eight characters is the same <strong>black subtree</strong> repeated conceptually—convolutions later slide that subtree along positions to reuse intermediate nodes.</p>
+    <div class="interactive-panel">
+      <h3>Architecture diagram: build layer by layer</h3>
+      <p>Click through to see how data flows from raw token IDs to logits. Sticky code panels elsewhere mirror this ordering.</p>
+      <div class="btn-group" id="archBtns">
+        <button type="button" class="btn active" data-layer="0">0 · IDs</button>
+        <button type="button" class="btn" data-layer="1">1 · Embed</button>
+        <button type="button" class="btn" data-layer="2">2 · Flatten₂</button>
+        <button type="button" class="btn" data-layer="3">3 · Block ×3</button>
+        <button type="button" class="btn" data-layer="4">4 · Logits</button>
+      </div>
+      <div class="arch-diagram" id="archDiagram"></div>
+    </div>
+    <h3 style="margin-top:32px;">Shape walkthrough (<code>B=4</code>, <code>T=8</code>, <code>C=10</code>, <code>H=200</code> before matching params)</h3>
+    <p>Printing <code>type(layer).__name__</code> and <code>out.shape</code> after each step catches silent broadcasting bugs early. The hierarchical stack looks like this (numbers are representative of the tutorial run, not mandatory):</p>
+    <div class="formula">(B=4, T=8, C=10) → embed → (4, 8, 10) → FlattenConsecutive(2) → (4, 4, 20) → Linear(20, 200): (4, 4, 20) @ W<sub>(20×200)</sub> + b<sub>(200)</sub> → (4, 4, 200)</div>
+    <p>The key linear-algebra fact is that <code>@</code> always multiplies the <strong>last</strong> axis of the left tensor with the weight matrix. A “surprise” that often unlocks hierarchical designs: the left operand does <strong>not</strong> have to be two-dimensional. If it were <code>(4, 5, 80)</code> instead, the same <code>80×200</code> weight would emit <code>(4, 5, 200)</code>—every leading dimension is treated as an independent <strong>batch</strong> axis. That is what lets you fuse <strong>four</strong> adjacent pairs inside each example <em>in parallel</em>, while still processing a minibatch of examples.</p>
+    <div class="card card-alt" style="margin-top:16px;">
+      <ul style="list-style:none;color:var(--text-dim);font-family:var(--mono);font-size:0.82rem;line-height:1.9;">
+        <li><span style="color:var(--accent3);">●</span> <code>Embedding</code> → <code>(4, 8, 10)</code></li>
+        <li><span style="color:var(--accent3);">●</span> <code>FlattenConsecutive(2)</code> → <code>(4, 4, 20)</code></li>
+        <li><span style="color:var(--accent3);">●</span> <code>Linear</code> (20→200) → <code>(4, 4, 200)</code></li>
+        <li><span style="color:var(--accent3);">●</span> <code>BatchNorm1d</code> + <code>Tanh</code> → same rank, per-channel stats</li>
+        <li><span style="color:var(--accent3);">●</span> <code>FlattenConsecutive(2)</code> → <code>(4, 2, 400)</code></li>
+        <li><span style="color:var(--accent3);">●</span> <code>Linear</code> (400→200) → <code>(4, 2, 200)</code></li>
+        <li><span style="color:var(--accent3);">●</span> <code>BN + Tanh</code> → <code>(4, 2, 200)</code></li>
+        <li><span style="color:var(--accent3);">●</span> <code>FlattenConsecutive(2)</code> → <code>(4, 400)</code> after squeeze</li>
+        <li><span style="color:var(--accent3);">●</span> <code>Linear</code> → logits <code>(4, vocab_size)</code></li>
+      </ul>
+    </div>
+    <p>When matching parameter counts between architectures, a hidden width near <strong>68</strong> can land both flat and hierarchical models around <strong>~22k</strong> parameters—useful for a controlled comparison. Pushing capacity to ~76k by widening embeddings and hidden layers is where validation loss near <strong>1.99</strong> becomes reachable with longer optimization.</p>
+    <div class="code-progression" id="progModel">
+      <div class="btn-group">
+        <button type="button" class="btn active" data-mstep="m1">Flat MLP list</button>
+        <button type="button" class="btn" data-mstep="m2">Hierarchical list</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">model.py</span><span class="code-lines" id="modelStepLab">Sequential build</span></div>
+        <pre class="code-block" id="mstep1"><code><span class="line"><span class="ln">1</span>model = Sequential([</code>
+<code><span class="line"><span class="ln">2</span>  Embedding(vocab_size, n_embed),</code>
+<code><span class="line"><span class="ln">3</span>  Flatten(),</code>
+<code><span class="line hl"><span class="ln">4</span>  Linear(n_embed * block_size, n_hidden),</code>
+<code><span class="line"><span class="ln">5</span>  BatchNorm1d(n_hidden), Tanh(),</code>
+<code><span class="line"><span class="ln">6</span>  Linear(n_hidden, vocab_size),</code>
+<code><span class="line"><span class="ln">7</span>])</code></pre>
+        <pre class="code-block" id="mstep2" style="display:none"><code><span class="line"><span class="ln">1</span>model = Sequential([</code>
+<code><span class="line"><span class="ln">2</span>  Embedding(vocab_size, n_embed),</code>
+<code><span class="line new hl"><span class="ln">3</span>  FlattenConsecutive(2), Linear(n_embed * 2, n_hidden),</code>
+<code><span class="line new"><span class="ln">4</span>  BatchNorm1d(n_hidden), Tanh(),</code>
+<code><span class="line new"><span class="ln">5</span>  FlattenConsecutive(2), Linear(n_hidden * 2, n_hidden),</code>
+<code><span class="line new"><span class="ln">6</span>  BatchNorm1d(n_hidden), Tanh(),</code>
+<code><span class="line new"><span class="ln">7</span>  FlattenConsecutive(2), Linear(n_hidden * 2, n_hidden),</code>
+<code><span class="line new"><span class="ln">8</span>  BatchNorm1d(n_hidden), Tanh(),</code>
+<code><span class="line new"><span class="ln">9</span>  Linear(n_hidden, vocab_size),</code>
+<code><span class="line"><span class="ln">10</span>])</code></pre>
+      </div>
+      <p class="step-caption" id="modelCap">Flat: one big linear sees all positions at once. Tree: three fusion stages for block_size=8.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Training the deeper hierarchical model</h2>
+    <p>The training loop stays familiar: sample a minibatch of contexts, forward through <code>model</code>, cross-entropy against next characters, <code>backward</code>, optimizer step. Two practical fixes matter enormously when prototyping.</p>
+    <p>First, <strong>smooth the loss curve</strong> for plotting: averaging consecutive loss values (for example reshaping the loss history into rows of 1000 and taking row means) removes scratchy variance from small batches. Second, when <code>BatchNorm</code> is in <strong>training</strong> mode, passing a batch of size one during sampling uses batch statistics with undefined variance—switch to eval mode and use running statistics.</p>
+    <p>Small minibatches—for example <strong>32</strong> contexts per step—make the <em>instantaneous</em> cross-entropy bounce wildly: a few easy or hard names in a batch swing the scalar up and down. If <code>lossi</code> is a long Python list of per-step losses, convert it with <code>torch.tensor(lossi)</code>, then <code>.view(-1, 1000).mean(dim=1)</code> so each plotted point is the mean of <strong>1000</strong> consecutive steps. On a 200k-step run that yields <strong>200</strong> smooth points; the curve then clearly shows the phase where <strong>learning-rate decay</strong> drains energy from the optimizer and lets the trajectory settle into a late plateau—structure that is almost invisible in the raw trace.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">In [3]</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>lossi = torch.tensor(loss_log)</code>
+<code><span class="line hl"><span class="ln">2</span>smooth = lossi.view(<span class="op">-</span><span class="num">1</span>, <span class="num">1000</span>).mean(dim=<span class="num">1</span>)</code>
+<code><span class="line"><span class="ln">3</span>plt.plot(smooth)</code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out [3]</span>
+        <pre class="output-text"># 200 rows × 1000 cols if len(lossi)==200_000
+# Row mean = smoother training curve for visual inspection</pre>
+      </div>
+    </div>
+    <div class="callout warn">
+      <p><strong>Sampling bug you can actually hit:</strong> after refactoring to <code>model(x)</code>, if the cell that rebuilds <code>model</code> does not re-run, batch norm may stay in training mode while you sample with a <strong>single-row</strong> context. Variance over one scalar is ill-defined; NaNs poison everything downstream. Fix: <code>for layer in model.layers: layer.training=False</code> (or equivalent) before evaluation, and give contexts shape <code>(1, T)</code> so the batch dimension exists.</p>
+    </div>
+    <div class="callout">
+      <p><strong>Why BatchNorm “breaks” on a batch of one in training mode:</strong> training-mode batch norm estimates variance from the current minibatch. With a single scalar activation (or a degenerate slice), that estimate is <strong>not defined</strong> in the usual sense—the spread of one number is not a meaningful statistic. Concretely, you can see this in toy code: the variance of the lone value <strong>5</strong> does not behave like a stable population variance. The layer may not always throw a loud error; instead you can get <code>nan</code> values that propagate through <code>tanh</code> and the rest of the forward pass, so <strong>loss can look fine during training</strong> while <strong>sampling returns garbage</strong>. The fix is eval mode plus running statistics, not a larger vocabulary.</p>
+    </div>
+    <p>When training and validation loss track closely, you are often <strong>not</strong> wildly overfitting yet—there may still be room from capacity and architecture. The opposite pattern (train low, val high) would push you toward regularization or more data; here the story is “underfitting relative to what a bigger net could do.”</p>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">train loop</span><span class="code-lines">essential</span></div>
+      <pre class="code-block annotated"><code><span class="line" data-note="Integer tensor (B, T) — no embedding yet in variable name."><span class="ln anno" title="Click for note">1</span>logits = model(xb)</code>
+<code><span class="line"><span class="ln">2</span>loss = F.cross_entropy(logits, yb)</code>
+<code><span class="line hl" data-note="Zero grads, backprop, step — same as earlier chapters."><span class="ln">3</span>loss.backward()</code>
+<code><span class="line"><span class="ln">4</span>optimizer.step()</code></pre>
+      <div class="code-note" id="trainNote"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Flat MLP vs hierarchical model</h2>
+    <p>When you match <strong>parameter counts</strong> between a wide flat model and a hierarchical one (for example tuning hidden size so both land near ~22k parameters), validation loss may look nearly identical at first—architecture alone is not a free lunch without tuning. After fixing <code>BatchNorm</code> reduction axes for 3D tensors, you may see a small additional gain because statistics are estimated over <code>batch × time_groups</code> rather than batch alone.</p>
+    <p>Representative matched-capacity numbers: a flat eight-character model might reach validation loss about <strong>2.027</strong> after a decent training schedule. A first hierarchical cut at the same ~<strong>22k</strong> parameters (hidden width tuned to match—e.g. <strong>68</strong> hidden units in the tree variant) can land near <strong>2.029</strong>—essentially the same score, which is what you expect if the bottleneck is optimization and hyperparameters, not the logo on the diagram. After correcting BatchNorm so time positions contribute to the same running statistics, the hierarchical run might improve to about <strong>2.022</strong>. That is a <em>small</em> delta; it may or may not be statistically significant on a single seed, but the direction matches the diagnosis that the buggy norm was maintaining <strong>separate</strong> statistics per temporal group.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Flat MLP</h3>
+        <p>Single fusion of all positions upfront. Simple shapes, fewer steps to debug. Parameter efficiency scales bluntly with <code>T·C</code> in the first matrix.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2);">Hierarchical (WaveNet-style)</h3>
+        <p>Repeated local linear maps mirror a binary tree. Better structural prior for combining local context before global prediction; requires correct BN over batch+time.</p>
+      </div>
+    </div>
+    <div class="interactive-panel">
+      <h3>Loss curve comparison (schematic)</h3>
+      <p>Representative validation metrics from a typical training run: extending context helps the flat model; hierarchy plus BN fix refines further; scaling capacity pushes below 2.0 nats. Drag the vertical marker to read off approximate values.</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="color:var(--text-dim);">step (×1000) =</label>
+        <input type="range" id="lossSlider" min="0" max="100" value="85" aria-label="training step">
+        <span class="slider-value" id="lossStepLab">85k</span>
+      </div>
+      <canvas id="lossCanvas" width="640" height="280"></canvas>
+      <p class="step-caption" id="lossReadout"></p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Code quality: <code>Sequential</code> and clean modules</h2>
+    <p>Refactoring scattered forward logic into layers plus a container pays off twice: <strong>readability</strong> (the model’s story is a list) and <strong>correctness</strong> (one place to set <code>training=False</code> for every batch norm when evaluating). After the refactor, rebuild the model whenever you change layer definitions—stale objects are a common source of confusing eval bugs.</p>
+    <p>You might wonder whether explicit <code>view</code> calls are “cheating.” They are not: they document intent and fail fast when shapes disagree. Prefer explicit <code>T // n</code> over excessive negative-one dimensions when you want clearer error messages during prototyping.</p>
+    <p>Define all layers in one place, sanity-check parameter count (~12k for a tiny flat model, tens of thousands after widening), then share one forward path for training and sampling—the same endgame as production PyTorch code.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Before</h3>
+        <p>Embedding lookup, <code>view</code>, and matmul spelled out in the training loop; easy to mistype a dimension when experimenting.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent);">After</h3>
+        <p><code>Sequential</code> lists the story top-to-bottom; evaluation, sampling, and training share one forward path.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <p><strong>Key takeaway:</strong> containers are not “object-oriented ceremony”—they are how frameworks recurse parameters, hook optimizers, and (later) load checkpoints. Your minimal <code>Sequential</code> is the same structural idea as <code>nn.Sequential</code>, just without the extra utilities.</p>
+    </div>
+    <p>A workflow that shows up constantly in practice: prototype new layers and shape logic in a <strong>Jupyter</strong> notebook—print shapes after every line, break after the first forward pass, fix bugs in isolation—then, once the tensors line up, <strong>copy the vetted code</strong> into a real repository and launch longer runs from an editor such as <strong>VS Code</strong>. The notebook is where you babysit ranks and broadcasting; the repo is where you keep training scripts, configs, and version control. Neither replaces the other.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Mapping to real <code>torch.nn</code></h2>
+    <p>Your hand-rolled modules correspond closely to PyTorch’s: <code>nn.Linear</code>, <code>nn.BatchNorm1d</code>, <code>nn.Tanh</code>, <code>nn.Embedding</code>, <code>nn.Flatten</code> (different kwargs—hence the custom name), and <code>nn.Sequential</code>. The important API deviation called out in careful implementations is <strong>tensor layout</strong>: PyTorch <code>BatchNorm1d</code> on 3D inputs assumes <code>(N, C, L)</code> and normalizes over <code>N</code> and <code>L</code> for fixed <code>C</code>. This tutorial’s convention keeps <strong>channels last</strong>—<code>(N, L, C)</code>—and reduces over leading batch/length dimensions instead. Both are valid; mixing them without translation causes silent shape bugs.</p>
+    <div class="callout">
+      <p><strong>Debugging heuristic:</strong> print <code>tensor.shape</code> after every layer when introducing a new layout. Inspect <code>running_mean.shape</code> in batch norm: it should carry one statistic per channel, not per spurious position.</p>
+    </div>
+    <div class="comparison">
+      <div class="card">
+        <h3>PyTorch <code>nn.BatchNorm1d</code> (3D)</h3>
+        <p>Documented layouts are <code>(N, C)</code> or <code>(N, C, L)</code>: the channel axis <code>C</code> sits in the <strong>middle</strong>. For volumetric 3D inputs, the layer reduces over the batch dimension <code>N</code> and the length dimension <code>L</code>, treating <code>C</code> as the feature vector per position.</p>
+      </div>
+      <div class="card">
+        <h3>This chapter (channels last)</h3>
+        <p>Activations are <code>(N, L, C)</code>: time or sequence length <code>L</code> precedes channels. Batch norm must reduce over <code>(0, 1)</code> so each of the <code>C</code> channels gets <strong>one</strong> running mean—not <code>L</code> separate means per channel slice.</p>
+      </div>
+    </div>
+    <table class="card" style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.8rem;color:var(--text-dim);">
+      <thead>
+        <tr style="color:var(--text);text-align:left;border-bottom:1px solid var(--border);">
+          <th style="padding:10px;">Hand-rolled</th>
+          <th style="padding:10px;">torch.nn</th>
+          <th style="padding:10px;">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px;">Linear</td><td style="padding:10px;">nn.Linear</td><td style="padding:10px;">Same <code>fan_in → fan_out</code> idea; bias optional.</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px;">BatchNorm1d</td><td style="padding:10px;">nn.BatchNorm1d</td><td style="padding:10px;">Official 3D layout is NCL; ours is NLC—translate or permute.</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px;">Tanh</td><td style="padding:10px;">nn.Tanh</td><td style="padding:10px;">Elementwise; identical story.</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px;">Embedding</td><td style="padding:10px;">nn.Embedding</td><td style="padding:10px;">PyTorch adds padding_idx, scaling, sparse, …</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:10px;">Flatten</td><td style="padding:10px;">nn.Flatten</td><td style="padding:10px;">Start/end dim kwargs differ from toy <code>view(B,-1)</code>.</td></tr>
+        <tr><td style="padding:10px;">FlattenConsecutive</td><td style="padding:10px;">(custom)</td><td style="padding:10px;">No one-liner with identical semantics+name; reshape/conv stacks replace it.</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:20px;">At this point in a from-scratch curriculum, you have effectively <strong>unlocked mental models for <code>torch.nn</code></strong>: modules nest, stateful layers exist, and <code>Sequential</code> is only the simplest container—later, <code>ModuleList</code> and <code>ModuleDict</code> appear when forward paths branch.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Performance, batch-norm fix, and convolutions as a for-loop</h2>
+    <p>Representative numbers from a full notebook-style run: validation loss might move from about <strong>2.10</strong> (three-character context) to about <strong>2.02</strong> after widening context to eight with a flat MLP alone. Matching parameter counts between flat and hierarchical stacks often lands both near <strong>2.03</strong> nats—for example <strong>2.027</strong> vs <strong>2.029</strong> in one log—until batch norm is audited for 3D activations; fixing the reduction axes can nudge the tree model toward about <strong>2.022</strong>. Scaling embeddings to <strong>24</strong> and widening hidden layers to roughly <strong>76k</strong> parameters can push validation toward about <strong>1.993</strong>—crossing below <strong>2.0</strong> is a satisfying milestone even when hyperparameters are not fully grid-searched.</p>
+    <p>Qualitatively, samples after better validation loss tend to look <strong>more name-like</strong>—still sometimes novel relative to the training list, but with improved letter statistics and morphology. Numbers alone never tell the whole story; keep a handful of printed samples per checkpoint.</p>
+    <p>The <strong>batch norm bug</strong> is instructive: with activations <code>(32, 4, 68)</code>, reducing only over batch dimension <code>0</code> leaves a <code>4</code> in the statistic shape—four separate running means per channel position. Instead, reduce over <code>(0, 1)</code> so each of the <code>68</code> channels has one running mean and variance estimated from <code>32×4</code> values.</p>
+    <div class="formula">μ, σ² computed over dim ∈ {0} if x.ndim == 2 else dim = (0, 1) for x.shape = (N, L, C<sub>last</sub>)</div>
+    <p>After the fix, a forward probe should show <code>running_mean.shape == torch.Size([1, 1, 68])</code> for that layer—<strong>68</strong> global channel statistics—not <code>[1, 4, 68]</code>. Intuitively, each mean and variance now pools <strong>32 × 4 = 128</strong> scalar activations per channel per step instead of only <strong>32</strong>, which stabilizes the estimates and removes the artificial per-position drift.</p>
+    <p>Scaling the same hierarchical stack by widening embeddings to <strong>24</strong> dimensions and increasing hidden width yields on the order of <strong>76&nbsp;000</strong> parameters. Training takes noticeably longer, and without a systematic sweep it is easy to feel “in the dark” on learning rate and width choices—but a longer run in that regime can push validation loss to about <strong>1.993</strong>, i.e. slightly below the psychologically round <strong>2.0</strong> barrier on the same task.</p>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Fixing reduction dimensions</h3>
+        <p><code>torch.mean</code> accepts a tuple of dims. For 2D inputs, keep the old behavior (reduce batch). For 3D <code>(N, L, C)</code> with channels last, reduce <code>(0, 1)</code> so statistics are <code>(1, 1, C)</code>—one mean/variance per channel.</p>
+      </div>
+      <div class="code-panel" id="panelBN">
+        <div class="code-header"><span class="code-filename">makemore.py</span><span class="code-lines">BatchNorm1d · train stats</span></div>
+        <pre class="code-block annotated"><code><span class="line" data-note="2D: N×C activations; 3D: treat N and L both as batch axes for norm."><span class="ln anno" title="Click for note">1</span>dim = <span class="num">0</span> <span class="kw">if</span> x.ndim == <span class="num">2</span> <span class="kw">else</span> (<span class="num">0</span>, <span class="num">1</span>)</code>
+<code><span class="line hl" data-note="Mean/var over all batch+time positions, per channel."><span class="ln anno" title="Click for note">2</span>meani = x.mean(dim, keepdim=<span class="kw">True</span>)</code>
+<code><span class="line"><span class="ln">3</span>vari = x.var(dim, keepdim=<span class="kw">True</span>)</code>
+<code><span class="line"><span class="ln">4</span><span class="cmt"># then normalize, scale, shift; update running_* with momentum</span></code></pre>
+        <div class="code-note" id="bnNote"></div>
+      </div>
+    </div>
+    <h3 style="margin-top:28px;">Why convolutions are “just a fast for-loop”</h3>
+    <p>Take a concrete name from the corpus—say <strong>DeAndre</strong>, seven letters plus the usual end token—which generates <strong>eight</strong> supervised rows in the dataset (eight different contexts that each predict a next character). You <em>can</em> run the hierarchical MLP on each row separately: build a tensor with shape <code>(1, 8)</code> (note the explicit batch dimension of one), forward through <code>model</code>, read logits. If you index a single row with a one-dimensional slice, you must promote it with something like <code>X[[i]]</code> so the batch axis exists—shape <code>(8,)</code> alone will not broadcast through the stack the way batched training does.</p>
+    <p>Now imagine you want logits at <em>all</em> eight positions for efficiency. A literal <code>for</code> loop in Python performs <strong>eight independent forwards</strong>. A <strong>1-D convolution</strong> implements the same repeated linear filters, but the loop moves into <strong>CUDA kernels</strong> (or other fused CPU backends): each layer’s affine map becomes a sliding operator over the sequence. The <strong>computational graph</strong> is unchanged; only the scheduling and memory reuse change. WaveNet diagrams make this vivid: the <strong>black</strong> subtree is exactly one forward you implemented; the <strong>orange</strong> outputs along the time axis are what convolutions compute in parallel. Crucially, intermediate nodes in the fusion tree <strong>reuse</strong> work—a node that is the right child of one local tree is the left child of the next—so separate Python forwards recompute values that a sliding implementation shares for free.</p>
+    <p><strong>Dilation</strong> in the WaveNet paper widens the receptive field per layer without naïvely widening every kernel: you skip inputs according to a schedule (<code>1, 2, 4, 8, …</code>), which is the convolutional view of “reach farther at each depth.” The pairwise tree in this chapter fixes the schedule to halving <code>T</code> at each stage; the underlying “combine neighbors, then neighbors of neighbors” story matches the diagram, even when the efficient implementation is still written as batched matmuls in a notebook.</p>
+    <div class="callout">
+      <p><strong>Not implemented in this chapter:</strong> gated activations, residual and skip wiring, and the full WaveNet forward as published. Those additions change optimization dynamics and capacity routing; the tree-shaped fusion scaffold is the prerequisite geometry.</p>
+    </div>
+    <h3 style="margin-top:28px;">Process notes (how deep learning work actually feels)</h3>
+    <ul style="color:var(--text-dim);margin-left:1.2em;margin-bottom:1em;">
+      <li>Framework docs are a starting point, not a guarantee—when shapes get weird, trust interactive probes over assumptions.</li>
+      <li>Most “debugging” time is <strong>babysitting tensor ranks</strong>: promoting dimensions, <code>view</code>/<code>permute</code>, and aligning <code>NCL</code> vs <code>NLC</code>.</li>
+      <li>Prototyping in a notebook then copying validated layers into a repository mirrors how small teams move fast without sacrificing reproducibility.</li>
+      <li>A serious experimental harness (configs, sweeps, paired train/val plots) matters once runs take long enough that guess-and-check becomes expensive. Glancing only at training loss—or tuning without logging hyperparameters alongside curves—is <strong>not</strong> how most production teams iterate; you want scripts that accept many CLI flags, launch parallel jobs, and archive plots next to the settings that produced them.</li>
+    </ul>
+    <div class="callout warn">
+      <p><strong>On reading framework documentation:</strong> large libraries invest heavily in kernels and distributed primitives, but surface-level docs for individual layers are not always kept perfectly aligned with behavior. Shape sections can be incomplete, ambiguous, or occasionally wrong relative to the code. The practical response is the one used throughout this chapter: cross-check against small experiments—print <code>shape</code>, read the <code>running_mean</code> tensor, step through a single batch—rather than trusting a prose table when the loss curve looks fine but samples do not.</p>
+    </div>
+    <p>Natural continuations from here include <strong>true dilated causal conv stacks</strong> (so the tree is slid along the sequence the way the WaveNet paper draws it), <strong>gated activations</strong>, <strong>residual and skip connections</strong>, classical <strong>recurrent nets</strong> including <strong>LSTM</strong> and <strong>GRU</strong> cells, and eventually <strong>Transformers</strong>—each a different way to route context, with complementary inductive biases and engineering trade-offs.</p>
+    <p>Stepping back, the cumulative modules in this series are effectively a miniature reimplementation of <code>torch.nn</code> on top of <code>torch.Tensor</code>: you have seen how <code>Module</code>-like objects nest, how containers aggregate parameters, and why stateful layers demand discipline. That mental model is the real “unlock” for reading production PyTorch—whether you keep training in notebooks or move entirely to scripts.</p>
+    <p>Finally, <strong>1-D convolution</strong> is the efficient way to slide the same fusion tree across all positions in a sequence, reusing shared nodes (the right child of one window is the left child of the next). The model’s math does not change; the loop moves from Python into optimized kernels.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header">
+        <span class="cell-label">In [2]</span>
+        <button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button>
+      </div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>params = <span class="fn">sum</span>(p.nelement() <span class="kw">for</span> p <span class="kw">in</span> model.parameters())</code>
+<code><span class="line hl"><span class="ln">2</span><span class="fn">print</span>(params)  <span class="cmt"># e.g. 22326 matched, 76592 scaled</span></code></pre>
+      <div class="cell-output" style="display:none;">
+        <span class="cell-label out-label">Out [2]</span>
+        <pre class="output-text">22326   # flat vs tree matched capacity (~22k)
+76592   # larger embedding + hidden (~76k)
+val_loss ≈ 1.993 after longer training run</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s14">
+  <div class="container">
+    <span class="section-num">14</span>
+    <h2>Playground</h2>
+    <p>Experiment with a toy “time length” and embedding width to see how many fusion stages a binary tree needs and what tensor shape emerges after each hypothetical <code>FlattenConsecutive(2)</code>. This does not train a model—it reinforces the shape recurrence.</p>
+    <div class="interactive-panel">
+      <h3>Tree depth calculator</h3>
+      <p>Set <code>T</code> (must be a power of two for this demo) and <code>C</code> (embedding size). After each stage, time halves and last-axis features double until <code>T=1</code>.</p>
+      <div class="two-col">
+        <div>
+          <label style="color:var(--text-dim);display:block;margin-bottom:8px;">T (context length)</label>
+          <input type="range" id="pgT" min="2" max="32" value="8" step="1" style="max-width:100%">
+          <span class="slider-value" id="pgTval">8</span>
+        </div>
+        <div>
+          <label style="color:var(--text-dim);display:block;margin-bottom:8px;">C (embed dim)</label>
+          <input type="range" id="pgC" min="4" max="32" value="10" step="1" style="max-width:100%">
+          <span class="slider-value" id="pgCval">10</span>
+        </div>
+      </div>
+      <pre class="output-text" id="pgOut" style="margin-top:20px;padding:16px;background:var(--bg-card-alt);border-radius:8px;border:1px solid var(--border);"></pre>
+    </div>
+    <div class="interactive-panel">
+      <h3>Learning rate explorer (schematic loss)</h3>
+      <p>Small batches make raw loss noisy; this diagram is <strong>not</strong> your exact run—it illustrates how step size affects descent on a smooth surrogate. Compare too small, reasonable, and too-large settings.</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0;">
+        <label style="color:var(--text-dim);">log₁₀(lr) ∈ [-4, -1]</label>
+        <input type="range" id="lrSlider" min="0" max="100" value="50" aria-label="log learning rate">
+        <span class="slider-value" id="lrVal">~1e-2.5</span>
+      </div>
+      <canvas id="lrCanvas" width="640" height="220"></canvas>
+      <p class="step-caption" id="lrCap"></p>
+    </div>
+    <h3 style="margin-top:40px;">Shape recipes &amp; sanity checks</h3>
+    <p>Use this as a fast lookup when something “almost works.” Each item is a symptom → fix pair distilled from the chapter.</p>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">Embedding output rank</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;">Expect <code>(B, T, C)</code>. If you see <code>(B, C)</code>, you indexed wrong or squeezed time prematurely.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">After <code>FlattenConsecutive(2)</code></h4>
+      <p style="margin-bottom:0;font-size:0.9rem;">From <code>(B, T, C)</code> to <code>(B, T/2, 2C)</code> when <code>T</code> is even. Odd <code>T</code> needs padding or a different tree.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">Linear after hierarchical flatten</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;">Weight shape <code>(2*C_in, H)</code> for pairwise fusion stages; multiply on the last axis only.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;"><code>BatchNorm</code> running mean shape</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;">Should collapse batch+time into statistics: <code>(1,1,C)</code> for 3D NLC tensors—not <code>(1,L,C)</code>.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">Sampling NaNs</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;">Set <code>training=False</code> on norm layers; ensure context has batch dimension <code>(1, T)</code>.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">Logits shape vs targets</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;"><code>cross_entropy</code> wants <code>(N, V)</code> logits and <code>(N,)</code> integer targets; flatten extra dims first if needed.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">Parameter explosion</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;">First flat linear scales as <code>O(T·C·H)</code>. Hierarchical stages spread cost across layers but still grow with <code>H</code> and <code>C</code>.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">View vs copy</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;"><code>view</code> requires contiguous memory; use <code>contiguous().view</code> after transposes.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">Squeeze surprises</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;"><code>squeeze()</code> without dim removes <em>all</em> size-1 axes—dangerous if batch size is 1. Prefer <code>squeeze(1)</code>.</p>
+    </div>
+    <div class="card" style="margin:14px 0;padding:18px;">
+      <h4 style="color:var(--accent);font-size:1rem;margin-bottom:8px;">Dilation vs pairwise tree</h4>
+      <p style="margin-bottom:0;font-size:0.9rem;">Both widen context exponentially with depth; dilation schedules skips in convolution; the tree uses fixed halving in time length.</p>
+    </div>
+    <h3 style="margin-top:36px;">Layer inspector loop (debug snippet)</h3>
+    <p>Drop this after a forward pass to print human-readable shapes—your fastest friend when adding a new block.</p>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">debug_forward.py</span><span class="code-lines">inspect</span></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>x = xb</code>
+<code><span class="line"><span class="ln">2</span><span class="kw">for</span> i, layer <span class="kw">in</span> <span class="fn">enumerate</span>(model.layers):</code>
+<code><span class="line hl"><span class="ln">3</span>    x = layer(x)</code>
+<code><span class="line"><span class="ln">4</span>    <span class="fn">print</span>(i, <span class="fn">type</span>(layer).__name__, <span class="fn">tuple</span>(x.shape))</code></pre>
+    </div>
+    <h3 style="margin-top:28px;">Sampling loop (character by character)</h3>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">sample.py</span><span class="code-lines">eval</span></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">for</span> layer <span class="kw">in</span> model.layers:</code>
+<code><span class="line"><span class="ln">2</span>    layer.training = <span class="kw">False</span></code>
+<code><span class="line"><span class="ln">3</span>out = []</code>
+<code><span class="line"><span class="ln">4</span>context = [<span class="num">0</span>] * block_size</code>
+<code><span class="line hl"><span class="ln">5</span><span class="kw">while</span> <span class="kw">True</span>:</code>
+<code><span class="line"><span class="ln">6</span>    Xc = torch.tensor([context])</code>
+<code><span class="line"><span class="ln">7</span>    logits = model(Xc)</code>
+<code><span class="line"><span class="ln">8</span>    probs = F.softmax(logits, dim=<span class="num">1</span>)</code>
+<code><span class="line"><span class="ln">9</span>    ix = torch.multinomial(probs, num_samples=<span class="num">1</span>, generator=g).item()</code>
+<code><span class="line"><span class="ln">10</span>    context = context[<span class="num">1</span>:] <span class="op">+</span> [ix]</code>
+<code><span class="line"><span class="ln">11</span>    out.append(itos[ix])</code>
+<code><span class="line"><span class="ln">12</span>    <span class="kw">if</span> ix == <span class="num">0</span>: <span class="kw">break</span></code></pre>
+    </div>
+    <h3 style="margin-top:28px;">Train / validation split helper</h3>
+    <div class="code-panel">
+      <div class="code-header"><span class="code-filename">split_loss.py</span><span class="code-lines">evaluate</span></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">split_loss</span>(split):</code>
+<code><span class="line"><span class="ln">2</span>    X, Y = (Xtr, Ytr) <span class="kw">if</span> split == <span class="str">'train'</span> <span class="kw">else</span> (Xdev, Ydev)</code>
+<code><span class="line hl"><span class="ln">3</span>    logits = model(X)</code>
+<code><span class="line"><span class="ln">4</span>    <span class="kw">return</span> F.cross_entropy(logits, Y).item()</code></pre>
+    </div>
+    <h3 style="margin-top:32px;">Numeric snapshot (typical run)</h3>
+    <table class="card" style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.78rem;color:var(--text-dim);margin-top:12px;">
+      <thead>
+        <tr style="color:var(--text);text-align:left;border-bottom:1px solid var(--border);">
+          <th style="padding:8px;">Setting</th>
+          <th style="padding:8px;">Val loss (approx)</th>
+          <th style="padding:8px;">Comment</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;">flat, T=3</td><td style="padding:8px;">2.10</td><td style="padding:8px;">Strong baseline before widening context.</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;">flat, T=8</td><td style="padding:8px;">2.02</td><td style="padding:8px;">More context alone helps a lot.</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;">tree ~22k params</td><td style="padding:8px;">2.029 → 2.022</td><td style="padding:8px;">BN axis fix closes a subtle gap.</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;">scaled ~76k</td><td style="padding:8px;">1.993</td><td style="padding:8px;">More capacity + longer training.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <p><strong>Believing small improvements on a single run:</strong> when batch-norm axes move validation from <strong>2.029</strong> to <strong>2.022</strong>, the gap is real enough to care about for engineering correctness, but it may be <strong>within noise</strong> as a scientific claim about generalization. Track <em>both</em> train and validation curves, repeat seeds or use a proper experiment harness, and treat leaderboard decimals with skepticism until you have a distribution of outcomes.</p>
+    </div>
+    <div class="callout">
+      <p><strong>Pushing the ~1.993 validation score without new ideas:</strong> the reported ~<strong>76k</strong>-parameter run was not heavily tuned: channel counts, fusion widths, and optimizers were chosen by hand. It is plausible that a <strong>wider flat MLP</strong> with enough tuning could match or beat the hierarchical net—embarrassing for the fancy diagram, instructive for you as a practitioner. Reasonable projects include reallocating channel budgets across layers, reading the original WaveNet paper for the gated/residual blocks, adjusting initialization and learning-rate schedules, and building a small sweep harness so you are no longer guessing in the dark.</p>
+    </div>
+    <p style="margin-top:20px;">Hierarchical models do not <em>always</em> beat flat ones at equal parameter count: allocation of width per stage, regularization, and optimizer settings dominate. The hierarchy buys a prior; tuning still decides the score.</p>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Neural Networks: Zero to Hero · Chapter 06 · Single-file tutorial (no external assets)</p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  function toggleOut(btn) {
+    var cell = btn.closest('.jupyter-cell');
+    var out = cell.querySelector('.cell-output');
+    if (!out) return;
+    var open = out.style.display !== 'block';
+    out.style.display = open ? 'block' : 'none';
+    btn.textContent = open ? 'Hide Output ▲' : 'Show Output ▼';
+  }
+  window.toggleOut = toggleOut;
+
+  // ---------- Nav + fade-in ----------
+  var nav = document.getElementById('nav');
+  window.addEventListener('scroll', function () {
+    nav.classList.toggle('visible', window.scrollY > 120);
+  }, { passive: true });
+
+  document.querySelectorAll('.fade-in').forEach(function (el) {
+    var io = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    }, { threshold: 0.08 });
+    io.observe(el);
+  });
+
+  // ---------- Annotated code ----------
+  function wireAnno(root, noteId) {
+    var box = document.getElementById(noteId);
+    if (!root || !box) return;
+    root.querySelectorAll('.ln.anno').forEach(function (ln) {
+      ln.addEventListener('click', function () {
+        var line = ln.closest('.line');
+        var note = line && line.getAttribute('data-note');
+        if (!note) return;
+        box.innerHTML = '<strong>Note:</strong> ' + note;
+        box.style.display = 'block';
+      });
+    });
+  }
+  wireAnno(document.getElementById('panelSequential'), 'seqNote');
+  wireAnno(document.getElementById('panelFlat'), 'flatNote');
+  wireAnno(document.getElementById('panelEmbed'), 'embedNote');
+  wireAnno(document.getElementById('panelLinear'), 'linNote');
+  wireAnno(document.getElementById('panelBN'), 'bnNote');
+  wireAnno(document.querySelector('#s9 .code-panel'), 'trainNote');
+
+  // ---------- Code progression flat / pair / depth ----------
+  var progBtns = document.querySelectorAll('#progFlatTree .btn');
+  var preFlat = document.getElementById('preFlat');
+  var prePair = document.getElementById('prePair');
+  var preDepth = document.getElementById('preDepth');
+  var progLines = document.getElementById('progLines');
+  var progCaption = document.getElementById('progCaption');
+  var progCaps = {
+    flat: 'Step A: one large matrix maps the full concatenated embedding.',
+    pair: 'Step B: view time as pairs so Linear hits 2C features per group, in parallel.',
+    depth: 'Step C: repeat Linear → BN → tanh blocks until time collapses to one group.'
+  };
+  var progModel = document.getElementById('progModel');
+  if (progModel) {
+    progModel.querySelectorAll('.btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var step = b.getAttribute('data-mstep');
+        progModel.querySelectorAll('.btn').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        document.getElementById('mstep1').style.display = step === 'm1' ? 'block' : 'none';
+        document.getElementById('mstep2').style.display = step === 'm2' ? 'block' : 'none';
+        var cap = document.getElementById('modelCap');
+        var lab = document.getElementById('modelStepLab');
+        if (step === 'm1') {
+          if (cap) cap.textContent = 'Flat: one big linear sees all positions at once.';
+          if (lab) lab.textContent = 'Flat Sequential';
+        } else {
+          if (cap) cap.textContent = 'Hierarchical: three pairwise fusion stages for block_size=8, then logits.';
+          if (lab) lab.textContent = 'WaveNet-style Sequential';
+        }
+      });
+    });
+  }
+
+  function renderMatmul() {
+    var r = parseInt(document.getElementById('batchRankSlider').value, 10);
+    var lab = document.getElementById('batchRankLab');
+    var viz = document.getElementById('matmulViz');
+    var cap = document.getElementById('matmulCaption');
+    if (!viz) return;
+    var labels = ['(G, 2C) @ (2C, H) → (G, H)', '(B, G, 2C) @ (2C, H) → (B, G, H)', '(B1, B2, G, 2C) @ (2C, H) → (B1, B2, G, H)'];
+    if (lab) lab.textContent = ['G only', 'B×G', 'B1×B2×G'][r - 1];
+    viz.innerHTML = '';
+    var t1 = document.createElement('div');
+    t1.className = 'mat-tensor';
+    t1.innerHTML = '<strong>x</strong> ' + ['(G,2C)', '(B,G,2C)', '(B1,B2,G,2C)'][r - 1];
+    var t2 = document.createElement('span');
+    t2.className = 'arch-arrow';
+    t2.textContent = '@';
+    var t3 = document.createElement('div');
+    t3.className = 'mat-tensor';
+    t3.innerHTML = '<strong>W</strong> (2C,H)';
+    var t4 = document.createElement('span');
+    t4.className = 'arch-arrow';
+    t4.textContent = '→';
+    var t5 = document.createElement('div');
+    t5.className = 'mat-tensor';
+    t5.innerHTML = '<strong>y</strong> ' + ['(G,H)', '(B,G,H)', '(B1,B2,G,H)'][r - 1];
+    viz.appendChild(t1);
+    viz.appendChild(t2);
+    viz.appendChild(t3);
+    viz.appendChild(t4);
+    viz.appendChild(t5);
+    if (cap) cap.textContent = labels[r - 1] + ' — same weights for every group.';
+  }
+  var bms = document.getElementById('batchRankSlider');
+  if (bms) {
+    bms.addEventListener('input', renderMatmul);
+    renderMatmul();
+  }
+
+  progBtns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var step = b.getAttribute('data-step');
+      progBtns.forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      preFlat.style.display = step === 'flat' ? 'block' : 'none';
+      prePair.style.display = step === 'pair' ? 'block' : 'none';
+      preDepth.style.display = step === 'depth' ? 'block' : 'none';
+      if (progLines) progLines.textContent = step === 'flat' ? 'Step A' : step === 'pair' ? 'Step B' : 'Step C';
+      if (progCaption) progCaption.textContent = progCaps[step] || '';
+    });
+  });
+
+  // ---------- Fusion animation ----------
+  var fusionStage = 0;
+  var fusionMax = 3;
+  function renderFusion() {
+    var el = document.getElementById('fusionStage');
+    var cap = document.getElementById('fusionCaption');
+    if (!el) return;
+    el.innerHTML = '';
+    var leaves = 8;
+    var groups = Math.max(1, leaves / Math.pow(2, fusionStage));
+    for (var g = 0; g < groups; g++) {
+      var n = document.createElement('div');
+      n.className = 'fusion-node' + (fusionStage > 0 ? ' merge' : '');
+      n.textContent = fusionStage === 0 ? String.fromCharCode(65 + g) : (fusionStage === fusionMax ? '●' : '·');
+      el.appendChild(n);
+    }
+    var texts = [
+      'Stage 0: eight character embeddings as leaves.',
+      'Stage 1: four fused pairs (first linear layer level).',
+      'Stage 2: two fused groups (second level).',
+      'Stage 3: single vector ready for final classifier.'
+    ];
+    if (cap) cap.textContent = texts[Math.min(fusionStage, texts.length - 1)];
+  }
+  document.getElementById('fusionNext').addEventListener('click', function () {
+    if (fusionStage < fusionMax) fusionStage++;
+    renderFusion();
+  });
+  document.getElementById('fusionReset').addEventListener('click', function () {
+    fusionStage = 0;
+    renderFusion();
+  });
+  renderFusion();
+
+  // ---------- Dilated visualizer ----------
+  function renderDil() {
+    var d = parseInt(document.getElementById('dilSlider').value, 10);
+    document.getElementById('dilVal').textContent = String(d);
+    var n = 16;
+    var grid = document.getElementById('dilGrid');
+    grid.innerHTML = '';
+    var taps = [];
+    for (var k = 0; k < 4; k++) {
+      var idx = n - 1 - k * d;
+      if (idx >= 0) taps.push(idx);
+    }
+    for (var i = 0; i < n; i++) {
+      var c = document.createElement('div');
+      c.className = 'dil-cell';
+      if (taps.indexOf(i) >= 0) c.classList.add('active');
+      else if (i < n - 1) c.classList.add('skip');
+      grid.appendChild(c);
+    }
+    var cap = document.getElementById('dilCaption');
+    if (cap) cap.textContent = 'Causal filter at output index ' + (n - 1) + ': taps at positions ' + taps.join(', ') + ' (dilation ' + d + ').';
+  }
+  document.getElementById('dilSlider').addEventListener('input', renderDil);
+  renderDil();
+
+  // ---------- Pair viz ----------
+  var letters = ['h','e','l','l','o',' ','a','i'];
+  function renderPairs() {
+    var n = parseInt(document.getElementById('pairSlider').value, 10);
+    document.getElementById('pairVal').textContent = String(n);
+    var wrap = document.getElementById('pairViz');
+    wrap.innerHTML = '';
+    for (var i = 0; i < letters.length; i += n) {
+      var chunk = letters.slice(i, i + n).join('');
+      var d = document.createElement('span');
+      d.className = 'pair-token';
+      d.textContent = chunk || '∅';
+      wrap.appendChild(d);
+    }
+  }
+  document.getElementById('pairSlider').addEventListener('input', renderPairs);
+  renderPairs();
+
+  // ---------- Architecture diagram ----------
+  var archLayers = [
+    ['Token IDs', 'xb (B, T)'],
+    ['Embedding', '(B, T, C)'],
+    ['FlattenConsecutive(2)', '(B, T/2, 2C)'],
+    ['×3: Linear → BN → tanh', 'repeat merge'],
+    ['Linear', 'logits (B, V)']
+  ];
+  function buildArch() {
+    var d = document.getElementById('archDiagram');
+    d.innerHTML = '';
+    archLayers.forEach(function (row, i) {
+      var layer = document.createElement('div');
+      layer.className = 'arch-layer';
+      layer.dataset.layer = String(i);
+      var b1 = document.createElement('div');
+      b1.className = 'arch-box';
+      b1.textContent = row[0];
+      var arr = document.createElement('span');
+      arr.className = 'arch-arrow';
+      arr.textContent = '→';
+      var b2 = document.createElement('div');
+      b2.className = 'arch-box';
+      b2.textContent = row[1];
+      layer.appendChild(b1);
+      layer.appendChild(arr);
+      layer.appendChild(b2);
+      d.appendChild(layer);
+    });
+  }
+  function showArchLayer(idx) {
+    document.querySelectorAll('#archDiagram .arch-layer').forEach(function (L, j) {
+      L.classList.toggle('on', j <= idx);
+    });
+    document.querySelectorAll('#archBtns .btn').forEach(function (b, j) {
+      b.classList.toggle('active', parseInt(b.dataset.layer, 10) === idx);
+    });
+  }
+  buildArch();
+  showArchLayer(0);
+  document.getElementById('archBtns').addEventListener('click', function (e) {
+    var b = e.target.closest('.btn');
+    if (!b) return;
+    showArchLayer(parseInt(b.dataset.layer, 10));
+  });
+
+  // ---------- Loss canvas (schematic) ----------
+  var lossCanvas = document.getElementById('lossCanvas');
+  var lossSlider = document.getElementById('lossSlider');
+  var lossReadout = document.getElementById('lossReadout');
+
+  function lossAt(curve, t) {
+    var base = curve === 0 ? 2.25 : curve === 1 ? 2.14 : curve === 2 ? 2.08 : 2.05;
+    var decay = 0.65 * (1 - Math.exp(-t / 35));
+    var noise = 0.02 * Math.sin(t * 0.7 + curve);
+    return base - decay + noise;
+  }
+
+  function drawLoss() {
+    var ctx = lossCanvas.getContext('2d');
+    var W = lossCanvas.width;
+    var H = lossCanvas.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    for (var g = 0; g < 5; g++) {
+      var y = 40 + g * ((H - 80) / 4);
+      ctx.beginPath();
+      ctx.moveTo(50, y);
+      ctx.lineTo(W - 20, y);
+      ctx.stroke();
+      ctx.fillStyle = '#8888a0';
+      ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+      ctx.fillText((2.3 - g * 0.1).toFixed(1), 8, y + 4);
+    }
+    var labels = ['flat T=3', 'flat T=8', 'hier ~22k', 'hier ~76k'];
+    var colors = ['#f472b6', '#6c8cff', '#34d399', '#fbbf24'];
+    for (var c = 0; c < 4; c++) {
+      ctx.beginPath();
+      ctx.strokeStyle = colors[c];
+      ctx.lineWidth = 2;
+      for (var t = 0; t <= 100; t++) {
+        var x = 50 + (W - 70) * (t / 100);
+        var y = 40 + (H - 80) * ((lossAt(c, t) - 1.85) / (2.35 - 1.85));
+        y = Math.min(H - 40, Math.max(40, y));
+        if (t === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = colors[c];
+      ctx.fillText(labels[c], W - 120, 24 + c * 14);
+    }
+    var step = parseInt(lossSlider.value, 10);
+    var tx = 50 + (W - 70) * (step / 100);
+    ctx.strokeStyle = '#e0e0e8';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(tx, 30);
+    ctx.lineTo(tx, H - 40);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    document.getElementById('lossStepLab').textContent = step + 'k';
+    var vals = [];
+    for (c = 0; c < 4; c++) vals.push(lossAt(c, step).toFixed(3));
+    lossReadout.textContent = '@ ~' + step + 'k steps: val nats → ' + labels.map(function (l, i) { return l + ': ' + vals[i]; }).join(' | ');
+  }
+  lossSlider.addEventListener('input', drawLoss);
+  drawLoss();
+
+  // ---------- Playground ----------
+  function isPow2(n) { return n > 0 && (n & (n - 1)) === 0; }
+  function pgUpdate() {
+    var T = parseInt(document.getElementById('pgT').value, 10);
+    var C = parseInt(document.getElementById('pgC').value, 10);
+    document.getElementById('pgTval').textContent = String(T);
+    document.getElementById('pgCval').textContent = String(C);
+    var lines = [];
+    var t = T;
+    var c = C;
+    var stage = 0;
+    if (!isPow2(T)) {
+      lines.push('Note: binary tree demo assumes T is power of 2. Current T=' + T + ' — stages are approximate.');
+    }
+    lines.push('Stage 0: (B, ' + t + ', ' + c + ') after Embedding');
+    while (t > 1) {
+      stage++;
+      t = Math.max(1, Math.floor(t / 2));
+      c = c * 2;
+      lines.push('After FlattenConsecutive(2) + Linear: stage ' + stage + ' → (B, ' + t + ', ' + c + ')  [feature dim is 2×prev channels after view]');
+    }
+    lines.push('Final time length 1: squeeze middle dim → (B, ' + c + ') before last heads.');
+    document.getElementById('pgOut').textContent = lines.join('\n');
+  }
+  document.getElementById('pgT').addEventListener('input', pgUpdate);
+  document.getElementById('pgC').addEventListener('input', pgUpdate);
+  pgUpdate();
+
+  // ---------- LR explorer ----------
+  var lrCanvas = document.getElementById('lrCanvas');
+  var lrSlider = document.getElementById('lrSlider');
+  function drawLR() {
+    if (!lrCanvas || !lrSlider) return;
+    var t = parseInt(lrSlider.value, 10) / 100;
+    var loglr = -4 + t * 3;
+    var lr = Math.pow(10, loglr);
+    var lv = document.getElementById('lrVal');
+    if (lv) lv.textContent = '10^' + loglr.toFixed(2);
+    var cap = document.getElementById('lrCap');
+    var ctx = lrCanvas.getContext('2d');
+    var W = lrCanvas.width;
+    var H = lrCanvas.height;
+    ctx.fillStyle = '#181825';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#2a2a3a';
+    for (var g = 0; g < 5; g++) {
+      var y = 30 + g * ((H - 50) / 4);
+      ctx.beginPath();
+      ctx.moveTo(40, y);
+      ctx.lineTo(W - 20, y);
+      ctx.stroke();
+    }
+    var steps = 120;
+    var x0 = 2.8;
+    function curve(scale, chaos) {
+      ctx.beginPath();
+      for (var t = 0; t <= steps; t++) {
+        var u = t / steps;
+        var x = 40 + (W - 60) * u;
+        var y = x0 * Math.exp(-scale * u) + 0.15 * Math.sin(u * chaos * Math.PI);
+        if (lr > 0.5) y += 0.4 * Math.sin(u * 18);
+        var py = 30 + (H - 50) * ((y - 0.2) / (3.2 - 0.2));
+        py = Math.min(H - 25, Math.max(25, py));
+        if (t === 0) ctx.moveTo(x, py);
+        else ctx.lineTo(x, py);
+      }
+      ctx.stroke();
+    }
+    ctx.lineWidth = 2;
+    if (lr < 0.003) {
+      ctx.strokeStyle = '#fbbf24';
+      curve(0.35, 3);
+      if (cap) cap.textContent = 'Very small lr: slow, smooth descent (underfitting in wall-clock).';
+    } else if (lr < 0.08) {
+      ctx.strokeStyle = '#34d399';
+      curve(1.2, 2);
+      if (cap) cap.textContent = 'Reasonable lr: steady decrease on this surrogate curve.';
+    } else {
+      ctx.strokeStyle = '#f87171';
+      curve(0.9, 6);
+      if (cap) cap.textContent = 'Large lr: oscillation / instability—watch val loss spike in real runs.';
+    }
+  }
+  if (lrSlider) {
+    lrSlider.addEventListener('input', drawLR);
+    drawLR();
+  }
+
+})();
+</script>
+</body>
+</html>

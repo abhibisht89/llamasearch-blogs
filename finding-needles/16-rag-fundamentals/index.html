@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG Fundamentals — Architecture &amp; Pipeline Design | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --query-dim: rgba(56, 189, 248, 0.25);
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 44px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover, .main-nav a.active { color: var(--accent); }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(167, 139, 250, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(52, 211, 153, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.65rem, 4.2vw, 2.75rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 22px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .callout.warn { border-left-color: var(--accent5); }
+    .callout.ok { border-left-color: var(--accent3); }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0; }
+    @media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      font-size: 0.92rem;
+      color: var(--text-dim);
+    }
+    .comparison > div h4 { margin: 0 0 10px; color: var(--text); font-size: 0.95rem; }
+    .demo {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .demo h4 { margin: 0 0 14px; color: var(--text); font-size: 1rem; }
+    .demo-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
+    button.btn, .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+    }
+    button.btn:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
+    button.btn.primary { background: rgba(34, 211, 238, 0.15); border-color: var(--accent); color: var(--accent); }
+    textarea.input, input.input, select.input {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    textarea.input { min-height: 100px; resize: vertical; }
+    .pipeline-stage {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      margin-bottom: 8px;
+      transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+    .pipeline-stage.active {
+      border-color: var(--accent);
+      background: rgba(34, 211, 238, 0.08);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+    .pipeline-stage .idx {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--accent2);
+      min-width: 1.5rem;
+    }
+    .arch-svg-wrap { overflow-x: auto; margin: 20px 0; }
+    .arch-svg-wrap svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    .arch-node { cursor: pointer; transition: opacity 0.2s; }
+    .arch-node.dim { opacity: 0.35; }
+    .arch-node.highlight rect, .arch-node.highlight ellipse { stroke: var(--accent) !important; stroke-width: 2.5px !important; }
+    .failure-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .failure-tabs button { font-size: 0.78rem; }
+    .failure-tabs button.on { background: rgba(167, 139, 250, 0.2); border-color: var(--accent2); color: var(--accent2); }
+    .chunk-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      margin: 4px 4px 4px 0;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .chunk-pill.on { background: rgba(52, 211, 153, 0.15); border-color: var(--accent3); color: var(--accent3); }
+    .prompt-preview {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      max-height: 320px;
+      overflow-y: auto;
+      color: var(--text-dim);
+    }
+    .slider-row { display: flex; align-items: center; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+    .slider-row label { min-width: 140px; color: var(--text-dim); font-size: 0.88rem; }
+    .slider-row input[type="range"] { flex: 1; min-width: 120px; max-width: 280px; }
+    .meter {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--border);
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .meter > div { height: 100%; background: linear-gradient(90deg, var(--accent3), var(--accent)); transition: width 0.2s; }
+    .playground-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 860px) { .playground-grid { grid-template-columns: 1fr; } }
+    .ret-chunk {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+    .ret-chunk .score { font-family: var(--mono); color: var(--accent5); font-size: 0.75rem; }
+    footer.page-foot {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../index.html">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../index.html">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">RAG Fundamentals</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="mainNav">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="Page sections">
+    <a href="#s0">00 · What is RAG?</a>
+    <a href="#s1">01 · Architecture</a>
+    <a href="#s2">02 · Ingestion</a>
+    <a href="#s3">03 · Query</a>
+    <a href="#s4">04 · Prompts</a>
+    <a href="#s5">05 · Failures</a>
+    <a href="#s6">06 · Guardrails</a>
+    <a href="#s7">07 · RAG vs alternatives</a>
+    <a href="#s8">08 · Playground</a>
+  </nav>
+
+  <header class="hero">
+    <span class="chapter-badge">Part 16 · Search Zero to Hero</span>
+    <h1>RAG Fundamentals<br /><span style="color: var(--accent);">Architecture &amp; Pipeline Design</span></h1>
+    <p class="subtitle">
+      <strong style="color: var(--text);">Retrieval-Augmented Generation</strong> connects a language model to a searchable knowledge base.
+      Ingestion and query pipelines, prompt assembly, failure modes, guardrails, and design trade-offs determine whether answers stay grounded in your documents.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">2</div><div class="lbl">Core pipelines</div></div>
+      <div class="hero-stat"><div class="val">k</div><div class="lbl">Chunks retrieved</div></div>
+      <div class="hero-stat"><div class="val">1×</div><div class="lbl">Embedding model</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>00 · What is RAG?</h2>
+    <p>
+      <strong>Retrieval-Augmented Generation</strong> (<code>RAG</code>) is a pattern for answering questions with a large language model (<code>LLM</code>) after first retrieving text that is likely relevant to the user’s question.
+      Instead of relying solely on weights learned during training, the model reads <em>fresh, explicit context</em> you inject into the prompt—typically passages from your own documents, help center, or internal wiki.
+    </p>
+    <p>
+      A plain <code>LLM</code> can sound authoritative while being wrong: it may <strong>hallucinate</strong> details, rely on <strong>stale knowledge</strong> frozen at training time, and offer no <strong>source attribution</strong> tied to your organization’s truth.
+      <code>RAG</code> does not eliminate those risks, but it anchors generation in retrieved evidence rather than parametric memory alone.
+    </p>
+    <p>
+      The modern formulation traces to Lewis et al., <em>Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</em> (2020), which trained a sequence-to-sequence model to condition on retrieved Wikipedia passages.
+      Interest surged in 2023–2024 as chat-style <code>LLM</code> products went mainstream and enterprises demanded answers over <em>private</em> data with clearer provenance and update paths than periodic full retraining.
+    </p>
+    <p>
+      <code>RAG</code> is not one algorithm; it is an <strong>architecture</strong> with interchangeable pieces: chunking strategy, embedding model, vector store, prompt template, and the generator model itself.
+      Getting value from <code>RAG</code> is usually less about picking a trendy vector database and more about disciplined pipeline design and measurement.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>01 · The RAG architecture</h2>
+    <p>
+      Production <code>RAG</code> systems almost always separate work into two pipelines: <strong>ingestion</strong> (offline or batch) and <strong>query</strong> (online, per request).
+    </p>
+    <div class="comparison">
+      <div>
+        <h4>Ingestion (offline)</h4>
+        <code>documents</code> → load → clean → <code>chunk</code> → <code>embed</code> → store in <code>vector DB</code> (often with metadata and access control).
+      </div>
+      <div>
+        <h4>Query (online)</h4>
+        <code>user question</code> → <code>embed</code> (same model as ingestion) → <code>retrieve top-k</code> → assemble context → <code>LLM</code> → answer (plus optional post-processing).
+      </div>
+    </div>
+    <p>
+      The default flow is <strong>retrieve, read, generate</strong>: fetch candidate evidence, place it in the prompt window, then synthesize a response that cites or paraphrases that material.
+      Multi-hop retrieval, tool use, and structured filters extend this pattern but keep the same core shape.
+    </p>
+
+    <div class="demo" id="archDemo">
+      <h4>Interactive architecture map</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Click a block to highlight that stage. Arrows show typical data flow.</p>
+      <div class="arch-svg-wrap">
+        <svg id="archSvg" width="760" height="280" viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" aria-label="RAG architecture diagram">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#555" />
+            </marker>
+          </defs>
+          <text x="380" y="28" text-anchor="middle" fill="#a78bfa" font-size="14" font-family="Inter,sans-serif">Ingestion path</text>
+          <g class="arch-node" data-key="docs" transform="translate(40,50)">
+            <rect width="120" height="44" rx="8" fill="#12121a" stroke="#2a2a3a" stroke-width="1.5"/>
+            <text x="60" y="28" text-anchor="middle" fill="#e0e0e8" font-size="12" font-family="Inter,sans-serif">Sources</text>
+          </g>
+          <g class="arch-node" data-key="chunk" transform="translate(200,50)">
+            <rect width="120" height="44" rx="8" fill="#12121a" stroke="#2a2a3a" stroke-width="1.5"/>
+            <text x="60" y="28" text-anchor="middle" fill="#e0e0e8" font-size="12" font-family="Inter,sans-serif">Chunk</text>
+          </g>
+          <g class="arch-node" data-key="emb" transform="translate(360,50)">
+            <rect width="120" height="44" rx="8" fill="#12121a" stroke="#2a2a3a" stroke-width="1.5"/>
+            <text x="60" y="28" text-anchor="middle" fill="#e0e0e8" font-size="12" font-family="Inter,sans-serif">Embed</text>
+          </g>
+          <g class="arch-node" data-key="store" transform="translate(520,50)">
+            <rect width="120" height="44" rx="8" fill="#12121a" stroke="#2a2a3a" stroke-width="1.5"/>
+            <text x="60" y="28" text-anchor="middle" fill="#e0e0e8" font-size="12" font-family="Inter,sans-serif">Vector store</text>
+          </g>
+          <line x1="160" y1="72" x2="200" y2="72" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <line x1="320" y1="72" x2="360" y2="72" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <line x1="480" y1="72" x2="520" y2="72" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+          <text x="380" y="150" text-anchor="middle" fill="#22d3ee" font-size="14" font-family="Inter,sans-serif">Query path</text>
+          <g class="arch-node" data-key="q" transform="translate(40,170)">
+            <rect width="120" height="44" rx="8" fill="#12121a" stroke="#2a2a3a" stroke-width="1.5"/>
+            <text x="60" y="28" text-anchor="middle" fill="#e0e0e8" font-size="12" font-family="Inter,sans-serif">Question</text>
+          </g>
+          <g class="arch-node" data-key="qemb" transform="translate(200,170)">
+            <rect width="120" height="44" rx="8" fill="#12121a" stroke="#2a2a3a" stroke-width="1.5"/>
+            <text x="60" y="28" text-anchor="middle" fill="#e0e0e8" font-size="12" font-family="Inter,sans-serif">Query embed</text>
+          </g>
+          <g class="arch-node" data-key="retr" transform="translate(360,170)">
+            <rect width="120" height="44" rx="8" fill="#12121a" stroke="#2a2a3a" stroke-width="1.5"/>
+            <text x="60" y="28" text-anchor="middle" fill="#e0e0e8" font-size="12" font-family="Inter,sans-serif">Retrieve</text>
+          </g>
+          <g class="arch-node" data-key="llm" transform="translate(520,170)">
+            <rect width="120" height="44" rx="8" fill="#12121a" stroke="#2a2a3a" stroke-width="1.5"/>
+            <text x="60" y="28" text-anchor="middle" fill="#e0e0e8" font-size="12" font-family="Inter,sans-serif">LLM</text>
+          </g>
+          <line x1="160" y1="192" x2="200" y2="192" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <line x1="320" y1="192" x2="360" y2="192" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <line x1="480" y1="192" x2="520" y2="192" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <path d="M 580 94 L 580 130 L 464 130 L 464 170" fill="none" stroke="#444" stroke-dasharray="4 3" stroke-width="1.2" marker-end="url(#arrow)"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="demo" id="pipelineDemo">
+      <h4>Animated pipeline step-through</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Walks through ingestion then query. Use Play to loop or Step for manual control.</p>
+      <div class="demo-controls">
+        <button type="button" class="btn primary" id="pipePlay">Play</button>
+        <button type="button" class="btn" id="pipePause">Pause</button>
+        <button type="button" class="btn" id="pipeStep">Step</button>
+        <button type="button" class="btn" id="pipeReset">Reset</button>
+        <span id="pipeLabel" style="color:var(--accent2);font-size:0.85rem;margin-left:8px;"></span>
+      </div>
+      <div id="pipeStages"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>02 · The ingestion pipeline</h2>
+    <p>
+      <strong>Document loading</strong> is the front door: <code>PDF</code>s, <code>HTML</code> pages, databases, <code>API</code> exports, tickets, wikis, and code repositories all land here.
+      Each format needs reliable <strong>text extraction</strong>; layout-heavy <code>PDF</code>s and complex tables are notorious weak points without specialized parsers.
+    </p>
+    <p>
+      After extraction comes <strong>cleaning</strong>: strip boilerplate, normalize whitespace, optionally deduplicate headers/footers, and preserve structure hints (headings, lists) when your chunker can exploit them.
+      <strong>Chunking</strong> splits text into retrieval units—size, overlap, and semantic boundaries strongly affect what the retriever can surface (<a href="../17-chunking-strategies/index.html" style="color:var(--accent);">Chapter 17</a>).
+    </p>
+    <p>
+      <strong>Embedding</strong> turns each chunk into a vector using a chosen model; batch your calls, handle rate limits, and version the model id alongside stored vectors so re-embedding is reproducible.
+      <strong>Vector storage</strong> persists vectors plus identifiers; choice of <code>vector DB</code> or search service involves latency, filtering, hybrid support, and ops maturity (<a href="../09-vector-databases/index.html" style="color:var(--accent);">Chapter 9</a>).
+    </p>
+    <p>
+      Rich <strong>metadata</strong>—<code>updated_at</code>, author, product area, language, access tier—powers filtering, ranking boosts, and UI citations.
+      <strong>Deduplication</strong> (exact and near-duplicate via embeddings or shingling) keeps indexes from being noisy with repeated policy PDFs or mirrored pages.
+    </p>
+    <div class="card">
+      <strong style="color:var(--text);">Orchestration frameworks</strong> such as <code>LlamaIndex</code>, <code>LangChain</code>, and <code>Haystack</code> provide connectors, abstractions, and evaluation hooks.
+      They accelerate prototyping; production teams still own data contracts, evaluation, and failure handling beneath the framework surface.
+    </div>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>03 · The query pipeline</h2>
+    <p>
+      At query time, the user’s text is embedded with the <strong>same embedding model</strong> and dimensionality as ingestion—mixing models without re-embedding yields meaningless similarity scores.
+      <strong>Retrieval</strong> returns <code>top-k</code> neighbors (plus optional metadata filters), often followed by <code>reranking</code> with a cross-encoder for better precision at small <code>k</code>.
+    </p>
+    <p>
+      <strong>Context assembly</strong> formats chunks into a single string or structured message list: numbering sources, injecting titles, and truncating to the model’s context budget.
+      The <strong>prompt template</strong> typically combines a system instruction, the context block, and the user question; clarity here directly affects faithfulness and refusal behavior.
+    </p>
+    <p>
+      The <code>LLM</code> generates an answer conditioned on that augmented prompt.
+      <strong>Post-processing</strong> may extract <code>citations</code>, validate JSON, run a consistency check against retrieved text, or attach confidence signals for the UI.
+    </p>
+
+    <div class="demo" id="promptBuilderDemo">
+      <h4>Interactive: assemble a prompt from retrieved chunks</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Toggle which chunks to include; the preview updates as in a typical RAG prompt.</p>
+      <p style="color:var(--text-dim);font-size:0.88rem;margin-bottom:8px;"><strong style="color:var(--text);">User question:</strong> What is our refund window for annual plans?</p>
+      <div id="chunkToggles"></div>
+      <div class="prompt-preview" id="promptPreview" role="region" aria-label="Assembled prompt"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>04 · Prompt engineering for RAG</h2>
+    <p>
+      The <strong>system prompt</strong> should state the contract explicitly: answer <em>only</em> from provided context, cite source numbers, and refuse when evidence is insufficient.
+      Vague instructions invite the model to fill gaps from parametric memory.
+    </p>
+    <p>
+      <strong>Context formatting</strong> benefits from numbered blocks (<code>[1]</code>, <code>[2]</code>) and optional metadata lines (title, date) so the model can refer to sources unambiguously.
+      A small set of <strong>few-shot</strong> examples in the system message—ideal answers given sample contexts—can lock in tone, citation style, and refusal patterns.
+    </p>
+    <p>
+      Add an explicit <strong>abstention</strong> rule: if the answer is not supported by the context, respond with a fixed phrase such as “I don’t know based on the provided documents.”
+      Pair that with monitoring to ensure abstention is not overused because retrieval is broken.
+    </p>
+    <p>
+      For <code>RAG</code>, <strong>temperature</strong> and <strong>top-p</strong> are often kept low (roughly <code>0.1–0.3</code> for temperature) to reduce creative paraphrase that drifts from evidence; creative writing use cases may differ.
+      <strong>Token budget</strong> management is non-negotiable: sum system prompt, instructions, retrieved chunks, tools output, and user message against the model’s <code>context window</code>, reserving headroom for the completion.
+    </p>
+
+    <div class="demo" id="ragParamsDemo">
+      <h4>Interactive: temperature &amp; context pressure</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Sliders illustrate how settings interact with a fictional token budget (educational, not model-accurate).</p>
+      <div class="slider-row">
+        <label for="tempR">Temperature</label>
+        <input type="range" id="tempR" min="0" max="100" value="20" />
+        <span id="tempV" style="font-family:var(--mono);color:var(--accent5);">0.20</span>
+      </div>
+      <div class="slider-row">
+        <label for="ctxR">Retrieved context (tokens)</label>
+        <input type="range" id="ctxR" min="500" max="12000" value="6000" step="100" />
+        <span id="ctxV" style="font-family:var(--mono);color:var(--accent5);">6000</span>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <div style="color:var(--text);font-size:0.9rem;margin-bottom:6px;">Budget vs. window (example 8k window)</div>
+        <div class="meter"><div id="ctxMeter" style="width:75%;"></div></div>
+        <p id="ctxAdvice" style="margin:10px 0 0;font-size:0.85rem;color:var(--text-dim);"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>05 · RAG failure modes</h2>
+    <p>
+      <code>RAG</code> fails in recognizable clusters. Treating them separately helps instrumentation: log retrieval sets, prompt snapshots, and model outputs together so you can tell whether to fix search, chunking, prompting, or the generator.
+    </p>
+    <h3>Retrieval failures</h3>
+    <ul class="fancy">
+      <li><strong>Query–document mismatch</strong>: lexical or semantic gap so the “right” passage never ranks high.</li>
+      <li><strong>Missing in top-k</strong>: answer exists in the corpus but not in the shortlist shown to the model.</li>
+      <li><strong>Bad chunk boundaries</strong>: critical fact split across two chunks so neither looks relevant alone.</li>
+    </ul>
+    <h3>Generation failures</h3>
+    <ul class="fancy">
+      <li><strong>Hallucination with context</strong>: model invents details not entailed by passages.</li>
+      <li><strong>Ignoring context</strong>: strong parametric answer overrides retrieved evidence.</li>
+      <li><strong>Misreading correct chunks</strong>: wrong entity or number picked from valid text.</li>
+    </ul>
+    <h3>Integration failures</h3>
+    <ul class="fancy">
+      <li><strong>Lost in the middle</strong>: very long context reduces attention to mid-document evidence.</li>
+      <li><strong>Contradictions</strong>: retrieved chunks disagree; model may pick arbitrarily or blend incorrectly.</li>
+      <li><strong>Dilution</strong>: irrelevant chunks consume budget and distract the model.</li>
+    </ul>
+
+    <div class="demo" id="failureGallery">
+      <h4>Failure mode gallery</h4>
+      <p style="margin-top:0;color:var(--text-dim);font-size:0.9rem;">Select a category to see a concrete narrative example.</p>
+      <div class="failure-tabs" id="failureTabs"></div>
+      <div class="card" id="failureBody" style="margin:0;"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>06 · Guardrails</h2>
+    <p>
+      <strong>Input guardrails</strong> scan for <code>prompt injection</code> attempts (“ignore previous instructions”), off-topic abuse, and policy violations before expensive retrieval and generation.
+      <strong>Output guardrails</strong> check for unsupported claims, missing citations when required, <code>PII</code> leakage, and toxic content.
+    </p>
+    <p>
+      <strong>Faithfulness checking</strong> asks whether each sentence (or the whole answer) is entailed by the retrieved set—using a smaller model, <code>NLI</code>-style classifiers, or citation-backed verification loops.
+      <strong>Safety filters</strong> remain important even with good retrieval; grounding reduces but does not remove harmful completions.
+    </p>
+    <p>
+      <strong>Cost guardrails</strong> cap tokens per request, cache frequent queries and embeddings, deduplicate retrieval for similar questions, and throttle abusive clients.
+      <strong>Monitoring</strong> should track retrieval hit rate, citation coverage, human thumbs feedback, latency per stage, and drift when documents or models change.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>07 · RAG vs fine-tuning vs long context</h2>
+    <p>
+      <code>RAG</code> keeps knowledge <strong>external</strong> and <strong>refreshable</strong>: update documents and embeddings without touching base model weights; citations can point to real sources.
+      <strong>Fine-tuning</strong> bakes patterns and facts into weights—great for stable domain jargon, formatting, or tone, but brittle for fast-changing corpora unless you retrain often.
+    </p>
+    <p>
+      <strong>Long-context models</strong> (very large <code>context windows</code>) invite “stuff everything in the prompt” strategies when corpora are small; latency and cost scale with tokens, and models may still attend unevenly across the window.
+    </p>
+    <div class="comparison">
+      <div>
+        <h4>When RAG shines</h4>
+        Frequently updated knowledge, need for traceability, cost control via small <code>k</code>, and hybrid filtering over metadata.
+      </div>
+      <div>
+        <h4>When fine-tuning shines</h4>
+        Stable domain knowledge, consistent output schema, style transfer, or teaching specialized reasoning formats.
+      </div>
+    </div>
+    <p>
+      These approaches are complementary: a fine-tuned or instruction-tuned model can enforce citation and refusal behavior while <code>RAG</code> supplies updatable facts from your corpus.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s8">
+    <h2>08 · Playground — RAG pipeline simulator</h2>
+    <p>
+      A toy lexical scorer (word overlap) stands in for retrieval here so you can vary <code>k</code>, prompt templates, and document coverage.
+    </p>
+    <div class="demo">
+      <h4>Knowledge base &amp; question</h4>
+      <label for="kbInput" style="color:var(--text-dim);font-size:0.88rem;">Documents (separate with a line containing only <code>---</code>)</label>
+      <textarea class="input" id="kbInput" rows="8" aria-label="Knowledge base documents"></textarea>
+      <label for="qInput" style="color:var(--text-dim);font-size:0.88rem;">Question</label>
+      <input class="input" id="qInput" type="text" aria-label="Question" />
+      <div class="demo-controls">
+        <label style="color:var(--text-dim);font-size:0.85rem;">top-k</label>
+        <input type="number" class="input" id="kInput" value="3" min="1" max="8" style="width:80px;margin:0;" />
+        <label style="color:var(--text-dim);font-size:0.85rem;margin-left:12px;">Template</label>
+        <select class="input" id="tplSelect" style="width:auto;min-width:180px;margin:0;">
+          <option value="strict">Strict citations</option>
+          <option value="concise">Concise assistant</option>
+          <option value="minimal">Minimal system</option>
+        </select>
+        <button type="button" class="btn primary" id="runSim">Run pipeline</button>
+      </div>
+      <div class="playground-grid">
+        <div>
+          <h3 style="margin-top:0;color:var(--accent3);font-size:1rem;">Retrieved chunks</h3>
+          <div id="retOut"></div>
+        </div>
+        <div>
+          <h3 style="margin-top:0;color:var(--query);font-size:1rem;">Assembled prompt (excerpt)</h3>
+          <div class="prompt-preview" id="playPrompt" style="max-height:240px;"></div>
+          <h3 style="color:var(--accent2);font-size:1rem;">Simulated answer</h3>
+          <div class="card" id="playAns" style="font-size:0.9rem;color:var(--text-dim);"></div>
+        </div>
+      </div>
+      <p id="playHint" style="margin:16px 0 0;font-size:0.82rem;color:var(--text-dim);"></p>
+    </div>
+  </section>
+
+  <footer class="page-foot">
+    RAG Fundamentals · Architecture &amp; pipeline design · Part of <a href="../index.html" style="color:var(--accent);">Search Zero to Hero</a>
+  </footer>
+
+  <script>
+(function () {
+  var navToggle = document.getElementById('navToggle');
+  var mainNav = document.getElementById('mainNav');
+  var navLinks = mainNav.querySelectorAll('a');
+
+  navToggle.addEventListener('click', function () {
+    var open = mainNav.classList.toggle('visible');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!mainNav.contains(e.target) && e.target !== navToggle) {
+      mainNav.classList.remove('visible');
+      navToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  var sections = document.querySelectorAll('section.fade-in');
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) en.target.classList.add('visible');
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -8% 0px' });
+  sections.forEach(function (s) { obs.observe(s); });
+
+  function onScrollNav() {
+    var y = window.scrollY + 120;
+    var cur = null;
+    sections.forEach(function (s) {
+      if (s.offsetTop <= y) cur = s.id;
+    });
+    navLinks.forEach(function (a) {
+      a.classList.toggle('active', cur && a.getAttribute('href') === '#' + cur);
+    });
+  }
+  window.addEventListener('scroll', onScrollNav, { passive: true });
+  onScrollNav();
+
+  /* Architecture diagram highlight */
+  var archNodes = document.querySelectorAll('.arch-node');
+  var archKeyMap = {
+    docs: ['docs', 'chunk', 'emb', 'store'],
+    chunk: ['docs', 'chunk', 'emb', 'store'],
+    emb: ['chunk', 'emb', 'store'],
+    store: ['emb', 'store', 'retr'],
+    q: ['q', 'qemb', 'retr', 'llm'],
+    qemb: ['q', 'qemb', 'retr'],
+    retr: ['qemb', 'retr', 'llm', 'store'],
+    llm: ['retr', 'llm']
+  };
+  archNodes.forEach(function (node) {
+    node.addEventListener('click', function () {
+      var key = node.getAttribute('data-key');
+      var keep = archKeyMap[key] || [key];
+      archNodes.forEach(function (n) {
+        var k = n.getAttribute('data-key');
+        n.classList.remove('highlight', 'dim');
+        if (keep.indexOf(k) === -1) n.classList.add('dim');
+        else n.classList.add('highlight');
+      });
+    });
+  });
+
+  /* Pipeline animation */
+  var pipeSteps = [
+    { phase: 'Ingestion', label: 'Load documents from sources (files, web, APIs).' },
+    { phase: 'Ingestion', label: 'Extract and clean text; normalize encoding and boilerplate.' },
+    { phase: 'Ingestion', label: 'Chunk text into retrieval units with optional overlap.' },
+    { phase: 'Ingestion', label: 'Embed chunks; batch and version embedding model id.' },
+    { phase: 'Ingestion', label: 'Upsert vectors + metadata into the vector store / index.' },
+    { phase: 'Query', label: 'Embed the user question with the same model as ingestion.' },
+    { phase: 'Query', label: 'Retrieve top-k neighbors (optionally filter by metadata).' },
+    { phase: 'Query', label: 'Assemble numbered context blocks into the prompt template.' },
+    { phase: 'Query', label: 'Call the LLM; post-process citations, safety, and formatting.' }
+  ];
+  var pipeContainer = document.getElementById('pipeStages');
+  var pipeLabel = document.getElementById('pipeLabel');
+  var pipeIdx = -1;
+  var pipeTimer = null;
+
+  function renderPipeStages() {
+    pipeContainer.innerHTML = '';
+    pipeSteps.forEach(function (step, i) {
+      var div = document.createElement('div');
+      div.className = 'pipeline-stage' + (i === pipeIdx ? ' active' : '');
+      div.innerHTML = '<span class="idx">' + (i + 1) + '</span><div><strong style="color:var(--text);">' +
+        step.phase + '</strong> — ' + step.label + '</div>';
+      pipeContainer.appendChild(div);
+    });
+    if (pipeIdx >= 0 && pipeIdx < pipeSteps.length) {
+      pipeLabel.textContent = 'Step ' + (pipeIdx + 1) + ' / ' + pipeSteps.length;
+    } else {
+      pipeLabel.textContent = '';
+    }
+  }
+
+  function advancePipe() {
+    pipeIdx = (pipeIdx + 1) % pipeSteps.length;
+    renderPipeStages();
+  }
+
+  function resetPipe() {
+    pipeIdx = -1;
+    if (pipeTimer) clearInterval(pipeTimer);
+    pipeTimer = null;
+    renderPipeStages();
+    pipeLabel.textContent = '';
+  }
+
+  document.getElementById('pipePlay').addEventListener('click', function () {
+    if (pipeTimer) return;
+    if (pipeIdx < 0) pipeIdx = -1;
+    advancePipe();
+    pipeTimer = setInterval(advancePipe, 1600);
+  });
+  document.getElementById('pipePause').addEventListener('click', function () {
+    if (pipeTimer) clearInterval(pipeTimer);
+    pipeTimer = null;
+  });
+  document.getElementById('pipeStep').addEventListener('click', function () {
+    if (pipeTimer) {
+      clearInterval(pipeTimer);
+      pipeTimer = null;
+    }
+    advancePipe();
+  });
+  document.getElementById('pipeReset').addEventListener('click', resetPipe);
+  renderPipeStages();
+
+  /* Prompt builder demo */
+  var demoChunks = [
+    { id: 1, text: '[Billing Policy — Section 2] Annual subscriptions may be refunded within 14 days of purchase if no seat has been activated.' },
+    { id: 2, text: '[Billing Policy — Section 4] Monthly plans are non-refundable after the first invoice cycle completes.' },
+    { id: 3, text: '[FAQ — Accounts] You can change your account email from Settings → Security. Refunds are handled by billing support.' },
+    { id: 4, text: '[Internal Note — Deprecated] Old policy: 30-day refund. Superseded by 2024 policy update.' }
+  ];
+  var chunkToggles = document.getElementById('chunkToggles');
+  var promptPreview = document.getElementById('promptPreview');
+  var selected = { 1: true, 2: true, 3: false, 4: false };
+
+  function renderChunkToggles() {
+    chunkToggles.innerHTML = '';
+    demoChunks.forEach(function (c) {
+      var span = document.createElement('span');
+      span.className = 'chunk-pill' + (selected[c.id] ? ' on' : '');
+      span.textContent = 'Source ' + c.id;
+      span.setAttribute('role', 'button');
+      span.tabIndex = 0;
+      span.addEventListener('click', function () {
+        selected[c.id] = !selected[c.id];
+        renderChunkToggles();
+        updatePromptPreview();
+      });
+      span.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          selected[c.id] = !selected[c.id];
+          renderChunkToggles();
+          updatePromptPreview();
+        }
+      });
+      chunkToggles.appendChild(span);
+    });
+    updatePromptPreview();
+  }
+
+  function updatePromptPreview() {
+    var parts = [];
+    parts.push('System: You are a support assistant. Answer ONLY using the numbered sources. If the answer is not contained in the sources, say you do not know.');
+    parts.push('');
+    var n = 0;
+    demoChunks.forEach(function (c) {
+      if (selected[c.id]) {
+        n++;
+        parts.push('[' + n + '] ' + c.text);
+      }
+    });
+    parts.push('');
+    parts.push('User: What is our refund window for annual plans?');
+    parts.push('');
+    parts.push('Assistant:');
+    promptPreview.textContent = parts.join('\n');
+  }
+  renderChunkToggles();
+
+  /* Temperature / context demo */
+  var tempR = document.getElementById('tempR');
+  var ctxR = document.getElementById('ctxR');
+  var tempV = document.getElementById('tempV');
+  var ctxV = document.getElementById('ctxV');
+  var ctxMeter = document.getElementById('ctxMeter');
+  var ctxAdvice = document.getElementById('ctxAdvice');
+  var WINDOW = 8192;
+  var RESERVED = 1200;
+
+  function updateRagParams() {
+    var t = tempR.value / 100;
+    tempV.textContent = t.toFixed(2);
+    var ctx = parseInt(ctxR.value, 10);
+    ctxV.textContent = String(ctx);
+    var used = Math.min(100, ((ctx + RESERVED) / WINDOW) * 100);
+    ctxMeter.style.width = used + '%';
+    var tips = [];
+    if (t > 0.5) tips.push('Higher temperature increases paraphrase risk for fact-heavy RAG answers.');
+    else tips.push('Lower temperature tends to stick closer to wording in context.');
+    if (ctx + RESERVED > WINDOW * 0.92) tips.push('Context is near the example window limit—truncate, compress, or retrieve fewer chunks.');
+    else if (ctx > 4000) tips.push('Long context can exhibit “lost in the middle” effects; consider reranking to top-k.');
+    else tips.push('Headroom remains for instructions and the model completion.');
+    ctxAdvice.textContent = tips.join(' ');
+  }
+  tempR.addEventListener('input', updateRagParams);
+  ctxR.addEventListener('input', updateRagParams);
+  updateRagParams();
+
+  /* Failure gallery */
+  var failures = [
+    { id: 'ret_mismatch', cat: 'Retrieval', title: 'Query–document mismatch', body: 'User asks for “Q3 churn in EMEA,” but documents say “retention by region” without the word “churn.” Embeddings may not align; hybrid search with synonyms or a small query rewriter helps.' },
+    { id: 'ret_topk', cat: 'Retrieval', title: 'Right doc, wrong top-k', body: 'The policy PDF contains the answer on page 40, but only pages 1–2 chunks enter top-k because the query matches marketing language on early pages. Increase k temporarily, add MMR diversity, or rerank.' },
+    { id: 'ret_chunk', cat: 'Retrieval', title: 'Split across chunks', body: 'Sentence A states eligibility; sentence B states the deadline, but your fixed 512-token windows cut between them. Neither chunk alone matches the query. Semantic chunking or overlap reduces this.' },
+    { id: 'gen_hallu', cat: 'Generation', title: 'Hallucination despite context', body: 'Retrieved text lists a 14-day window, but the model answers “30 days” from outdated parametric knowledge. Stronger system prompts, citation requirements, and verification help.' },
+    { id: 'gen_ignore', cat: 'Generation', title: 'Ignores context', body: 'Context clearly says “no,” but the model answers “yes” to please the user. Lower temperature, consequence framing in the system prompt, and entailment checks catch this.' },
+    { id: 'gen_wrong', cat: 'Generation', title: 'Misreads correct chunk', body: 'Chunk mentions two plans; the model cites the wrong plan’s price. Ask for explicit comparison tables or structured outputs when ambiguity is high.' },
+    { id: 'int_lost', cat: 'Integration', title: 'Lost in the middle', body: 'Ten long chunks fill the window; the key fact sits in the middle and is under-attended. Place critical passages near the start or end, or compress middle material.' },
+    { id: 'int_contra', cat: 'Integration', title: 'Contradictory chunks', body: 'Wiki says v2 API is deprecated; Slack export says it is still supported. The model may average them. Resolve conflicts in the source system or add temporal metadata.' },
+    { id: 'int_dilute', cat: 'Integration', title: 'Irrelevant chunks dilute', body: 'Broad retrieval pulls onboarding docs into a billing question, eating token budget. Metadata filters, hybrid scoring, and reranking sharpen the set.' }
+  ];
+  var failTabs = document.getElementById('failureTabs');
+  var failBody = document.getElementById('failureBody');
+  var activeFail = 0;
+
+  function renderFailure() {
+    failTabs.innerHTML = '';
+    failures.forEach(function (f, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn' + (i === activeFail ? ' on' : '');
+      b.textContent = f.cat + ': ' + f.title;
+      b.addEventListener('click', function () {
+        activeFail = i;
+        renderFailure();
+      });
+      failTabs.appendChild(b);
+    });
+    var f = failures[activeFail];
+    failBody.innerHTML = '<h4 style="margin:0 0 10px;color:var(--text);">' + f.title + '</h4><p style="margin:0;color:var(--text-dim);">' + f.body + '</p>';
+  }
+  renderFailure();
+
+  /* Playground */
+  var defaultKb = [
+    'Our SLA promises 99.9% monthly uptime for the Enterprise tier. Standard tier is 99.5%.',
+    'Incident reports must be filed within 24 hours. Postmortems are due within five business days.',
+    'Password rotation is no longer required; use SSO and hardware keys where available.',
+    'Data residency: EU customers can choose the Frankfurt region. US defaults to Oregon.'
+  ].join('\n---\n');
+
+  var kbInput = document.getElementById('kbInput');
+  var qInput = document.getElementById('qInput');
+  var kInput = document.getElementById('kInput');
+  var tplSelect = document.getElementById('tplSelect');
+  var retOut = document.getElementById('retOut');
+  var playPrompt = document.getElementById('playPrompt');
+  var playAns = document.getElementById('playAns');
+  var playHint = document.getElementById('playHint');
+
+  kbInput.value = defaultKb;
+  qInput.value = 'What uptime do we promise Enterprise customers?';
+
+  function tokenize(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(function (w) { return w.length > 2; });
+  }
+
+  function scoreDoc(q, doc) {
+    var qw = tokenize(q);
+    var joined = doc.toLowerCase();
+    var hit = 0;
+    qw.forEach(function (w) {
+      if (joined.indexOf(w) !== -1) hit++;
+    });
+    return hit;
+  }
+
+  function buildTemplates(tpl, contextBlock, question) {
+    if (tpl === 'strict') {
+      return 'System: Answer using ONLY the sources below. Cite source numbers like [1]. If unsupported, say: I do not know from the provided sources.\n\nSources:\n' + contextBlock + '\n\nUser: ' + question + '\n\nAssistant:';
+    }
+    if (tpl === 'concise') {
+      return 'System: You are a precise assistant. Keep answers short. Use the context; do not invent facts.\n\nContext:\n' + contextBlock + '\n\nQuestion: ' + question + '\n\nAnswer:';
+    }
+    return 'System: Help the user.\n\n' + contextBlock + '\n\nQ: ' + question + '\nA:';
+  }
+
+  function simulateAnswer(chunks, question) {
+    var joined = chunks.join(' ').toLowerCase();
+    var q = question.toLowerCase();
+    if (!chunks.length) {
+      return { text: 'I do not know from the provided sources (no chunks retrieved).', mode: 'abstain' };
+    }
+    if (joined.indexOf('99.9') !== -1 && (q.indexOf('uptime') !== -1 || q.indexOf('enterprise') !== -1 || q.indexOf('sla') !== -1)) {
+      return { text: 'Enterprise tier lists 99.9% monthly uptime in the SLA document [see retrieved chunk].', mode: 'grounded' };
+    }
+    if (joined.indexOf('24 hour') !== -1 && q.indexOf('incident') !== -1) {
+      return { text: 'Incidents should be filed within 24 hours per policy.', mode: 'grounded' };
+    }
+    if (joined.indexOf('frankfurt') !== -1 && (q.indexOf('eu') !== -1 || q.indexOf('residency') !== -1)) {
+      return { text: 'EU customers may select the Frankfurt region for data residency.', mode: 'grounded' };
+    }
+    if (scoreDoc(question, joined) < 1) {
+      return { text: 'I do not know from the provided sources (weak retrieval match).', mode: 'abstain' };
+    }
+    return { text: 'The retrieved text partially relates, but a confident specific answer is not justified in this toy simulator—try tightening your question or adding keywords present in the docs.', mode: 'weak' };
+  }
+
+  document.getElementById('runSim').addEventListener('click', function () {
+    var docs = kbInput.value.split(/\n---\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var question = qInput.value.trim();
+    var k = Math.max(1, Math.min(8, parseInt(kInput.value, 10) || 3));
+    var tpl = tplSelect.value;
+
+    if (!docs.length || !question) {
+      playHint.textContent = 'Add at least one document and a non-empty question.';
+      return;
+    }
+
+    var scored = docs.map(function (d, i) {
+      return { i: i, text: d, s: scoreDoc(question, d) };
+    });
+    scored.sort(function (a, b) { return b.s - a.s; });
+    var top = scored.slice(0, k);
+    retOut.innerHTML = '';
+    top.forEach(function (row, idx) {
+      var div = document.createElement('div');
+      div.className = 'ret-chunk';
+      div.innerHTML = '<span class="score">score: ' + row.s + '</span><br/>' + escapeHtml(row.text.slice(0, 280)) + (row.text.length > 280 ? '…' : '');
+      retOut.appendChild(div);
+    });
+
+    var contextBlock = '';
+    var chunkTexts = [];
+    top.forEach(function (row, idx) {
+      contextBlock += '[' + (idx + 1) + '] ' + row.text + '\n\n';
+      chunkTexts.push(row.text);
+    });
+    var fullPrompt = buildTemplates(tpl, contextBlock.trim(), question);
+    playPrompt.textContent = fullPrompt.slice(0, 3500) + (fullPrompt.length > 3500 ? '\n… [truncated for display]' : '');
+
+    var ans = simulateAnswer(chunkTexts, question);
+    playAns.textContent = ans.text;
+    if (ans.mode === 'abstain') {
+      playHint.textContent = 'Failure signal: abstention—retrieval or template may be too strict, or knowledge base lacks coverage.';
+    } else if (ans.mode === 'weak') {
+      playHint.textContent = 'Failure signal: weak grounding—try different keywords, increase k, or improve document wording.';
+    } else {
+      playHint.textContent = 'Grounded path: high lexical overlap led to a confident toy answer. Real systems still need evaluation.';
+    }
+  });
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+})();
+  </script>
+</body>
+</html>

@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build Your First Reasoning Model — Reasoning from Scratch</title>
+<style>
+/* ============================================================
+   Chapter 12 — shared series tokens (match Ch.01–11)
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 60vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 700px; height: 700px; background: radial-gradient(circle, rgba(52,211,153,0.12) 0%, rgba(108,140,255,0.06) 40%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 760px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent3), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.callout.pink { border-left-color: var(--accent4); background: rgba(244,114,182,0.08); }
+.callout.triumph { border-left-color: var(--accent5); background: rgba(251,191,36,0.1); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; line-height: 1.8; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-yellow { background: rgba(251,191,36,0.15); color: var(--accent5); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent3); background: rgba(52,211,153,0.15); color: var(--accent3); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+.footer a { margin: 0 12px; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+td { color: var(--text-dim); }
+.flow-diagram { font-family: var(--mono); font-size: 0.82rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 20px; line-height: 1.9; color: var(--text-dim); overflow-x: auto; }
+.flow-diagram .highlight { color: var(--accent3); }
+.code-block { font-family: var(--mono); font-size: 0.78rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; line-height: 1.75; color: var(--text-dim); overflow-x: auto; white-space: pre-wrap; }
+.code-block .kw { color: var(--accent2); }
+.code-block .fn { color: var(--accent); }
+.code-block .str { color: var(--accent3); }
+.code-block .cm { color: #555; font-style: italic; }
+.code-block .num { color: var(--accent5); }
+
+/* ============================================================
+   Ch.12-specific: training chart, reward panel, before/after
+   ============================================================ */
+.chart-wrap { display: grid; grid-template-columns: 1fr 200px; gap: 20px; align-items: start; }
+@media (max-width: 700px) { .chart-wrap { grid-template-columns: 1fr; } }
+#train-canvas { width: 100%; max-width: 560px; height: 280px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card-alt); display: block; }
+.chart-stats { font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); line-height: 2; }
+.chart-stats .val { color: var(--accent3); font-weight: 600; }
+.reward-viz { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 600px) { .reward-viz { grid-template-columns: 1fr; } }
+.reward-box { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; transition: all 0.35s; }
+.reward-box.active { border-color: var(--accent3); box-shadow: 0 0 24px rgba(52,211,153,0.12); }
+.reward-box .rb-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 8px; }
+.reward-box .rb-val { font-family: var(--mono); font-size: 2rem; font-weight: 800; }
+.reward-box.format .rb-val { color: var(--accent2); }
+.reward-box.correct .rb-val { color: var(--accent); }
+.reward-box.combined .rb-val { color: var(--accent3); }
+.reward-box.dim { opacity: 0.35; }
+.reward-example { font-family: var(--mono); font-size: 0.75rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 16px; line-height: 1.7; color: var(--text-dim); }
+.reward-example .pass { color: var(--accent3); }
+.reward-example .fail { color: var(--danger); }
+.toggle-panel { display: flex; gap: 12px; align-items: center; margin: 16px 0; flex-wrap: wrap; }
+.toggle-panel label { font-size: 0.85rem; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.toggle-panel input[type="range"] { width: 160px; accent-color: var(--accent3); }
+.output-panel { font-family: var(--mono); font-size: 0.78rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 20px; line-height: 1.8; min-height: 220px; color: var(--text-dim); }
+.output-panel .think { color: var(--accent2); }
+.output-panel .ans { color: var(--accent3); font-weight: 600; }
+.output-panel .bad { color: var(--danger); }
+.pipeline-steps { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 24px 0; }
+.pipe-step { flex: 1; min-width: 140px; max-width: 180px; padding: 16px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card-alt); text-align: center; position: relative; }
+.pipe-step .ps-num { font-family: var(--mono); font-size: 0.65rem; color: var(--accent); margin-bottom: 6px; }
+.pipe-step .ps-name { font-weight: 700; font-size: 0.85rem; color: var(--text); margin-bottom: 4px; }
+.pipe-step .ps-desc { font-size: 0.72rem; color: var(--text-dim); line-height: 1.4; }
+.pipe-step.highlight-step { border-color: var(--accent3); box-shadow: 0 0 20px rgba(52,211,153,0.15); }
+.journey-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 24px 0; }
+@media (max-width: 700px) { .journey-grid { grid-template-columns: repeat(2, 1fr); } }
+.journey-cell { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; font-size: 0.75rem; color: var(--text-dim); transition: all 0.3s; }
+.journey-cell .jc-num { font-family: var(--mono); color: var(--accent); font-weight: 700; display: block; margin-bottom: 4px; }
+.journey-cell.lit { border-color: var(--accent3); color: var(--text); background: rgba(52,211,153,0.08); }
+.example-steps { counter-reset: ex; list-style: none; margin: 16px 0; padding: 0; }
+.example-steps li { counter-increment: ex; padding: 14px 16px 14px 48px; margin-bottom: 10px; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; position: relative; font-size: 0.9rem; color: var(--text-dim); }
+.example-steps li::before { content: counter(ex); position: absolute; left: 14px; top: 14px; width: 24px; height: 24px; border-radius: 50%; background: rgba(108,140,255,0.2); color: var(--accent); font-family: var(--mono); font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.example-steps li strong { color: var(--text); }
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<!-- Breadcrumb -->
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; background: #111118; border-bottom: 1px solid #23232f; padding: 10px 24px; font-size: 0.82rem; color: #8888a0; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Reasoning from Scratch</a><span class="bc-sep">›</span><span class="bc-current">Ch.12 — Build Your Reasoning Model</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Reasoning from Scratch</a>
+  <div class="nav-links">
+    <a href="#bridge">Bridge</a>
+    <a href="#r1zero">R1-Zero</a>
+    <a href="#rlvr">RLVR</a>
+    <a href="#template">Template</a>
+    <a href="#rewards">Rewards</a>
+    <a href="#grpo">GRPO</a>
+    <a href="#training">Training</a>
+    <a href="#emergent">Emergent</a>
+    <a href="#before-after">Before/After</a>
+    <a href="#r1">R1 vs Zero</a>
+    <a href="#reflection">Reflection</a>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO — The capstone: everything converges here
+     ============================================================ -->
+<div class="hero">
+  <div class="container">
+    <span class="section-num">CHAPTER 12 · FINAL</span>
+    <h1>Build Your First Reasoning Model</h1>
+    <p class="subtitle">Twelve chapters ago we asked why LLMs need to think. Today you close the loop: take a plain Qwen 2.5 3B, train it with GRPO on GSM8K using only verifiable rewards — no chain-of-thought demonstrations, no human reasoning traces — and watch reasoning <em>emerge</em>. This is the DeepSeek R1-Zero blueprint, and it is the climax of the entire series.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Base Model (3B)</span></div>
+      <div class="stat"><span class="stat-val">8,792</span><span class="stat-label">GSM8K Problems</span></div>
+      <div class="stat"><span class="stat-val">0</span><span class="stat-label">Human Demonstrations</span></div>
+      <div class="stat"><span class="stat-val">GRPO</span><span class="stat-label">Pure RL Training</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 00 — Bridge from GRPO (Ch.11) to reasoning models
+     ============================================================ -->
+<section class="section fade-in" id="bridge">
+  <div class="container">
+    <span class="section-num">00 — THE MISSING BRIDGE</span>
+    <h2>From GRPO to Reasoning Models</h2>
+    <p>Chapter 11 derived Group-Relative Policy Optimization: sample G completions per prompt, compute verifiable rewards, normalize advantages within the group, update π<sub>θ</sub> with a KL penalty toward a reference model. Elegant mathematics — but we never answered the question that motivated the entire RL arc:</p>
+
+    <div class="callout pink">
+      <p><strong>Can GRPO turn a non-reasoning LLM into a reasoning model?</strong> In January 2025, the DeepSeek-R1 paper answered with a definitive yes. DeepSeek-R1-Zero — the precursor to full R1 — used GRPO with verifiable rewards and <em>zero</em> supervised fine-tuning on reasoning traces. Reasoning emerged from RL alone.</p>
+    </div>
+
+    <p>The course traced four broad methods for building reasoning models:</p>
+    <table>
+      <thead><tr><th>Method</th><th>Chapters</th><th>Core idea</th></tr></thead>
+      <tbody>
+        <tr><td>Inference-time compute</td><td>01–03</td><td>CoT prompting, verifiers, search at decode time</td></tr>
+        <tr><td><strong>Pure RL (this chapter)</strong></td><td>04–12</td><td>Train the policy with outcome rewards; reasoning emerges</td></tr>
+        <tr><td>SFT + RL hybrid</td><td>—</td><td>Cold-start demonstrations, then RL (DeepSeek-R1 full pipeline)</td></tr>
+        <tr><td>Distillation</td><td>—</td><td>Compress teacher reasoning into a student model</td></tr>
+      </tbody>
+    </table>
+
+    <p>This chapter completes Arc 4. You will understand the R1-Zero recipe end-to-end, implement its reward function and training template, configure GRPO in TRL, and interpret the emergent behaviors that made the paper famous — including the celebrated “aha moment” where the model learns to re-evaluate its own mistakes without ever being shown how.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 01 — The R1-Zero approach
+     ============================================================ -->
+<section class="section fade-in" id="r1zero">
+  <div class="container">
+    <span class="section-num">01 — THE R1-ZERO BLUEPRINT</span>
+    <h2>Pure RL, No Demonstrations</h2>
+    <p>Before DeepSeek-R1 came DeepSeek-R1-Zero. The name signals the key constraint: <strong>zero</strong> supervised fine-tuning on human reasoning examples. The model never sees input–output pairs where an expert wrote out a chain of thought. It only sees:</p>
+
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.2em;line-height:1.9;">
+      <li>Math word problems from GSM8K (questions only — answers used for verification, not imitation).</li>
+      <li>A system prompt describing output format (think tags + answer tags).</li>
+      <li>Binary rewards from external verifiers (format check + answer check).</li>
+      <li>GRPO updates that increase probability of high-reward completions.</li>
+    </ul>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-yellow">Traditional SFT</span></h3>
+        <p>Show the model thousands of worked solutions. It learns to <em>imitate</em> reasoning text. Quality ceiling = demonstration quality.</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-green">R1-Zero (RLVR)</span></h3>
+        <p>Only reward correct final answers in correct format. The model discovers <em>its own</em> reasoning strategies via trial and error. Reasoning is emergent, not copied.</p>
+      </div>
+    </div>
+
+    <div class="flow-diagram">
+<span class="highlight">Base model</span> (Qwen 2.5 3B)
+    ↓  sample G completions per GSM8K question
+<span class="highlight">Verifiable rewards</span> (format + correctness → binary)
+    ↓  group-relative advantages (no value network, no reward model)
+<span class="highlight">GRPO update</span> + KL(π<sub>θ</sub> ‖ π<sub>ref</sub>)
+    ↓  repeat for thousands of steps
+<span class="highlight">Reasoning model</span> — longer CoT, self-correction, higher accuracy
+    </div>
+
+    <p>The algorithm at the heart is still GRPO from Chapter 11. What changed is the reward source: instead of a learned reward model trained on human preferences, R1-Zero uses <strong>RLVR</strong> — Reinforcement Learning with Verifiable Rewards — where correctness is checked by deterministic tools (calculators, unit tests, symbolic parsers).</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 02 — RLVR and why we can drop the reward model
+     ============================================================ -->
+<section class="section fade-in" id="rlvr">
+  <div class="container">
+    <span class="section-num">02 — VERIFIABLE REWARDS</span>
+    <h2>No Reward Model Needed</h2>
+    <p>Classic RLHF trains a separate reward model on human rankings: “response A is better than B.” That works for open-ended chat but introduces subjectivity and an extra model to maintain.</p>
+
+    <p>R1-Zero asks a simpler question for math: <strong>is the final number correct?</strong> To verify “5 × 3 + 4 = 19,” you do not need a neural network — you need a calculator. For code, run the LeetCode test suite. For GSM8K, parse the answer after the <code>&lt;answer&gt;</code> tag and compare to the gold label.</p>
+
+    <div class="callout ok">
+      <p><strong>Objective rewards.</strong> Verifiable tasks produce rewards in {0, 1} with no ambiguity. GRPO’s group normalization still provides the learning signal: within a batch of G samples on the same question, completions that got reward 1 are up-weighted relative to those that got 0 — even when every sample in a hard batch gets 0.</p>
+    </div>
+
+    <p>DeepSeek added a second verifiable signal beyond correctness: <strong>format rewards</strong>. If the model omits <code>&lt;redacted_thinking&gt;</code> … <code>&lt;/redacted_thinking&gt;</code> or <code>&lt;answer&gt;</code> … <code>&lt;/answer&gt;</code>, it receives no credit. This nudges the policy to allocate tokens to an explicit reasoning block before committing to a final answer — creating the structural slot where chain-of-thought can grow.</p>
+
+    <div class="formula">
+      r<sub>format</sub> ∈ {0, 1} &nbsp;&nbsp;·&nbsp;&nbsp; r<sub>correct</sub> ∈ {0, 1} &nbsp;&nbsp;·&nbsp;&nbsp; r = 1 iff r<sub>format</sub> = 1 ∧ r<sub>correct</sub> = 1, else 0
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 03 — Training template (system prompt)
+     ============================================================ -->
+<section class="section fade-in" id="template">
+  <div class="container">
+    <span class="section-num">03 — THE TRAINING TEMPLATE</span>
+    <h2>Format Without Teaching Content</h2>
+    <p>The training template is a system prompt prepended to every GSM8K question. Crucially, it tells the model <em>how to structure</em> its output, not <em>what to think</em>. There are no example solutions, no “first multiply, then add” hints — only a contract about tags.</p>
+
+    <div class="card">
+      <h3>DeepSeek R1-Zero System Prompt</h3>
+      <div class="code-block"><span class="cm"># Training template — enforces structure, not reasoning content</span>
+SYSTEM_PROMPT = <span class="str">"""A conversation between User and Assistant.
+The User asks a question, and the Assistant solves it.
+The Assistant first thinks about the reasoning process in the mind
+and then provides the User with the answer.
+
+The reasoning process and answer are enclosed within tags:
+
+&lt;redacted_thinking&gt; reasoning process here &lt;/redacted_thinking&gt;
+&lt;answer&gt; answer here &lt;/answer&gt;"""</span></div>
+    </div>
+
+    <p>During GRPO rollouts, the model generates freely inside these tags. Early in training, completions are short, badly formatted, and wrong. GRPO gradually shifts mass toward longer thinking blocks that precede correct answers — because those are the only trajectories that receive reward 1.</p>
+
+    <div class="callout">
+      <p><strong>We never say “re-evaluate if wrong.”</strong> Yet late in training, models spontaneously write phrases like “wait, let me reconsider step by step” — the famous aha moment. That behavior was never in the SFT data because there was no SFT data. RL alone discovered it was useful for maximizing r<sub>correct</sub>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 04 — Dataset and base model setup
+     ============================================================ -->
+<section class="section fade-in" id="setup">
+  <div class="container">
+    <span class="section-num">04 — MODEL &amp; DATA</span>
+    <h2>Qwen 2.5 3B on GSM8K</h2>
+    <p>The hands-on recipe uses a small base model so you can run experiments on a single GPU (A100 recommended; T4 works but training takes several hours longer). Qwen 2.5 3B is a strong instruction-tuned base that has <em>not</em> been trained as a dedicated reasoning model — making it the perfect blank canvas.</p>
+
+    <div class="card card-alt">
+      <h3>Stack</h3>
+      <ul style="color:var(--text-dim);margin:0 0 0 1.2em;line-height:1.9;">
+        <li><strong>Base model:</strong> <code>Qwen/Qwen2.5-3B-Instruct</code> (or similar 3B chat model)</li>
+        <li><strong>Dataset:</strong> OpenAI GSM8K — 7,473 train + 1,319 test = <strong>8,792</strong> grade-school math word problems</li>
+        <li><strong>Libraries:</strong> Hugging Face TRL (<code>GRPOTrainer</code>), Transformers, optional Unsloth for faster fine-tuning</li>
+        <li><strong>Hardware:</strong> 1× A100 (~3–4 hours) or 1× T4 (much longer)</li>
+      </ul>
+    </div>
+
+    <div class="code-block"><span class="cm"># Step 1 — load base model (reference policy frozen for KL)</span>
+<span class="kw">from</span> transformers <span class="kw">import</span> AutoModelForCausalLM, AutoTokenizer
+
+model_name = <span class="str">"Qwen/Qwen2.5-3B-Instruct"</span>
+model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=<span class="str">"bfloat16"</span>)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+<span class="cm"># Step 2 — load GSM8K (questions become prompts; answers used only in reward fn)</span>
+<span class="kw">from</span> datasets <span class="kw">import</span> load_dataset
+gsm8k = load_dataset(<span class="str">"openai/gsm8k"</span>, <span class="str">"main"</span>)
+<span class="cm"># Each row: question (str), answer (str with #### final number)</span></div>
+
+    <p>The training loop feeds questions with the system template. Gold answers never appear in the prompt — they exist only inside the reward function for verification.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 05 — Reward function (interactive breakdown)
+     ============================================================ -->
+<section class="section fade-in" id="rewards">
+  <div class="container">
+    <span class="section-num">05 — REWARD DESIGN</span>
+    <h2>Format + Correctness → Binary Reward</h2>
+    <p>The reward function is the entire supervision signal. Toggle below to see how each component is evaluated on a sample completion.</p>
+
+    <div class="interactive-panel">
+      <h3>Reward Function Explorer</h3>
+      <div class="btn-group" id="reward-btns">
+        <button class="btn active" data-mode="format">Format reward</button>
+        <button class="btn" data-mode="correct">Correctness reward</button>
+        <button class="btn" data-mode="combined">Combined (binary)</button>
+      </div>
+
+      <div class="reward-viz">
+        <div class="reward-box format active" id="rb-format">
+          <div class="rb-label">r<sub>format</sub></div>
+          <div class="rb-val" id="rv-format">1</div>
+          <div style="font-size:0.72rem;color:var(--text-dim);margin-top:8px;">Valid think + answer tags</div>
+        </div>
+        <div class="reward-box correct active" id="rb-correct">
+          <div class="rb-label">r<sub>correct</sub></div>
+          <div class="rb-val" id="rv-correct">1</div>
+          <div style="font-size:0.72rem;color:var(--text-dim);margin-top:8px;">Parsed answer matches gold</div>
+        </div>
+        <div class="reward-box combined active" id="rb-combined">
+          <div class="rb-label">r (final)</div>
+          <div class="rb-val" id="rv-combined">1</div>
+          <div style="font-size:0.72rem;color:var(--text-dim);margin-top:8px;">1 only if both pass</div>
+        </div>
+      </div>
+
+      <div class="reward-example" id="reward-explain">
+        <span class="pass">✓ Format check:</span> Response contains exactly one <code>&lt;redacted_thinking&gt;…&lt;/redacted_thinking&gt;</code> block followed by one <code>&lt;answer&gt;…&lt;/answer&gt;</code> block.<br>
+        <span class="pass">✓ Correctness check:</span> Extracted answer <strong>18</strong> matches gold label from GSM8K.<br>
+        <span class="pass">→ Combined reward = 1</span> — this completion gets positive advantage in its GRPO group.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Python Implementation</h3>
+      <div class="code-block"><span class="kw">import</span> re
+
+THINK_PATTERN = re.compile(
+    r<span class="str">"&lt;redacted_thinking&gt;(.*?)&lt;/redacted_thinking&gt;\s*&lt;answer&gt;(.*?)&lt;/answer&gt;"</span>,
+    re.DOTALL,
+)
+
+<span class="kw">def</span> <span class="fn">extract_answer</span>(text: str) -> str | None:
+    <span class="cm">"""Parse final answer from tagged completion."""</span>
+    m = THINK_PATTERN.search(text)
+    <span class="kw">if</span> <span class="kw">not</span> m:
+        <span class="kw">return</span> None
+    <span class="kw">return</span> m.group(<span class="num">2</span>).strip()
+
+<span class="kw">def</span> <span class="fn">format_reward</span>(completion: str) -> float:
+    <span class="cm">"""1 if tags present and well-formed, else 0."""</span>
+    <span class="kw">return</span> <span class="num">1.0</span> <span class="kw">if</span> THINK_PATTERN.search(completion) <span class="kw">else</span> <span class="num">0.0</span>
+
+<span class="kw">def</span> <span class="fn">correctness_reward</span>(completion: str, gold: str) -> float:
+    <span class="cm">"""1 if numeric answer matches GSM8K label, else 0."""</span>
+    pred = extract_answer(completion)
+    gold_num = gold.split(<span class="str">"####"</span>)[-<span class="num">1</span>].strip()
+    <span class="kw">if</span> pred <span class="kw">is</span> None:
+        <span class="kw">return</span> <span class="num">0.0</span>
+    <span class="kw">return</span> <span class="num">1.0</span> <span class="kw">if</span> pred.replace(<span class="str">","</span>, <span class="str">""</span>) == gold_num.replace(<span class="str">","</span>, <span class="str">""</span>) <span class="kw">else</span> <span class="num">0.0</span>
+
+<span class="kw">def</span> <span class="fn">combined_reward</span>(completion: str, gold: str) -> float:
+    <span class="cm">"""Binary RLVR reward used in GRPO — all or nothing."""</span>
+    <span class="kw">if</span> format_reward(completion) <span class="num">&lt;</span> <span class="num">1.0</span>:
+        <span class="kw">return</span> <span class="num">0.0</span>
+    <span class="kw">return</span> correctness_reward(completion, gold)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 06 — GRPO training configuration
+     ============================================================ -->
+<section class="section fade-in" id="grpo">
+  <div class="container">
+    <span class="section-num">06 — GRPO TRAINING SETUP</span>
+    <h2>Configuring the Trainer</h2>
+    <p>TRL’s <code>GRPOTrainer</code> wraps the loop from Chapter 11: for each batch of prompts, generate G completions, score with your reward function, compute group-relative advantages, apply the clipped surrogate objective with KL regularization toward π<sub>ref</sub>.</p>
+
+    <table>
+      <thead><tr><th>Parameter</th><th>Typical value</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>num_generations</code> (G)</td><td>8 or 16</td><td>Completions sampled per question for group baseline</td></tr>
+        <tr><td><code>beta</code> (β)</td><td>0.04 – 0.1</td><td>KL coefficient — prevents policy from drifting too far from base model</td></tr>
+        <tr><td><code>learning_rate</code></td><td>5e-7 – 1e-6</td><td>Small LR; RL on LLMs is fragile at high steps</td></tr>
+        <tr><td><code>num_train_epochs</code></td><td>1 – 3</td><td>One pass often suffices; watch for over-long CoT</td></tr>
+        <tr><td><code>max_completion_length</code></td><td>512 – 1024</td><td>Cap thinking length; grows naturally as model learns</td></tr>
+        <tr><td><code>per_device_train_batch_size</code></td><td>1 – 2</td><td>Limited by G × sequence length memory</td></tr>
+      </tbody>
+    </table>
+
+    <div class="card">
+      <h3>GRPOConfig + Trainer</h3>
+      <div class="code-block"><span class="kw">from</span> trl <span class="kw">import</span> GRPOConfig, GRPOTrainer
+
+training_args = GRPOConfig(
+    output_dir=<span class="str">"./qwen-grpo-gsm8k"</span>,
+    num_generations=<span class="num">8</span>,          <span class="cm"># group size G</span>
+    beta=<span class="num">0.04</span>,                    <span class="cm"># KL coefficient</span>
+    learning_rate=<span class="num">5e-7</span>,
+    num_train_epochs=<span class="num">1</span>,
+    max_completion_length=<span class="num">768</span>,
+    per_device_train_batch_size=<span class="num">1</span>,
+    gradient_accumulation_steps=<span class="num">4</span>,
+    logging_steps=<span class="num">10</span>,
+    save_steps=<span class="num">100</span>,
+)
+
+<span class="kw">def</span> <span class="fn">reward_fn</span>(completions, **kwargs):
+    <span class="cm">"""TRL passes batches; return list of scalar rewards."""</span>
+    golds = kwargs[<span class="str">"answer"</span>]
+    <span class="kw">return</span> [combined_reward(c, g) <span class="kw">for</span> c, g <span class="kw">in</span> zip(completions, golds)]
+
+trainer = GRPOTrainer(
+    model=model,
+    args=training_args,
+    train_dataset=gsm8k[<span class="str">"train"</span>],
+    processing_class=tokenizer,
+    reward_funcs=reward_fn,
+)
+
+trainer.train()</div>
+    </div>
+
+    <div class="callout">
+      <p><strong>No value network. No reward model.</strong> The GRPO advantage for completion i is A<sub>i</sub> = (r<sub>i</sub> − mean(r<sub>group</sub>)) / std(r<sub>group</sub>). When all G samples fail, advantages are still well-defined — the “least bad” wrong answer gets a relative boost, driving exploration.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 07 — Training progress visualization
+     ============================================================ -->
+<section class="section fade-in" id="training">
+  <div class="container">
+    <span class="section-num">07 — TRAINING DYNAMICS</span>
+    <h2>Accuracy Climbs as Reasoning Grows</h2>
+    <p>DeepSeek-R1-Zero reported two coupled trends during training: GSM8K accuracy rises with step count, and average response length inside <code>&lt;redacted_thinking&gt;</code> grows — the model learns to spend more tokens thinking before answering. Use the slider to scrub through training.</p>
+
+    <div class="interactive-panel">
+      <h3>GRPO Training Progress</h3>
+      <div class="chart-wrap">
+        <canvas id="train-canvas" width="560" height="280"></canvas>
+        <div class="chart-stats">
+          <div>Step: <span class="val" id="cs-step">0</span> / 500</div>
+          <div>GSM8K accuracy: <span class="val" id="cs-acc">12%</span></div>
+          <div>Avg think length: <span class="val" id="cs-len">45</span> tokens</div>
+          <div>Mean reward: <span class="val" id="cs-rew">0.08</span></div>
+        </div>
+      </div>
+      <div class="toggle-panel">
+        <label>Training step <input type="range" id="step-slider" min="0" max="500" value="0"></label>
+        <button class="btn" id="animate-btn">▶ Animate training</button>
+        <button class="btn" id="reset-chart">Reset</button>
+      </div>
+      <p style="font-size:0.85rem;margin-bottom:0;">Curves approximate R1-Zero dynamics: slow start (format learning), then rapid accuracy gains as CoT length increases. Real runs on 3B may differ in absolute numbers but show the same shape.</p>
+    </div>
+
+    <ol class="example-steps">
+      <li><strong>Steps 0–50:</strong> Model learns tag format. Accuracy flat ~10%. Completions are short and mostly wrong.</li>
+      <li><strong>Steps 50–200:</strong> Correct answers begin appearing. Think blocks lengthen. Mean reward climbs.</li>
+      <li><strong>Steps 200–400:</strong> Self-correction phrases emerge (“wait, let me recheck”). Accuracy accelerates.</li>
+      <li><strong>Steps 400+:</strong> Diminishing returns. Monitor KL and length — collapse into verbose junk is possible without β tuning.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 08 — Emergent reasoning & aha moment
+     ============================================================ -->
+<section class="section fade-in" id="emergent">
+  <div class="container">
+    <span class="section-num">08 — EMERGENT BEHAVIOR</span>
+    <h2>Reasoning Nobody Taught</h2>
+    <p>The most striking R1-Zero result is not the accuracy chart — it is <em>what</em> appears inside the thinking tags. The training template never mentions chain-of-thought, step-by-step arithmetic, or self-correction. Yet the model invents them because longer, structured reasoning correlates with r = 1 on hard GSM8K problems.</p>
+
+    <div class="card card-alt">
+      <h3><span class="tag tag-purple">The “Aha Moment”</span></h3>
+      <p>During R1-Zero training, researchers observed completions on a complex algebra problem where the model started down a wrong path, then wrote — unprompted — “let’s re-evaluate this step by step.” It scrapped the incorrect approach and restarted. No demonstration data contained that phrase. RL discovered that backtracking improves expected reward.</p>
+    </div>
+
+    <div class="card">
+      <h3>Emergent behaviors (zero SFT examples of any of these)</h3>
+      <ul style="color:var(--text-dim);margin:0 0 0 1.2em;line-height:1.9;">
+        <li><strong>Longer thinking:</strong> Average tokens in <code>&lt;redacted_thinking&gt;</code> increases monotonically with training steps.</li>
+        <li><strong>Step-by-step decomposition:</strong> Multi-hop arithmetic broken into intermediate lines.</li>
+        <li><strong>Self-verification:</strong> Model re-checks its own arithmetic before committing to <code>&lt;answer&gt;</code>.</li>
+        <li><strong>Backtracking:</strong> Explicit “that can’t be right” and restart — the aha moment.</li>
+        <li><strong>Test-time compute scaling:</strong> Harder questions automatically get longer reasoning (same mechanism as Chapter 01, but now baked into weights).</li>
+      </ul>
+    </div>
+
+    <div class="code-block"><span class="cm"># Emergent completion (after GRPO) — never seen in training labels</span>
+&lt;redacted_thinking&gt;
+If a &gt; 1, the sum of real roots satisfies...
+First I tried factoring as (x-1)(x-2) but the discriminant is negative.
+<span class="str">Wait — let me re-evaluate step by step.</span>
+Using Vieta: sum of roots = -b/a = ...
+The two real roots are 2 and 5, sum = 7.
+&lt;/redacted_thinking&gt;
+&lt;answer&gt;7&lt;/answer&gt;</div>
+
+    <p>This is why R1-Zero changed the field: it showed that reasoning is not only something you <em>prompt</em> (Chapters 01–03) or <em>imitate</em> (SFT) — it can be <em>reinforced</em> into existence when the task reward is rich enough and the policy has room to explore.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 09 — Before/After comparison (interactive)
+     ============================================================ -->
+<section class="section fade-in" id="before-after">
+  <div class="container">
+    <span class="section-num">09 — BEFORE &amp; AFTER</span>
+    <h2>Same Question, Different Model</h2>
+    <p>Toggle between the base Qwen 2.5 3B (pre-GRPO) and the GRPO-trained reasoning model on the same GSM8K problem. The base model jumps to an answer; the trained model shows emergent chain-of-thought inside the thinking tags.</p>
+
+    <div class="interactive-panel">
+      <h3>GSM8K Problem</h3>
+      <p style="color:var(--text);font-size:0.95rem;margin-bottom:16px;"><strong>Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers’ market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers’ market?</strong></p>
+
+      <div class="btn-group">
+        <button class="btn active" id="btn-before">Before RL (base model)</button>
+        <button class="btn" id="btn-after">After GRPO training</button>
+      </div>
+
+      <div class="output-panel" id="model-output"></div>
+
+      <div class="comparison" style="margin-top:20px;">
+        <div class="card card-alt" style="margin:0;">
+          <h4 style="color:var(--danger);font-size:0.9rem;">Base model</h4>
+          <p style="margin:0;font-size:0.85rem;">No tags, no intermediate steps. Often wrong (guesses 26 or 32). Classic System-1 pattern from Chapter 01.</p>
+        </div>
+        <div class="card card-alt" style="margin:0;">
+          <h4 style="color:var(--accent3);font-size:0.9rem;">After GRPO</h4>
+          <p style="margin:0;font-size:0.85rem;">16 − 3 − 4 = 9 eggs sold × $2 = <strong>$18</strong>. Structured reasoning + correct format → r = 1.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Strawberry test.</strong> Before training, “how many R’s in strawberry?” → “2.” After GRPO, the model writes: “Let’s go character by character… R appears three times.” Same RL mechanism, different task — reasoning generalizes beyond GSM8K arithmetic.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 10 — R1 vs R1-Zero
+     ============================================================ -->
+<section class="section fade-in" id="r1">
+  <div class="container">
+    <span class="section-num">10 — BEYOND R1-ZERO</span>
+    <h2>What Full DeepSeek-R1 Adds</h2>
+    <p>R1-Zero proved pure RL works. DeepSeek-R1 — the production model — adds stages R1-Zero skipped, because pure RL models can be brittle: uneven readability, language mixing, and rough edges in formatting. The full pipeline:</p>
+
+    <div class="pipeline-steps">
+      <div class="pipe-step">
+        <div class="ps-num">STAGE 1</div>
+        <div class="ps-name">Cold-start SFT</div>
+        <div class="ps-desc">Small set of curated CoT examples to stabilize format and readability</div>
+      </div>
+      <div class="pipe-step highlight-step">
+        <div class="ps-num">STAGE 2</div>
+        <div class="ps-name">RL (GRPO)</div>
+        <div class="ps-desc">Same RLVR as R1-Zero — scale reasoning on verifiable tasks</div>
+      </div>
+      <div class="pipe-step">
+        <div class="ps-num">STAGE 3</div>
+        <div class="ps-name">Rejection sampling</div>
+        <div class="ps-desc">Generate many completions; keep high-reward trajectories as new SFT data</div>
+      </div>
+      <div class="pipe-step">
+        <div class="ps-num">STAGE 4</div>
+        <div class="ps-name">Final SFT</div>
+        <div class="ps-desc">Polish on filtered reasoning traces for deployment quality</div>
+      </div>
+    </div>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-green">R1-Zero (this chapter)</span></h3>
+        <p>Pure RL only. Proof that reasoning emerges. Best for understanding fundamentals and reproducing on small models.</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-blue">R1 (production)</span></h3>
+        <p>SFT → RL → rejection sampling → SFT. Better UX, cleaner language, stronger benchmarks — built on the Zero insight.</p>
+      </div>
+    </div>
+
+    <p>You just built the core of the stack — Stage 2 in isolation, exactly as R1-Zero did. Adding cold-start SFT and rejection sampling is engineering polish, not a different theory.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 11 — Full pipeline checklist
+     ============================================================ -->
+<section class="section fade-in" id="pipeline">
+  <div class="container">
+    <span class="section-num">11 — YOUR BUILD CHECKLIST</span>
+    <h2>End-to-End Recipe</h2>
+    <ol class="example-steps">
+      <li><strong>Install:</strong> <code>transformers</code>, <code>trl</code>, <code>datasets</code>, <code>accelerate</code> — optionally <code>unsloth</code> for 2× faster training.</li>
+      <li><strong>Load</strong> Qwen 2.5 3B + GSM8K. Keep a frozen copy as π<sub>ref</sub> for KL.</li>
+      <li><strong>Define</strong> the system template with <code>&lt;redacted_thinking&gt;</code> and <code>&lt;answer&gt;</code> tags.</li>
+      <li><strong>Implement</strong> <code>format_reward</code>, <code>correctness_reward</code>, and binary <code>combined_reward</code>.</li>
+      <li><strong>Configure</strong> GRPO: G=8, β=0.04, lr=5e-7, max_completion_length=768.</li>
+      <li><strong>Train</strong> for 1 epoch (~3–4 hrs on A100). Log accuracy and mean response length.</li>
+      <li><strong>Evaluate</strong> on GSM8K test split + qualitative probes (strawberry, multi-step word problems).</li>
+      <li><strong>Inspect</strong> thinking blocks for emergent self-correction — the aha moment is your reward for the whole series.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 12 — Series reflection (climax)
+     ============================================================ -->
+<section class="section fade-in" id="reflection">
+  <div class="container">
+    <span class="section-num">12 — THE JOURNEY</span>
+    <h2>You Built Reasoning from Scratch</h2>
+    <p>Hover the grid — each chapter lit up on the path to this moment.</p>
+
+    <div class="journey-grid" id="journey-grid">
+      <div class="journey-cell" data-ch="1"><span class="jc-num">01</span>Why think?</div>
+      <div class="journey-cell" data-ch="2"><span class="jc-num">02</span>Chain-of-thought</div>
+      <div class="journey-cell" data-ch="3"><span class="jc-num">03</span>Verifiers &amp; search</div>
+      <div class="journey-cell" data-ch="4"><span class="jc-num">04</span>RL foundations</div>
+      <div class="journey-cell" data-ch="5"><span class="jc-num">05</span>MDPs &amp; values</div>
+      <div class="journey-cell" data-ch="6"><span class="jc-num">06</span>Solving MDPs</div>
+      <div class="journey-cell" data-ch="7"><span class="jc-num">07</span>TD control</div>
+      <div class="journey-cell" data-ch="8"><span class="jc-num">08</span>Policy gradients</div>
+      <div class="journey-cell" data-ch="9"><span class="jc-num">09</span>PPO &amp; TRPO</div>
+      <div class="journey-cell" data-ch="10"><span class="jc-num">10</span>RL meets LLMs</div>
+      <div class="journey-cell" data-ch="11"><span class="jc-num">11</span>GRPO</div>
+      <div class="journey-cell lit" data-ch="12"><span class="jc-num">12</span>You are here</div>
+    </div>
+
+    <p>Chapter 01 explained why one forward pass is not enough — System 1 LLMs need test-time compute or trained deliberation. Chapters 02–03 showed inference-time fixes: CoT prompting, verifiers, self-consistency. Clever, but the model weights never change.</p>
+
+    <p>Chapters 04–07 built the RL foundation from bandits to Bellman equations to Q-learning — the vocabulary of states, actions, returns, and policies. Chapter 08 turned the corner to policy gradients: optimize π<sub>θ</sub> directly. Chapters 09–11 climbed the modern stack — PPO’s trust region, then GRPO’s group-relative advantages that eliminated the value network entirely.</p>
+
+    <p>Chapter 10 connected RL to LLMs: token MDPs, verifiable vs subjective rewards, RLHF pipelines. Chapter 11 derived GRPO. And now Chapter 12 — you stand where DeepSeek stood in January 2025, watching a 3B model teach itself to think.</p>
+
+    <div class="callout triumph">
+      <p><strong>The triumph is not the benchmark score.</strong> It is the proof that reasoning can be an emergent property of reinforcement learning on verifiable tasks — no human chain-of-thought required. You understand every layer: the prompt format, the binary reward, the group advantage, the KL anchor, the training curve, the aha moment. You can read the R1 paper, reproduce a miniature R1-Zero, and know exactly what each symbol means. That is reasoning from scratch.</p>
+    </div>
+  </div>
+</section>
+
+<div class="footer">
+  <p>
+    <a href="../11-grpo-deep-dive/">← Ch.11 — GRPO</a>
+    <a href="../">Back to Series</a>
+  </p>
+  <p style="margin-top:16px;">Reasoning from Scratch · Chapter 12 of 12 · Final chapter</p>
+</div>
+
+<script>
+/* ============================================================
+   Scroll animations + sticky nav (series standard)
+   ============================================================ */
+const nav = document.getElementById('nav');
+const faders = document.querySelectorAll('.fade-in');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+faders.forEach(f => observer.observe(f));
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+
+/* ============================================================
+   Reward function explorer — toggle format / correct / combined
+   ============================================================ */
+(function () {
+  const modes = {
+    format: {
+      explain: '<span class="pass">✓ Format check:</span> Response contains exactly one <code>&lt;redacted_thinking&gt;…&lt;/redacted_thinking&gt;</code> block followed by one <code>&lt;answer&gt;…&lt;/answer&gt;</code> block.<br><span class="cm">Correctness ignored in this view.</span><br><span class="pass">→ r<sub>format</sub> = 1</span>',
+      highlight: ['format']
+    },
+    correct: {
+      explain: '<span class="pass">✓ Correctness check:</span> Extracted answer <strong>18</strong> matches gold label from GSM8K (16 − 3 − 4 = 9 eggs × $2).<br><span class="cm">Format assumed valid in this view.</span><br><span class="pass">→ r<sub>correct</sub> = 1</span>',
+      highlight: ['correct']
+    },
+    combined: {
+      explain: '<span class="pass">✓ Format check:</span> Valid think + answer tags.<br><span class="pass">✓ Correctness check:</span> Answer <strong>18</strong> matches gold.<br><span class="pass">→ Combined reward = 1</span> — positive GRPO advantage.',
+      highlight: ['format', 'correct', 'combined']
+    }
+  };
+
+  const btns = document.querySelectorAll('#reward-btns .btn');
+  const explain = document.getElementById('reward-explain');
+  const boxes = { format: document.getElementById('rb-format'), correct: document.getElementById('rb-correct'), combined: document.getElementById('rb-combined') };
+
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      btns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const mode = btn.dataset.mode;
+      explain.innerHTML = modes[mode].explain;
+      Object.keys(boxes).forEach(k => {
+        boxes[k].classList.toggle('active', modes[mode].highlight.includes(k));
+        boxes[k].classList.toggle('dim', !modes[mode].highlight.includes(k));
+      });
+    });
+  });
+})();
+
+/* ============================================================
+   Training progress chart — accuracy & think-length vs steps
+   ============================================================ */
+(function () {
+  const canvas = document.getElementById('train-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const PAD = { l: 48, r: 20, t: 24, b: 40 };
+
+  // Synthetic curves mimicking R1-Zero paper shape
+  function accuracy(s) {
+    const t = s / 500;
+    return 0.12 + 0.62 * (1 - Math.exp(-4 * t)) + 0.06 * Math.sin(t * 8);
+  }
+  function thinkLen(s) {
+    return 40 + 280 * (1 - Math.exp(-2.5 * s / 500)) + 15 * Math.sin(s / 40);
+  }
+
+  const accData = [], lenData = [];
+  for (let s = 0; s <= 500; s += 5) {
+    accData.push({ s, v: Math.min(0.78, accuracy(s)) });
+    lenData.push({ s, v: thinkLen(s) });
+  }
+
+  let currentStep = 0;
+  let animId = null;
+
+  function xScale(s) { return PAD.l + (s / 500) * (W - PAD.l - PAD.r); }
+  function yAcc(v) { return PAD.t + (1 - v / 0.85) * (H - PAD.t - PAD.b); }
+  function yLen(v) { return PAD.t + (1 - v / 400) * (H - PAD.t - PAD.b); }
+
+  function drawGrid() {
+    ctx.strokeStyle = 'rgba(42,42,58,0.8)';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '10px SF Mono, monospace';
+    for (let i = 0; i <= 4; i++) {
+      const y = PAD.t + (i / 4) * (H - PAD.t - PAD.b);
+      ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(W - PAD.r, y); ctx.stroke();
+    }
+    ctx.fillText('0', PAD.l - 16, H - PAD.b + 14);
+    ctx.fillText('500 steps', W - PAD.r - 52, H - PAD.b + 14);
+    ctx.fillText('accuracy', 8, PAD.t + 4);
+    ctx.fillStyle = 'rgba(167,139,250,0.8)';
+    ctx.fillText('think len', 8, PAD.t + 18);
+  }
+
+  function drawCurve(data, yFn, color, maxStep) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let started = false;
+    data.forEach(pt => {
+      if (pt.s > maxStep) return;
+      const x = xScale(pt.s), y = yFn(pt.v);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  function drawCursor(step) {
+    const acc = accData.find(d => d.s >= step) || accData[accData.length - 1];
+    const len = lenData.find(d => d.s >= step) || lenData[lenData.length - 1];
+    const x = xScale(step);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(251,191,36,0.5)';
+    ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, H - PAD.b); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#34d399';
+    ctx.beginPath(); ctx.arc(x, yAcc(acc.v), 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#a78bfa';
+    ctx.beginPath(); ctx.arc(x, yLen(len.v), 5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function render(step) {
+    ctx.clearRect(0, 0, W, H);
+    drawGrid();
+    drawCurve(accData, yAcc, 'rgba(52,211,153,0.85)', step);
+    drawCurve(lenData, yLen, 'rgba(167,139,250,0.85)', step);
+    drawCursor(step);
+    const acc = accData.find(d => d.s >= step) || accData[accData.length - 1];
+    const len = lenData.find(d => d.s >= step) || lenData[lenData.length - 1];
+    document.getElementById('cs-step').textContent = step;
+    document.getElementById('cs-acc').textContent = Math.round(acc.v * 100) + '%';
+    document.getElementById('cs-len').textContent = Math.round(len.v);
+    document.getElementById('cs-rew').textContent = (acc.v * 0.85 * 0.3 + acc.v * 0.7).toFixed(2);
+  }
+
+  const slider = document.getElementById('step-slider');
+  slider.addEventListener('input', () => {
+    if (animId) cancelAnimationFrame(animId);
+    currentStep = parseInt(slider.value, 10);
+    render(currentStep);
+  });
+
+  document.getElementById('animate-btn').addEventListener('click', () => {
+    if (animId) { cancelAnimationFrame(animId); animId = null; return; }
+    currentStep = 0;
+    function tick() {
+      currentStep = Math.min(500, currentStep + 4);
+      slider.value = currentStep;
+      render(currentStep);
+      if (currentStep < 500) animId = requestAnimationFrame(tick);
+      else animId = null;
+    }
+    animId = requestAnimationFrame(tick);
+  });
+
+  document.getElementById('reset-chart').addEventListener('click', () => {
+    if (animId) cancelAnimationFrame(animId);
+    currentStep = 0;
+    slider.value = 0;
+    render(0);
+  });
+
+  render(0);
+})();
+
+/* ============================================================
+   Before / After model output toggle
+   ============================================================ */
+(function () {
+  const before = `<span class="bad">Janet sells 16 eggs at $2 each minus what she uses.</span>
+She uses 3 + 4 = 7 eggs.
+16 - 7 = 9 eggs left.
+9 × 2 = <span class="bad">18... actually maybe 26?</span>
+
+<span class="ans bad">26</span>
+
+<span class="cm"># No thinking tags. Wrong answer. r = 0.</span>`;
+
+  const after = `<span class="think">&lt;redacted_thinking&gt;</span>
+Janet's ducks lay 16 eggs per day.
+She eats 3 for breakfast and uses 4 for muffins.
+Eggs used: 3 + 4 = 7.
+Eggs remaining: 16 - 7 = 9.
+She sells each egg for $2.
+Daily revenue: 9 × 2 = 18 dollars.
+Let me verify: 7 + 9 = 16. ✓
+<span class="think">&lt;/redacted_thinking&gt;</span>
+<span class="think">&lt;answer&gt;</span><span class="ans">18</span><span class="think">&lt;/answer&gt;</span>
+
+<span class="cm"># Emergent step-by-step reasoning. Correct. r = 1.</span>`;
+
+  const out = document.getElementById('model-output');
+  const btnBefore = document.getElementById('btn-before');
+  const btnAfter = document.getElementById('btn-after');
+
+  function show(which) {
+    out.innerHTML = which === 'before' ? before : after;
+    btnBefore.classList.toggle('active', which === 'before');
+    btnAfter.classList.toggle('active', which === 'after');
+  }
+  btnBefore.addEventListener('click', () => show('before'));
+  btnAfter.addEventListener('click', () => show('after'));
+  show('before');
+})();
+
+/* ============================================================
+   Journey grid — light up chapters on hover (series recap)
+   ============================================================ */
+(function () {
+  const cells = document.querySelectorAll('.journey-cell');
+  cells.forEach(cell => {
+    cell.addEventListener('mouseenter', () => {
+      const n = parseInt(cell.dataset.ch, 10);
+      cells.forEach(c => {
+        c.classList.toggle('lit', parseInt(c.dataset.ch, 10) <= n);
+      });
+    });
+    cell.addEventListener('mouseleave', () => {
+      cells.forEach(c => c.classList.toggle('lit', c.dataset.ch === '12'));
+    });
+  });
+})();
+</script>
+</body>
+</html>

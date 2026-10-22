@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scaling Laws for Large Language Models — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  border-left-color: var(--danger);
+  background: rgba(248, 113, 113, 0.08);
+}
+.callout.ok {
+  border-left-color: var(--accent3);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+/* ===== Q&A box ===== */
+.qa-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+  background: var(--bg-card-alt);
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); font-size: 0.95rem; line-height: 1.65; }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Bigram Table ===== */
+.bigram-table-wrapper { overflow-x: auto; margin: 20px 0; }
+.bigram-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  width: 100%;
+}
+.bigram-table th, .bigram-table td {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  text-align: center;
+  transition: background 0.3s, color 0.3s;
+}
+.bigram-table th {
+  background: var(--bg-card-alt);
+  color: var(--accent);
+  font-weight: 600;
+}
+.bigram-table td {
+  background: var(--bg-card);
+  color: var(--text-dim);
+}
+.bigram-table td.highlight-cell {
+  background: rgba(108,140,255,0.15);
+  color: var(--text);
+  font-weight: 700;
+}
+.bigram-table td.zero-cell {
+  color: rgba(136,136,160,0.3);
+}
+.bigram-table .row-header {
+  background: var(--bg-card-alt);
+  color: var(--accent2);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ===== Chart container ===== */
+.chart-container { position: relative; margin: 20px 0; }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Input fields ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* ===== Timeline ===== */
+.timeline-item {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 12px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+.timeline-item:hover { border-color: var(--accent); }
+.timeline-year { font-family: var(--mono); font-weight: 700; color: var(--accent); min-width: 80px; }
+.timeline-name { font-weight: 600; color: var(--text); }
+.timeline-desc { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; }
+
+/* ===== Interview questions ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  font-family: var(--sans);
+}
+.hint-btn:hover, .reveal-btn:hover {
+  border-color: var(--accent);
+  background: rgba(108,140,255,0.08);
+}
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(251,191,36,0.06);
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+.hint-box.visible { display: block; }
+.answer {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.answer.visible { display: block; }
+.solution-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent3);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.answer .explanation { color: var(--text-dim); font-size: 0.92rem; line-height: 1.6; }
+.answer .explanation strong { color: var(--text); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Scaling Laws Of Llms</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">Scaling Laws for Large Language Models</a>
+  <div class="nav-links">
+    <a href="#s0">Overview</a>
+    <a href="#s1">Three Axes</a>
+    <a href="#s2">Kaplan</a>
+    <a href="#s3">Chinchilla</a>
+    <a href="#s-prelude">Prelude</a>
+    <a href="#s4">Emergence</a>
+    <a href="#s5">Inference</a>
+    <a href="#s6">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Scaling Laws for Large Language Models</h1>
+    <p class="subtitle">
+      How power-law relationships between model size, data, and compute predict performance — and why the optimal allocation keeps surprising researchers.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">9</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">6</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">3</span>
+        <span class="stat-label">Key Papers</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Given a fixed compute budget, should you train a larger model on less data or a smaller model on more data? Scaling laws provide empirical formulas to predict test loss from model size, dataset size, and compute — and they've led to surprising conclusions about the trade-offs between parameters and training tokens.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 0: WHAT ARE SCALING LAWS? ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>What Are Scaling Laws?</h2>
+
+    <p>
+      <strong>Scaling laws</strong> are empirical relationships that describe how model performance — typically measured as test loss or perplexity — changes as you increase model size, dataset size, or compute. They are not laws in the strict sense; they are functions that researchers have fit to experimental data and that have been repeatedly refined and sometimes invalidated as new models are trained.
+    </p>
+
+    <p>
+      The core idea: performance depends heavily on <strong>scale</strong>. More parameters, more tokens, and more floating-point operations (FLOPs) generally lead to better models. But the relationship is not linear — it follows <strong>power-law</strong> curves that appear as straight lines on <strong>log-log plots</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">The Central Question</h3>
+    <p>
+      With a fixed compute budget, what is the optimal allocation between model size and training data? Scaling laws aim to answer this.
+    </p>
+
+    <h3 style="margin-top:28px;">Why This Matters</h3>
+    <p>
+      Training large language models is expensive. Running grid search over all combinations of model size and data size is infeasible. Scaling laws let you <strong>predict</strong> test loss for given combinations without actually training, so you can choose the best allocation before committing compute.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Scaling Law Visualizer</h3>
+      <p>Adjust the axes and curves to see how loss scales with parameters, data, or compute. On log-log plots, power-law relationships appear as straight lines.</p>
+
+      <div class="btn-group">
+        <button class="btn active" onclick="setScalingAxis('params')">Loss vs Parameters</button>
+        <button class="btn" onclick="setScalingAxis('data')">Loss vs Data</button>
+        <button class="btn" onclick="setScalingAxis('compute')">Loss vs Compute</button>
+      </div>
+
+      <div class="slider-container">
+        <label>Power-law exponent (α): <span class="slider-value" id="scalingExpVal">0.076</span></label>
+        <input type="range" id="scalingExpSlider" min="1" max="30" value="76" step="1">
+      </div>
+
+      <div class="chart-container">
+        <canvas id="scalingCanvas" width="840" height="320"></canvas>
+      </div>
+
+      <div style="font-size:0.8rem; color:var(--text-dim); margin-top:12px;">
+        Loss ∝ N<sup>−α</sup> (or D<sup>−α</sup>, C<sup>−α</sup>). On log-log plots, power laws appear as straight lines with slope −α.
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Scaling laws are not universal truths. They are fitted to specific experiments and have been invalidated over time. The Kaplan (2020) recommendations were later challenged by Chinchilla (2022), and today many production models are overtrained by Chinchilla's definition — because inference cost, not just training cost, dominates real-world economics.</p>
+    </div>
+
+    <h3 style="margin-top:36px;">The practical question behind the curves</h3>
+    <p>
+      Industrial-scale training is not only about minimizing a single scalar loss on a held-out slice of the pre-training corpus. Once models become large enough, they begin to exhibit <strong>behaviors at inference time</strong>—few-shot pattern completion inside a prompt, verbalized intermediate steps for arithmetic, rough instruction following from plain text—that are not explicitly encoded in the objective. Those behaviors are <strong>expensive to discover by brute-force grid search</strong>: each point on a scaling surface corresponds to a full training run. The appeal of a scaling <em>law</em> is predictive power. If you can estimate how test loss (and, indirectly, downstream skills) depends on parameter count <em>N</em>, token count <em>D</em>, and total training FLOPs <em>C</em>, you can choose how to spend the next unit of budget before you spend it.
+    </p>
+
+    <div class="formula">
+      Given budget C, choose (N, D) to minimize L<sub>test</sub>(N, D) subject to training FLOPs ≈ C
+    </div>
+
+    <p>
+      Even when scaling laws are “just curve fits,” teams treat them as planning tools because exhaustive search over (N, D) pairs at frontier scale is economically impossible. The curves are <em>guides</em>, not guarantees — data mix, architecture, or optimizer changes can shift the fitted surface.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 1: THREE AXES OF SCALING ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>The Three Axes of Scaling</h2>
+
+    <p>
+      When scaling language models, you typically control three things:
+    </p>
+
+    <div class="card">
+      <ul style="list-style:none; font-size:0.95rem;">
+        <li style="margin-bottom:14px;">
+          <span style="color:var(--accent);">●</span> <strong>Model size (N):</strong> The number of parameters. You can increase this by stacking more transformer blocks, increasing hidden dimension, or adding more attention heads.
+        </li>
+        <li style="margin-bottom:14px;">
+          <span style="color:var(--accent2);">●</span> <strong>Dataset size (D):</strong> The number of tokens in the training corpus. More tokens means more sequences to process.
+        </li>
+        <li>
+          <span style="color:var(--accent3);">●</span> <strong>Compute budget (C):</strong> The total number of floating-point operations (FLOPs) used during training. This is a function of both N and D — bigger models and more data both increase compute.
+        </li>
+      </ul>
+    </div>
+
+    <h3 style="margin-top:28px;">What Is a FLOP?</h3>
+    <p>
+      A <strong>floating-point operation</strong> is any low-level math operation between two floating-point numbers — for example, adding two numbers together. During transformer training, every matrix multiplication (e.g., W<sub>Q</sub> × embedding), every attention score, every feed-forward layer involves thousands of such operations. A bigger model has more parameters and thus more FLOPs per token. More tokens means more FLOPs total.
+    </p>
+
+    <h3 style="margin-top:28px;">The Trade-off</h3>
+    <p>
+      With a <strong>fixed compute budget</strong>, increasing model size forces you to decrease data size, and vice versa. If you scale N by 5×, you must scale D by roughly 2× to keep the same total FLOPs (the exact ratio depends on the architecture). Scaling laws tell you how to allocate C between N and D to minimize test loss.
+    </p>
+
+    <h3 style="margin-top:28px;">Fresh Data vs. Repeated Data</h3>
+    <p>
+      An important principle: <strong>new data is always better than repeated data</strong>. Training for multiple epochs over the same billion tokens is worse than training for one epoch over a trillion tokens. Fresh tokens bring new knowledge, new domains, and new facts. Repeated data leads to overfitting and diminishing returns.
+    </p>
+
+    <p>
+      In practice, the <strong>number of optimization steps</strong> is almost always tied to how many unique tokens you intend to see: frontier labs prefer scaling the corpus outward (more languages, more books, more code) rather than recycling the same terabytes for hundreds of passes. The intuition is straightforward—a trillion-token crawl samples far more factual and stylistic diversity than a billion-token subset revisited a thousand times—so the marginal information per FLOP stays higher when tokens stay fresh.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Tokenization and wall-clock time:</strong> The same conceptual “amount of text” can require very different numbers of subword tokens depending on language and BPE merge statistics. A high-resource language may accumulate frequent merges until many whole words become single vocabulary entries; a low-resource language may remain closer to character- or byte-level chunking. Longer tokenized outputs mean more autoregressive decoding steps for a fixed model, and transformer attention is <strong>quadratic in sequence length</strong>, so latency can explode even when parameter count is unchanged. This is one reason multilingual systems can feel uneven in speed across languages despite a single shared architecture.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Compute Budget Allocator</h3>
+      <p>Given a fixed compute budget (10× increase), compare Kaplan's recommendation (model 5×, data 2×) vs. Chinchilla's recommendation (model 3.1×, data 3.1×).</p>
+
+      <div class="slider-container">
+        <label>Compute budget multiplier: <span class="slider-value" id="allocBudgetVal">10</span>×</label>
+        <input type="range" id="allocBudgetSlider" min="2" max="100" value="10" step="1">
+      </div>
+
+      <div class="comparison">
+        <div class="card">
+          <h3 style="color:var(--accent);">Kaplan (2020)</h3>
+          <p style="margin-bottom:8px;">Prioritize model size over data.</p>
+          <div id="kaplanAlloc" style="font-family:var(--mono); font-size:0.9rem; color:var(--text);"></div>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--accent3);">Chinchilla (2022)</h3>
+          <p style="margin-bottom:8px;">Scale model and data equally.</p>
+          <div id="chinchillaAlloc" style="font-family:var(--mono); font-size:0.9rem; color:var(--text);"></div>
+        </div>
+      </div>
+
+      <div id="allocExplanation" style="font-size:0.85rem; color:var(--text-dim); margin-top:12px;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>FLOPs Calculator</h3>
+      <p>Estimate training compute for a given model size and data size. Approximate FLOPs ≈ 6 × N × D (forward + backward passes).</p>
+
+      <div class="two-col">
+        <div class="slider-container">
+          <label>Parameters (N): <span class="slider-value" id="flopsNVal">8B</span></label>
+          <input type="range" id="flopsNSlider" min="6" max="12" value="9.9" step="0.1">
+        </div>
+        <div class="slider-container">
+          <label>Training tokens (D): <span class="slider-value" id="flopsDVal">1T</span></label>
+          <input type="range" id="flopsDSlider" min="9" max="16" value="12" step="0.5">
+        </div>
+      </div>
+
+      <div id="flopsResult" class="formula" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 2: KAPLAN ET AL. (OPENAI 2020) ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Kaplan et al. (2020) — OpenAI Scaling Laws</h2>
+
+    <p>
+      The first major work on scaling laws for language models came from OpenAI. Kaplan et al. trained many models of varying sizes on varying amounts of data and observed several consistent patterns.
+    </p>
+
+    <h3 style="margin-top:28px;">Key Findings</h3>
+
+    <div class="card">
+      <ul style="list-style:none; font-size:0.9rem;">
+        <li style="margin-bottom:12px;">
+          <span style="color:var(--accent3);">✓</span> <strong>Performance depends heavily on scale:</strong> Number of parameters, number of tokens, and compute all matter.
+        </li>
+        <li style="margin-bottom:12px;">
+          <span style="color:var(--accent3);">✓</span> <strong>Model shape doesn't matter much:</strong> Fewer transformer blocks with wider hidden dimensions vs. more blocks with narrower dimensions — both reach similar performance for the same total parameter count.
+        </li>
+        <li style="margin-bottom:12px;">
+          <span style="color:var(--accent3);">✓</span> <strong>Scale both together:</strong> If you scale only model size or only data size, you get diminishing returns. The best gains come from scaling both.
+        </li>
+        <li>
+          <span style="color:var(--accent3);">✓</span> <strong>Larger models are more sample efficient:</strong> A bigger model reaches a given loss target with fewer tokens than a smaller model. It plateaus at a lower loss and gets there faster.
+        </li>
+      </ul>
+    </div>
+
+    <h3 style="margin-top:28px;">The Loss Curve</h3>
+    <p>
+      In Kaplan's plots, each line represents a different model size. The x-axis is the number of tokens seen during training. The y-axis is test loss. Smaller models (e.g., 10³ parameters) plateau quickly at a high loss (e.g., ~6). Larger models (e.g., 10⁹ parameters) plateau at a much lower loss (e.g., ~2) and reach that loss in fewer tokens.
+    </p>
+
+    <p>
+      Those curves combine a <strong>capacity story</strong> and a <strong>sample-efficiency story</strong>. A tiny model may descend briefly as data accumulates, then stall: additional tokens barely move test loss because the representational ceiling is low. A much larger model not only approaches a <em>lower</em> asymptotic loss; it often crosses intermediate loss levels—say, a plateau near 6.2—after seeing <strong>an order of magnitude fewer tokens</strong> than the small model needed to reach the same intermediate value. That is what people mean when they say larger models are <strong>more sample-efficient at a fixed loss target</strong>. Perplexity is the exponential of cross-entropy loss, so a gap of several nats on the y-axis is an enormous multiplicative difference in perplexity.
+    </p>
+
+    <div class="formula">
+      perplexity = exp(loss)&nbsp;&nbsp;·&nbsp;&nbsp;Δ loss of 1 nat ≈ e× change in perplexity
+    </div>
+
+    <p>
+      Larger models learn faster per token, but under a <em>fixed</em> compute envelope a huge model leaves fewer tokens on the table — you may underutilize parameters (Chinchilla’s critique of earlier work) or pay unbearable inference costs later. Sample efficiency answers “how many tokens to hit loss L for this N,” not “ignore the budget.”
+    </p>
+
+    <h3 style="margin-top:28px;">Kaplan's Recommendation</h3>
+    <p>
+      Given a 10× increase in compute budget, Kaplan suggested: <strong>increase model size by 5× and data size by 2×</strong>. In other words, prioritize scaling the model over scaling the data.
+    </p>
+
+    <div class="formula">
+      For 10× compute: N ↑ 5×  &nbsp;&nbsp;  D ↑ 2×
+    </div>
+
+    <p>
+      This recommendation was later challenged by the Chinchilla paper, which argued that OpenAI's models were undertrained and that the optimal allocation was different.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: CHINCHILLA (HOFFMANN ET AL. 2022) ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Chinchilla (Hoffmann et al., 2022) — Compute-Optimal Training</h2>
+
+    <p>
+      Google DeepMind's Chinchilla paper directly challenged the Kaplan recommendations. It trained many models with the <strong>same compute budget</strong> but varying allocations of model size vs. data size, then measured test loss.
+    </p>
+
+    <h3 style="margin-top:28px;">The Experiment</h3>
+    <p>
+      Chinchilla compared models like <strong>Gopher</strong> (280B parameters, 300B tokens) with <strong>Chinchilla</strong> (70B parameters, 1.4T tokens). Both used roughly the same compute. Chinchilla outperformed Gopher — a smaller model trained on more data beat a larger model trained on less data.
+    </p>
+
+    <div class="card card-alt">
+      <table style="width:100%; font-family:var(--mono); font-size:0.9rem; border-collapse:collapse;">
+        <tr><td style="padding:8px; border-bottom:1px solid var(--border);"><strong>Model</strong></td><td style="padding:8px; border-bottom:1px solid var(--border);"><strong>Parameters</strong></td><td style="padding:8px; border-bottom:1px solid var(--border);"><strong>Tokens</strong></td><td style="padding:8px; border-bottom:1px solid var(--border);"><strong>Tokens/Param</strong></td></tr>
+        <tr><td style="padding:8px;">GPT-3</td><td style="padding:8px;">175B</td><td style="padding:8px;">300B</td><td style="padding:8px;">~1.7</td></tr>
+        <tr><td style="padding:8px;">Gopher</td><td style="padding:8px;">280B</td><td style="padding:8px;">300B</td><td style="padding:8px;">~1.1</td></tr>
+        <tr><td style="padding:8px; color:var(--accent3);">Chinchilla</td><td style="padding:8px;">70B</td><td style="padding:8px;">1.4T</td><td style="padding:8px;"><strong>20</strong></td></tr>
+      </table>
+    </div>
+
+    <h3 style="margin-top:28px;">Chinchilla's Recommendation</h3>
+    <p>
+      For a compute-optimal model: <strong>scale model size and data size at the same rate</strong>. For a 10× compute increase, increase both by ~3.1×.
+    </p>
+
+    <div class="formula">
+      For 10× compute: N ↑ 3.1×  &nbsp;&nbsp;  D ↑ 3.1×
+    </div>
+
+    <h3 style="margin-top:28px;">The 20 Tokens Per Parameter Rule</h3>
+    <p>
+      Chinchilla's key finding: for a compute-optimal model, you should use approximately <strong>20 tokens for every parameter</strong> in the network. So a 70B parameter model should be trained on ~1.4T tokens. GPT-3, with 175B parameters and only 300B tokens, was severely undertrained by this standard — it would have needed ~3.5T tokens or more.
+    </p>
+
+    <p>
+      The empirical backbone of the paper is a <strong>controlled comparison ladder</strong>: train many models that consume <em>approximately the same</em> total training FLOPs while sweeping how aggressively you scale <em>N</em> versus <em>D</em>, then read off which allocation minimizes validation loss. That is how Chinchilla could argue against the earlier OpenAI prescription without hand-waving—<strong>Gopher</strong> (280B parameters, 300B tokens) and <strong>Chinchilla</strong> (70B parameters, 1.4T tokens) sit in the same rough compute band, yet the smaller, data-rich model wins. The headline ratio “~20 tokens per parameter” is the compact mnemonic that falls out of those iso-compute fronts.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent); margin-bottom:10px;">Under-trained by data</h3>
+        <p style="margin-bottom:0; font-size:0.92rem;">Very large <em>N</em>, modest <em>D</em> (GPT-3–era style): many parameters see each token only a handful of times. Capacity is left on the table unless you scale tokens up—empirically, on the order of <strong>multiple trillions</strong> of tokens for hundred-billion-parameter stacks if you wanted strict Chinchilla alignment.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3); margin-bottom:10px;">Compute-matched sweet spot</h3>
+        <p style="margin-bottom:0; font-size:0.92rem;">Raise <em>D</em> in tandem with <em>N</em> so neither side of the model–data product is obviously starved. The 70B / 1.4T pair is the canonical exhibit.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Implication:</strong> All pre-Chinchilla models were undertrained. They had more parameters than they could effectively use given their data. The implication is that many of those models could have achieved better performance with fewer parameters and more training data. Back-of-the-envelope extrapolation for the largest stacks suggests they might have required on the order of <strong>multiple trillions to tens of trillions of tokens</strong>—not hundreds of billions—to fully “saturate” their parameter counts under the ~20 tokens-per-parameter heuristic.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Real-World Examples Today</h3>
+    <p>
+      Modern models often exceed Chinchilla's recommendation. <strong>Llama 3 8B</strong> is trained on ~14T tokens — about 1,900 tokens per parameter. <strong>Llama 3 70B</strong> is also trained on ~14T tokens. These models are <strong>overtrained</strong> by Chinchilla's definition — they use far more tokens per parameter than 20. The reason: inference cost, not training cost, drives most decisions.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION PRELUDE: NOPE, ICL, BRIDGE TO SCALING ===== -->
+<section class="section fade-in" id="s-prelude">
+  <div class="container">
+    <span class="section-num">03½</span>
+    <h2>Prelude — Position encodings without additions, and few-shot learning before the budget calculus</h2>
+
+    <p>
+      Scaling-law narratives sit on top of a quieter fact about modern transformers: <strong>useful inductive biases can be learned or hybridized</strong> in ways that textbook diagrams do not always emphasize. Two ideas from recent practice make that concrete—first, a “do nothing” baseline for positional information; second, the demonstration-driven inference regime that made industrial labs ask how to spend the next megawatt-hour of training.
+    </p>
+
+    <h3 style="margin-top:28px;">RoPE in one line, and its opposite, “NOPE”</h3>
+    <p>
+      <strong>Rotary positional encodings (RoPE)</strong> leave token magnitudes alone but rotate query and key vectors by a position-dependent angle so that dot products encode relative location. An alternative line of work removes explicit positional modules entirely—sometimes called <strong>NOPE</strong> (no positional encoding)—and shows that, with scale and depth, models can still solve tasks that ostensibly require order information.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent); margin-bottom:10px;">RoPE-heavy stacks</h3>
+        <p style="margin-bottom:0; font-size:0.92rem;">Inject periodic structure into attention so nearby positions are easy to privilege; relative geometry is controlled and analyzable.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2); margin-bottom:10px;">NOPE-style stacks</h3>
+        <p style="margin-bottom:0; font-size:0.92rem;">Forces the network to <em>recover</em> positional structure through weights and activations if it needs it; empirically can extrapolate to longer contexts more gracefully than some explicit schemes, though absolute quality still eventually drifts as sequences grow.</p>
+      </div>
+    </div>
+
+    <p>
+      Contemporary open-weight systems sometimes <strong>interleave</strong> RoPE layers with NOPE-style blocks rather than committing to a single recipe—an engineering admission that the trade-offs (locality bias vs. long-range pressure) are not closed. Explicit position features can encourage attention to stay “near” the cursor; their absence can nudge the model toward using more of the prefix when that is advantageous.
+    </p>
+
+    <h3 style="margin-top:28px;">Proof by construction: absolute position inside hidden states</h3>
+    <p>
+      A striking theoretical result (unusual in language-modeling literature) shows that <strong>even with zero positional injection</strong>, one can <em>initialize</em> embeddings and projection matrices so that a particular hidden dimension tracks the absolute index of a token. The construction is instructive rather than descriptive: it fixes the first coordinates of every token embedding to constants, gives the start-of-sequence token a distinctive pattern, and chooses <strong>W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub></strong> so that self-attention propagates a running count from the left edge. Word <em>i</em> then reads out position <em>i</em> in a designated channel.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Do not confuse possibility with SGD:</strong> Gradient descent is not guaranteed to find that clean initialization. Real NOPE checkpoints do not exhibit pretty, human-readable counting matrices when you print weights. The theorem answers “is it <em>representable</em>?”—not “is this <em>the</em> mechanism in service?” Empirical task performance is the evidence that <em>something</em> position-like is learned.</p>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Extrapolation nuance:</strong> NOPE often degrades more gently as evaluation sequences stretch beyond training lengths than some explicit encodings—there was never a hard-coded maximum sinusoid table to violate—but performance still falls off eventually. The claim is comparative, not that length generalization becomes free.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Attention without separate Q/K projections:</strong> If every position used the same vector for query and key, dot-product or cosine similarity would be maximized at the <em>current</em> index, encouraging a near-diagonal attention map and starving the rest of the prefix. Learned projections exist so heads can allocate mass across distant tokens. A historical parallel: early sequence models sometimes applied attention with a single representation per position but explicitly <strong>disallowed attending to the present token</strong> to dodge that failure mode. Modern multi-head designs achieve diversity through independent linear maps instead.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">In-context learning as the phenomenon that reframed budgets</h3>
+    <p>
+      <strong>In-context learning (ICL)</strong>—the same idea as few-shot prompting—feeds a sequence of labeled examples <em>inside the context window</em>, followed by a new input. The model must infer the pattern (mapping from inputs to outputs) and complete the next pair <em>without weight updates</em>. The behavior was popularized with GPT-3-scale systems: at sufficient scale, the same next-token objective suddenly supports surprisingly task-like completions on held-out formats.
+    </p>
+
+    <p>
+      In a structured-extraction prompt, demonstrations might map operational requests to labeled fields (<em>action</em>, <em>audience</em>, <em>deadline</em>, <em>urgency</em>); a new input then expects the same template. A capable base model infers missing fields from language cues alone. Real models sometimes veer—continuing with another fabricated pair or garbling labels—because <strong>pure causal LM training does not isolate “stop after one completion”</strong> as a constraint. The model is doing pattern induction from context, not from a fine-tuned head.
+    </p>
+
+    <div class="card card-alt" style="margin-top:20px;">
+      <p style="color:var(--text); font-size:0.92rem; margin-bottom:10px;"><strong>Why this connects to scaling laws.</strong> ICL, chain-of-thought-style verbal reasoning, and zero-shot instruction following are <strong>not observed reliably</strong> in small models fed the same objective. Once labs noticed that these behaviors <em>turn on</em> only past certain compute thresholds, predicting how loss moves with (N, D, C) became a strategic tool: you are not only forecasting perplexity, but also the regime where expensive interactive capabilities become statistically reliable enough to productize.</p>
+      <p style="margin-bottom:0; font-size:0.9rem; color:var(--text-dim);">Base models in the hundreds of billions of parameters, trained for trillions of tokens on heterogeneous web text, remain the canonical reference class—post-training sharpens usability, but many raw behaviors already live in the pre-trained checkpoint.</p>
+    </div>
+
+    <p>
+      Next-token prediction can look like “task solving” because the training distribution contains innumerable templates of instructions, forms, dialogues, and solutions. At scale, some compressed regularities behave like <em>meta-rules</em> for continuing structured text — ICL is statistical pattern completion, not a separate objective.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: EMERGENT CAPABILITIES ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Emergent Capabilities at Scale</h2>
+
+    <p>
+      As models scale up, they exhibit behaviors that smaller models do not. These are often called <strong>emergent capabilities</strong>: in-context learning, chain-of-thought prompting, instruction following, and more memorized knowledge.
+    </p>
+
+    <h3 style="margin-top:28px;">In-Context Learning</h3>
+    <p>
+      <strong>In-context learning</strong> (also called few-shot learning) is the ability to perform a task from a few demonstrations in the prompt, without any training. You give the model several input-output pairs, then a new input, and it generalizes from the pattern. This was first discovered with GPT-3 — only models large enough and trained on enough data exhibited it.
+    </p>
+
+    <h3 style="margin-top:28px;">Chain-of-Thought</h3>
+    <p>
+      <strong>Chain-of-thought prompting</strong> asks the model to produce intermediate reasoning steps before the final answer. For math problems, prompting with "let's think step by step" often improves accuracy dramatically. This behavior is elicited more strongly in larger models.
+    </p>
+
+    <h3 style="margin-top:28px;">Sharp vs. Gradual Emergence</h3>
+    <p>
+      Early work suggested that some capabilities appeared abruptly — a sharp jump from near-zero to high accuracy at a certain scale. A follow-up paper questioned this: when you measure with partial credit (e.g., how many digits of the answer are correct) instead of strict accuracy, the curves often appear smoother. Capabilities may still be gradually accumulating; the sharpness can depend on how you measure.
+    </p>
+
+    <h3 style="margin-top:28px;">Plotting emergence against training FLOPs, not parameter count alone</h3>
+    <p>
+      A large-scale empirical study from Google DeepMind placed <strong>total training compute</strong> (floating-point operations expended over the entire run) on the horizontal axis rather than parameter count in isolation. That choice matters because you can realize similar FLOP totals with different (N, D) pairs: a medium model chewing through a colossal corpus and a wide model touching fewer tokens may sit near each other on the x-axis while behaving differently on tasks. The headline curves track how accuracy on challenging benchmarks climbs as training FLOPs march through orders of magnitude.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent); margin-bottom:10px;">Eight-digit addition (no scratch space)</h3>
+        <p style="margin-bottom:0; font-size:0.92rem;">Plain prompting without intermediate work rises from chance-level performance to tens of percent accuracy as compute grows—smooth-ish improvement on a hard discrete task.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3); margin-bottom:10px;">Scratch-pad / chain-of-thought style</h3>
+        <p style="margin-bottom:0; font-size:0.92rem;">Letting the model emit intermediate tokens before the final sum can look <strong>useless at small scale</strong> (accuracy stays flat) then jump sharply once the model is large enough to actually exploit the extra space. The contrast fueled the narrative that “reasoning emerges.”</p>
+      </div>
+    </div>
+
+    <p>
+      Analogous plots appear for <strong>math word problems</strong> and coarse measures of <strong>instruction following</strong>. Separately, bigger models with more diverse training mixes tend to <strong>memorize more factual material</strong>—people, places, dates—because capacity and exposure both increase. Packaging all of these under one umbrella label, “emergent abilities,” is convenient rhetoric; the underlying curves are still monotonic improvements in expectation, even when thresholds look dramatic.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Metric sensitivity:</strong> If you score answers with strict exact match, a model that moves from “always wrong” to “sometimes fully correct” produces a cliff. If you reward partial progress—first digit correct, numeric distance, character edit distance—the same underlying competence curve can look like a steady glide. Neither visualization is “false”; they answer different questions. The defensible universal claim is weaker but still important: <strong>more training compute → better expected performance</strong> across a basket of probes, even if “emergence” is partly an artifact of discontinuous scoring.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Zero-shot chain-of-thought prompting</h3>
+    <p>
+      The simplest elicitation trick is textual: append a phrase such as <strong>“Let’s think step by step.”</strong> before the answer region. On grade-school arithmetic word problems, a base model may then outline intermediate quantities (“each apple is $2…”) before stating a conclusion. The behavior is fragile—small model variants ramble or derail—but at scale it is repeatable enough to register on aggregate benchmarks. Viewed through scaling lenses, chain-of-thought is another capacity that <strong>materializes jointly</strong> with model depth and data volume rather than being hand-coded.
+    </p>
+
+    <div class="formula">
+      [problem text] + “Let’s think step by step.” → model-generated rationale → final answer token(s)
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Model Comparison Timeline</h3>
+      <p>Explore how models evolved from GPT-2 to Llama 3. Click a model to see details.</p>
+
+      <div id="timelineContainer"></div>
+      <div id="timelineDetail" class="card card-alt" style="margin-top:16px; display:none;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Power Law Explorer</h3>
+      <p>Adjust the exponent α in the power-law relationship Loss = A · N<sup>−α</sup>. See how the curve shape changes on both linear and log-log axes.</p>
+
+      <div class="slider-container">
+        <label>Exponent (α): <span class="slider-value" id="powerExpVal">0.076</span></label>
+        <input type="range" id="powerExpSlider" min="1" max="20" value="76" step="1">
+      </div>
+
+      <div class="chart-container">
+        <canvas id="powerCanvas" width="840" height="280"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: INFERENCE COST & OVER-TRAINING ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Inference Cost and Over-Training</h2>
+
+    <p>
+      Scaling laws optimize for <strong>training</strong> compute. But in production, <strong>inference</strong> cost often dominates. Every time a user sends a query, the model must run a forward pass. With hundreds of millions of users, that cost adds up quickly.
+    </p>
+
+    <h3 style="margin-top:28px;">The Inference Trade-off</h3>
+    <p>
+      A smaller model is cheaper to serve. If you can train a smaller model to match the performance of a larger one by overtraining it on more tokens, you save money at inference time. That's why many companies now train fixed-size models on as many tokens as they can — even if it means spending 100× or 1000× more on training than a compute-optimal model would.
+    </p>
+
+    <p>
+      At the serving extreme, a chat product with hundreds of millions of weekly actives may spend <strong>far more on forward passes than on the original pre-training job</strong>. Training is a one-time (or occasional) burn; inference is a continuous leak proportional to query volume, context length, and model width. That asymmetry pushes organizations to pick the smallest <em>N</em> that still clears a quality bar, then extend <em>D</em> until gains flatten—hence public chatter about <strong>tens of trillions of tokens</strong> for models that are “small” on the absolute parameter leaderboard. The Chinchilla prescription is the right answer to a <em>different</em> objective function (minimize loss per training FLOP), not the full P&amp;L statement.
+    </p>
+
+    <h3 style="margin-top:28px;">Over-Training vs. Under-Training</h3>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--danger);">Under-Trained</h3>
+        <p>Fewer tokens per parameter than Chinchilla recommends. The model has capacity it hasn't fully utilized. GPT-3 and Gopher were undertrained.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3);">Over-Trained</h3>
+        <p>More tokens per parameter than Chinchilla recommends. The model has seen more data than it "needs" for compute-optimal training. Llama 3 8B is overtrained.</p>
+      </div>
+    </div>
+
+    <p>
+      Over-training here says nothing about loss or quality — it simply means more tokens per parameter than the Chinchilla recommendation. The goal is often to save money at inference by using a smaller model that achieves similar performance through extended training.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Training Efficiency Dashboard</h3>
+      <p>Compare under-trained, compute-optimal, and over-trained models. See how tokens per parameter affects loss and inference cost.</p>
+
+      <div class="btn-group">
+        <button class="btn" onclick="setEfficiencyMode('undertrained')">Under-Trained</button>
+        <button class="btn active" onclick="setEfficiencyMode('optimal')">Compute-Optimal</button>
+        <button class="btn" onclick="setEfficiencyMode('overtrained')">Over-Trained</button>
+      </div>
+
+      <div class="bar-chart" id="efficiencyChart" style="height:220px;"></div>
+
+      <div id="efficiencyExplanation" style="font-size:0.85rem; color:var(--text-dim); margin-top:12px;"></div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key takeaway:</strong> Most models you encounter today are overtrained by Chinchilla's definition. Companies prioritize easy serving at inference over training efficiency. That's why you see 8B parameter models trained on 14T tokens — the performance keeps improving with more tokens, and the smaller model is cheaper to serve.</p>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Orders of magnitude in the wild:</strong> Once a lab commits to a fixed parameter budget—say single-digit billions—it is now routine to keep shoveling <strong>20–50+ trillion tokens</strong> (exact figures shift with each release) through the same architecture as long as marginal loss improvements justify the data procurement and electricity. The ratio <em>D</em>/<em>N</em> is therefore not merely “a little above 20”; it can exceed three orders of magnitude for flagship small models. The word <em>overtrained</em> should be read as “above the Chinchilla compute-optimal frontier,” not as pejorative quality judgment.</p>
+    </div>
+
+    <p>
+      Chinchilla-optimal training minimizes loss per FLOP, but deployment often re-optimizes with inference cost in the loop — a smaller model trained on extra tokens can match quality while being cheaper to serve.
+    </p>
+
+    <h3 style="margin-top:28px;">Limits of Scaling and Data Exhaustion</h3>
+    <p>
+      A natural question: <strong>have we run out of data?</strong> The easily accessible text on the internet has been mined extensively. Some companies now buy and digitize books to expand training corpora. There is only so much high-quality text available. What comes next for data scaling? One direction is <strong>synthetic data</strong> — having language models generate more data, then training new models on that data. The effectiveness of this approach is still an open question, but it is an active area of research and deployment.
+    </p>
+
+    <h3 style="margin-top:28px;">Diminishing Returns</h3>
+    <p>
+      Scaling is not infinitely effective. At some point, adding more parameters or more data yields smaller and smaller gains. The exact limits are not well understood, and they may shift as architectures and data quality improve. The key is that scaling laws describe <strong>empirical trends</strong> — they are useful for planning but should not be treated as immutable.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 6: PLAYGROUND ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Playground</h2>
+    <p>
+      Experiment with scaling law concepts. Compute FLOPs, estimate tokens per parameter, and explore the Kaplan vs. Chinchilla allocation trade-offs.
+    </p>
+
+    <div class="interactive-panel" style="margin-top:32px;">
+      <h3>Tokens Per Parameter Calculator</h3>
+      <p>Enter model size and training tokens to compute the tokens-per-parameter ratio. Chinchilla recommends ~20 for compute-optimal training.</p>
+
+      <div class="two-col">
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Parameters (e.g., 70e9)</label>
+          <input type="text" class="text-input" id="tppParams" value="70e9" oninput="updateTPP()">
+        </div>
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Training tokens (e.g., 1.4e12)</label>
+          <input type="text" class="text-input" id="tppTokens" value="1.4e12" oninput="updateTPP()">
+        </div>
+      </div>
+
+      <div id="tppResult" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Diminishing Returns Explorer</h3>
+      <p>See how scaling only model size (or only data) leads to diminishing returns compared to scaling both together.</p>
+
+      <div class="chart-container">
+        <canvas id="diminishCanvas" width="840" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p>
+    Scaling Laws for Large Language Models — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+
+function formatNum(n) {
+  if (n >= 1e18) return (n / 1e18).toFixed(1) + ' quintillion';
+  if (n >= 1e15) return (n / 1e15).toFixed(1) + ' quadrillion';
+  if (n >= 1e12) return (n / 1e12).toFixed(1) + 'T';
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return n.toLocaleString();
+  return n.toString();
+}
+
+const barColors = ['#6c8cff', '#a78bfa', '#34d399', '#fbbf24', '#f472b6', '#fb923c', '#38bdf8', '#e879f9'];
+
+// ============================================================
+// SCALING LAW VISUALIZER
+// ============================================================
+
+let scalingAxis = 'params';
+
+function setScalingAxis(axis) {
+  scalingAxis = axis;
+  document.querySelectorAll('#s0 .btn-group .btn').forEach((b, i) => {
+    b.classList.toggle('active', (['params','data','compute'][i] === axis));
+  });
+  drawScalingCanvas();
+}
+
+function drawScalingCanvas() {
+  const canvas = document.getElementById('scalingCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = { top: 30, right: 30, bottom: 50, left: 60 };
+  const plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const exp = parseInt(document.getElementById('scalingExpSlider').value) / 1000;
+  document.getElementById('scalingExpVal').textContent = exp.toFixed(3);
+
+  const labels = { params: ['Parameters (N)', 'Test Loss'], data: ['Training Tokens (D)', 'Test Loss'], compute: ['Compute (FLOPs)', 'Test Loss'] };
+  const [xLabel, yLabel] = labels[scalingAxis];
+
+  // Log scale: 10^3 to 10^12
+  const xMin = 3, xMax = 12;
+  const xLog = (v) => pad.left + ((Math.log10(v) - xMin) / (xMax - xMin)) * plotW;
+  const yLog = (v) => pad.top + plotH - (Math.log10(v) - Math.log10(0.5)) / (Math.log10(10) - Math.log10(0.5)) * plotH;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = xMin; i <= xMax; i++) {
+    const x = xLog(Math.pow(10, i));
+    ctx.beginPath();
+    ctx.moveTo(x, pad.top);
+    ctx.lineTo(x, pad.top + plotH);
+    ctx.stroke();
+  }
+
+  // Power law curve: L = 10 * N^(-alpha)
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let i = 0; i <= 200; i++) {
+    const xVal = Math.pow(10, xMin + (xMax - xMin) * i / 200);
+    const yVal = 10 * Math.pow(xVal, -exp);
+    const x = xLog(xVal);
+    const y = yLog(yVal);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(xLabel, W / 2, H - 8);
+  ctx.save();
+  ctx.translate(20, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+}
+
+document.getElementById('scalingExpSlider').addEventListener('input', drawScalingCanvas);
+drawScalingCanvas();
+
+// ============================================================
+// COMPUTE BUDGET ALLOCATOR
+// ============================================================
+
+function updateAllocator() {
+  const mult = parseInt(document.getElementById('allocBudgetSlider').value);
+  document.getElementById('allocBudgetVal').textContent = mult;
+
+  // Kaplan: for 10x compute, N×5, D×2. So scale_N = mult^0.7, scale_D = mult^0.3
+  const kaplanN = Math.pow(mult, 0.7);
+  const kaplanD = Math.pow(mult, 0.3);
+  // Chinchilla: scale both by mult^0.5 (e.g. 3.1× for 10x)
+  const chinchN = Math.pow(mult, 0.5);
+  const chinchD = Math.pow(mult, 0.5);
+
+  document.getElementById('kaplanAlloc').innerHTML = `
+    N × ${kaplanN.toFixed(2)} ≈ ${formatNum(1e9 * kaplanN)} params<br>
+    D × ${kaplanD.toFixed(2)} ≈ ${formatNum(1e9 * kaplanD)} tokens
+  `;
+  document.getElementById('chinchillaAlloc').innerHTML = `
+    N × ${chinchN.toFixed(2)} ≈ ${formatNum(1e9 * chinchN)} params<br>
+    D × ${chinchD.toFixed(2)} ≈ ${formatNum(1e9 * chinchD)} tokens
+  `;
+
+  document.getElementById('allocExplanation').textContent =
+    `Chinchilla recommends scaling N and D equally. Kaplan suggests prioritizing N. For ${mult}× compute, Chinchilla uses a smaller model and more data.`;
+}
+
+document.getElementById('allocBudgetSlider').addEventListener('input', updateAllocator);
+updateAllocator();
+
+// ============================================================
+// FLOPS CALCULATOR
+// ============================================================
+
+function updateFLOPs() {
+  const nExp = parseFloat(document.getElementById('flopsNSlider').value);
+  const dExp = parseFloat(document.getElementById('flopsDSlider').value);
+  const N = Math.pow(10, nExp);
+  const D = Math.pow(10, dExp);
+
+  document.getElementById('flopsNVal').textContent = nExp >= 9 ? (N / 1e9).toFixed(1) + 'B' : nExp >= 6 ? (N / 1e6).toFixed(0) + 'M' : formatNum(N);
+  document.getElementById('flopsDVal').textContent = dExp >= 12 ? (D / 1e12).toFixed(1) + 'T' : (D / 1e9).toFixed(1) + 'B';
+
+  const flops = 6 * N * D;
+  document.getElementById('flopsResult').innerHTML = `
+    C ≈ 6 × N × D = <strong style="color:var(--accent);">${formatNum(flops)}</strong> FLOPs
+  `;
+}
+
+document.getElementById('flopsNSlider').addEventListener('input', updateFLOPs);
+document.getElementById('flopsDSlider').addEventListener('input', updateFLOPs);
+updateFLOPs();
+
+// ============================================================
+// MODEL COMPARISON TIMELINE
+// ============================================================
+
+const timelineData = [
+  { year: '2019', name: 'GPT-2', params: '1.5B', tokens: '10B', ratio: '~7', note: 'Early scaling' },
+  { year: '2020', name: 'GPT-3', params: '175B', tokens: '300B', ratio: '~1.7', note: 'Undertrained' },
+  { year: '2021', name: 'Gopher', params: '280B', tokens: '300B', ratio: '~1.1', note: 'Undertrained' },
+  { year: '2022', name: 'Chinchilla', params: '70B', tokens: '1.4T', ratio: '20', note: 'Compute-optimal' },
+  { year: '2023', name: 'Llama 2 8B', params: '8B', tokens: '2T', ratio: '250', note: 'Overtrained' },
+  { year: '2024', name: 'Llama 3 8B', params: '8B', tokens: '14T', ratio: '~1900', note: 'Heavily overtrained' },
+  { year: '2024', name: 'Llama 3 70B', params: '70B', tokens: '14T', ratio: '~200', note: 'Overtrained' },
+];
+
+function renderTimeline() {
+  const container = document.getElementById('timelineContainer');
+  const detailEl = document.getElementById('timelineDetail');
+  container.innerHTML = timelineData.map((m, i) => `
+    <div class="timeline-item" data-idx="${i}" onclick="showTimelineDetail(${i})">
+      <div class="timeline-year">${m.year}</div>
+      <div>
+        <div class="timeline-name">${m.name}</div>
+        <div class="timeline-desc">${m.params} params · ${m.tokens} tokens · ${m.ratio} tokens/param</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showTimelineDetail(idx) {
+  const m = timelineData[idx];
+  const detailEl = document.getElementById('timelineDetail');
+  detailEl.style.display = 'block';
+  detailEl.innerHTML = `
+    <h3 style="margin-bottom:8px;">${m.name} (${m.year})</h3>
+    <p style="margin-bottom:4px;"><strong>Parameters:</strong> ${m.params} &nbsp;|&nbsp; <strong>Tokens:</strong> ${m.tokens} &nbsp;|&nbsp; <strong>Tokens/param:</strong> ${m.ratio}</p>
+    <p style="margin-bottom:0; font-size:0.9rem;">${m.note}</p>
+  `;
+}
+renderTimeline();
+
+// ============================================================
+// POWER LAW EXPLORER
+// ============================================================
+
+function drawPowerCanvas() {
+  const canvas = document.getElementById('powerCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = { top: 30, right: 30, bottom: 50, left: 60 };
+  const plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const exp = parseInt(document.getElementById('powerExpSlider').value) / 1000;
+  document.getElementById('powerExpVal').textContent = exp.toFixed(3);
+
+  const xMin = 6, xMax = 12;
+  const xLog = (v) => pad.left + ((Math.log10(v) - xMin) / (xMax - xMin)) * plotW;
+  const yLog = (v) => pad.top + plotH - (Math.log10(v) - Math.log10(0.5)) / (Math.log10(10) - Math.log10(0.5)) * plotH;
+
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let i = 0; i <= 200; i++) {
+    const xVal = Math.pow(10, xMin + (xMax - xMin) * i / 200);
+    const yVal = 10 * Math.pow(xVal, -exp);
+    const x = xLog(xVal);
+    const y = yLog(yVal);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Parameters (N)', W / 2, H - 8);
+}
+document.getElementById('powerExpSlider').addEventListener('input', drawPowerCanvas);
+drawPowerCanvas();
+
+// ============================================================
+// TRAINING EFFICIENCY DASHBOARD
+// ============================================================
+
+let efficiencyMode = 'optimal';
+
+function setEfficiencyMode(mode) {
+  efficiencyMode = mode;
+  document.querySelectorAll('#s5 .btn-group .btn').forEach((b, i) => {
+    b.classList.toggle('active', (['undertrained','optimal','overtrained'][i] === mode));
+  });
+  renderEfficiencyChart();
+}
+
+function renderEfficiencyChart() {
+  const chart = document.getElementById('efficiencyChart');
+  chart.innerHTML = '';
+
+  const data = {
+    undertrained: [
+      { label: 'GPT-3', loss: 2.8, tokensPerParam: 1.7, params: '175B' },
+      { label: 'Gopher', loss: 2.6, tokensPerParam: 1.1, params: '280B' },
+    ],
+    optimal: [
+      { label: 'Chinchilla', loss: 2.2, tokensPerParam: 20, params: '70B' },
+    ],
+    overtrained: [
+      { label: 'Llama 3 8B', loss: 2.0, tokensPerParam: 1900, params: '8B' },
+      { label: 'Llama 3 70B', loss: 1.8, tokensPerParam: 200, params: '70B' },
+    ],
+  };
+
+  const items = data[efficiencyMode];
+  const maxLoss = Math.max(...items.map(d => d.loss));
+
+  items.forEach((d, i) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bar-wrapper';
+
+    const value = document.createElement('div');
+    value.className = 'bar-value';
+    value.textContent = d.loss.toFixed(2);
+
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (d.loss / maxLoss) * 100 + '%';
+    bar.style.background = barColors[i];
+
+    const label = document.createElement('div');
+    label.className = 'bar-label';
+    label.textContent = d.label + ' (' + d.tokensPerParam + ' T/P)';
+
+    wrapper.appendChild(value);
+    wrapper.appendChild(bar);
+    wrapper.appendChild(label);
+    chart.appendChild(wrapper);
+  });
+
+  const expl = {
+    undertrained: 'Under-trained models have many parameters but few tokens. They plateau at higher loss.',
+    optimal: 'Compute-optimal models balance N and D. Chinchilla recommends ~20 tokens per parameter.',
+    overtrained: 'Over-trained models use more tokens per parameter. Better for inference cost.',
+  };
+  document.getElementById('efficiencyExplanation').textContent = expl[efficiencyMode];
+}
+renderEfficiencyChart();
+
+// ============================================================
+// TOKENS PER PARAMETER CALCULATOR (PLAYGROUND)
+// ============================================================
+
+function updateTPP() {
+  const nStr = document.getElementById('tppParams').value;
+  const dStr = document.getElementById('tppTokens').value;
+  const N = parseFloat(nStr);
+  const D = parseFloat(dStr);
+
+  const resultDiv = document.getElementById('tppResult');
+
+  if (isNaN(N) || isNaN(D) || N <= 0 || D <= 0) {
+    resultDiv.innerHTML = '<span style="color:var(--text-dim);">Enter valid numbers.</span>';
+    return;
+  }
+
+  const ratio = D / N;
+  const status = ratio < 10 ? 'Undertrained' : ratio > 50 ? 'Overtrained' : 'Near compute-optimal';
+
+  resultDiv.innerHTML = `
+    <div class="card card-alt">
+      <p style="margin-bottom:8px; color:var(--text);">Tokens per parameter = <strong style="color:var(--accent);">${ratio.toFixed(1)}</strong></p>
+      <p style="margin-bottom:0; font-size:0.9rem;">
+        <span class="tag ${ratio < 10 ? 'tag-pink' : ratio > 50 ? 'tag-green' : 'tag-blue'}">${status}</span>
+        ${ratio < 10 ? 'Chinchilla recommends ~20 for compute-optimal.' : ratio > 50 ? 'Overtrained — good for inference cost.' : 'Close to Chinchilla recommendation.'}
+      </p>
+    </div>
+  `;
+}
+updateTPP();
+
+// ============================================================
+// DIMINISHING RETURNS EXPLORER
+// ============================================================
+
+function drawDiminishCanvas() {
+  const canvas = document.getElementById('diminishCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = { top: 30, right: 30, bottom: 50, left: 60 };
+  const plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const x = (v) => pad.left + (v / 100) * plotW;
+  const y = (v) => pad.top + plotH - (v / 100) * plotH;
+
+  // Scale both
+  ctx.strokeStyle = '#34d399';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) {
+    const loss = 100 - i * 0.85;
+    if (i === 0) ctx.moveTo(x(i), y(loss));
+    else ctx.lineTo(x(i), y(loss));
+  }
+  ctx.stroke();
+
+  // Scale N only
+  ctx.strokeStyle = '#6c8cff';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) {
+    const loss = 100 - i * 0.4;
+    if (i === 0) ctx.moveTo(x(i), y(loss));
+    else ctx.lineTo(x(i), y(loss));
+  }
+  ctx.stroke();
+
+  // Scale D only
+  ctx.strokeStyle = '#f472b6';
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) {
+    const loss = 100 - i * 0.35;
+    if (i === 0) ctx.moveTo(x(i), y(loss));
+    else ctx.lineTo(x(i), y(loss));
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Scale (arbitrary)', W / 2, H - 8);
+  ctx.fillText('Loss', 25, pad.top + plotH / 2);
+
+  ctx.fillStyle = '#34d399';
+  ctx.fillText('Scale N & D', 750, 100);
+  ctx.fillStyle = '#6c8cff';
+  ctx.fillText('Scale N only', 750, 120);
+  ctx.fillStyle = '#f472b6';
+  ctx.fillText('Scale D only', 750, 140);
+}
+drawDiminishCanvas();
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+
+// ============================================================
+// INTERVIEW QUESTIONS — hint / reveal
+// ============================================================
+
+function toggleHint(id) {
+  const el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('visible');
+}
+
+function reveal(id) {
+  const el = document.getElementById(id + '-answer');
+  if (el) el.classList.toggle('visible');
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Landscape — DeepSeek and the LLM Architecture</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  background: rgba(251, 191, 36, 0.08);
+  border-left-color: var(--accent5);
+}
+.callout.warn p { color: var(--text); }
+.callout.ok {
+  background: rgba(52, 211, 153, 0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text); }
+
+/* ===== Q&A box ===== */
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+.qa-box p:last-child { margin-bottom: 0; }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Bigram Table ===== */
+.bigram-table-wrapper { overflow-x: auto; margin: 20px 0; }
+.bigram-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  width: 100%;
+}
+.bigram-table th, .bigram-table td {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  text-align: center;
+  transition: background 0.3s, color 0.3s;
+}
+.bigram-table th {
+  background: var(--bg-card-alt);
+  color: var(--accent);
+  font-weight: 600;
+}
+.bigram-table td {
+  background: var(--bg-card);
+  color: var(--text-dim);
+}
+.bigram-table td.highlight-cell {
+  background: rgba(108,140,255,0.15);
+  color: var(--text);
+  font-weight: 700;
+}
+.bigram-table td.zero-cell {
+  color: rgba(136,136,160,0.3);
+}
+.bigram-table .row-header {
+  background: var(--bg-card-alt);
+  color: var(--accent2);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ===== Chart container ===== */
+.chart-container { position: relative; margin: 20px 0; }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Input fields ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+</style>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: rgba(10, 10, 15, 0.92); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+.timeline { position: relative; padding-left: 28px; margin: 24px 0; }
+.timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+.timeline-item { position: relative; margin-bottom: 24px; }
+.timeline-item::before {
+  content: ''; position: absolute; left: -24px; top: 6px;
+  width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg);
+}
+.timeline-year { font-family: var(--mono); color: var(--accent5); font-size: 0.85rem; font-weight: 700; }
+.step-indicator { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.step-dot {
+  padding: 6px 14px; border-radius: 20px; font-size: 0.8rem;
+  border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; transition: all 0.2s;
+}
+.step-dot.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.step-dot.done { border-color: var(--accent3); background: rgba(52,211,153,0.1); color: var(--accent3); }
+.output-readout { font-family: var(--mono); font-size: 0.85rem; color: var(--text); margin-top: 12px;
+  background: var(--bg-card-alt); padding: 12px; border-radius: 8px; white-space: pre-wrap; }
+.ctrl { font-size: 0.85rem; color: var(--text-dim); display: block; margin: 8px 0 4px; }
+.demo-canvas { width: 100%; max-width: 560px; margin: 12px auto; background: var(--bg-card-alt); display: block; }
+.arch-diagram { display: grid; gap: 12px; margin: 24px 0; }
+.arch-row { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 8px; align-items: center; }
+@media (max-width: 700px) { .arch-row { grid-template-columns: 1fr; } .arch-arrow { transform: rotate(90deg); text-align: center; } }
+.arch-box {
+  background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; text-align: center; font-size: 0.9rem; transition: all 0.3s;
+}
+.arch-box.highlight { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.arch-box.innovation { border-color: var(--accent4); background: rgba(244,114,182,0.08); }
+.arch-arrow { color: var(--text-dim); font-size: 1.2rem; text-align: center; }
+.param-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.82rem; margin: 16px 0; }
+.param-table th, .param-table td { padding: 10px 12px; border: 1px solid var(--border); text-align: left; }
+.param-table th { background: var(--bg-card-alt); color: var(--accent); }
+.phase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 24px 0; }
+.phase-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; text-align: center;
+}
+.phase-num { font-size: 2rem; font-weight: 800; color: var(--accent); font-family: var(--mono); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<nav class="breadcrumb-nav">
+  <a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span>
+  <a href="../../">Learning Blogs</a><span class="bc-sep">›</span>
+  <a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span>
+  <span class="bc-current">The Landscape</span>
+</nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">The Landscape</a>
+  <div class="nav-links">
+    <a href="#s0">Why Foundations</a>
+    <a href="#s1">DeepSeek Story</a>
+    <a href="#s2">LLM Basics</a>
+    <a href="#s3">Scaling Laws</a>
+    <a href="#s4">Training Stages</a>
+    <a href="#s5">Comparison</a>
+    <a href="#s6">Four Pillars</a>
+    <a href="#s7">Turning Point</a>
+    <a href="#s8">Engine Analogy</a>
+    <a href="#s9">Architecture</a>
+    <a href="#s10">Token Journey</a>
+    <a href="#s11">Transformer</a>
+    <a href="#s12">Output</a>
+    <a href="#s13">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <p style="font-family:var(--mono); color:var(--accent); letter-spacing:3px; font-size:0.85rem; margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 01</p>
+    <h1>The Landscape</h1>
+    <p class="subtitle">DeepSeek and the LLM Architecture — from scaling laws and architectural innovations to the complete journey of a token through every layer of a modern language model.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">671B</span><span class="stat-label">DeepSeek-V3 Params</span></div>
+      <div class="stat"><span class="stat-val">37B</span><span class="stat-label">Active at Once</span></div>
+      <div class="stat"><span class="stat-val">6</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      DeepSeek did not arrive overnight. A year of research papers, architectural innovations, and reinforcement-learning breakthroughs culminated in January 2025 with DeepSeek-R1 — an open-source reasoning model that rivaled the best closed systems at a fraction of the cost. This chapter maps the full landscape: what large language models are, why size matters, how transformers work, and exactly what happens when a single token passes through the stack.
+    </p>
+  </div>
+</header>
+
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Why Foundations Matter More Than Flashy Apps</h2>
+
+    <p>
+      DeepSeek released an open-source reasoning model competitive with frontier closed systems — at a fraction of the training and inference cost. That makes it worth studying, but API usage alone does not explain <strong>how the architecture works</strong>: Multi-Head Latent Attention, Mixture of Experts, quantization, and the GRPO reinforcement-learning pipeline each require matrix-level understanding before you can implement or modify them.
+    </p>
+
+    <div class="callout">
+      <p><strong>The 95/5 split:</strong> Running DeepSeek via API, building RAG chatbots, and shipping LLM applications is valuable — but it represents roughly <strong>5% of the effort</strong>. The other <strong>95%</strong> is architecture and modeling. Once you understand those, applications become straightforward. Without them, you are forever dependent on black boxes you cannot debug, extend, or improve.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Series Roadmap</h3>
+    <p>
+      This series is a build-from-scratch curriculum. Every building block of the DeepSeek architecture is covered with:
+    </p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Mathematical derivations</strong> — every matrix multiplication shown and explained</li>
+      <li><strong>Working code</strong> — each module implemented and tested in PyTorch</li>
+      <li><strong>Visual explanations</strong> — diagrams designed for concepts that text alone cannot convey</li>
+      <li><strong>Comparisons</strong> — DeepSeek innovations side-by-side with standard transformer components</li>
+    </ul>
+    <p>
+      Two major tracks structure the series. <strong>Architecture</strong> covers Multi-Head Latent Attention, Mixture of Experts, Multi-Token Prediction, Quantization, and Rotary Positional Encodings. <strong>Modeling</strong> covers Reinforcement Learning, DPO, PPO, and GRPO — the training pipeline that produced DeepSeek-R1's reasoning capabilities. The capstone recreates a mini DeepSeek-R1 on GPUs.
+    </p>
+
+    <div class="qa-box">
+      <div class="q">A common question is: why not just use the API if it works?</div>
+      <p>Because API usage teaches you nothing about <em>why</em> the model works, <em>what</em> breaks when it fails, or <em>how</em> to improve it. Organizations hiring "LLM engineers" increasingly want people who can build and modify architectures — not just call endpoints. The engineer who can implement Multi-Head Latent Attention from a blank file is fundamentally more valuable than one who can only write prompts. DeepSeek's release made this skill set urgent: the model is open-source, the papers are public, and the techniques are reproducible — if you understand them deeply enough.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>The DeepSeek Story: From Obscure Release to Global Shockwave</h2>
+
+    <p>
+      DeepSeek-R1 arrived in January 2025. Many practitioners initially treated it as another weekly model release — the announcement was skimmed and attention moved on. That underestimation did not last long once benchmarks and pricing became clear.
+    </p>
+
+    <h3 style="margin-top:28px;">Release and Cost</h3>
+    <p>
+      DeepSeek-R1 was a <strong>reasoning model competitive with OpenAI's best systems</strong>, trained and deployed at roughly <strong>1/1000th the cost</strong>, and released as <strong>fully open-source</strong> under a permissive license. It was cheaper to run, not just cheaper to build — API pricing runs approximately <strong>27× cheaper</strong> than comparable OpenAI offerings (~$0.55 vs ~$30 per 1M tokens).
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · DeepSeek Release Timeline</h4>
+      <p style="font-size:0.9rem; color:var(--text-dim); margin-bottom:16px;">Click each milestone to see details. DeepSeek-R1 was not the beginning — it was the culmination of more than a year of research.</p>
+      <div class="step-indicator" id="timelineSteps"></div>
+      <div class="output-readout" id="timelineReadout"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">The Paper Trail: More Than a Year of Research</h3>
+    <p>
+      DeepSeek-R1 did not emerge from nothing. The company's research timeline reveals a systematic progression:
+    </p>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="timeline-year">January 2024</div>
+        <p style="margin:8px 0 0;"><strong>DeepSeek LLM</strong> — the first foundational language model paper.</p>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-year">January 2024</div>
+        <p style="margin:8px 0 0;"><strong>DeepSeek Coder</strong> — specialized for code generation.</p>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-year">March 2024</div>
+        <p style="margin:8px 0 0;"><strong>Vision-Language Model</strong> — multimodal capabilities.</p>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-year">April 2024</div>
+        <p style="margin:8px 0 0;"><strong>DeepSeek Math</strong> — mathematical reasoning in open language models.</p>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-year">June 2024</div>
+        <p style="margin:8px 0 0;"><strong>DeepSeek-V2</strong> and <strong>DeepSeek Coder V2</strong> — major architectural upgrades including early MoE and MLA experiments.</p>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-year">Late 2024</div>
+        <p style="margin:8px 0 0;"><strong>DeepSeek-V3</strong> — the 671-billion-parameter foundational model (53-page technical report) that set the stage for R1.</p>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-year">January 2025</div>
+        <p style="margin:8px 0 0;"><strong>DeepSeek-R1</strong> — the reasoning model built on top of DeepSeek-V3 using large-scale reinforcement learning.</p>
+      </div>
+    </div>
+
+    <p>
+      Each paper introduced innovations that compounded. Mixture of Experts, Multi-Head Latent Attention, Multi-Token Prediction, Quantization, and Rotary Positional Encodings were not single-paper ideas — they evolved across releases. DeepSeek-V2's 52-page report and DeepSeek-V3's 53-page report contain architectural details that no summary adequately covers. Multi-Head Latent Attention alone requires extensive notes — on the order of <strong>50 pages</strong> — before the mechanism is fully understood.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Key insight:</strong> DeepSeek-R1's public debut in January 2025 was the <em>visible peak</em> of a research mountain that had been growing since at least January 2024. Understanding R1 requires understanding V3, V2, and the entire architectural lineage.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">What Is DeepSeek, Precisely?</h3>
+    <p>
+      At its core, <strong>DeepSeek is a Chinese AI company</strong> that builds large language models. Their website (deepseek.com) lists every model release with accompanying research papers. The progression on their research page tells the story: DeepSeek LLM → DeepSeek-V2 → DeepSeek-V3 → DeepSeek-R1, with specialized variants (Coder, Math, Vision) branching off along the way.
+    </p>
+    <p>
+      <strong>DeepSeek-V3</strong> is the foundational model with <strong>671 billion parameters</strong>. <strong>DeepSeek-R1</strong> is the reasoning model constructed <em>after</em> V3 was trained — it inherits V3's weights and adds a reinforcement-learning pipeline that teaches step-by-step reasoning. Keep this distinction clear: V2 and V3 are foundational (pre-trained) models; R1 is a reasoning model built on top of V3.
+    </p>
+
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Large Language Models: The Probabilistic Engine</h2>
+
+    <p>
+      You have used ChatGPT. You type "Make a travel plan for me to visit Italy" and receive a detailed itinerary. That response comes from a <strong>large language model</strong> — but what is an LLM, mathematically?
+    </p>
+    <p>
+      Strip away the interface, the branding, and the product packaging. At its heart, a large language model is an <strong>engine that takes in a sequence of tokens and outputs a probability distribution over the next token</strong>. When tokens are sampled from that distribution and appended to the sequence, one token at a time, the result is coherent text — travel plans, essays, code, reasoning chains.
+    </p>
+
+    <div class="formula">P(w<sub>n</sub> | w<sub>1</sub>, w<sub>2</sub>, …, w<sub>n−1</sub>)</div>
+
+    <p>
+      Large language models are <strong>probabilistic engines for next-token prediction</strong>. This is the first and most important mental model. Everything else — emergent abilities, reasoning, translation — is a consequence of doing this one task at enormous scale with a transformer architecture.
+    </p>
+
+    <h3 style="margin-top:28px;">Probabilistic, Not Deterministic</h3>
+    <p>
+      ChatGPT's answers <em>look</em> deterministic. They feel confident. But underneath, every token carries a probability. Consider completing this sentence:
+    </p>
+
+    <div class="card card-alt" style="font-family:var(--mono); font-size:0.95rem; text-align:center;">
+      <p style="color:var(--text); margin:0;">"After years of hard work, your effort will take you ___"</p>
+    </div>
+
+    <p>
+      The model's top prediction might be <strong>"to"</strong> — and if you always pick the highest-probability token (greedy decoding), the output appears deterministic. But the model also assigns non-trivial probability to tokens like <strong>"far"</strong>, <strong>"places"</strong>, and others. The full distribution over the vocabulary reveals the model's uncertainty and alternative completions.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Next-Token Probability Distribution</h4>
+      <p style="font-size:0.9rem; color:var(--text-dim);">Simulated log-scale distribution for a confident completion. The top token dominates, but alternatives retain measurable probability.</p>
+      <canvas class="demo-canvas" id="probCanvas" width="560" height="280"></canvas>
+      <label class="ctrl">Confidence (how peaked the distribution is): <span id="confVal">0.85</span></label>
+      <input type="range" id="confSlider" min="50" max="99" step="1" value="85">
+      <div class="output-readout" id="probReadout"></div>
+    </div>
+
+    <p>
+      On a log-log scale, the typical next-token distribution looks like a steep power law: the first token has very high probability (especially for confident predictions), and probability falls off rapidly for lower-ranked tokens. This shape is why greedy decoding often works well — the top token is usually far ahead — but also why sampling with temperature can produce creative variation.
+    </p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Never confuse fluent output with certainty. Every token the model generates is a sample from a probability distribution. Understanding this distribution — its shape, its entropy, its tail behavior — is essential for debugging model behavior and designing decoding strategies.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Size, Scaling Laws, and Emergent Properties</h2>
+
+    <h3>What Does "Large" Mean?</h3>
+    <p>
+      No one has an exact definition of when a language model becomes "large." But there is a well-documented phenomenon: <strong>as model size increases, performance improves dramatically</strong>. The paper that crystallized this for modern LLMs was OpenAI's GPT-3 work, titled <em>"Language Models are Few-Shot Learners."</em> The authors demonstrated that scaling model size to <strong>175 billion parameters</strong> produced dramatic improvements in both one-shot and few-shot learning — capabilities that simply did not exist at smaller scales.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>GPT-2 (2019)</h3>
+        <p>Largest variant: <strong>1.5 billion</strong> parameters. Impressive text generation, but limited task generalization.</p>
+      </div>
+      <div class="card">
+        <h3>GPT-3 (2020)</h3>
+        <p>Largest variant: <strong>175 billion</strong> parameters. Crossed the size barrier from 1.3B → 13B → 175B. Few-shot learning emerged.</p>
+      </div>
+    </div>
+
+    <p>
+      The scaling journey did not stop at 175 billion. A Nature paper charting neural network size from the 1950s to 2020 shows an <strong>exponential increase</strong> in parameter count. Language models (shown as orange dots on recent charts) have dominated the size space, reaching approximately <strong>1 trillion parameters</strong> and beyond. The y-axis is log-scale — this is exponential growth, not linear.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Scaling Law &amp; Emergent Pickup</h4>
+      <p style="font-size:0.9rem; color:var(--text-dim);">Drag the model-size slider. Watch task performance stay flat, then suddenly "pick up" past a critical scale — emergent behavior.</p>
+      <canvas class="demo-canvas" id="scaleCanvas" width="560" height="300"></canvas>
+      <label class="ctrl">Model size (log scale, billions of params): <span id="scaleVal">1.5</span>B</label>
+      <input type="range" id="scaleSlider" min="0" max="100" step="1" value="5">
+      <div class="output-readout" id="scaleReadout"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Emergent Properties</h3>
+    <p>
+      As model size increases beyond a critical threshold, models develop <strong>emergent properties</strong> — capabilities absent in smaller models but present in larger ones. Examples include:
+    </p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Performing arithmetic</li>
+      <li>Word unscrambling</li>
+      <li>Translation between languages</li>
+      <li>Summarization</li>
+      <li>Grammar checking</li>
+      <li>Following complex instructions</li>
+      <li>Writing emails from custom instructions — trivial for modern LLMs, impossible for earlier NLP systems</li>
+    </ul>
+    <p>
+      The x-axis in emergent-behavior charts is roughly computational power (FLOPs) or model size. The y-axis is task performance. For each task, there is a <strong>pickup point</strong> — a scale beyond which performance suddenly jumps. Before that point, the model fails; after it, the model succeeds. This is why companies like OpenAI and Anthropic have publicly stated they are "just chasing size" — there is still hope that at 10 trillion or 100 trillion parameters, entirely unknown capabilities may emerge.
+    </p>
+
+    <h3 style="margin-top:28px;">LLMs vs. Task-Specific NLP</h3>
+    <p>
+      Earlier NLP models were designed for <strong>specific tasks</strong>: machine translation systems for translation, parsers for syntax, classifiers for sentiment. Large language models, trained only on next-token prediction, develop general capabilities through emergent properties. A single LLM can translate, summarize, check grammar, write code, and reason — tasks that previously required separate specialized systems.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>The transformer secret:</strong> All of this scaling power runs on one architecture — the <strong>Transformer</strong>, introduced in the 2017 paper <em>"Attention Is All You Need"</em> by Vaswani et al. The sections below unpack it from input tokenization through output projection.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Why Size Matters</h3>
+    <p>
+      The training objective — next-token prediction on internet-scale text — does not explicitly teach translation, arithmetic, or summarization. These capabilities <em>emerge</em> when the model is large enough to capture the statistical patterns that implicitly encode them. Smaller models simply lack the capacity.
+    </p>
+
+    <div class="qa-box">
+      <div class="q">A common question is: will scaling ever stop delivering returns?</div>
+      <p>Nobody knows for certain. OpenAI and Anthropic have publicly stated they are still "chasing size" because emergent capabilities continue appearing at new scales. There may be a wall — a scale beyond which more parameters yield diminishing returns — but we have not hit it yet. DeepSeek's contribution is showing that when you do hit diminishing returns from raw scale, <em>architectural innovation</em> (MoE, MLA, quantization) can extract dramatically more performance per active parameter and per dollar of compute.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Creating an LLM: Pre-Training and Fine-Tuning</h2>
+
+    <p>
+      Building a large language model involves <strong>two distinct stages</strong>. Understanding this pipeline is essential because DeepSeek's breakthroughs span both stages — architectural innovations during pre-training and a revolutionary reinforcement-learning approach during post-training.
+    </p>
+
+    <div class="phase-grid">
+      <div class="phase-card">
+        <div class="phase-num">1</div>
+        <h3 style="margin-top:8px;">Pre-Training</h3>
+        <p style="font-size:0.9rem; margin:0;">Auto-regressive training on massive unlabeled text. The model creates its own labels by predicting the next token. Produces a <strong>foundational model</strong>.</p>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">2</div>
+        <h3 style="margin-top:8px;">Fine-Tuning</h3>
+        <p style="font-size:0.9rem; margin:0;">Training on labeled data to teach specific behaviors: instruction following, translation, safety. GPT-3.5 (ChatGPT) used <strong>RLHF</strong>.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Stage 1: Pre-Training</h3>
+    <p>
+      Pre-training uses <strong>no human-labeled data</strong>. The model is fed enormous quantities of text assembled from the internet, textbooks, media, research articles, and curated corpora. GPT-2, for example, was trained on data from Reddit, books, Wikipedia articles, and the Open WebText corpus.
+    </p>
+    <p>
+      The training objective is simple: given a sequence of tokens, predict the next one. Because the "correct" next token is always known (it is the token that actually appears in the text), the model generates its own supervision signal. This is the <strong>auto-regressive</strong> training paradigm. After pre-training, the model has basic language capabilities — grammar, facts, patterns — but may not follow instructions or produce helpful dialogue.
+    </p>
+    <p>
+      Pre-training at scale is extraordinarily expensive. Costs run upward of <strong>millions of dollars</strong>, and for the largest models, potentially <strong>tens or hundreds of millions</strong>. As model size increases, so does the compute bill.
+    </p>
+
+    <h3 style="margin-top:28px;">Stage 2: Fine-Tuning</h3>
+    <p>
+      After pre-training, the model is <strong>fine-tuned</strong> on labeled datasets to teach specific behaviors. Examples of labeled fine-tuning data:
+    </p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Instruction following:</strong> "Convert 45 kilometers to meters" → "45,000 meters"</li>
+      <li><strong>Translation pairs:</strong> French sentence → English sentence</li>
+      <li><strong>Dialogue formatting:</strong> User message → helpful assistant response</li>
+    </ul>
+    <p>
+      GPT-3.5, which became the product ChatGPT, was fine-tuned with <strong>Reinforcement Learning from Human Feedback (RLHF)</strong>. Human annotators graded model outputs for quality, and those grades were fed back as a reward signal during training. This alignment step is what made raw GPT-3 into a conversational assistant.
+    </p>
+
+    <div class="callout">
+      <p><strong>Where DeepSeek changed the game:</strong> Instead of relying primarily on human-labeled feedback for reasoning, DeepSeek used <strong>large-scale reinforcement learning with rule-based reward systems</strong> — Group Relative Policy Optimization (GRPO). No human judgment required for the reward; pure rules. This is the main reason DeepSeek-R1 excels at step-by-step reasoning. Later chapters cover GRPO in depth.</p>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: if pre-training already teaches language, why fine-tune at all?</div>
+      <p>Pre-training teaches the model <em>what language looks like</em> — statistics, facts, patterns. Fine-tuning teaches the model <em>how to be useful</em> — follow instructions, refuse harmful requests, format answers helpfully, reason step-by-step. A pre-trained model asked "Convert 45 km to meters" might continue with unrelated text because continuation is what it was trained to do. Fine-tuning reshapes the output distribution toward task completion.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>DeepSeek vs. the World: Performance, Cost, and Trade-offs</h2>
+
+    <h3>A Mathematical Showdown</h3>
+    <p>
+      Benchmarks on standard test suites tell one story. A single hard problem tells another. Consider this definite integral from the 1968 Putnam competition — a competition known for exceptionally difficult problems:
+    </p>
+
+    <div class="formula">∫₀¹ x⁴(1−x)⁴ / (1+x²) dx = 22/7 − π</div>
+
+    <p>
+      The result is beautiful. Many people know the approximation π ≈ 22/7, but 22/7 is actually <em>greater</em> than π by a tiny amount. This integral captures exactly that difference. The proof was first devised around 1944.
+    </p>
+    <p>
+      When GPT-4o was given this integral as a multiple-choice question with option A = 22/7 − π as the correct answer, it selected <strong>option B (2×10⁵/5)</strong> — a spectacular failure. DeepSeek solved it step-by-step and arrived at the correct answer, <strong>22/7 − π</strong>, in roughly 10–15 seconds. One example does not prove universal superiority, but it demonstrates capability on genuinely difficult reasoning problems.
+    </p>
+
+    <h3 style="margin-top:28px;">Formal Comparison: DeepSeek vs. GPT-4</h3>
+    <p>
+      On broad benchmarks, performance between DeepSeek and GPT-4 remains hotly debated. A reasonable consensus: they are <strong>similar or DeepSeek is superior on several tasks</strong>. The decisive difference is not raw capability — it is <strong>cost and openness</strong>.
+    </p>
+
+    <table class="param-table">
+      <tr><th>Metric</th><th>GPT-4</th><th>DeepSeek-R1</th></tr>
+      <tr><td>Pricing (per 1M tokens)</td><td>~$30</td><td>~$0.55</td></tr>
+      <tr><td>Open source</td><td>No (closed)</td><td>Yes (permissive license)</td></tr>
+      <tr><td>Self-hostable</td><td>No</td><td>Yes (with sufficient hardware)</td></tr>
+      <tr><td>Parameters (foundational)</td><td>Undisclosed (~1T estimated)</td><td>671 billion (DeepSeek-V3)</td></tr>
+    </table>
+
+    <p>
+      DeepSeek-R1 costs roughly <strong>100–500× less</strong> than GPT-4 for API usage. On performance-vs-cost charts, DeepSeek-V3 sits at the <strong>top-right</strong> — highest performance on the y-axis, lowest cost on the x-axis (leftmost among frontier models). DeepSeek-V3 outperforms GPT-4 on most reported benchmark parameters on DeepSeek's website.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Performance vs. Cost Landscape</h4>
+      <canvas class="demo-canvas" id="costCanvas" width="560" height="320"></canvas>
+      <p style="font-size:0.85rem; color:var(--text-dim); text-align:center; margin-top:8px;">Y-axis: evaluation score · X-axis: price per 1M tokens (log scale). DeepSeek-V3 dominates the efficient frontier.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">DeepSeek vs. Llama</h3>
+    <p>
+      Meta's Llama family represents the best of open-source AI — amazing models, freely available. But DeepSeek exceeds Llama on both scale and architectural innovation. Llama's largest instruct variants (70B, 405B) are outperformed by DeepSeek's 671B foundational model, which additionally incorporates Mixture of Experts, Multi-Head Latent Attention, Multi-Token Prediction, Quantization, and advanced reinforcement-learning training. DeepSeek has both <strong>greater scale</strong> and <strong>more architectural innovations</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">Strengths and Weaknesses</h3>
+    <div class="comparison">
+      <div class="card">
+        <h3>Strengths</h3>
+        <ul style="color:var(--text-dim); margin:0; padding-left:1.2em;">
+          <li><strong>Open source</strong> — download, inspect, modify, self-host</li>
+          <li><strong>Cost efficient</strong> — 100–500× cheaper API pricing</li>
+          <li><strong>Competitive performance</strong> — matches or exceeds GPT-4 on many tasks</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Weaknesses</h3>
+        <ul style="color:var(--text-dim); margin:0; padding-left:1.2em;">
+          <li><strong>Safety &amp; polish</strong> — may not be as refined as GPT-4 for enterprise guardrails (improving with versions)</li>
+          <li><strong>Deployment cost</strong> — 671B parameters require serious GPU infrastructure to self-host</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Decision framework:</strong> If safety guardrails are paramount, GPT-4 may be preferable for now. If you are a lean, fast-growing startup, DeepSeek cuts costs dramatically while delivering top-tier performance. If data privacy matters — you cannot send data to closed-source APIs — DeepSeek's open-source nature lets you self-host (assuming you can provision the compute).</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>What Makes DeepSeek Special: Four Pillars of Innovation</h2>
+
+    <p>
+      DeepSeek's cost efficiency and performance did not come from one trick. Four major categories of innovation compound together — and within the first category alone, five distinct architectural changes work in concert.
+    </p>
+
+    <div class="phase-grid">
+      <div class="phase-card"><div class="phase-num">①</div><h3 style="margin-top:8px;">Innovative Architecture</h3></div>
+      <div class="phase-card"><div class="phase-num">②</div><h3 style="margin-top:8px;">Training Methodology</h3></div>
+      <div class="phase-card"><div class="phase-num">③</div><h3 style="margin-top:8px;">GPU Optimization</h3></div>
+      <div class="phase-card"><div class="phase-num">④</div><h3 style="margin-top:8px;">Model Ecosystem</h3></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Pillar 1: Five Architectural Innovations</h3>
+
+    <div class="card">
+      <h3>1. Multi-Head Latent Attention (MLA)</h3>
+      <p style="margin-bottom:0;">
+        Standard multi-head attention (from "Attention Is All You Need") uses a key-value cache that stores full-dimensional keys and values. DeepSeek stores the KV cache in a <strong>latent (compressed) space</strong>. Result: the attention mechanism uses less memory, runs faster, and remains computationally efficient — without the quality degradation of simpler approximations like Multi-Query Attention.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>2. Mixture of Experts (MoE)</h3>
+      <p style="margin-bottom:0;">
+        In a standard transformer, the entire feed-forward network activates for every token. In MoE, the network contains multiple "experts" (separate feed-forward sub-networks), and a <strong>router</strong> decides which expert(s) activate for each token. Of 671 billion total parameters, only about <strong>37 billion are active</strong> at any given time. This is the second major efficiency driver.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>3. Multi-Token Prediction</h3>
+      <p style="margin-bottom:0;">
+        Standard LLMs predict one token at a time. DeepSeek implements a recent innovation: predict <strong>multiple tokens simultaneously</strong>. If the model can accurately predict several tokens in parallel, inference speed increases substantially.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>4. Quantization</h3>
+      <p style="margin-bottom:0;">
+        Instead of storing every parameter as a full floating-point number, parameters are represented in compressed form — blocky at fine granularity, nearly identical at model scale. Quantization compresses transformer parameters with minimal quality loss.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>5. Rotary Positional Encodings (RoPE)</h3>
+      <p style="margin-bottom:0;">
+        Original transformers added positional encodings directly to token embeddings — "polluting" the embedding vector with position information. RoPE instead <strong>rotates the query and key vectors</strong> to encode position. Rotation preserves magnitude while encoding relative position — a highly efficient approach applied later in the attention computation rather than at the embedding stage.
+      </p>
+    </div>
+
+    <h3 style="margin-top:28px;">Pillar 2: Reinforcement Learning Reborn</h3>
+    <p>
+      The DeepSeek-R1 paper makes the field of reinforcement learning for LLMs feel reborn. GPT-3.5 relied on human annotators grading output quality. DeepSeek-R1 uses <strong>large-scale reinforcement learning with a rule-based reward system</strong> — no human judgment in the loop. The framework is called <strong>Group Relative Policy Optimization (GRPO)</strong>, and it is the primary reason DeepSeek-R1 excels at complex, step-by-step reasoning.
+    </p>
+
+    <h3 style="margin-top:28px;">Pillar 3: GPU Optimization Tricks</h3>
+    <p>
+      DeepSeek bypassed industry-standard CUDA for certain functions, using NVIDIA's <strong>Parallel Thread Execution (PTX)</strong> — an intermediate representation closer to machine code than CUDA. This contributed to training and inference efficiency, reducing costs.
+    </p>
+
+    <h3 style="margin-top:28px;">Pillar 4: Model Ecosystem &amp; Distillation</h3>
+    <p>
+      DeepSeek did not stop at the 671B model. They distilled it into smaller variants — as small as <strong>1.5 billion parameters</strong> — creating a full model ecosystem. Distillation transfers knowledge from the large "teacher" model to compact "student" models, making capable AI accessible on modest hardware.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Roadmap:</strong> The series follows the same four-phase structure — Architecture (bulk of content) → Training Methodology → GPU Optimization → Model Ecosystem/Distillation — culminating in a mini DeepSeek-R1 recreation.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Deep Dive: Mixture of Experts Routing</h3>
+    <p>
+      A <strong>router</strong> — a small neural network within each MoE layer — examines the incoming token's representation and selects which expert FFN(s) activate. The rest stay idle: they contain learned weights but consume no compute for that token. Standard transformers activate <strong>every parameter for every token</strong>; MoE activates <strong>only the relevant subset</strong> — more total parameters (more storage), far fewer active parameters (less compute per token).
+    </p>
+
+    <h3 style="margin-top:28px;">Deep Dive: Multi-Head Latent Attention and the KV Cache</h3>
+    <p>
+      During inference, autoregressive generation requires caching previously computed Key and Value vectors so they are not recomputed for every new token. Standard multi-head attention stores full-dimensional K and V tensors — this cache grows linearly with sequence length and can dominate memory usage for long contexts.
+    </p>
+    <p>
+      DeepSeek's MLA compresses the KV cache into a <strong>latent space</strong> — lower-dimensional representations that preserve the information needed for attention while using dramatically less memory. The attention computation itself also becomes faster because it operates on these compressed representations. This is not a free lunch — the compression must be designed carefully to avoid quality loss — but DeepSeek's papers demonstrate that the trade-off is favorable.
+    </p>
+
+    <h3 style="margin-top:28px;">PTX vs. CUDA: The Performance Stack</h3>
+    <p>
+      NVIDIA's software stack has layers: <strong>CUDA</strong> at the top (high-level parallel programming), <strong>PTX (Parallel Thread Execution)</strong> in the middle (assembly-like intermediate representation), and machine code on the GPU silicon. DeepSeek used PTX for certain critical functions instead of standard CUDA kernels, eliminating abstraction overhead in the hottest code paths — operations executed billions of times during training and inference. At DeepSeek's scale, engineering optimizations translate directly into dollar savings.
+    </p>
+
+    <h3 style="margin-top:28px;">Deep Dive: GRPO vs. RLHF</h3>
+    <p>
+      GPT-3.5's alignment used <strong>Reinforcement Learning from Human Feedback (RLHF)</strong>: human annotators rated outputs, and a reward model learned to predict those ratings. DeepSeek-R1's alignment uses <strong>Group Relative Policy Optimization (GRPO)</strong> with <strong>rule-based rewards</strong>. For mathematical reasoning, the rule is simple: is the final answer correct? No human needed. For code, does it compile and pass tests? Rule-based. This scales to millions of training examples without annotation bottlenecks.
+    </p>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>DeepSeek as a Turning Point in AI History</h2>
+
+    <p>
+      DeepSeek is not merely another model release. It represents a structural shift in what the AI industry believed was possible — and who could achieve it.
+    </p>
+
+    <h3 style="margin-top:28px;">Proof That Scale Is Not Everything</h3>
+    <p>
+      For years, the narrative was that only massively funded US corporations could build frontier AI. DeepSeek demonstrated that a comparatively <strong>small team</strong> could reach parity with the best models using <strong>novel techniques and far fewer resources</strong> — dramatically lower than Big Tech budgets, though not literally $6 million as some headlines claimed.
+    </p>
+
+    <h3 style="margin-top:28px;">Industry Impact</h3>
+    <p>
+      The release shifted assumptions about who can build frontier models and at what cost. DeepSeek is open source, competitively performant, and documented in 50+ page technical reports — reproducible by anyone willing to invest the engineering effort. That is the landscape this chapter maps.
+    </p>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Opening the Engine: The LLM as a Next-Token Prediction Machine</h2>
+
+    <p>
+      LLMs are next-token prediction engines. To understand DeepSeek's innovations — MLA in the attention block, MoE in the feed-forward block — we need to see every component: token embeddings, transformer blocks, output projection. The architecture determines what token comes next; there is no magic layer beneath it.
+    </p>
+
+    <h3 style="margin-top:28px;">Where Do the Parameters Live?</h3>
+    <p>
+      GPT-3 has approximately <strong>175 billion parameters</strong>. GPT-4 is estimated at roughly <strong>1 trillion</strong>. GPT-4.5 may reach <strong>5–10 trillion</strong>. These numbers are not abstract — each parameter is a learned weight in a specific layer. They are scattered across:
+    </p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Token embedding matrices</li>
+      <li>Positional embedding matrices</li>
+      <li>Multi-head attention projections (Query, Key, Value, Output)</li>
+      <li>Feed-forward network weights (inside every transformer block)</li>
+      <li>Layer normalization parameters</li>
+      <li>Output projection layer (vocabulary-sized)</li>
+    </ul>
+    <p>
+      Language learning is a <strong>byproduct</strong> of the next-token prediction task. The engine is complex because learning language requires complexity — you cannot predict the next word accurately with a trivial architecture. The 175 billion parameters exist because next-token prediction at scale demands them.
+    </p>
+
+    <div class="qa-box">
+      <div class="q">A common question is: why is the architecture so complex if the task is just "predict the next word"?</div>
+      <p>Because "predict the next word" implicitly requires understanding grammar, facts, context, discourse structure, and world knowledge. A model that only memorized bigram statistics would fail on long-range dependencies ("The cat, which had chased the mouse through the garden despite the rain, finally caught ___"). The transformer's depth (many stacked blocks) and attention mechanism (dynamic context lookup) exist precisely to capture these dependencies. Complexity in architecture mirrors complexity in language.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>The Three-Part Architecture: Input, Processor, Output</h2>
+
+    <p>
+      When you open the LLM black box, the schematic divides into <strong>three major parts</strong>. Think of them as the intake system, the processing core, and the exhaust/output.
+    </p>
+
+    <div class="arch-diagram">
+      <div class="arch-row">
+        <div class="arch-box highlight" id="archInput"><strong>Part 1: Input</strong><br><span style="font-size:0.8rem;color:var(--text-dim);">Tokenization · Embedding · Positional Encoding</span></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box highlight" id="archProcessor"><strong>Part 2: Processor</strong><br><span style="font-size:0.8rem;color:var(--text-dim);">Transformer Block(s)</span></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box highlight" id="archOutput"><strong>Part 3: Output</strong><br><span style="font-size:0.8rem;color:var(--text-dim);">LayerNorm · Vocabulary Projection</span></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Part 1: The Input Block</h3>
+    <p>
+      Given a sentence like <strong>"The next day is bright"</strong>, three operations happen to every token before processing begins:
+    </p>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Tokenization</strong> — split text into tokens and assign token IDs from the vocabulary</li>
+      <li><strong>Token Embedding</strong> — map each token ID to a dense vector capturing semantic meaning</li>
+      <li><strong>Positional Embedding</strong> — encode where each token sits in the sequence</li>
+    </ol>
+    <p>Token embedding and positional embedding are <strong>added together</strong> to produce the <strong>input embedding</strong> — a single dense vector per token entering the processor.</p>
+
+    <h3 style="margin-top:28px;">Part 2: The Processor (Transformer Block)</h3>
+    <p>Inside each transformer block, every token passes through <strong>six operations</strong>:</p>
+    <div class="flow">
+      <div class="flow-step">1. Layer Normalization</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step innovation">2. Multi-Head Attention <span class="tag tag-pink" style="margin-left:8px;">MLA lives here</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">3. Dropout</div>
+      <div class="flow-arrow">↓ + skip connection</div>
+      <div class="flow-step">4. Layer Normalization</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step innovation">5. Feed-Forward Neural Network <span class="tag tag-pink" style="margin-left:8px;">MoE lives here</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">6. Dropout + skip connection</div>
+    </div>
+    <p>
+      DeepSeek's two primary architectural innovations map directly onto this block: <strong>Multi-Head Latent Attention</strong> replaces standard attention, and <strong>Mixture of Experts</strong> replaces the standard feed-forward network. Opening the engine and identifying these two components is the first step toward understanding <em>why</em> DeepSeek is efficient.
+    </p>
+
+    <h3 style="margin-top:28px;">Part 3: The Output Block</h3>
+    <p>
+      After passing through all transformer blocks, tokens undergo final layer normalization, then a projection layer that maps from embedding dimension (e.g., 768) to vocabulary size (e.g., 50,000). The highest-scoring token ID becomes the next-token prediction.
+    </p>
+
+    <div class="callout">
+      <p><strong>Path to MLA:</strong> Before Multi-Head Latent Attention, four foundations are required — (1) this full architecture overview, (2) why self-attention is needed, (3) how self-attention becomes multi-head attention, and (4) key-value caching. Each gets its own chapter; this chapter covers (1).</p>
+    </div>
+
+    <h3 style="margin-top:28px;">The Four-Step Learning Path to MLA</h3>
+    <p>
+      Multi-Head Latent Attention cannot be understood in isolation. The learning path:
+    </p>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>LLM Architecture</strong> (this chapter) — the complete pipeline from token to prediction</li>
+      <li><strong>Why Attention?</strong> — the context bottleneck that attention solves</li>
+      <li><strong>Self-Attention</strong> — Query, Key, Value, scaled dot-product, softmax</li>
+      <li><strong>Multi-Head Attention</strong> — parallel heads, concatenation, projection</li>
+      <li><strong>Key-Value Cache</strong> — inference optimization, memory bottlenecks</li>
+      <li><strong>Multi-Head Latent Attention</strong> — DeepSeek's compressed KV cache innovation</li>
+    </ol>
+    <p>
+      Each step builds on the previous. Skip any step and MLA becomes opaque notation. Follow the sequence and it becomes an engineering trade-off you could implement yourself.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>Standard Transformer Block</h3>
+        <p style="margin:0;">Dense Multi-Head Attention · Dense Feed-Forward Network · All parameters active · Full KV cache</p>
+      </div>
+      <div class="card">
+        <h3>DeepSeek Transformer Block</h3>
+        <p style="margin:0;">Multi-Head <em>Latent</em> Attention · Mixture of <em>Experts</em> FFN · ~37B/671B active · Compressed KV cache · Quantized weights · RoPE positions</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>The Journey of a Token — Input Phase</h2>
+
+    <p>
+      The input block is easiest to follow through a single token. Take <strong>"friend"</strong> in the sentence <strong>"A true friend accepts you."</strong> — five tokens total, with the model predicting what comes after "you." The sections below trace one token through all five input-phase stages.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Token Journey: Input Phase</h4>
+      <p style="font-size:0.9rem; color:var(--text-dim);">Step through the five input-phase stages. Watch "friend" transform from raw text to a 768-dimensional input embedding.</p>
+      <div class="token-row" id="journeyTokens"></div>
+      <div class="step-indicator" id="journeySteps"></div>
+      <div class="output-readout" id="journeyReadout"></div>
+      <button class="btn" id="journeyPrev">← Previous</button>
+      <button class="btn" id="journeyNext">Next →</button>
+    </div>
+
+    <h3 style="margin-top:28px;">Phase 1: Isolation</h3>
+    <p>
+      The first step is <strong>isolation</strong>: every word is detached from its neighbors. The sentence is broken apart; each token is examined individually before receiving an ID.
+    </p>
+
+    <h3 style="margin-top:28px;">Phase 2: Token ID Assignment</h3>
+    <p>
+      Isolated, each token needs an identity. The model consults the <strong>vocabulary</strong> — a lookup table of token IDs listing every token the model knows, each with a unique number. This vocabulary contains three types of entries:
+    </p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Characters:</strong> a, b, c, … z</li>
+      <li><strong>Subwords:</strong> fragments like "isation", "tion", common morphemes</li>
+      <li><strong>Full words:</strong> "token", "enter", "begin", "friend"</li>
+    </ul>
+    <p>
+      Vocabulary size varies by model — <strong>50,000 tokens</strong> for GPT-2, roughly <strong>100,000</strong> for GPT-4 — so the token ID assigned to "friend" may differ across models. In our example, <strong>"friend" receives token ID 20112</strong>. Every other token in the sentence gets its own ID. The token ID carries <strong>no semantic meaning</strong>; it is purely an index into the vocabulary table.
+    </p>
+
+    <div class="formula">friend → Token ID: 20112</div>
+
+    <h3 style="margin-top:28px;">How the Vocabulary Is Built: Byte Pair Encoding</h3>
+    <p>
+      The vocabulary is constructed using <strong>Byte Pair Encoding (BPE)</strong> — a subword tokenization algorithm that iteratively merges the most frequent character pairs in a training corpus. The process:
+    </p>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Start with individual characters as the base vocabulary</li>
+      <li>Count all adjacent character pairs in the training text</li>
+      <li>Merge the most frequent pair into a new token</li>
+      <li>Repeat until the vocabulary reaches the desired size (50,000 for GPT-2)</li>
+    </ol>
+    <p>
+      The result: common words like "friend" become single tokens. Rare words get split into subwords ("unhappiness" → "un" + "happiness" or similar). Unknown words at inference time can always be decomposed into character-level tokens — no word is ever truly "unknown." GPT-4 uses a larger vocabulary (~100,000 tokens), likely with an improved BPE variant.
+    </p>
+
+    <div class="qa-box">
+      <div class="q">A common question is: why use subwords instead of whole words or individual characters?</div>
+      <p>Whole-word tokenization creates enormous vocabularies (every word in every language) and cannot handle novel words. Character-level tokenization creates very long sequences (every word spelled out letter by letter), making attention quadratic costs unbearable. Subword tokenization hits the sweet spot: common words are single tokens (efficient), rare words decompose into meaningful fragments (no unknown-token failures), and vocabulary size stays manageable at 50,000–100,000 entries.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Phase 3: Token Embedding</h3>
+    <p>
+      A token ID alone carries no meaning. <strong>Token embedding</strong> maps each ID to a dense vector — in GPT-2 small, <strong>768 dimensions</strong>. Each dimension is a learned feature; the model discovers what they represent during training, not through hand-designed categories like "noun" or "emotion."
+    </p>
+    <p>
+      "Friend" might score 0.1 on one dimension, 2.1 on another, 0.3 on a third — producing a <strong>768-dimensional vector</strong> that encodes semantic content. GPT-2 XL uses <strong>1,600 dimensions</strong>. These embedding values are <strong>learned parameters</strong> — initialized randomly, optimized during training through backpropagation.
+    </p>
+
+    <h3 style="margin-top:28px;">Phase 4: Positional Embedding</h3>
+    <p>
+      Meaning alone is insufficient. Consider: <em>"The dog the dog chased another dog."</em> Both instances of "dog" have identical token embeddings, yet they refer to different entities. The only way to distinguish them is <strong>position</strong>: the first "dog" is at position 2, the second at position 5.
+    </p>
+    <p>
+      Positional embedding adds another <strong>768-dimensional vector</strong> encoding where the token sits in the sequence. For "friend" in "A true friend accepts you," the position is <strong>3</strong> (A=1, true=2, friend=3, accepts=4, you=5). Like token embeddings, positional embedding weights are learned parameters.
+    </p>
+
+    <h3 style="margin-top:28px;">Phase 5: Input Embedding</h3>
+    <p>
+      Token embedding and positional embedding are <strong>added together</strong>:
+    </p>
+
+    <div class="formula">input_embedding = token_embedding + positional_embedding &nbsp; (768-dim each)</div>
+
+    <p>
+      The result is the <strong>input embedding</strong> — a single 768-dimensional vector combining meaning and position. The transformer block does not see words; it sees <strong>768-dimensional vectors</strong>.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Input block summary:</strong> Tokenization (ID assignment via vocabulary) → Token Embedding (meaning, 768-dim) → Positional Embedding (position, 768-dim) → Add → Input Embedding. Five steps. One vector per token. Ready for the processor.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Mapping Phases to Architecture Labels</h3>
+    <p>
+      The five narrative phases map directly onto the three labeled steps in the architecture diagram:
+    </p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Tokenization</strong> = Phase 1 (Isolation) + Phase 2 (Token ID Assignment)</li>
+      <li><strong>Token Embedding</strong> = Phase 3</li>
+      <li><strong>Positional Embedding</strong> = Phase 4</li>
+      <li><strong>Input Embedding</strong> = Phase 5 (addition of the two vectors)</li>
+    </ul>
+    <p>
+      When you see "tokenized text" in a codebase or paper, it refers to the integer token IDs (Phase 2). When you see "input embeddings," it refers to the final 768-dimensional vectors after all five phases complete.
+    </p>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>The Journey of a Token — Through the Transformer Block</h2>
+
+    <p>
+      With input embeddings computed, all five tokens — "A," "true," "friend," "accepts," "you" — enter the transformer block as a matrix of shape <strong>(5 × 768)</strong>: five rows (tokens), 768 columns (features). By the time they exit, the model has encoded context, grammar, and relationships between all five tokens.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Transformer Block Step-Through</h4>
+      <p style="font-size:0.9rem; color:var(--text-dim);">Click through the six sub-layers of one transformer block. Highlight shows where DeepSeek innovates.</p>
+      <div class="step-indicator" id="tbSteps"></div>
+      <canvas class="demo-canvas" id="tbCanvas" width="560" height="200"></canvas>
+      <div class="output-readout" id="tbReadout"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Step 1: Layer Normalization</h3>
+    <p>
+      Each 768-dimensional vector enters layer normalization first. <strong>Layer normalization</strong> adjusts mean and standard deviation so the mean becomes <strong>0</strong> and the standard deviation becomes <strong>1</strong>. This stabilizes training — without it, activations can drift to extreme values across deep networks, causing gradients to vanish or explode.
+    </p>
+
+    <div class="formula">LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β</div>
+
+    <h3 style="margin-top:28px;">Step 2: Multi-Head Attention — Context Mapping</h3>
+    <p>
+      This is where the transformer earns its name. <strong>Multi-head attention</strong> asks: for the token "friend," how much attention should be paid to each neighbor? It builds an attention map:
+    </p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>"friend" → "A": low attention</li>
+      <li>"friend" → "true": moderate attention (modifies "friend")</li>
+      <li>"friend" → "accepts": high attention (friend accepts…)</li>
+      <li>"friend" → "you": moderate attention</li>
+    </ul>
+    <p>
+      Consider completing: <em>"I am from Pune, India. I speak ___."</em> To predict the next word ("Hindi" or "Marathi"), the model must attend heavily to "Pune" and "India," not to "I am from." Attention encodes <strong>context</strong> — which tokens matter for which predictions. This is DeepSeek's first innovation site: <strong>Multi-Head Latent Attention (MLA)</strong> makes this step faster and more memory-efficient.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Attention Weight Explorer</h4>
+      <p style="font-size:0.9rem; color:var(--text-dim);">Select a query token and see simulated attention weights across the sentence "I am from Pune, India. I speak ___."</p>
+      <div class="btn-group" id="attnTokenBtns"></div>
+      <div id="attnBars" class="bar-chart" style="height:160px;"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Step 3: Dropout</h3>
+    <p>
+      <strong>Dropout</strong> randomly sets a fraction of activations to zero during training. If the dropout rate is 0.5 and there are 100 parameters, roughly 50 are zeroed each step. Why? Some parameters become "lazy" — they rely on others to do the work. Forcing random parameters offline compels the remaining ones to learn independently. Dropout improves generalization and prevents overfitting. There are <strong>two dropout layers</strong> per transformer block — one after attention, one after the feed-forward network.
+    </p>
+
+    <h3 style="margin-top:28px;">Skip Connections (Shortcut Connections)</h3>
+    <p>
+      The "+" signs in the architecture diagram are <strong>skip connections</strong> (also called residual connections). They add the input of a sub-layer directly to its output, creating an alternate path for gradients during backpropagation. Without skip connections, gradients flowing through many chained multiplications either shrink to zero (<strong>vanishing gradients</strong> — learning stops) or grow without bound (<strong>exploding gradients</strong> — training becomes unstable). Skip connections are the highway that keeps gradients flowing.
+    </p>
+
+    <h3 style="margin-top:28px;">Step 4: Second Layer Normalization</h3>
+    <p>Same operation as step 1 — normalize the vector after the attention sub-layer and its skip connection merge.</p>
+
+    <h3 style="margin-top:28px;">Step 5: Feed-Forward Neural Network — Expansion and Contraction</h3>
+    <p>
+      The feed-forward network (FFN) is the second major innovation site for DeepSeek (<strong>Mixture of Experts</strong>). In a standard transformer, the FFN:
+    </p>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Takes the 768-dimensional input</li>
+      <li>Expands to a higher-dimensional space: <strong>4 × 768 = 3,072 dimensions</strong></li>
+      <li>Applies a non-linearity (ReLU, GELU, or similar)</li>
+      <li>Compresses back to <strong>768 dimensions</strong></li>
+    </ol>
+    <p>
+      This expand-contract pattern lets the model explore richer representational spaces with more parameters, capturing complexity that the 768-dimensional space alone cannot express. In DeepSeek's MoE variant, instead of one FFN, there are multiple "expert" FFNs, and a router selects which expert(s) activate per token — dramatically increasing total parameters while keeping active parameters manageable.
+    </p>
+
+    <h3 style="margin-top:28px;">Step 6: Dropout + Skip Connection</h3>
+    <p>Final dropout, then another skip connection merging the FFN output with the pre-FFN signal. One transformer block complete.</p>
+
+    <h3 style="margin-top:28px;">Twelve Blocks, Not One</h3>
+    <p>
+      One transformer block is not the whole journey. GPT-2 model sizes:
+    </p>
+
+    <table class="param-table">
+      <tr><th>Variant</th><th>Transformer Blocks</th><th>Embedding Dim</th></tr>
+      <tr><td>GPT-2 Small</td><td>12</td><td>768</td></tr>
+      <tr><td>GPT-2 Medium</td><td>24</td><td>1,024</td></tr>
+      <tr><td>GPT-2 Large</td><td>36</td><td>1,280</td></tr>
+      <tr><td>GPT-2 XL</td><td>48</td><td>1,600</td></tr>
+    </table>
+
+    <p>
+      Every token passes through <strong>all blocks sequentially</strong> — 12 times for GPT-2 Small, 48 times for GPT-2 XL. Modern models may stack <strong>96 or more</strong> blocks. Critically, the output dimension remains <strong>768</strong> (for GPT-2 Small) after every block — the vector shape is preserved, but the <em>values</em> are transformed at each layer, building increasingly abstract representations.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Full pipeline cost:</strong> Five steps in the input block. Six sub-layers × 12 blocks = 72 operations in the processor. Then normalization and vocabulary projection. Every token traverses this pipeline on every inference pass — which is why DeepSeek's efficiency innovations (MLA, MoE, quantization) matter.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>The Journey of a Token — Output, Prediction, and Training</h2>
+
+    <p>
+      After 12 transformer blocks, each token still carries a 768-dimensional vector — same shape, transformed values. All five tokens ("A," "true," "friend," "accepts," "you") exit together. The output block converts these vectors into vocabulary-sized predictions.
+    </p>
+
+    <h3 style="margin-top:28px;">Final Layer Normalization</h3>
+    <p>
+      One more normalization step — <strong>final layer normalization</strong> — stabilizes the representations before projection. Every 768-dimensional vector is normalized using the same layer norm formula as inside the transformer blocks.
+    </p>
+
+    <h3 style="margin-top:28px;">The Output Projection Layer</h3>
+    <p>
+      The model must convert 768-dimensional vectors into predictions over the full vocabulary. The output layer is a linear projection:
+    </p>
+
+    <div class="formula">logits = input_embedding × W<sub>out</sub> + b &nbsp;&nbsp; where W<sub>out</sub> is (768 × 50,000)</div>
+
+    <p>
+      For vocabulary size 50,000 (GPT-2), each token's 768-dimensional vector is multiplied by a weight matrix of shape <strong>(768 × 50,000)</strong>, producing a <strong>50,000-dimensional logits vector</strong>. Each dimension corresponds to one token in the vocabulary. The highest logit indicates the model's top prediction for the next token.
+    </p>
+
+    <h3 style="margin-top:28px;">Multiple Prediction Tasks in One Sequence</h3>
+    <p>
+      A critical detail: the sentence "A true friend accepts you" is not one prediction task — it is <strong>five</strong>:
+    </p>
+
+    <table class="param-table">
+      <tr><th>Input (prefix)</th><th>Target (next token)</th></tr>
+      <tr><td>A</td><td>true</td></tr>
+      <tr><td>A true</td><td>friend</td></tr>
+      <tr><td>A true friend</td><td>accepts</td></tr>
+      <tr><td>A true friend accepts</td><td>you</td></tr>
+      <tr><td>A true friend accepts you</td><td><em>??? (what we want to predict)</em></td></tr>
+    </table>
+
+    <p>
+      During training, every position in the sequence generates a loss term. The model predicts "true" given "A," "friend" given "A true," and so on. During inference, only the final position matters — the next token after the full prefix.
+    </p>
+
+    <h3 style="margin-top:28px;">Choosing the Next Token: Logits, Softmax, and Decoding</h3>
+    <p>
+      For each token's 50,000-dimensional logits vector, the index with the highest value maps back to the predicted token. Example: if the highest logit at position "you" corresponds to token ID 555, look up ID 555 in the vocabulary — perhaps "." or "well" or "always."
+    </p>
+    <p>
+      Before training, predictions are random. The model might predict "4" when the correct answer is "true." This gap between prediction and reality is the <strong>loss</strong>.
+    </p>
+    <p>
+      Raw logits are not probabilities — they can be any real number. To convert to a valid probability distribution, apply <strong>softmax</strong>:
+    </p>
+
+    <div class="formula">P(token_i) = exp(logit_i) / Σⱼ exp(logit_j)</div>
+
+    <p>
+      Softmax squashes logits into positive values that sum to 1.0. The token with the highest probability is selected (greedy decoding) or sampled (stochastic decoding). During training, cross-entropy loss compares the predicted distribution against the one-hot target (the actual next token) and penalizes divergence.
+    </p>
+    <p>
+      At inference time for our example, only the <strong>final position</strong> matters: given "A true friend accepts you," what comes next? The model produces a 50,000-dimensional logits vector at that position, softmax converts it to probabilities, and the top token becomes the prediction.
+    </p>
+
+    <h3 style="margin-top:28px;">Backpropagation: Training Every Parameter</h3>
+    <p>
+      The loss is computed (typically cross-entropy between predicted and actual token distributions), then <strong>backpropagated</strong> through the entire network. Every learnable parameter is updated:
+    </p>
+
+    <table class="param-table">
+      <tr><th>Component</th><th>Learnable?</th><th>Notes</th></tr>
+      <tr><td>Token embedding matrix</td><td>★ Yes</td><td>Vocabulary × embedding_dim</td></tr>
+      <tr><td>Positional embedding matrix</td><td>★ Yes</td><td>Max_seq_len × embedding_dim</td></tr>
+      <tr><td>Multi-head attention (Q, K, V, O projections)</td><td>★ Yes</td><td>Per transformer block</td></tr>
+      <tr><td>Feed-forward network weights</td><td>★ Yes</td><td>Per transformer block; MoE adds experts</td></tr>
+      <tr><td>Layer normalization (γ, β)</td><td>★ Yes</td><td>Per normalization layer</td></tr>
+      <tr><td>Output projection layer</td><td>★ Yes</td><td>embedding_dim × vocabulary_size</td></tr>
+    </table>
+
+    <p>
+      These parameters, repeated across 12 (or 48, or 96) transformer blocks, sum to the total parameter count: <strong>175 billion</strong> for GPT-3, <strong>671 billion</strong> for DeepSeek-V3 (with only ~37B active per token due to MoE). Backpropagation optimizes all of them jointly so that next-token predictions improve, and as a byproduct, the model learns language itself.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>The complete journey:</strong> Isolation → Token ID (20112) → Token Embedding (768-dim) → Positional Embedding (768-dim) → Input Embedding (sum) → [LayerNorm → Attention → Dropout → Skip → LayerNorm → FFN → Dropout → Skip] × N blocks → Final LayerNorm → Output Projection (50,000-dim logits) → Argmax → Next token. DeepSeek modified the Attention and FFN sub-layers; everything else in this chapter is the baseline we build upon.</p>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: if the task is next-token prediction, how does the model learn summarization, translation, or coding?</div>
+      <p>Emergent properties. At sufficient scale, optimizing next-token prediction on diverse internet text implicitly requires learning grammar, facts, reasoning patterns, code syntax, and multilingual structure. No explicit summarization loss is needed — a model that accurately predicts tokens in a news article "knows" how news articles are structured, and can generate summaries by continuing text in summary-like patterns. Fine-tuning and reinforcement learning then steer these latent capabilities toward useful behaviors.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s13a">
+  <div class="container">
+    <span class="section-num">13a</span>
+    <h2>Chapter Review: Key Numbers to Remember</h2>
+
+    <table class="param-table">
+      <tr><th>Quantity</th><th>Value</th><th>Context</th></tr>
+      <tr><td>DeepSeek-V3 total parameters</td><td>671 billion</td><td>Foundational model</td></tr>
+      <tr><td>DeepSeek-V3 active parameters</td><td>~37 billion</td><td>MoE — only subset active per token</td></tr>
+      <tr><td>DeepSeek-R1 API cost</td><td>~$0.55 / 1M tokens</td><td>vs GPT-4 ~$30 / 1M tokens</td></tr>
+      <tr><td>Cost advantage</td><td>~27× cheaper (build) · 100–500× (API)</td><td>Market-shaking differential</td></tr>
+      <tr><td>Market cap impact</td><td>~$2 trillion erased</td><td>US tech stocks, Jan 2025</td></tr>
+      <tr><td>GPT-3 parameters</td><td>175 billion</td><td>"Language Models are Few-Shot Learners"</td></tr>
+      <tr><td>GPT-2 largest</td><td>1.5 billion</td><td>Pre-scaling-law era</td></tr>
+      <tr><td>GPT-2 vocabulary</td><td>50,000 tokens</td><td>BPE tokenization</td></tr>
+      <tr><td>GPT-2 embedding dim</td><td>768 (small) · 1,600 (XL)</td><td>Varies by model size</td></tr>
+      <tr><td>GPT-2 transformer blocks</td><td>12 / 24 / 36 / 48</td><td>Small / Medium / Large / XL</td></tr>
+      <tr><td>FFN expansion factor</td><td>4×</td><td>768 → 3,072 → 768</td></tr>
+      <tr><td>Smallest distilled model</td><td>1.5 billion</td><td>DeepSeek model ecosystem</td></tr>
+      <tr><td>Example token ID ("friend")</td><td>20112</td><td>50,000-token vocabulary</td></tr>
+    </table>
+
+    <div class="qa-box">
+      <div class="q">A common question is: can I run DeepSeek-V3 on my laptop?</div>
+      <p>Not the full 671B model — that requires a cluster of high-memory GPUs (think dozens of H100s or equivalent). However, DeepSeek provides distilled models as small as 1.5B parameters that can run on consumer hardware. Quantization (covered in later chapters) further reduces memory requirements. The open-source weights mean you can choose the size that fits your hardware budget.</p>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: how is DeepSeek-R1 different from DeepSeek-V3?</div>
+      <p>DeepSeek-V3 is the foundational model — pre-trained on massive text corpora with next-token prediction. DeepSeek-R1 is built <em>on top of</em> V3 using reinforcement learning (GRPO with rule-based rewards) to teach step-by-step reasoning. V3 is the engine; R1 is the engine plus a reasoning module trained to show its work. You need V3 (or its weights) before you can create R1.</p>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">A common question is: why do we need positional embeddings if attention handles context?</div>
+      <p>Attention is permutation-invariant — if you shuffle the input tokens, the attention output (before positional info) would be the same. Without positional embeddings, "Dog bites man" and "Man bites dog" would produce identical representations. Positional embeddings break this symmetry, encoding each token's location in the sequence. RoPE (used by DeepSeek) is a more sophisticated way to inject this positional information directly into the attention computation by rotating query and key vectors.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Playground: Explore the LLM Pipeline</h2>
+
+    <p>
+      Adjust parameters below to see how vocabulary size, embedding dimension, and number of transformer blocks affect the total parameter count and computational load of an LLM engine.
+    </p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · LLM Architecture Calculator</h4>
+
+      <label class="ctrl">Vocabulary size: <span id="pgVocabVal">50000</span></label>
+      <input type="range" id="pgVocab" min="10000" max="150000" step="5000" value="50000">
+
+      <label class="ctrl">Embedding dimension: <span id="pgEmbedVal">768</span></label>
+      <input type="range" id="pgEmbed" min="256" max="4096" step="128" value="768">
+
+      <label class="ctrl">Transformer blocks: <span id="pgBlocksVal">12</span></label>
+      <input type="range" id="pgBlocks" min="1" max="96" step="1" value="12">
+
+      <label class="ctrl">FFN expansion factor: <span id="pgFfnVal">4</span>×</label>
+      <input type="range" id="pgFfn" min="2" max="8" step="1" value="4">
+
+      <div class="output-readout" id="pgReadout"></div>
+      <canvas class="demo-canvas" id="pgCanvas" width="560" height="260"></canvas>
+    </div>
+
+    <div class="card card-alt">
+      <h3>What's Next</h3>
+      <p style="margin-bottom:8px;">With the full LLM architecture mapped, the following chapters dive deep into each component on the path to DeepSeek's innovations:</p>
+      <ol style="color:var(--text-dim); margin:0; padding-left:1.5em;">
+        <li><strong>Why attention?</strong> — Motivating the context bottleneck</li>
+        <li><strong>Self-attention</strong> — Query, Key, Value from scratch</li>
+        <li><strong>Multi-head attention</strong> — Parallel attention heads</li>
+        <li><strong>Key-value cache</strong> — Efficient inference</li>
+        <li><strong>Multi-Head Latent Attention</strong> — DeepSeek's attention innovation</li>
+        <li><strong>Mixture of Experts</strong> — DeepSeek's FFN innovation</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Decoding DeepSeek · Chapter 01: The Landscape</p>
+  <p style="margin-top:8px;"><a href="../">← Back to Index</a> · <a href="../../">All Learning Blogs</a></p>
+</footer>
+
+
+<script>
+// ============================================================
+// TIMELINE DEMO
+// ============================================================
+const timelineData = [
+  { label: 'Jan 2024', title: 'DeepSeek LLM', desc: 'First foundational language model paper. Beginning of the research trail.' },
+  { label: 'Jan 2024', title: 'DeepSeek Coder', desc: 'Code-specialized variant. Early signal of domain-specific training.' },
+  { label: 'Mar 2024', title: 'Vision-Language Model', desc: 'Multimodal capabilities — image + text understanding.' },
+  { label: 'Apr 2024', title: 'DeepSeek Math', desc: 'Mathematical reasoning in open language models.' },
+  { label: 'Jun 2024', title: 'DeepSeek-V2 + Coder V2', desc: 'Major architectural upgrades. Early MoE and MLA experiments. 52-page report.' },
+  { label: 'Late 2024', title: 'DeepSeek-V3', desc: '671 billion parameters. 53-page technical report. Foundation for R1.' },
+  { label: 'Jan 2025', title: 'DeepSeek-R1', desc: 'Reasoning model. Rivals OpenAI o1. Open source. ~$0.55/M tokens. Market shock.' },
+];
+const tlSteps = document.getElementById('timelineSteps');
+const tlReadout = document.getElementById('timelineReadout');
+let tlIdx = 0;
+timelineData.forEach((d, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'step-dot' + (i === 0 ? ' active' : '');
+  btn.textContent = d.label;
+  btn.onclick = () => { tlIdx = i; renderTimeline(); };
+  tlSteps.appendChild(btn);
+});
+function renderTimeline() {
+  tlSteps.querySelectorAll('.step-dot').forEach((b, i) => {
+    b.classList.toggle('active', i === tlIdx);
+    b.classList.toggle('done', i < tlIdx);
+  });
+  const d = timelineData[tlIdx];
+  tlReadout.textContent = d.title + '\n\n' + d.desc;
+}
+renderTimeline();
+
+// ============================================================
+// PROBABILITY DISTRIBUTION DEMO
+// ============================================================
+const probCanvas = document.getElementById('probCanvas');
+const probCtx = probCanvas.getContext('2d');
+const confSlider = document.getElementById('confSlider');
+const confVal = document.getElementById('confVal');
+const probReadout = document.getElementById('probReadout');
+const tokens = ['to', 'far', 'places', 'ahead', 'there', 'home', 'now', 'soon', 'great', 'beyond'];
+
+function drawProb() {
+  const conf = parseInt(confSlider.value) / 100;
+  confVal.textContent = conf.toFixed(2);
+  const W = probCanvas.width, H = probCanvas.height;
+  probCtx.clearRect(0, 0, W, H);
+  const probs = tokens.map((_, i) => i === 0 ? conf : (1 - conf) * Math.pow(0.55, i) / 5);
+  const sum = probs.reduce((a, b) => a + b, 0);
+  const norm = probs.map(p => p / sum);
+  const maxP = Math.max(...norm);
+  const barW = (W - 60) / tokens.length;
+  norm.forEach((p, i) => {
+    const x = 30 + i * barW;
+    const h = (p / maxP) * (H - 60);
+    probCtx.fillStyle = i === 0 ? '#6c8cff' : 'rgba(108,140,255,0.35)';
+    probCtx.fillRect(x, H - 30 - h, barW - 4, h);
+    probCtx.fillStyle = '#8888a0';
+    probCtx.font = '10px monospace';
+    probCtx.textAlign = 'center';
+    probCtx.fillText(tokens[i], x + barW / 2 - 2, H - 10);
+    probCtx.fillStyle = '#e0e0e8';
+    probCtx.fillText((p * 100).toFixed(1) + '%', x + barW / 2 - 2, H - 35 - h);
+  });
+  probReadout.textContent = 'Top prediction: "' + tokens[0] + '" at ' + (norm[0] * 100).toFixed(1) + '%\nAlternatives retain measurable probability — the model is not certain.';
+}
+confSlider.addEventListener('input', drawProb);
+drawProb();
+
+// ============================================================
+// SCALING LAW DEMO
+// ============================================================
+const scaleCanvas = document.getElementById('scaleCanvas');
+const scaleCtx = scaleCanvas.getContext('2d');
+const scaleSlider = document.getElementById('scaleSlider');
+const scaleVal = document.getElementById('scaleVal');
+const scaleReadout = document.getElementById('scaleReadout');
+const tasks = ['Arithmetic', 'Translation', 'Unscrambling', 'Summarization'];
+
+function sizeFromSlider(v) {
+  const logMin = Math.log10(0.1), logMax = Math.log10(2000);
+  return Math.pow(10, logMin + (v / 100) * (logMax - logMin));
+}
+
+function drawScale() {
+  const size = sizeFromSlider(parseInt(scaleSlider.value));
+  scaleVal.textContent = size >= 1 ? size.toFixed(0) : size.toFixed(1);
+  const W = scaleCanvas.width, H = scaleCanvas.height;
+  const pad = { t: 20, r: 20, b: 40, l: 50 };
+  scaleCtx.clearRect(0, 0, W, H);
+  scaleCtx.fillStyle = '#8888a0';
+  scaleCtx.font = '11px monospace';
+  scaleCtx.fillText('Task Performance', 10, 15);
+  scaleCtx.fillText('Model Size (B params, log)', W / 2 - 60, H - 5);
+  const results = tasks.map((t, i) => {
+    const threshold = [10, 30, 50, 80][i];
+    const perf = size > threshold ? Math.min(0.95, 0.3 + 0.65 * (1 - Math.exp(-(size - threshold) / 50))) : 0.05 + 0.1 * (size / threshold);
+    return { t, perf, emerged: size > threshold };
+  });
+  results.forEach((r, i) => {
+    const y = pad.t + i * 55 + 20;
+    scaleCtx.fillStyle = r.emerged ? '#34d399' : '#8888a0';
+    scaleCtx.fillText(r.t, pad.l, y);
+    scaleCtx.fillStyle = '#2a2a3a';
+    scaleCtx.fillRect(pad.l + 100, y - 12, W - pad.l - pad.r - 100, 20);
+    scaleCtx.fillStyle = r.emerged ? '#6c8cff' : '#f87171';
+    scaleCtx.fillRect(pad.l + 100, y - 12, (W - pad.l - pad.r - 100) * r.perf, 20);
+    scaleCtx.fillStyle = '#e0e0e8';
+    scaleCtx.fillText((r.perf * 100).toFixed(0) + '%' + (r.emerged ? ' ✓ emergent' : ''), pad.l + 110 + (W - pad.l - pad.r - 100) * r.perf, y + 4);
+  });
+  const emerged = results.filter(r => r.emerged).length;
+  scaleReadout.textContent = 'Model: ' + scaleVal.textContent + 'B params\nEmergent tasks: ' + emerged + ' / ' + tasks.length;
+}
+scaleSlider.addEventListener('input', drawScale);
+drawScale();
+
+// ============================================================
+// COST COMPARISON CANVAS
+// ============================================================
+const costCanvas = document.getElementById('costCanvas');
+const costCtx = costCanvas.getContext('2d');
+const models = [
+  { name: 'GPT-4o mini', score: 72, cost: 0.15, color: '#8888a0' },
+  { name: 'Llama 70B', score: 78, cost: 0.9, color: '#a78bfa' },
+  { name: 'GPT-4o', score: 88, cost: 30, color: '#f87171' },
+  { name: 'DeepSeek-V3', score: 90, cost: 0.55, color: '#34d399' },
+  { name: 'Llama 405B', score: 82, cost: 3.5, color: '#a78bfa' },
+];
+function drawCost() {
+  const W = costCanvas.width, H = costCanvas.height;
+  const pad = { t: 30, r: 30, b: 50, l: 60 };
+  costCtx.clearRect(0, 0, W, H);
+  costCtx.fillStyle = '#8888a0';
+  costCtx.font = '11px monospace';
+  costCtx.fillText('Eval Score →', W / 2 - 30, 15);
+  costCtx.save();
+  costCtx.translate(15, H / 2);
+  costCtx.rotate(-Math.PI / 2);
+  costCtx.fillText('Cost ($/1M tokens) →', 0, 0);
+  costCtx.restore();
+  const logMin = Math.log10(0.1), logMax = Math.log10(50);
+  models.forEach(m => {
+    const x = pad.l + ((Math.log10(m.cost) - logMin) / (logMax - logMin)) * (W - pad.l - pad.r);
+    const y = pad.t + (1 - m.score / 100) * (H - pad.t - pad.b);
+    costCtx.beginPath();
+    costCtx.arc(x, y, 8, 0, Math.PI * 2);
+    costCtx.fillStyle = m.color;
+    costCtx.fill();
+    costCtx.fillStyle = '#e0e0e8';
+    costCtx.font = '10px monospace';
+    costCtx.fillText(m.name, x - 30, y - 14);
+  });
+}
+drawCost();
+
+// ============================================================
+// TOKEN JOURNEY DEMO
+// ============================================================
+const journeyTokens = ['A', 'true', 'friend', 'accepts', 'you'];
+const journeyPhases = [
+  { name: 'Isolation', desc: 'Each token is separated from its neighbors. "friend" is examined alone.' },
+  { name: 'Token ID', desc: 'friend → Token ID: 20112 (from 50,000-token vocabulary built via BPE).' },
+  { name: 'Token Embedding', desc: '768 questions probe meaning. Result: 768-dim vector [0.12, 1.87, -0.34, …].' },
+  { name: 'Positional Embedding', desc: 'Position 3 of 5. Another 768-dim vector encodes position in sequence.' },
+  { name: 'Input Embedding', desc: 'token_emb + pos_emb → single 768-dim uniform. Ready for transformer blocks.' },
+];
+let jIdx = 0;
+const jTokensEl = document.getElementById('journeyTokens');
+const jStepsEl = document.getElementById('journeySteps');
+const jReadout = document.getElementById('journeyReadout');
+journeyPhases.forEach((p, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'step-dot';
+  btn.textContent = (i + 1) + '. ' + p.name;
+  btn.onclick = () => { jIdx = i; renderJourney(); };
+  jStepsEl.appendChild(btn);
+});
+function renderJourney() {
+  jTokensEl.innerHTML = '';
+  journeyTokens.forEach((t, i) => {
+    const span = document.createElement('span');
+    span.className = 'token ' + (t === 'friend' ? 'token-highlight' : 'token-word');
+    span.textContent = t;
+    jTokensEl.appendChild(span);
+  });
+  jStepsEl.querySelectorAll('.step-dot').forEach((b, i) => b.classList.toggle('active', i === jIdx));
+  jReadout.textContent = journeyPhases[jIdx].name + '\n\n' + journeyPhases[jIdx].desc;
+}
+document.getElementById('journeyPrev').onclick = () => { jIdx = Math.max(0, jIdx - 1); renderJourney(); };
+document.getElementById('journeyNext').onclick = () => { jIdx = Math.min(journeyPhases.length - 1, jIdx + 1); renderJourney(); };
+renderJourney();
+
+// ============================================================
+// TRANSFORMER BLOCK DEMO
+// ============================================================
+const tbStepsData = [
+  { name: 'LayerNorm', desc: 'Normalize: mean→0, std→1. Stabilizes activations.', innov: false },
+  { name: 'Multi-Head Attention', desc: 'Build context map. How much does "friend" attend to each neighbor? ★ MLA innovation site.', innov: true },
+  { name: 'Dropout', desc: 'Randomly zero ~50% of activations. Forces lazy params to learn.', innov: false },
+  { name: 'LayerNorm + Skip', desc: 'Second normalization. Skip connection merges with pre-attention input.', innov: false },
+  { name: 'Feed-Forward (FFN)', desc: 'Expand 768→3072, non-linearity, compress 3072→768. ★ MoE innovation site.', innov: true },
+  { name: 'Dropout + Skip', desc: 'Final dropout and skip connection. Exit one transformer block.', innov: false },
+];
+let tbIdx = 0;
+const tbStepsEl = document.getElementById('tbSteps');
+const tbReadout = document.getElementById('tbReadout');
+const tbCanvas = document.getElementById('tbCanvas');
+const tbCtx = tbCanvas.getContext('2d');
+tbStepsData.forEach((s, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'step-dot';
+  btn.textContent = s.name;
+  btn.onclick = () => { tbIdx = i; renderTB(); };
+  tbStepsEl.appendChild(btn);
+});
+function renderTB() {
+  tbStepsEl.querySelectorAll('.step-dot').forEach((b, i) => b.classList.toggle('active', i === tbIdx));
+  tbReadout.textContent = tbStepsData[tbIdx].name + (tbStepsData[tbIdx].innov ? ' [DeepSeek Innovation]' : '') + '\n\n' + tbStepsData[tbIdx].desc;
+  const W = tbCanvas.width, H = tbCanvas.height;
+  tbCtx.clearRect(0, 0, W, H);
+  const bw = (W - 40) / tbStepsData.length;
+  tbStepsData.forEach((s, i) => {
+    const x = 20 + i * bw;
+    tbCtx.fillStyle = i === tbIdx ? (s.innov ? '#f472b6' : '#6c8cff') : (s.innov ? 'rgba(244,114,182,0.3)' : 'rgba(108,140,255,0.2)');
+    tbCtx.fillRect(x, 40, bw - 4, H - 80);
+    tbCtx.fillStyle = '#e0e0e8';
+    tbCtx.font = '9px monospace';
+    tbCtx.textAlign = 'center';
+    tbCtx.fillText((i + 1).toString(), x + bw / 2 - 2, H / 2);
+  });
+}
+renderTB();
+
+// ============================================================
+// ATTENTION EXPLORER
+// ============================================================
+const attnSentence = ['I', 'am', 'from', 'Pune,', 'India.', 'I', 'speak'];
+const attnWeights = {
+  'I':       [0.05, 0.05, 0.05, 0.05, 0.05, 0.40, 0.35],
+  'am':      [0.10, 0.05, 0.05, 0.05, 0.05, 0.35, 0.35],
+  'from':    [0.05, 0.10, 0.05, 0.15, 0.15, 0.25, 0.25],
+  'Pune,':   [0.05, 0.05, 0.10, 0.10, 0.15, 0.30, 0.25],
+  'India.':  [0.05, 0.05, 0.10, 0.20, 0.10, 0.25, 0.25],
+  'I':       [0.05, 0.05, 0.05, 0.30, 0.30, 0.10, 0.15],
+  'speak':   [0.03, 0.03, 0.05, 0.35, 0.35, 0.09, 0.10],
+};
+const attnBtns = document.getElementById('attnTokenBtns');
+const attnBars = document.getElementById('attnBars');
+let attnQuery = 'speak';
+Object.keys(attnWeights).forEach((tok, idx) => {
+  const btn = document.createElement('button');
+  btn.className = 'btn' + (tok === attnQuery ? ' active' : '');
+  btn.textContent = tok;
+  btn.onclick = () => { attnQuery = tok; renderAttn(); };
+  if (idx === 0) attnBtns.innerHTML = '';
+  attnBtns.appendChild(btn);
+});
+function renderAttn() {
+  attnBtns.querySelectorAll('.btn').forEach(b => b.classList.toggle('active', b.textContent === attnQuery));
+  attnBars.innerHTML = '';
+  const w = attnWeights[attnQuery] || attnWeights['speak'];
+  w.forEach((val, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'bar-wrapper';
+    const valEl = document.createElement('div');
+    valEl.className = 'bar-value';
+    valEl.textContent = (val * 100).toFixed(0) + '%';
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (val * 100) + '%';
+    bar.style.background = val > 0.25 ? '#6c8cff' : 'rgba(108,140,255,0.4)';
+    const lbl = document.createElement('div');
+    lbl.className = 'bar-label';
+    lbl.textContent = attnSentence[i];
+    wrap.appendChild(valEl);
+    wrap.appendChild(bar);
+    wrap.appendChild(lbl);
+    attnBars.appendChild(wrap);
+  });
+}
+renderAttn();
+
+// ============================================================
+// PLAYGROUND CALCULATOR
+// ============================================================
+const pgVocab = document.getElementById('pgVocab');
+const pgEmbed = document.getElementById('pgEmbed');
+const pgBlocks = document.getElementById('pgBlocks');
+const pgFfn = document.getElementById('pgFfn');
+const pgReadout = document.getElementById('pgReadout');
+const pgCanvas = document.getElementById('pgCanvas');
+const pgCtx = pgCanvas.getContext('2d');
+
+function calcParams(V, D, L, F) {
+  const embed = V * D * 2;
+  const attnPerBlock = 4 * D * D;
+  const ffnPerBlock = 2 * D * (F * D);
+  const blockParams = attnPerBlock + ffnPerBlock + 4 * D;
+  const allBlocks = L * blockParams;
+  const output = D * V;
+  const total = embed + allBlocks + output;
+  return { embed, allBlocks, output, total, attnPerBlock, ffnPerBlock };
+}
+
+function formatB(n) {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  return n.toLocaleString();
+}
+
+function updatePG() {
+  const V = parseInt(pgVocab.value);
+  const D = parseInt(pgEmbed.value);
+  const L = parseInt(pgBlocks.value);
+  const F = parseInt(pgFfn.value);
+  document.getElementById('pgVocabVal').textContent = V.toLocaleString();
+  document.getElementById('pgEmbedVal').textContent = D;
+  document.getElementById('pgBlocksVal').textContent = L;
+  document.getElementById('pgFfnVal').textContent = F;
+  const p = calcParams(V, D, L, F);
+  pgReadout.textContent =
+    'Token + Positional Embeddings: ' + formatB(p.embed) + '\n' +
+    'Transformer Blocks (' + L + '×): ' + formatB(p.allBlocks) + '\n' +
+    '  └ Attention per block: ' + formatB(p.attnPerBlock) + '\n' +
+    '  └ FFN per block (' + F + '× expand): ' + formatB(p.ffnPerBlock) + '\n' +
+    'Output Projection: ' + formatB(p.output) + '\n' +
+    'TOTAL: ' + formatB(p.total) + ' parameters\n\n' +
+    'GPT-3 reference: ~175B | DeepSeek-V3: 671B total, ~37B active (MoE)';
+  const W = pgCanvas.width, H = pgCanvas.height;
+  pgCtx.clearRect(0, 0, W, H);
+  const items = [
+    { label: 'Embed', val: p.embed, color: '#6c8cff' },
+    { label: 'Blocks', val: p.allBlocks, color: '#a78bfa' },
+    { label: 'Output', val: p.output, color: '#34d399' },
+  ];
+  const maxV = p.total;
+  items.forEach((it, i) => {
+    const bw = 120;
+    const x = 60 + i * 160;
+    const h = (it.val / maxV) * (H - 60);
+    pgCtx.fillStyle = it.color;
+    pgCtx.fillRect(x, H - 30 - h, bw, h);
+    pgCtx.fillStyle = '#e0e0e8';
+    pgCtx.font = '11px monospace';
+    pgCtx.textAlign = 'center';
+    pgCtx.fillText(it.label, x + bw / 2, H - 10);
+    pgCtx.fillText(formatB(it.val), x + bw / 2, H - 35 - h);
+  });
+}
+
+[pgVocab, pgEmbed, pgBlocks, pgFfn].forEach(el => el.addEventListener('input', updatePG));
+updatePG();
+
+// ============================================================
+// SCROLL: NAV + FADE-IN
+// ============================================================
+const nav = document.getElementById('nav');
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+</body>
+</html>

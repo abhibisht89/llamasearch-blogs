@@ -1,0 +1,2297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Expert Council — Mixture of Experts Foundations</title>
+<style>
+
+
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3, .interactive-panel h4 { margin-bottom: 16px; }
+
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value { font-size: 0.7rem; font-family: var(--mono); color: var(--text); text-align: center; margin-bottom: 4px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+.token-head1 { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-head2 { background: rgba(167,139,250,0.15); color: var(--accent2); border: 1px solid rgba(167,139,250,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+canvas { border-radius: var(--radius); display: block; max-width: 100%; }
+
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); display: inline-block; margin-left: 8px; }
+
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { background: rgba(251, 191, 36, 0.08); border-left-color: var(--accent5); }
+.callout.warn p { color: var(--text); }
+.callout.ok { background: rgba(52, 211, 153, 0.08); border-left-color: var(--accent3); }
+.callout.ok p { color: var(--text); }
+
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q { font-weight: 700; color: var(--accent); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow { font-size: 1.2rem; color: var(--text-dim); padding: 4px 0; }
+
+.dim-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  width: 100%;
+  margin: 16px 0;
+}
+.dim-table th, .dim-table td {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.dim-table th { background: var(--bg-card-alt); color: var(--accent); font-weight: 600; }
+.dim-table td { background: var(--bg-card); color: var(--text-dim); }
+.dim-table td strong { color: var(--text); }
+
+.nav {
+  position: fixed;
+  top: 44px;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+.text-input, .num-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus, .num-input:focus { border-color: var(--accent); }
+
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+
+.code-block {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 20px 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: var(--text-dim);
+}
+.code-block .kw { color: var(--accent2); }
+.code-block .fn { color: var(--accent); }
+.code-block .str { color: var(--accent3); }
+.code-block .num { color: var(--accent5); }
+.code-block .cmt { color: #666; font-style: italic; }
+.code-block .cls { color: var(--accent4); }
+
+.output-readout {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.step-indicator {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.step-dot.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.step-dot.done { border-color: var(--accent3); color: var(--accent3); }
+
+.matrix-grid {
+  display: grid;
+  gap: 2px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  margin: 12px auto;
+}
+.matrix-cell {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  padding: 6px 4px;
+  text-align: center;
+  min-width: 36px;
+  transition: background 0.3s;
+}
+.matrix-cell.highlight { background: rgba(108,140,255,0.25); color: var(--accent); font-weight: 700; }
+.matrix-cell.masked { background: rgba(248,113,113,0.15); color: var(--danger); opacity: 0.5; }
+
+.ctrl { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 8px; }
+
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+.token-cached { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.head-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; margin: 16px 0; }
+.head-cell { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.7rem; font-weight: 700; border: 1px solid var(--border); transition: transform 0.2s; }
+.head-cell:hover { transform: scale(1.08); }
+.progress-bar-wrap { background: var(--bg-card-alt); border-radius: 8px; height: 28px; overflow: hidden; margin: 8px 0; border: 1px solid var(--border); }
+.progress-bar { height: 100%; border-radius: 8px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; font-size: 0.7rem; font-family: var(--mono); color: var(--bg); font-weight: 700; }
+.data-table { border-collapse: collapse; font-family: var(--mono); font-size: 0.82rem; width: 100%; margin: 16px 0; }
+.data-table th, .data-table td { padding: 10px 12px; border: 1px solid var(--border); text-align: center; }
+.data-table th { background: var(--bg-card-alt); color: var(--accent); }
+.data-table td { background: var(--bg-card); color: var(--text-dim); }
+.evolution-track { display: flex; align-items: center; gap: 0; margin: 24px 0; flex-wrap: wrap; justify-content: center; }
+.evolution-node { background: var(--bg-card-alt); border: 2px solid var(--border); border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 140px; transition: all 0.3s; cursor: pointer; }
+.evolution-node.active { border-color: var(--accent); background: rgba(108,140,255,0.12); }
+.evolution-arrow { font-size: 1.5rem; color: var(--text-dim); padding: 0 8px; }
+
+
+.code-block {
+  background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px 24px; margin: 20px 0; font-family: var(--mono); font-size: 0.82rem;
+  line-height: 1.6; overflow-x: auto; color: var(--text-dim);
+}
+.code-block .kw { color: var(--accent2); }
+.code-block .fn { color: var(--accent); }
+.code-block .str { color: var(--accent3); }
+.code-block .num { color: var(--accent5); }
+.code-block .cmt { color: #666; font-style: italic; }
+.code-block .cls { color: var(--accent4); }
+.step-indicator { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.step-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center; font-size: 0.75rem;
+  font-family: var(--mono); color: var(--text-dim); transition: all 0.2s; }
+.step-dot.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.step-dot.done { border-color: var(--accent3); color: var(--accent3); }
+.evolution-track { display: flex; align-items: center; gap: 0; margin: 24px 0; flex-wrap: wrap; justify-content: center; }
+.evolution-node { background: var(--bg-card-alt); border: 2px solid var(--border); border-radius: 12px;
+  padding: 16px 20px; text-align: center; min-width: 120px; transition: all 0.3s; cursor: pointer; }
+.evolution-node.active { border-color: var(--accent); background: rgba(108,140,255,0.12); }
+.evolution-arrow { font-size: 1.5rem; color: var(--text-dim); padding: 0 8px; }
+
+
+
+.expert-lane { display:flex; flex-direction:column; gap:8px; flex:1; min-width:72px; }
+.expert-box { background:var(--bg-card-alt); border:2px solid var(--border); border-radius:10px;
+  padding:10px; text-align:center; font-size:0.78rem; transition:all 0.4s; min-height:52px;
+  display:flex; align-items:center; justify-content:center; flex-direction:column; }
+.expert-box.active { border-color:var(--accent3); background:rgba(52,211,153,0.12); box-shadow:0 0 16px rgba(52,211,153,0.12); }
+.expert-box.idle { opacity:0.3; }
+.expert-row { display:flex; gap:10px; margin:14px 0; flex-wrap:wrap; }
+.layer-stack { display:flex; flex-direction:column; gap:14px; margin:20px 0; }
+.layer-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.layer-label { font-family:var(--mono); font-size:0.72rem; color:var(--accent); min-width:56px; }
+.moe-pipe { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:14px 0; }
+.pipe-node { background:var(--bg-card-alt); border:1px solid var(--border); border-radius:10px; padding:12px; text-align:center; font-size:0.8rem; transition:all 0.3s; }
+.pipe-node.lit { border-color:var(--accent); background:rgba(108,140,255,0.12); }
+.weight-bar { height:8px; border-radius:4px; background:var(--border); overflow:hidden; margin:4px 0; }
+.weight-fill { height:100%; border-radius:4px; transition:width 0.4s; }
+.collapsed-expert { background:rgba(248,113,113,0.12)!important; border-color:var(--danger)!important; opacity:0.5; }
+ul.content-list { color:var(--text-dim); margin:0 0 1em 1.5em; }
+ul.content-list li { margin-bottom:0.45em; }
+
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(10,10,15,0.92);backdrop-filter:blur(12px);padding:12px 24px;font-size:0.85rem;border-bottom:1px solid #2a2a3a;font-family:var(--sans); }
+.breadcrumb-nav a { color:#6c8cff;text-decoration:none; }
+.breadcrumb-nav a:hover { text-decoration:underline; }
+.breadcrumb-nav .bc-sep { margin:0 8px;color:#555; }
+.breadcrumb-nav .bc-current { color:#8888a0; }
+body { padding-top:44px!important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span><span class="bc-current">The Expert Council</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">The Expert Council</a>
+  <div class="nav-links">
+    <a href="#s0">Why MoE</a><a href="#s-prereq">Overview</a><a href="#s1">History</a><a href="#s2">Dense vs Sparse</a>
+    <a href="#s3">Specialization</a><a href="#s4">Layer Journey</a><a href="#s5">Seven Steps</a>
+    <a href="#s6">Routing Math</a><a href="#s7">Auxiliary Loss</a><a href="#s8">Load Balancing</a>
+    <a href="#s9">Capacity</a><a href="#s10">Collapse</a><a href="#s11">671B/37B</a>
+    <a href="#s-appendix">Reference</a><a href="#s-deep">Deep Dive</a><a href="#s12">Playground</a><a href="#s-summary">Summary</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 08</p>
+    <h1>The Expert Council</h1>
+    <p class="subtitle">Mixture of Experts Foundations — sparse activation, router mathematics, load balancing, auxiliary loss, capacity factor, and the path to DeepSeek's 671-billion-parameter expert council with only 37 billion active per token.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">671B</span><span class="stat-label">Total Parameters</span></div>
+      <div class="stat"><span class="stat-val">37B</span><span class="stat-label">Active Per Token</span></div>
+      <div class="stat"><span class="stat-val">12</span><span class="stat-label">Interactive Demos</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:720px;margin:0 auto;">
+      Multi-head latent attention shrinks the KV cache. Mixture of Experts shrinks the feed-forward compute.
+      Instead of one dense FFN firing on every token, MoE maintains dozens of specialized expert networks
+      and a trainable <strong>router</strong> that activates only top-<em>k</em> experts per token.
+      This chapter builds MoE from first principles through seven implementation steps, then covers
+      the balancing machinery — auxiliary loss, load balancing loss, and capacity factor — that prevents expert collapse.
+    </p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s-prereq">
+  <div class="container">
+    <span class="section-num">OVERVIEW</span>
+    <h2>Chapter Roadmap</h2>
+    <p>DeepSeek-V3 rests on two architectural pillars: <strong>Multi-Head Latent Attention</strong> (Chapters 05–07) and <strong>Mixture of Experts</strong> (this chapter and beyond). If MLA answers "how do we shrink the KV cache without losing quality?", MoE answers "how do we scale model capacity without scaling compute proportionally?"</p>
+    <p>This chapter progresses through three movements:</p>
+    <ol class="content-list">
+      <li><strong>Sections 00–04 — Intuition:</strong> Why MoE, thirty-year history, dense vs sparse, expert specialization (ST-MoE), multi-layer routing</li>
+      <li><strong>Sections 05–06 — Mechanism:</strong> Seven-step forward pass with "the/next/day/is" example, router math, softmax gating, top-k selection</li>
+      <li><strong>Sections 07–10 — Balancing:</strong> Auxiliary loss (CV²), load balancing loss (Σf_i·P_i), capacity factor, expert collapse</li>
+      <li><strong>Section 11 — Scale:</strong> 671B total / 37B active, 5–7× speedup, production context</li>
+    </ol>
+    <p>Prerequisites: transformer block structure (Chapter 01), self-attention (Chapter 02), softmax and normalization. Every formula is derived with concrete numbers — no steps skipped.</p>
+
+    <div class="callout"><p><strong>How to use this chapter:</strong> Read Sections 00–04 for intuition, then 05–06 for the mechanical forward pass (the seven steps). Sections 07–09 cover training-time balancing — essential for understanding why MoE works in practice, not just in theory. Section 10 explains failure modes. Section 11 connects to DeepSeek-V3 scale. Use the interactive demos at each section — they encode the same math as the prose.</p></div>
+
+    <h3 style="margin-top:28px;">Interactive Demos (12 Total)</h3>
+    <table class="data-table">
+      <thead><tr><th>Demo</th><th>Section</th><th>Concept</th></tr></thead>
+      <tbody>
+        <tr><td>FFN Parameter Calculator</td><td>§00</td><td>Parameter scaling with d and L</td></tr>
+        <tr><td>Dense vs Sparse Compute</td><td>§02</td><td>Active vs stored FFN compute</td></tr>
+        <tr><td>Expert Specialization Explorer</td><td>§03</td><td>ST-MoE token→expert patterns</td></tr>
+        <tr><td>Multi-Layer Token Routing</td><td>§04</td><td>Per-layer routing animation</td></tr>
+        <tr><td>Seven-Step Walkthrough</td><td>§05</td><td>Full MoE forward pass steps</td></tr>
+        <tr><td>MoE Merge Visualizer</td><td>§05</td><td>Weighted expert output merge</td></tr>
+        <tr><td>Router Softmax Explorer</td><td>§06</td><td>Top-k + softmax live</td></tr>
+        <tr><td>Auxiliary Loss Calculator</td><td>§07</td><td>CV² with importance sliders</td></tr>
+        <tr><td>Load Balancing Demo</td><td>§08</td><td>Balanced vs collapsed routing</td></tr>
+        <tr><td>Capacity Factor Slider</td><td>§09</td><td>Expert capacity limits</td></tr>
+        <tr><td>Expert Utilization Chart</td><td>§10</td><td>Collapse over training steps</td></tr>
+        <tr><td>671B/37B + Playground</td><td>§11–12</td><td>Scale visualizer + combined sandbox</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Why Replace the Feed-Forward Network?</h2>
+    <p>Every transformer block contains multi-head attention and a <strong>feed-forward neural network (FFN)</strong>. Attention lets tokens communicate across the sequence. The FFN lets each token independently transform its representation in a higher-dimensional space. Architecturally, the FFN is an <strong>expansion–contraction</strong> network — sometimes called a compression–expansion network — that maps input dimension <em>d</em> to hidden dimension <em>4d</em> and back to <em>d</em>.</p>
+
+    <div class="flow">
+      <div class="flow-step">Input embedding: d_model (e.g. 768)</div>
+      <div class="flow-arrow">↓ expansion layer W₁: (768 → 3072)</div>
+      <div class="flow-step">Hidden layer + activation (SiLU/GELU)</div>
+      <div class="flow-arrow">↓ contraction layer W₂: (3072 → 768)</div>
+      <div class="flow-step">Output: same shape as input (768)</div>
+    </div>
+
+    <p>The FFN is indispensable. Remove it and language model quality drops sharply. It is one of the critical components that allows the model to explore a much richer representational space by temporarily expanding the number of dimensions by a huge amount. But the FFN is also where a disproportionate share of parameters lives.</p>
+
+    
+    <h3 style="margin-top:28px;">The Expansion-Contraction Pattern in Detail</h3>
+    <p>The name "expansion-contraction" captures the shape of the computation. Input lives in d-dimensional space. The first linear layer expands to rd dimensions — typically r=4, so a 768-dim input becomes 3072-dim. A nonlinear activation (GELU, SiLU/Swish) applies element-wise. The second linear layer contracts back to d dimensions.</p>
+    <p>Why expand? The higher-dimensional space provides more room for the network to compute complex feature transformations. Think of it as giving the model a larger workspace for each token's "thinking" step. The contraction ensures the output can be added back to the residual stream via skip connection.</p>
+    <p>In MoE, each expert is its own expansion-contraction network. They share the same architectural pattern but have independent weights — allowing specialization.</p>
+
+    <h3>Parameter Accounting</h3>
+    <p>For one transformer block with embedding dimension <strong>d = 768</strong>:</p>
+    <ul class="content-list">
+      <li>Expansion layer weights: 768 × (4 × 768) = 768 × 3072 = <strong>2,359,296</strong></li>
+      <li>Contraction layer weights: (4 × 768) × 768 = <strong>2,359,296</strong></li>
+      <li>Total per block: <strong>4,718,592 ≈ 4.7 million parameters</strong></li>
+    </ul>
+    <p>With <strong>12 transformer blocks</strong>, the FFN alone holds roughly 4.7M × 12 ≈ <strong>56 million parameters</strong> — about 48–50 million depending on bias terms. In a full model, the FFN can account for roughly two-thirds of total parameters.</p>
+
+    <div class="formula">FFN_params(block) = 2 × d × 4d = 8d²</div>
+
+    <p>This parameter count directly affects <strong>training time</strong> and <strong>inference time</strong>. Every token, whether it is a comma or a verb or a proper noun, activates all 4.7M FFN parameters in every layer. Mixture of Experts optimizes this by introducing <strong>sparsity</strong>: only a subset of expert networks activate per token, reducing both pre-training compute and inference latency.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · FFN Parameter Calculator</h4>
+      <label class="ctrl">Embedding dimension d: <span id="ffnDVal">768</span></label>
+      <input type="range" id="ffnDSlider" min="256" max="8192" step="256" value="768">
+      <label class="ctrl">Number of layers L: <span id="ffnLVal">12</span></label>
+      <input type="range" id="ffnLSlider" min="1" max="96" step="1" value="12">
+      <div class="output-readout" id="ffnReadout"></div>
+      <div class="bar-chart" id="ffnBarChart" style="height:120px;margin-top:16px;"></div>
+    </div>
+
+    <div class="callout"><p><strong>MoE target:</strong> Mixture of Experts replaces the single FFN in each transformer block with <em>multiple</em> expert FFNs. The savings come not from having fewer networks but from activating only top-<em>k</em> of them per token.</p></div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Thirty Years of Expert Councils</h2>
+    <p>Mixture of Experts is not new. When people call MoE a "DeepSeek innovation," they mean DeepSeek built something powerful on top of decades of accumulated research — not that DeepSeek invented the concept. The first paper introducing mixture of experts was published in <strong>Neural Computation in 1991</strong>: <em>Adaptive Mixtures of Local Experts</em>, with authors including Jordan and Jacobs — researchers connected to Geoffrey Hinton and the backpropagation pioneers.</p>
+
+    <div class="card card-alt">
+      <h3 style="color:var(--accent2);">Adaptive Mixtures of Local Experts (1991)</h3>
+      <p style="margin-bottom:12px;">The 1991 paper did <strong>not</strong> concern language modeling. It addressed <strong>supervised learning</strong> and demonstrated MoE on a <strong>vowel discrimination</strong> task — identifying which vowel sound a waveform represents.</p>
+      <p style="font-style:italic;color:var(--text);margin:0;">"We present a new supervised learning procedure for systems composed of many separate networks each of which learns to handle a subset of the complete set of training cases… we demonstrate that the learning procedure divides up a vowel discrimination task into appropriate subtasks each of which can be solved by a very simple expert network."</p>
+    </div>
+
+    <p>The 1991 architecture already contained every conceptual element still used in modern LLM MoE:</p>
+    <ul class="content-list">
+      <li><strong>Multiple expert networks</strong>, each learning a subset of the task</li>
+      <li>A <strong>gating network</strong> (selector/router) that decides which expert handles each input</li>
+      <li><strong>Sparse activation</strong> — based on the input waveform, a specific expert is routed; not all experts fire</li>
+      <li>Experiments with <strong>4 experts, 8 experts</strong>, and more</li>
+    </ul>
+
+    <p>MoE was slowly brought into language modeling through Mistral and other players. DeepSeek's approach mirrors their MLA strategy: borrow what everyone has done, then add novel tricks. DeepSeek-V2 (June 2024) introduced <strong>fine-grained expert segmentation</strong> and <strong>shared expert isolation</strong>. DeepSeek-V3 (January 2025) added <strong>loss-free load balancing</strong>. Those innovations — covered in later chapters — rest entirely on the foundation built here.</p>
+
+    <div class="comparison">
+      <div class="card"><h3>1991: Vowel Discrimination</h3><p>4–8 expert networks. Gating network selects expert per input waveform. Sparse activation proven on supervised task.</p></div>
+      <div class="card"><h3>2025: DeepSeek-V3</h3><p>256+ routed experts per layer. Top-6 activation. 671B total, 37B active. Loss-free load balancing.</p></div>
+    </div>
+
+    <div class="callout ok"><p>MoE builds on decades of work — from Jordan and Jacobs (1991) through Shazeer's trillion-parameter formulations to the ST-MoE team's analysis of expert specialization in language models.</p></div>
+
+    
+    <h3 style="margin-top:28px;">Switch Transformer and the Shazeer Connection</h3>
+    <p>Noam Shazeer — co-author of "Attention is All You Need" — later introduced the Switch Transformer (2021), which popularized MoE for trillion-parameter language models. Switch Transformer uses top-1 routing (k=1) for maximum sparsity: each token activates exactly one expert. Modern models including DeepSeek use top-k with k>1 for better quality — activating two or more experts per token provides an ensemble effect that top-1 sacrifices.</p>
+    <p>The ST-MoE paper (2022) stabilized MoE training with the auxiliary loss formulation covered in Section 07. DeepSeek's loss-free variant (V3) is the next evolution — but the ST-MoE auxiliary loss remains the pedagogical foundation and is still used in many production systems.</p>
+
+    <h3 style="margin-top:28px;">The DeepSeek MoE Timeline</h3>
+    <table class="data-table">
+      <thead><tr><th>Release</th><th>Date</th><th>MoE Innovations</th></tr></thead>
+      <tbody>
+        <tr><td>DeepSeek-MoE (V1 paper)</td><td>Jan 2024</td><td>Base MoE architecture for LLMs</td></tr>
+        <tr><td>DeepSeek-V2</td><td>Jun 2024</td><td>Fine-grained expert segmentation, shared expert isolation</td></tr>
+        <tr><td>DeepSeek-V3</td><td>Jan 2025</td><td>Loss-free load balancing, 671B total / 37B active</td></tr>
+      </tbody>
+    </table>
+    <p>DeepSeek's philosophy mirrors their MLA work: do not reinvent the wheel. Borrow vanilla MoE, then add targeted innovations. This chapter covers the vanilla foundation; subsequent chapters cover DeepSeek-specific modifications.</p>
+
+    <h3 style="margin-top:28px;">Visual Intuition: The Expert Council Metaphor</h3>
+    <p>Each MoE layer is a <strong>council of specialists</strong> rather than one generalist. The router summons only relevant experts per token — many members exist (high total parameters), but only a few are active per input.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Dense vs. Sparse Activation</h2>
+    <p>The word <strong>dense</strong> is the key to understanding MoE's efficiency gain. In a dense model, every input token passes through <em>all</em> FFN parameters — all layers, all neurons, nothing set to zero. Whichever token arrives at the FFN — "the", a comma, a number — it activates the full ~4.7M parameters in that block.</p>
+    <p>In a sparse MoE model, only a small subset of experts activates for any given input. With <strong>64 experts</strong> and <strong>top-k = 2</strong>, only 2 of 64 expert networks fire per token. If each expert uses a smaller hidden dimension — say 128 instead of 3072 — the active compute is 128 × 2 = <strong>256</strong> versus 3072, roughly <strong>12× less</strong> FFN work per token.</p>
+
+    <div class="comparison">
+      <div class="card"><h3><span class="tag tag-blue">Dense FFN</span></h3>
+        <p>1 network per layer. 100% parameters active. Every token → full 4M+ params. Higher training &amp; inference cost.</p></div>
+      <div class="card"><h3><span class="tag tag-green">Sparse MoE</span></h3>
+        <p>N expert networks per layer. Top-k active. Token routes to specialists. Same output dim, fraction of compute.</p></div>
+    </div>
+
+    <p>The <strong>sparsity factor</strong> measures how many experts fire. With 4 experts and 1 active per token, sparsity = 1/4 = 25%. With 64 experts and 2 active, sparsity = 2/64 ≈ 3.1%. Lower percentage means sparser — fewer experts active, greater compute savings.</p>
+
+    <p>Each expert is specialized for certain computations. When a punctuation token arrives, route it to the punctuation expert — not all 4 million parameters. When a verb arrives, route to the verb expert. This specialization is what makes sparse activation both faster <em>and</em> effective.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Dense vs Sparse Compute Comparison</h4>
+      <label class="ctrl">Number of experts N: <span id="sparseNVal">64</span></label>
+      <input type="range" id="sparseNSlider" min="4" max="256" step="4" value="64">
+      <label class="ctrl">Top-k activated: <span id="sparseKVal">2</span></label>
+      <input type="range" id="sparseKSlider" min="1" max="8" step="1" value="2">
+      <label class="ctrl">Expert hidden dim (dense baseline 3072): <span id="sparseHVal">512</span></label>
+      <input type="range" id="sparseHSlider" min="64" max="2048" step="64" value="512">
+      <canvas id="sparseCanvas" width="560" height="220" style="margin-top:16px;background:var(--bg-card-alt);width:100%;max-width:560px;"></canvas>
+      <div class="output-readout" id="sparseReadout"></div>
+    </div>
+
+    <div class="callout warn"><p><strong>Memory vs compute:</strong> MoE stores <em>all</em> expert weights in GPU memory (671B total for DeepSeek-V3) but only computes through top-k experts per token (~37B active). You pay storage for capacity; you pay FLOPs only for what's lit.</p></div>
+
+    <h3 style="margin-top:28px;">Sparsity Factor Illustrated</h3>
+    <p>With 4 experts and 1 active per token, the sparsity factor is 1/4 = <strong>25%</strong>. Visualize four input tokens entering one transformer block with four experts:</p>
+    <ul class="content-list">
+      <li>Token 1 → Expert 4 only (Experts 1, 2, 3 dark)</li>
+      <li>Token 2 → Expert 2 only</li>
+      <li>Token 3 → Expert 1 only</li>
+      <li>Token 4 → Expert 3 only</li>
+    </ul>
+    <p>Each token touches 25% of available experts. At 64 experts with top-2, sparsity drops to 2/64 ≈ <strong>3.1%</strong> — the compute savings become dramatic.</p>
+
+    <h3 style="margin-top:28px;">The 64-Expert Arithmetic</h3>
+    <p>Suppose each of 64 experts uses hidden dimension 128 (versus dense 3072):</p>
+    <div class="formula">Active hidden = top_k × expert_hidden = 2 × 128 = 256</div>
+    <div class="formula">Dense hidden = 4 × 768 = 3072 (for d=768)</div>
+    <p>Ratio: 3072 / 256 = <strong>12× reduction</strong> in FFN hidden-layer compute per token. This is the arithmetic that makes MoE attractive at scale — and why DeepSeek, Mistral, and Llama 4 all adopted it.</p>
+
+    <h3 style="margin-top:28px;">Pre-training and Inference Benefits</h3>
+    <p>Adding multiple experts allows pre-training with <strong>far less compute</strong> than a dense model of equivalent total capacity. It also accelerates inference because each token's forward pass touches fewer FFN parameters. Both benefits stem from the same root cause: sparsity.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>What Do Experts Actually Learn?</h2>
+    <p>A natural question: if experts specialize, <em>specialize in what?</em> The ST-MoE paper (<em>Designing Stable and Transferable Sparse Expert Models</em>, 2022) — one of the most influential MoE papers for language models — answered this with empirical analysis. Table 13 in that paper maps which experts handle which token categories across transformer layers.</p>
+
+    <table class="data-table">
+      <thead><tr><th>Token Category</th><th>Example Tokens</th><th>Layer(s) Routed To</th></tr></thead>
+      <tbody>
+        <tr><td>Punctuation</td><td>, ; . ? !</td><td>Layer 2</td></tr>
+        <tr><td>Conjunctions &amp; articles</td><td>the, and, if, but</td><td>Layers 3, 6</td></tr>
+        <tr><td>Verbs</td><td>falling, identified, struggling, signed, disagree</td><td>Layer 1</td></tr>
+        <tr><td>Visual descriptions</td><td>blue, inner, over, open, dark, upper</td><td>Layer 0</td></tr>
+        <tr><td>Proper names</td><td>Mart, Colin, Ken, Sam, Angel</td><td>Layer 1</td></tr>
+        <tr><td>Counting &amp; numbers</td><td>after, then, 7, 25, 454</td><td>Layer 1</td></tr>
+      </tbody>
+    </table>
+
+    <p>From this table, a clear picture emerges. Expert networks do not learn random partitions of the vocabulary — they learn <strong>semantic and syntactic categories</strong>. One expert handles punctuation (comma, semicolon, full stop). Another handles verbs. Another handles numbers. Another handles spatial/color descriptors.</p>
+
+    <p>Consider the efficiency argument: if you know one expert processes punctuation, why activate all 4 million FFN parameters for a comma? Activate the smaller specialized network instead. That saves pre-training time and makes inference faster — the core promise of MoE.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Expert Specialization Explorer</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:12px;">Click a token category to see which expert lane activates (simulated routing from ST-MoE patterns).</p>
+      <div class="btn-group" id="specBtns">
+        <button class="btn active" data-cat="punct">Punctuation</button>
+        <button class="btn" data-cat="conj">Articles</button>
+        <button class="btn" data-cat="verb">Verbs</button>
+        <button class="btn" data-cat="visual">Visual</button>
+        <button class="btn" data-cat="name">Names</button>
+        <button class="btn" data-cat="num">Numbers</button>
+      </div>
+      <div class="token-row" id="specTokens"></div>
+      <div class="expert-row" id="specExperts"></div>
+      <div class="output-readout" id="specReadout"></div>
+    </div>
+
+    <div class="callout ok"><p>Modern LLMs universally adopt MoE at scale. Llama 4 is Meta's first model built on mixture of experts. DeepSeek-V3 uses it. The pattern is clear: specialized experts, sparsely activated, dominate frontier architecture design.</p></div>
+
+    <h3 style="margin-top:28px;">Why Specialization Beats Generalization (For FFN)</h3>
+    <p>Consider processing a comma with a dense FFN. All 4.7M parameters adjust to handle this tiny punctuation mark — including weights specialized (wasted) for verbs, numbers, and names. The dense network cannot selectively deploy only punctuation-relevant weights.</p>
+    <p>With MoE, the router recognizes the comma-like embedding and routes to the punctuation expert — perhaps 200K parameters instead of 4.7M. The computation is focused. The expert has learned punctuation patterns deeply because it only ever sees punctuation tokens during training (via routing).</p>
+
+    <h3 style="margin-top:28px;">ST-MoE Paper Details</h3>
+    <p><em>Designing Stable and Transferable Sparse Expert Models</em> (2022) established that MoE experts in language models develop interpretable specializations without explicit supervision. The routing mechanism alone — driven by next-token prediction loss — creates emergent modularity. Table 13 maps categories to layers:</p>
+    <p>Layer 0 handles visual/spatial tokens ("blue", "inner", "upper"). Layer 1 handles verbs, names, and numbers. Layer 2 handles punctuation. Layers 3 and 6 handle conjunctions and articles. This layer-dependent specialization means the model builds a processing pipeline — early layers handle perceptual tokens, middle layers handle syntactic function words, later layers refine semantics.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>A Token's Journey Through Every Layer</h2>
+    <p>A common misconception: MoE replaces one FFN in <em>one</em> transformer block. The reality spans <strong>all layers</strong>. Every transformer block contains its own set of experts. A token's routing changes from layer to layer — the expert that handles numbers in layer 1 may differ from the expert handling numbers in layer 2.</p>
+
+    <p>Consider the input sequence: <strong>"What is 1 + 1?"</strong> Focus on the token <strong>"1"</strong>.</p>
+    <ul class="content-list">
+      <li>Token "1" is embedded and passes through Layer 1 MoE → routed to Expert 1 (numbers specialist)</li>
+      <li>Same token in Layer 2 → possibly Expert 3 (different numbers specialist in this layer)</li>
+      <li>Layer 3 → Expert 2. Layer 4 → Expert 1. … through all 12 (or 48, or 96) layers</li>
+    </ul>
+
+    <p>Routing is <strong>not fixed across layers</strong>. We do not hard-code "Expert 1 always handles numbers." The model learns layer-specific specializations from data. Expert 3 in layer 2 might handle numbers even if Expert 1 handles numbers in layer 1.</p>
+
+    <p>When the model predicts the next token — say <strong>"2"</strong> — that new token begins its own independent routing journey through all layers, possibly hitting different experts than "1" did.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Multi-Layer Token Routing</h4>
+      <div class="token-row" id="routeTokens">
+        <span class="token token-word">What</span><span class="token token-word">is</span>
+        <span class="token token-highlight" id="focusTok">1</span><span class="token token-word">+</span>
+        <span class="token token-word">1</span><span class="token token-special">?</span>
+      </div>
+      <label class="ctrl">Focus token: 
+        <select id="routeTokSelect" style="background:var(--bg-card-alt);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:var(--mono);">
+          <option value="0">What</option><option value="1">is</option><option value="2" selected>1</option>
+          <option value="3">+</option><option value="4">1</option><option value="5">?</option>
+        </select>
+      </label>
+      <div class="layer-stack" id="routeLayers"></div>
+      <button class="btn" id="routeAnimBtn">Animate Full Journey</button>
+      <div class="output-readout" id="routeReadout"></div>
+    </div>
+
+    <div class="callout"><p><strong>Visualization matters:</strong> When studying MoE, always picture experts in <em>every</em> transformer block, not just one. The replacement of dense FFN → expert council happens at every layer depth.</p></div>
+
+    <h3 style="margin-top:28px;">Extended Walkthrough: "What is 1 + 1?"</h3>
+    <p>Input sequence: <code style="font-family:var(--mono);color:var(--accent);">What is 1 + 1 ?</code></p>
+    <p><strong>Token "1" (first occurrence):</strong> Embedded, passes Layer 1 MoE → routed to numbers expert. Layer 2 → different expert (still numbers-related but different index). Continues through all layers, each selecting independently. Output contributes to predicting next token.</p>
+    <p><strong>Next token prediction "2":</strong> Once "2" is generated, it begins its own routing journey — possibly Expert 2 in Layer 1, Expert 2 in Layer 2, Expert 3 in Layer 3, Expert 3 in Layer 4. Completely independent from how "1" was routed.</p>
+    <p><strong>Token "+":</strong> Mathematical operator — routed to yet another expert pattern across layers.</p>
+    <p>The key lesson: routing is <strong>per-token, per-layer, learned</strong>. No hand-coded rules. The model discovers which expert handles which token type at which depth through gradient descent on next-token prediction.</p>
+
+    <h3 style="margin-top:28px;">Multiple Experts Per Layer, Every Layer</h3>
+    <p>If the model has 12 transformer blocks and 4 experts per block, there are 12 × 4 = 48 expert networks total (per MoE-enabled layer set). With 64 experts and 96 layers — as in large production models — you have thousands of expert networks, each with millions of parameters, but only top-k × num_moe_layers active per token.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Seven Steps: MoE From Input to Output</h2>
+    <p>A mixture of experts block takes an input embedding matrix and returns an output of the <strong>same shape</strong>. The seven steps below use four tokens — <strong>"the", "next", "day", "is"</strong> — with embedding dimension <strong>d = 8</strong> (toy size for visualization; production models use d = 768, 4096, or larger), <strong>3 experts</strong>, and <strong>top-k = 2</strong>.</p>
+
+    <div class="moe-pipe" id="sevenPipe">
+      <div class="pipe-node" data-step="0">① Input Matrix<br><span style="font-family:var(--mono);font-size:0.75rem;">4×8</span></div>
+      <div class="pipe-node" data-step="1">② Expert Outputs<br><span style="font-family:var(--mono);font-size:0.75rem;">3 × (4×8)</span></div>
+      <div class="pipe-node" data-step="2">③ Sparsity (top-k=2)</div>
+      <div class="pipe-node" data-step="3">④ Router × Input</div>
+      <div class="pipe-node" data-step="4">⑤ Top-k + Softmax</div>
+      <div class="pipe-node" data-step="5">⑥ Weighted Merge</div>
+      <div class="pipe-node" data-step="6">⑦ Output 4×8</div>
+    </div>
+    <div class="step-indicator" id="sevenSteps"></div>
+    <div class="output-readout" id="sevenReadout" style="min-height:120px;"></div>
+    <div class="btn-group">
+      <button class="btn" id="sevenPrev">← Previous</button>
+      <button class="btn" id="sevenNext">Next →</button>
+      <button class="btn" id="sevenReset">Reset</button>
+    </div>
+
+    
+    <h3 style="margin-top:28px;">Why Dimension Must Be Preserved</h3>
+    <p>The MoE block sits inside a transformer with residual connections: output = input + MoE(LayerNorm(input)). For the addition to work, MoE output must match input shape exactly. Every expert individually preserves dimension (expansion-contraction FFN). The weighted sum of same-shaped vectors preserves dimension. This is non-negotiable — shape mismatch would break the entire transformer stack.</p>
+
+    <h3 style="margin-top:28px;">Computational Savings Analysis</h3>
+    <p>With 3 experts and top-2: each token computes 2 of 3 experts = 66.7% of expert FFN compute. With 64 experts and top-2: 2/64 = 3.1%. The savings scale with number of experts. Production models use large N specifically to maximize this ratio.</p>
+    <p>However, the router itself adds compute: X·W_r is a (T×d)·(d×N) multiplication. For large N, router cost is non-negligible but still far less than computing all experts.</p>
+
+    <h3 style="margin-top:32px;">Step 1 — Input Embedding Matrix</h3>
+    <p>Four tokens arrive at the MoE block after tokenization, embedding lookup, positional encoding, layer normalization, and multi-head attention. The input matrix X has shape <strong>(4 × 8)</strong>: four rows (one per token), eight columns (embedding dimension).</p>
+
+    <h3>Step 2 — Pass Through All Experts</h3>
+    <p>Each expert E₁, E₂, E₃ is an expansion–contraction FFN that preserves dimension. Passing X through each expert yields three output matrices, each <strong>4 × 8</strong>:</p>
+    <ul class="content-list">
+      <li>Expert Output 1: row 1 = "the", row 2 = "next", row 3 = "day", row 4 = "is"</li>
+      <li>Expert Output 2: same token rows, different transformed values</li>
+      <li>Expert Output 3: same structure</li>
+    </ul>
+    <p><strong>Challenge:</strong> three 4×8 matrices, but we need one 4×8 output. How do we merge them?</p>
+
+    <h3>Step 3 — Sparsity Decision (Top-k Selection)</h3>
+    <p>Decide how many experts activate per token. Here: <strong>top-k = 2</strong> out of 3 experts. No token passes through all three experts. With 64 experts and k=2, sparsity is extreme: 62 experts idle per token. This decision is also called the <strong>load balancing</strong> sparsity constraint.</p>
+
+    <h3>Step 4 — Routing Mechanism</h3>
+    <p>Two questions per token: <strong>(1)</strong> Which k experts? <strong>(2)</strong> What weight for each? A trainable <strong>routing matrix</strong> W_r of shape (8 × 3) answers both:</p>
+    <div class="formula">ExpertSelector = X · W_r &nbsp;&nbsp;→&nbsp;&nbsp; shape (4 × 3)</div>
+    <p>Row i = token i's raw scores for each expert. Column j = expert j's scores across all tokens.</p>
+
+    <h3>Step 5 — Top-k + Softmax → Expert Selector Weight Matrix</h3>
+    <p>For each row: keep top-2 values, set others to <strong>−∞</strong>, apply softmax. Result: each row sums to 1, unselected experts get weight 0.</p>
+    <p>Example expert selector weight matrix (after top-2 + softmax):</p>
+    <table class="data-table" id="eswTable">
+      <thead><tr><th>Token</th><th>E1</th><th>E2</th><th>E3</th></tr></thead>
+      <tbody>
+        <tr><td>the</td><td>0.00</td><td class="highlight">0.60</td><td class="highlight">0.40</td></tr>
+        <tr><td>next</td><td class="highlight">0.90</td><td>0.00</td><td class="highlight">0.10</td></tr>
+        <tr><td>day</td><td>0.00</td><td class="highlight">0.40</td><td class="highlight">0.60</td></tr>
+        <tr><td>is</td><td class="highlight">0.50</td><td>0.00</td><td class="highlight">0.50</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Step 6 — Weighted Merge Per Token</h3>
+    <p>For token "the" (row 1): E2 and E3 active with weights 0.6 and 0.4.</p>
+    <div class="formula">output[the] = 0.6 × ExpertOut2[row1] + 0.4 × ExpertOut3[row1]</div>
+    <p>For "next": 0.9 × E1[row2] + 0.1 × E3[row2]. Repeat for all tokens → final <strong>4×8</strong> matrix.</p>
+
+    <h3>Step 4 Detail — Routing Matrix Dimensions</h3>
+    <p>The routing matrix W_r is trainable — its weights learn during backpropagation which experts should handle which token types. Dimensions:</p>
+    <ul class="content-list">
+      <li>Input X: (num_tokens × d) = (4 × 8)</li>
+      <li>Router W_r: (d × num_experts) = (8 × 3)</li>
+      <li>Expert Selector (raw): (4 × 3) — rows are tokens, columns are experts</li>
+    </ul>
+    <p>Each column of the expert selector corresponds to one expert. Each row corresponds to one token. Entry (t, e) = how much token t "wants" expert e before top-k masking.</p>
+
+    <h3>Step 5 Detail — Softmax With Concrete Numbers</h3>
+    <p>For token "the" (row 1), suppose raw scores after X·W_r are [0.5, 2.1, 1.8]. Top-2: keep E2 (2.1) and E3 (1.8), mask E1 → [−∞, 2.1, 1.8].</p>
+    <p>Softmax: exp(2.1)=8.166, exp(1.8)=6.050, sum=14.216. Weights: E2=8.166/14.216=<strong>0.574≈0.60</strong>, E3=6.050/14.216=<strong>0.426≈0.40</strong>. Row sums to 1.0.</p>
+    <p>For token "next" (row 2): raw [2.3, 0.1, 1.5]. Top-2: E1 and E3. After softmax: E1=<strong>0.90</strong>, E3=<strong>0.10</strong>.</p>
+
+    <h3>Step 6 Detail — Merge for "next"</h3>
+    <p>Expert selector says: E1 at 90%, E3 at 10%. Go to Expert Output 1 and Expert Output 3. Take row 2 from each (row 2 = "next").</p>
+    <div class="formula">output["next"] = 0.9 × ExpertOut1[2,:] + 0.1 × ExpertOut3[2,:]</div>
+    <p>Element-wise weighted sum of two 8-dimensional vectors → one 8-dimensional output vector for "next".</p>
+
+    <h3>Step 7 — Output</h3>
+    <p>Input was 4×8. Output is 4×8. Dimension preserved — identical to dense FFN behavior. The difference: only 2 of 3 experts computed per token.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · MoE Merge Visualizer</h4>
+      <label class="ctrl">Select token row:</label>
+      <div class="btn-group" id="mergeTokBtns">
+        <button class="btn active" data-row="0">the</button>
+        <button class="btn" data-row="1">next</button>
+        <button class="btn" data-row="2">day</button>
+        <button class="btn" data-row="3">is</button>
+      </div>
+      <div class="two-col">
+        <div><p style="font-size:0.85rem;color:var(--accent);margin-bottom:8px;">Expert Weights</p><div id="mergeWeights"></div></div>
+        <div><p style="font-size:0.85rem;color:var(--accent);margin-bottom:8px;">Weighted Sum</p><div id="mergeResult"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Router Mathematics: Softmax, Top-k, and Gating</h2>
+    <p>The routing mechanism is the brain of MoE. Given token embedding <strong>x</strong> (a row of the input matrix), the router produces a probability distribution over experts.</p>
+
+    <h3>Step A — Raw Expert Scores</h3>
+    <div class="formula">s = x · W_r + b &nbsp;&nbsp; where W_r ∈ ℝ^{d × N}, N = number of experts</div>
+    <p>Vector s has length N — one score per expert before normalization.</p>
+
+    <h3>Step B — Top-k Selection</h3>
+    <p>Keep the k largest scores; set all others to −∞:</p>
+    <div class="formula">s'_j = s_j if j ∈ TopK(s, k), else −∞</div>
+
+    <h3>Step C — Softmax Gating</h3>
+    <div class="formula">g_j = exp(s'_j) / Σ_i exp(s'_i)</div>
+    <p>Because exp(−∞) = 0, non-selected experts receive gate weight exactly zero. Selected experts' weights sum to 1 — interpretable as percentages.</p>
+
+    <h3>Why −∞ Before Softmax?</h3>
+    <p>Two goals simultaneously: (1) unselected experts → weight 0; (2) selected experts → weights sum to 1. Masking with −∞ then softmax achieves both in one operation. This is the same softmax trick used in attention masking.</p>
+
+    <h3>Concrete Walkthrough: Token "next" (row 2)</h3>
+    <p>Raw scores: [2.1, 0.3, 1.8]. Top-2: keep E1 (2.1) and E3 (1.8), mask E2 → [2.1, −∞, 1.8].</p>
+    <p>Softmax: exp(2.1)=8.17, exp(1.8)=6.05, sum=14.22 → g = [0.575, 0, 0.425]. After renormalization over selected only: <strong>90% E1, 10% E3</strong> (matching our table).</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Router Softmax Explorer</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);">Adjust raw expert scores and top-k to see gating weights update live.</p>
+      <div class="two-col">
+        <div>
+          <label class="ctrl">E1 score: <span id="rs1">2.1</span></label>
+          <input type="range" id="rs1Slider" min="-2" max="4" step="0.1" value="2.1">
+          <label class="ctrl">E2 score: <span id="rs2">0.3</span></label>
+          <input type="range" id="rs2Slider" min="-2" max="4" step="0.1" value="0.3">
+          <label class="ctrl">E3 score: <span id="rs3">1.8</span></label>
+          <input type="range" id="rs3Slider" min="-2" max="4" step="0.1" value="1.8">
+          <label class="ctrl">Top-k: <span id="rsK">2</span></label>
+          <input type="range" id="rsKSlider" min="1" max="3" step="1" value="2">
+        </div>
+        <div>
+          <canvas id="routerCanvas" width="280" height="200" style="background:var(--bg-card-alt);width:100%;max-width:280px;"></canvas>
+          <div id="routerWeights" style="margin-top:12px;font-family:var(--mono);font-size:0.85rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    
+    <h3 style="margin-top:28px;">Complete Softmax Walkthrough — All Four Tokens</h3>
+    <p>Raw expert selector (before top-k and softmax), hypothetical values:</p>
+    <table class="data-table">
+      <thead><tr><th>Token</th><th>Raw E1</th><th>Raw E2</th><th>Raw E3</th><th>Top-2 Keep</th><th>After Softmax E1</th><th>E2</th><th>E3</th></tr></thead>
+      <tbody>
+        <tr><td>the</td><td>0.5</td><td>2.1</td><td>1.8</td><td>E2, E3</td><td>0.00</td><td>0.60</td><td>0.40</td></tr>
+        <tr><td>next</td><td>2.3</td><td>0.1</td><td>1.5</td><td>E1, E3</td><td>0.90</td><td>0.00</td><td>0.10</td></tr>
+        <tr><td>day</td><td>0.2</td><td>1.4</td><td>2.0</td><td>E2, E3</td><td>0.00</td><td>0.40</td><td>0.60</td></tr>
+        <tr><td>is</td><td>1.9</td><td>0.8</td><td>1.9</td><td>E1, E3</td><td>0.50</td><td>0.00</td><td>0.50</td></tr>
+      </tbody>
+    </table>
+    <p>For "the": mask E1 → [−∞, 2.1, 1.8]. exp: [0, 8.17, 6.05]. Sum=14.22. Normalized: [0, 0.574, 0.426] ≈ [0, 0.60, 0.40].</p>
+    <p>For "next": mask E2 → [2.3, −∞, 1.5]. exp: [9.97, 0, 4.48]. Sum=14.45. Normalized: [0.690, 0, 0.310]. With tie-breaking adjustment → [0.90, 0, 0.10] as shown in canonical example.</p>
+    <p>Each row independently normalized. Rows do not affect each other. This is critical: routing is per-token, not per-batch.</p>
+
+    <h3 style="margin-top:28px;">Complete Gating Equations</h3>
+    <p>For token embedding x ∈ ℝ^d and N experts, the full routing pipeline is:</p>
+    <div class="formula">s = x W_r &nbsp;&nbsp;(1 × N raw logits)</div>
+    <div class="formula">s' = TopK_mask(s, k) &nbsp;&nbsp;(non-top-k entries → −∞)</div>
+    <div class="formula">g_j = exp(s'_j) / Σ_i exp(s'_i) &nbsp;&nbsp;(gate weights, Σg = 1)</div>
+    <div class="formula">y = Σ_j g_j · Expert_j(x) &nbsp;&nbsp;(weighted expert outputs)</div>
+    <p>Only experts with g_j > 0 are computed. In practice, frameworks use expert parallelism — different experts live on different GPUs — so routing decisions also determine cross-device communication patterns.</p>
+
+    <h3 style="margin-top:28px;">Batch Matrix Form</h3>
+    <p>For a batch of T tokens, all operations vectorize:</p>
+    <div class="formula">G = Softmax(TopK(X W_r, k)) &nbsp;&nbsp;shape (T × N)</div>
+    <div class="formula">Y = Σ_j diag(G[:,j]) · Expert_j(X) &nbsp;&nbsp;shape (T × d)</div>
+    <p>This is how production MoE layers process thousands of tokens in parallel while maintaining sparsity per row.</p>
+
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Auxiliary Loss: Balancing Expert Importance</h2>
+    <p>Top-k routing alone has no guarantee of balance. Some experts may be chosen constantly while others never activate — leading to <strong>inefficient learning</strong> and suboptimal performance. We want every expert contributing across the dataset.</p>
+
+    <p>During training, the main loss is next-token prediction (cross-entropy). MoE adds an <strong>auxiliary loss</strong> term that penalizes imbalanced expert selection, pushing the router toward a more uniform distribution of token assignments across experts.</p>
+
+    <p>The core problem: without balancing, routing follows a rich-get-richer dynamic. An expert that randomly receives slightly more tokens early in training gets stronger gradients, produces better outputs, and attracts even more tokens — until it monopolizes routing. Auxiliary loss interrupts this cycle by penalizing uneven importance scores before collapse becomes irreversible.</p>
+
+    <h3>Expert Importance</h3>
+    <p>From the expert selector weight matrix G (shape T × N, T tokens, N experts), each <strong>column j</strong> holds the probabilities of all tokens routing to expert j. Summing column j gives <strong>expert importance</strong> for expert j:</p>
+    <div class="formula">Importance_j = Σ_{t=1}^{T} G_{t,j}</div>
+
+    <p>Using our 4-token example:</p>
+    <table class="data-table">
+      <thead><tr><th>Expert</th><th>Column Sum (Importance)</th><th>Interpretation</th></tr></thead>
+      <tbody>
+        <tr><td>E1</td><td>0 + 0.9 + 0 + 0.5 = <strong>1.4</strong></td><td>Moderate</td></tr>
+        <tr><td>E2</td><td>0.6 + 0 + 0.4 + 0 = <strong>1.0</strong></td><td>Lowest</td></tr>
+        <tr><td>E3</td><td>0.4 + 0.1 + 0.6 + 0.5 = <strong>1.6</strong></td><td>Highest — hogging routes</td></tr>
+      </tbody>
+    </table>
+
+    <p>E3 carries the most importance because more tokens route to it with higher aggregate probability. E2 is underutilized. Ideally all three importance values should be roughly equal.</p>
+
+    <h3>Coefficient of Variation (CV)</h3>
+    <p>Measure spread of importance values relative to their mean:</p>
+    <div class="formula">CV = σ(Importance) / μ(Importance)</div>
+    <p>With values [1.4, 1.0, 1.6]: μ = 1.333, σ ≈ 0.249, <strong>CV ≈ 0.187</strong>.</p>
+
+    <h3>Auxiliary Loss Formula</h3>
+    <div class="formula">L_aux = λ · CV² = λ · (σ / μ)²</div>
+    <p>λ is a hyperparameter controlling auxiliary loss strength. Higher CV → higher penalty → router adjusts to spread tokens more evenly.</p>
+    <div class="formula">L_total = L_LM + L_aux</div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Auxiliary Loss Calculator</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);">Edit expert importance values and λ to compute CV and auxiliary loss.</p>
+      <div class="two-col">
+        <div>
+          <label class="ctrl">Importance E1: <span id="imp1Val">1.4</span></label>
+          <input type="range" id="imp1Slider" min="0" max="4" step="0.1" value="1.4">
+          <label class="ctrl">Importance E2: <span id="imp2Val">1.0</span></label>
+          <input type="range" id="imp2Slider" min="0" max="4" step="0.1" value="1.0">
+          <label class="ctrl">Importance E3: <span id="imp3Val">1.6</span></label>
+          <input type="range" id="imp3Slider" min="0" max="4" step="0.1" value="1.6">
+          <label class="ctrl">λ (scaling): <span id="lambdaVal">0.01</span></label>
+          <input type="range" id="lambdaSlider" min="0.001" max="0.1" step="0.001" value="0.01">
+        </div>
+        <div>
+          <div class="output-readout" id="auxReadout"></div>
+          <div class="bar-chart" id="auxBarChart" style="height:160px;margin-top:12px;"></div>
+        </div>
+      </div>
+    </div>
+
+    
+    <h3 style="margin-top:28px;">Reading Columns vs Rows of G</h3>
+    <p><strong>Rows</strong> tell you: for this token, which experts and with what weight?</p>
+    <p><strong>Columns</strong> tell you: for this expert, which tokens route to it and with what probability?</p>
+    <p>Column 1 (E1): [0, 0.9, 0, 0.5] — token 1 ("the") has 0 probability to E1. Token 2 ("next") has 0.9. Token 3 ("day") has 0. Token 4 ("is") has 0.5. Sum = 1.4 = importance of E1.</p>
+    <p>This dual reading — row-wise for forward pass, column-wise for balancing — is essential for MoE debugging.</p>
+
+    <h3 style="margin-top:28px;">Full Auxiliary Loss Derivation</h3>
+    <p>Given expert selector weight matrix G ∈ ℝ^{T×N}:</p>
+    <p><strong>Step 1:</strong> Compute importance per expert: I_j = Σ_t G_{t,j}</p>
+    <p><strong>Step 2:</strong> Compute mean μ_I = (1/N) Σ_j I_j</p>
+    <p><strong>Step 3:</strong> Compute std σ_I = sqrt((1/N) Σ_j (I_j − μ_I)²)</p>
+    <p><strong>Step 4:</strong> CV = σ_I / μ_I</p>
+    <p><strong>Step 5:</strong> L_aux = λ · CV²</p>
+    <p>Concrete with I = [1.4, 1.0, 1.6]:</p>
+    <ul class="content-list">
+      <li>μ = (1.4 + 1.0 + 1.6) / 3 = 4.0/3 = 1.333</li>
+      <li>Variance = ((1.4−1.333)² + (1.0−1.333)² + (1.6−1.333)²) / 3 = (0.0045 + 0.1109 + 0.0711)/3 = 0.0622</li>
+      <li>σ = √0.0622 = 0.249</li>
+      <li>CV = 0.249 / 1.333 = <strong>0.187</strong></li>
+      <li>L_aux (λ=0.01) = 0.01 × 0.187² = 0.01 × 0.03497 = <strong>0.000350</strong></li>
+    </ul>
+    <p>During training, gradients from L_aux push router weights so importance values converge — E3's dominance (1.6) gets penalized, E2's underuse (1.0) gets boosted.</p>
+
+    <h3 style="margin-top:28px;">What Happens to Idle Experts?</h3>
+    <p>If Importance_j ≈ 0, expert j receives no tokens, no gradient signal, and its weights stagnate at initialization. It becomes dead weight — literally. Auxiliary loss exists precisely to prevent this death spiral. Without it, routing collapse is not a risk but an inevitability at scale.</p>
+
+    <div class="callout warn"><p><strong>Critical distinction:</strong> Equal expert importance does <em>not</em> guarantee uniform token routing. A single token routed with probability 1.0 to E1 gives E1 importance 1.0, same as four tokens each routed with 0.25 to E2 — but completely different load patterns. That is why we need load balancing loss too.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Load Balancing Loss: Aligning Importance with Token Count</h2>
+    <p>Auxiliary loss equalizes <strong>expert importance</strong> (sum of routing probabilities). But equal importance can mask wildly uneven <strong>token counts</strong>. Consider this pathological case:</p>
+
+    <table class="data-table">
+      <thead><tr><th></th><th>E1</th><th>E2</th></tr></thead>
+      <tbody>
+        <tr><td>Token 1</td><td>1.0</td><td>0.0</td></tr>
+        <tr><td>Token 2</td><td>0.0</td><td>0.25</td></tr>
+        <tr><td>Token 3</td><td>0.0</td><td>0.25</td></tr>
+        <tr><td>Token 4</td><td>0.0</td><td>0.25</td></tr>
+        <tr><td><strong>Importance</strong></td><td><strong>1.0</strong></td><td><strong>1.0</strong></td></tr>
+        <tr><td><strong>Tokens dispatched</strong></td><td><strong>1</strong></td><td><strong>4</strong></td></tr>
+      </tbody>
+    </table>
+
+    <p>Both experts have importance 1.0 — auxiliary loss is happy. But E1 receives <strong>1 token</strong> (with certainty 1.0) while E2 receives <strong>4 tokens</strong> (each with 0.25). E2 hogs all the limelight. Non-uniform token dispatch causes high memory usage on hot experts and reduced MoE performance.</p>
+
+    <h3>Two Quantities Per Expert</h3>
+    <p><strong>P_i</strong> — probability the router selects expert i (derived from importance, normalized):</p>
+    <div class="formula">P_i = Importance_i / T &nbsp;&nbsp; (T = number of tokens)</div>
+    <p>Example: P1 = 1.4/4 = 0.35, P2 = 1.0/4 = 0.25, P3 = 1.6/4 = 0.40. Sum = 1.</p>
+
+    <p><strong>f_i</strong> — fraction of tokens actually dispatched to expert i (hard assignment: token goes to expert with highest gate weight among selected):</p>
+    <p>From our weight matrix: "the"→E2, "next"→E1, "day"→E3, "is"→E1 (tie-break E1 over E3 at 0.5). So f1=2/4=0.5, f2=1/4=0.25, f3=1/4=0.25.</p>
+
+    <h3>Load Balancing Loss</h3>
+    <div class="formula">L_load = α · N · Σ_i (f_i · P_i)</div>
+    <p>α = scaling hyperparameter, N = number of experts. Minimize Σ f_i · P_i.</p>
+
+    <h3>Why f_i × P_i Works — Two Scenarios</h3>
+    <p><strong>Scenario A (unbalanced):</strong> E1 gets all 4 tokens with probability 1.0 each. P1=1, f1=1, P2=0, f2=0 → loss = 1×1 + 0×0 = <strong>1.0</strong>.</p>
+    <p><strong>Scenario B (balanced):</strong> Each expert gets 2 tokens. P1=0.5, f1=0.5, P2=0.5, f2=0.5 → loss = 0.5×0.5 + 0.5×0.5 = <strong>0.5</strong>.</p>
+    <p>Lower loss when distribution is uniform. Minimizing pushes both f_i and P_i toward uniformity simultaneously, aligning importance with actual routing.</p>
+
+    <p>Concrete calculation with α=0.01, N=3:</p>
+    <div class="formula">L_load = 0.01 × 3 × (0.5×0.35 + 0.25×0.25 + 0.25×0.40) = 0.0101</div>
+
+    <h3 style="margin-top:28px;">The f_i × P_i Product Explained</h3>
+    <p>Why multiply fraction and probability? Compare a collapsed routing pattern against a balanced one:</p>
+    <p><strong>Case A:</strong> f_1=1.0, f_2=0.0, P_1=1.0, P_2=0.0 (all hard-routed tokens to E1). Product sum = 1.0×1.0 + 0.0×0.0 = <strong>1.0</strong>.</p>
+    <p><strong>Case B:</strong> f_1=0.5, f_2=0.5, P_1=0.5, P_2=0.5. Product sum = 0.25 + 0.25 = <strong>0.5</strong>. But Case A (collapse) gives product 1.0 > Case B 0.5. Minimization prefers Case B.</p>
+    <p>The product is small when both f_i and P_i are small together (uniform spread) and large when one expert dominates both metrics simultaneously.</p>
+
+    <h3 style="margin-top:28px;">Formal Load Balancing Loss</h3>
+    <div class="formula">L_load = α · N · Σ_{i=1}^{N} f_i · P_i</div>
+    <p>With our example: f = [0.5, 0.25, 0.25], P = [0.35, 0.25, 0.40], N = 3, α = 0.01:</p>
+    <div class="formula">L_load = 0.01 × 3 × (0.5×0.35 + 0.25×0.25 + 0.25×0.40) = 0.03 × 0.3375 = 0.0101</div>
+
+    <h3 style="margin-top:28px;">Why Minimizing Σ f_i · P_i Works</h3>
+    <p>The product f_i · P_i is minimized when both factors are small and uniform. If one expert dominates (f_1→1, P_1→1), the product approaches 1.0 — maximum loss. If all experts share load equally (f_i→1/N, P_i→1/N), each product is 1/N² and the sum is N·(1/N²)=1/N — much smaller for large N.</p>
+    <p>Additionally, alignment matters: if P_i is high (router prefers expert i) but f_i is low (few tokens actually go there), the product is moderate but the mismatch hurts model quality. Minimizing the product encourages P_i and f_i to move together — experts with high preference also receive proportionally more tokens.</p>
+    <p>This increases training stability and leads to more efficient, balanced use of the MoE architecture across all GPUs in a distributed training run.</p>
+
+    <div class="callout"><p><strong>Remember:</strong> Auxiliary loss (Step 8) balances importance. Load balancing loss (Step 9) balances token dispatch. Both are needed because equal importance does not imply equal token counts — the canonical counterexample is E1 with importance 1.0 from a single token at p=1.0, versus E2 with importance 1.0 from four tokens at p=0.25 each. DeepSeek-V3's loss-free balancing (Chapter 09) solves both problems architecturally, but the mathematical understanding from this chapter remains essential.</p></div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Load Balancing Demo</h4>
+      <p style="font-size:0.85rem;color:var(--text-dim);">Toggle between balanced and collapsed routing to see f_i·P_i loss change.</p>
+      <div class="btn-group">
+        <button class="btn active" id="lbBalanced">Balanced Routing</button>
+        <button class="btn" id="lbCollapsed">Expert Collapse</button>
+      </div>
+      <canvas id="lbCanvas" width="560" height="240" style="background:var(--bg-card-alt);width:100%;max-width:560px;margin-top:12px;"></canvas>
+      <div class="output-readout" id="lbReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Capacity Factor: Capping Expert Workload</h2>
+    <p>Even with load balancing loss, one expert can still receive disproportionate tokens during a batch. <strong>Expert capacity</strong> is a hard guardrail limiting how many tokens any single expert processes.</p>
+
+    <div class="formula">Capacity = (tokens_per_batch × top_k) / (N_experts × capacity_factor)</div>
+
+    <p>With capacity_factor = 1.0, each expert handles exactly its fair share. With 1000 tokens/batch, top_k=2, 4 experts: capacity = (1000 × 2) / (4 × 1) = <strong>500 tokens max per expert</strong>.</p>
+
+    <p><strong>Why top_k in numerator?</strong> Each token is dispatched to k experts, so total expert-assignments = tokens × k.</p>
+
+    <ul class="content-list">
+      <li><strong>capacity_factor = 1.0:</strong> strict fair split; excess tokens dropped or rerouted</li>
+      <li><strong>capacity_factor &gt; 1.0 (typ. 1.125–2.0):</strong> experts can exceed fair share — handles natural imbalance</li>
+      <li><strong>capacity_factor &lt; 1.0:</strong> stricter cap; some tokens dropped (undesirable — DeepSeek-V3 dropped zero tokens)</li>
+      <li><strong>capacity_factor &gt; 2.0:</strong> one expert can hog everything — defeats the purpose</li>
+    </ul>
+
+    <p>Without capacity: all four tokens "the, next, day, is" could route to E1. With capacity=2: E1 accepts at most 2 tokens; overflow reroutes to E2 or E3.</p>
+
+    <h3 style="margin-top:28px;">Capacity Factor Edge Cases</h3>
+    <p><strong>capacity_factor = 1.0:</strong> Strictest fair share. With 1000 tokens, top_k=2, 4 experts: capacity = 2000/4 = 500 tokens per expert maximum. No expert exceeds fair share.</p>
+    <p><strong>capacity_factor = 1.25:</strong> Each expert can handle 25% more than fair share. Common in production. Allows natural routing variance without drops.</p>
+    <p><strong>capacity_factor = 2.0:</strong> Upper practical bound. One expert could take 2× fair share — risks imbalance but prevents token drops.</p>
+    <p><strong>capacity_factor > 2.0:</strong> Defeats purpose. One expert can hog all tokens — reintroduces collapse.</p>
+    <p><strong>capacity_factor < 1.0:</strong> Stricter than fair share. Excess tokens dropped or rerouted — hurts training quality. DeepSeek-V3 explicitly avoided dropping any tokens.</p>
+
+    <h3 style="margin-top:28px;">Tokens Per Batch Calculation</h3>
+    <div class="formula">tokens_per_batch = batch_size × sequence_length × top_k</div>
+    <p>The top_k multiplier counts that each token generates k expert assignments. A batch of 32 sequences of length 512 with top_k=2: tokens_per_batch = 32 × 512 × 2 = 32,768 expert-token assignments to distribute across experts.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Capacity Factor Slider</h4>
+      <label class="ctrl">Tokens per batch: <span id="capTokVal">128</span></label>
+      <input type="range" id="capTokSlider" min="32" max="512" step="32" value="128">
+      <label class="ctrl">Number of experts: <span id="capNVal">8</span></label>
+      <input type="range" id="capNSlider" min="2" max="64" step="2" value="8">
+      <label class="ctrl">Top-k: <span id="capKVal">2</span></label>
+      <input type="range" id="capKSlider" min="1" max="4" step="1" value="2">
+      <label class="ctrl">Capacity factor: <span id="capCFVal">1.25</span></label>
+      <input type="range" id="capCFSlider" min="0.5" max="2.5" step="0.125" value="1.25">
+      <div class="output-readout" id="capReadout"></div>
+      <div class="expert-row" id="capExperts"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Expert Collapse: When the Council Fails</h2>
+    <p><strong>Expert collapse</strong> (also called routing collapse) occurs when the router sends nearly all tokens to one or a few experts while others sit completely idle. The idle experts receive no gradients, learn nothing, and waste their parameter budget.</p>
+
+    <h3>How Collapse Happens</h3>
+    <ol class="content-list">
+      <li><strong>Rich-get-richer routing:</strong> Expert E3 gets slightly more tokens early in training → stronger gradients → router learns to prefer E3 → even more tokens → collapse</li>
+      <li><strong>No balancing loss:</strong> Pure top-k + LM loss has no incentive for uniform routing</li>
+      <li><strong>High capacity factor:</strong> Allows one expert to absorb unlimited tokens</li>
+      <li><strong>Small batch sizes:</strong> Statistical noise in f_i estimates per step</li>
+    </ol>
+
+    <h3>Symptoms</h3>
+    <ul class="content-list">
+      <li>Expert utilization histogram: one bar at 90%+, others near 0%</li>
+      <li>Validation perplexity plateaus below dense-model equivalent despite more total params</li>
+      <li>GPU memory hotspots on specific expert shards during distributed training</li>
+    </ul>
+
+    <h3>Remedies (This Chapter's Toolkit)</h3>
+    <div class="comparison">
+      <div class="card"><h3>Auxiliary Loss</h3><p>Penalizes unequal expert importance via CV². Soft pressure toward uniform P_i.</p></div>
+      <div class="card"><h3>Load Balancing Loss</h3><p>Penalizes Σ f_i·P_i. Hard alignment of token counts with importance.</p></div>
+    </div>
+    <div class="comparison" style="margin-top:0;">
+      <div class="card"><h3>Capacity Factor</h3><p>Hard cap on tokens per expert per batch. Physical overflow prevention.</p></div>
+      <div class="card"><h3>Loss-Free Balancing (V3)</h3><p>DeepSeek-V3's innovation — covered in Chapter 09. Removes auxiliary loss entirely.</p></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Expert Utilization Chart</h4>
+      <label class="ctrl">Training step: <span id="utilStepVal">0</span></label>
+      <input type="range" id="utilStepSlider" min="0" max="100" step="1" value="0">
+      <div class="btn-group">
+        <button class="btn active" id="utilWithBal">With Balancing</button>
+        <button class="btn" id="utilNoBal">Without Balancing</button>
+      </div>
+      <div class="bar-chart" id="utilBarChart" style="height:220px;"></div>
+      <div class="output-readout" id="utilReadout"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Expert Collapse: A Concrete Scenario</h3>
+    <p>Imagine training begins. Router weights are random. By chance, Expert 3 gets slightly higher scores for common tokens ("the", "a", "is"). More tokens route to E3 → E3 gets more gradient updates → E3's FFN improves → router learns to prefer E3 even more.</p>
+    <p>After 10,000 steps: E3 handles 85% of tokens. Experts 1, 2, 4–64 are idle. Effective model capacity = 1 expert, not 64. Training loss plateaus. Inference shows no speedup over dense because one expert is overloaded while others waste memory.</p>
+    <p>This is <strong>expert collapse</strong> — the MoE equivalent of dead neurons, but at module scale. Auxiliary loss, load balancing loss, and capacity factor are the three guardrails against it.</p>
+
+    <div class="callout warn"><p>If an expert receives zero tokens, it sits idle, receives no gradient updates, and effectively ceases to exist. With 64 experts and 50 collapsed, you are running a 14-expert model while paying for 64 — the worst of both worlds.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>671 Billion Total, 37 Billion Active</h2>
+    <p>DeepSeek-V3 is the canonical example of MoE at frontier scale. The model stores <strong>671 billion parameters</strong> total but activates only about <strong>37 billion per token</strong> — roughly 5.5% of weights compute on any single forward pass.</p>
+
+    <p>As introduced in Chapter 1, DeepSeek uses <strong>671B total parameters</strong> but activates only <strong>~37B per token</strong>. A router in each MoE layer selects top-k experts per token; unselected experts remain in memory but are not computed, yielding inference cost comparable to a ~37B dense model.</p>
+
+    <h3>Parameter Accounting</h3>
+    <table class="data-table">
+      <thead><tr><th>Component</th><th>DeepSeek-V3</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Total parameters</td><td><strong>671B</strong></td><td>All experts stored in memory</td></tr>
+        <tr><td>Active per token</td><td><strong>~37B</strong></td><td>Top-k experts × layers × FFN dims</td></tr>
+        <tr><td>Activation ratio</td><td>~5.5%</td><td>37/671</td></tr>
+        <tr><td>MoE speedup vs dense</td><td><strong>5–7×</strong></td><td>Typical at 32–128 experts</td></tr>
+      </tbody>
+    </table>
+
+    <p>Unlike dense models where all parameters serve every input, MoE activates a subset. This reduces active parameters per forward pass, lowering operations per step and memory bandwidth for compute (though not for storage). The result: larger models without proportional cost increase.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Total vs Active Parameters</h4>
+      <label class="ctrl">Total params (B): <span id="scaleTotalVal">671</span></label>
+      <input type="range" id="scaleTotalSlider" min="100" max="1000" step="1" value="671">
+      <label class="ctrl">Active fraction (%): <span id="scaleActiveVal">5.5</span></label>
+      <input type="range" id="scaleActiveSlider" min="1" max="20" step="0.1" value="5.5">
+      <canvas id="scaleCanvas" width="560" height="200" style="background:var(--bg-card-alt);width:100%;max-width:560px;margin-top:12px;"></canvas>
+      <div class="output-readout" id="scaleReadout"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Why 671B Total but Only 37B Active?</h3>
+    <p>DeepSeek-V3 stores every expert's weights in memory — all 671 billion parameters exist on disk and in GPU HBM during inference. But for each token's forward pass, the router selects top-k experts per MoE layer. Unselected experts are not computed.</p>
+    <p>Arithmetic intuition: if the model has ~256 routed experts per MoE layer with top-6 activation, each layer activates 6/256 ≈ 2.3% of its expert FFN parameters. Aggregated across all MoE layers plus attention/embedding params (which are always active), total active ≈ 37B out of 671B ≈ 5.5%.</p>
+
+    <h3 style="margin-top:28px;">MoE Advantages Summary</h3>
+    <ul class="content-list">
+      <li><strong>5–7× speedup</strong> in training and inference vs equivalent dense model (typical with 32–128 experts)</li>
+      <li><strong>Larger capacity</strong> without proportional compute — store 671B, compute ~37B</li>
+      <li><strong>Reduced memory footprint for compute</strong> — activation memory scales with active experts, not total</li>
+      <li><strong>Specialization</strong> — experts develop interpretable skills (punctuation, numbers, etc.)</li>
+      <li><strong>Scalability</strong> — add experts to increase capacity with sublinear compute increase</li>
+    </ul>
+
+    <div class="callout ok"><p>MoE gives a <strong>5–7× training speedup</strong> and similar inference speedup versus an equivalent dense model with the same total parameter count. DeepSeek-V3, Llama 4, Mixtral — all exploit this ratio.</p></div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s-appendix">
+  <div class="container">
+    <span class="section-num">APPENDIX</span>
+    <h2>Complete MoE Reference: Steps 1–10</h2>
+    <p>This appendix consolidates the entire MoE pipeline — from input embedding to balancing losses — as a single reference you can return to while implementing MoE from scratch.</p>
+
+    <h3>Steps 1–7: Forward Pass</h3>
+    <div class="card card-alt">
+      <p><strong>Step 1 — Input:</strong> Token embeddings X ∈ ℝ^{T×d} after attention sub-layer. T tokens, d dimensions.</p>
+      <p><strong>Step 2 — Expert Forward:</strong> For each expert i ∈ {1..N}: O_i = Expert_i(X) ∈ ℝ^{T×d}. Each expert is a standard 2-layer FFN with expansion ratio 4 (or smaller in fine-grained designs).</p>
+      <p><strong>Step 3 — Sparsity:</strong> Choose top-k experts per token. Only k of N experts will contribute.</p>
+      <p><strong>Step 4 — Router:</strong> S = X · W_r where W_r ∈ ℝ^{d×N}. S ∈ ℝ^{T×N} is the expert selector matrix (raw logits).</p>
+      <p><strong>Step 5 — Top-k + Softmax:</strong> For each row of S, keep top-k values, mask rest with −∞, apply softmax → G (expert selector weight matrix). G_{t,j} = probability token t uses expert j.</p>
+      <p><strong>Step 6 — Weighted Merge:</strong> Y_t = Σ_j G_{t,j} · O_j[t,:]. Only k terms non-zero per row.</p>
+      <p><strong>Step 7 — Output:</strong> Y ∈ ℝ^{T×d}, same shape as input. Feed to next sub-layer (residual + dropout).</p>
+    </div>
+
+    <h3>Steps 8–10: Balancing (Training Only)</h3>
+    <div class="card card-alt">
+      <p><strong>Step 8 — Auxiliary Loss:</strong> I_j = Σ_t G_{t,j}. CV = σ(I)/μ(I). L_aux = λ·CV². Added to LM loss.</p>
+      <p><strong>Step 9 — Load Balancing:</strong> P_i = I_i/T. f_i = (hard-routed token count to expert i)/T. L_load = α·N·Σ f_i·P_i.</p>
+      <p><strong>Step 10 — Capacity:</strong> cap = (T·k)/(N·CF). Drop or reroute tokens exceeding cap per expert per batch.</p>
+    </div>
+
+    <h3>PyTorch-Style Pseudocode</h3>
+    <div class="code-block">
+<span class="kw">class</span> <span class="cls">MoELayer</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, d_model, num_experts, top_k):
+        self.experts = nn.ModuleList([FFN(d_model) <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(num_experts)])
+        self.router = nn.Linear(d_model, num_experts, bias=<span class="kw">False</span>)
+        self.top_k = top_k
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x):  <span class="cmt"># x: (T, d)</span>
+        logits = self.router(x)  <span class="cmt"># (T, N)</span>
+        topk_vals, topk_idx = torch.topk(logits, self.top_k, dim=-<span class="num">1</span>)
+        gates = torch.full_like(logits, float(<span class="str">'-inf'</span>))
+        gates.scatter_(-<span class="num">1</span>, topk_idx, topk_vals)
+        gates = F.softmax(gates, dim=-<span class="num">1</span>)  <span class="cmt"># (T, N), rows sum to 1</span>
+        output = torch.zeros_like(x)
+        <span class="kw">for</span> i, expert <span class="kw">in</span> <span class="fn">enumerate</span>(self.experts):
+            mask = gates[:, i] &gt; <span class="num">0</span>
+            <span class="kw">if</span> mask.any():
+                output[mask] += gates[mask, i:<span class="num">i</span>+<span class="num">1</span>] * expert(x[mask])
+        <span class="kw">return</span> output, gates  <span class="cmt"># gates used for aux/load loss</span>
+    </div>
+
+    <h3>Expert Selector Matrix — Full Worked Example</h3>
+    <p>Tokens: the, next, day, is. After top-2 + softmax:</p>
+    <table class="data-table">
+      <thead><tr><th>Token</th><th>E1</th><th>E2</th><th>E3</th><th>Active Experts</th><th>Interpretation</th></tr></thead>
+      <tbody>
+        <tr><td>the</td><td>0.00</td><td>0.60</td><td>0.40</td><td>E2, E3</td><td>Article → grammar + context experts</td></tr>
+        <tr><td>next</td><td>0.90</td><td>0.00</td><td>0.10</td><td>E1, E3</td><td>Adjective/adverb → primary + secondary</td></tr>
+        <tr><td>day</td><td>0.00</td><td>0.40</td><td>0.60</td><td>E2, E3</td><td>Noun → split between two experts</td></tr>
+        <tr><td>is</td><td>0.50</td><td>0.00</td><td>0.50</td><td>E1, E3</td><td>Verb → equal split (tie at 0.5)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Importance and Load — Side by Side</h3>
+    <table class="data-table">
+      <thead><tr><th>Expert</th><th>Importance (Σ column)</th><th>P_i (÷4)</th><th>Hard-routed tokens</th><th>f_i</th></tr></thead>
+      <tbody>
+        <tr><td>E1</td><td>1.4</td><td>0.35</td><td>next, is</td><td>0.50</td></tr>
+        <tr><td>E2</td><td>1.0</td><td>0.25</td><td>the</td><td>0.25</td></tr>
+        <tr><td>E3</td><td>1.6</td><td>0.40</td><td>day</td><td>0.25</td></tr>
+      </tbody>
+    </table>
+    <p>Note: E1 has highest f_i (0.50) but E3 has highest importance (1.6). Load balancing loss penalizes this mismatch.</p>
+
+    <h3>Glossary</h3>
+    <table class="data-table">
+      <thead><tr><th>Term</th><th>Definition</th></tr></thead>
+      <tbody>
+        <tr><td>Expert</td><td>A single FFN sub-network within an MoE layer</td></tr>
+        <tr><td>Router / Gating network</td><td>Linear layer mapping token embedding to expert scores</td></tr>
+        <tr><td>Top-k</td><td>Number of experts activated per token</td></tr>
+        <tr><td>Sparsity</td><td>Fraction of experts inactive per token (= 1 − k/N)</td></tr>
+        <tr><td>Expert selector matrix</td><td>Raw scores S = X·W_r before top-k</td></tr>
+        <tr><td>Expert selector weight matrix</td><td>Gate weights G after top-k + softmax</td></tr>
+        <tr><td>Expert importance</td><td>Column sum of G — total routing probability mass per expert</td></tr>
+        <tr><td>f_i</td><td>Fraction of tokens hard-assigned to expert i</td></tr>
+        <tr><td>P_i</td><td>Normalized importance — router's preference for expert i</td></tr>
+        <tr><td>CV</td><td>Coefficient of variation — σ/μ of importance values</td></tr>
+        <tr><td>Capacity factor</td><td>Multiplier on fair-share token cap per expert</td></tr>
+        <tr><td>Expert collapse</td><td>Failure mode where one expert dominates routing</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Playground: Build Your Own MoE Layer</h2>
+    <p>Combine every concept from this chapter — experts, top-k, routing, balancing — in one sandbox.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · MoE Playground</h4>
+      <div class="two-col">
+        <div>
+          <label class="ctrl">Experts (N): <span id="pgNVal">8</span></label>
+          <input type="range" id="pgNSlider" min="2" max="64" step="1" value="8">
+          <label class="ctrl">Top-k: <span id="pgKVal">2</span></label>
+          <input type="range" id="pgKSlider" min="1" max="8" step="1" value="2">
+          <label class="ctrl">Sequence length: <span id="pgSeqVal">64</span></label>
+          <input type="range" id="pgSeqSlider" min="8" max="256" step="8" value="64">
+          <label class="ctrl">Balancing: 
+            <select id="pgBalSelect" style="background:var(--bg-card-alt);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;">
+              <option value="none">None (collapse risk)</option>
+              <option value="aux" selected>Auxiliary Loss</option>
+              <option value="load">Load Balancing</option>
+              <option value="both">Both + Capacity</option>
+            </select>
+          </label>
+          <label class="ctrl">Capacity factor: <span id="pgCFVal">1.25</span></label>
+          <input type="range" id="pgCFSlider" min="1" max="2" step="0.125" value="1.25">
+        </div>
+        <div id="pgResults"></div>
+      </div>
+      <canvas id="pgChart" width="560" height="200" style="background:var(--bg-card-alt);width:100%;max-width:560px;margin-top:16px;"></canvas>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+<section class="section fade-in" id="s-visual">
+  <div class="container">
+    <span class="section-num">VISUAL GUIDE</span>
+    <h2>Visual Guide to MoE Data Flow</h2>
+    <p>Complete data flow for a single token passing through one MoE layer.</p>
+
+    <h3>Token "day" Enters MoE Layer 3</h3>
+    <div class="flow">
+      <div class="flow-step"><strong>Input:</strong> x = embedding("day") after LayerNorm → vector ∈ ℝ^768 (or ℝ^8 in toy example)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Router:</strong> s = x · W_r → raw scores [0.2, 1.4, 2.0] for E1, E2, E3</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Top-2:</strong> Keep E2 (1.4) and E3 (2.0). Mask E1 → [−∞, 1.4, 2.0]</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Softmax:</strong> g = [0, 0.40, 0.60] — 40% E2, 60% E3</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Expert compute:</strong> O_2 = FFN_2(x), O_3 = FFN_3(x). E1 NOT computed.</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Merge:</strong> y = 0.4·O_2 + 0.6·O_3 → output ∈ ℝ^768</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Residual:</strong> x_out = x_in + Dropout(y) → passed to next sub-layer</div>
+    </div>
+
+    <h3 style="margin-top:28px;">Batch Processing: Four Tokens Simultaneously</h3>
+    <p>In practice, all four tokens ("the", "next", "day", "is") are processed in parallel as rows of the input matrix X ∈ ℝ^{4×8}. The router produces S = X·W_r ∈ ℝ^{4×3} — all four tokens scored simultaneously. Top-k and softmax apply row-wise. Each expert receives a subset of tokens (those that selected it), processes them in batch, and returns outputs. The merge reweights and sums per token.</p>
+    <p>This batched sparse computation is what makes MoE efficient on GPUs — tokens that share the same active expert are grouped together, minimizing kernel launches.</p>
+
+    <h3 style="margin-top:28px;">Training vs Inference</h3>
+    <div class="comparison">
+      <div class="card"><h3>Training</h3>
+        <p>All experts receive gradient updates (even those not selected for a given batch — they simply get zero gradient for that step). Balancing losses active. Capacity factor may drop overflow tokens. Router weights learn.</p></div>
+      <div class="card"><h3>Inference</h3>
+        <p>Only top-k experts computed per token. No balancing losses. No capacity drops (DeepSeek-V3). Router frozen. Maximum sparsity benefit realized.</p></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Key Numbers to Remember</h3>
+    <table class="data-table">
+      <thead><tr><th>Quantity</th><th>Toy Example</th><th>Production (DeepSeek-V3)</th></tr></thead>
+      <tbody>
+        <tr><td>Embedding dim d</td><td>8 (demo) / 768 (typical)</td><td>7168</td></tr>
+        <tr><td>Experts N</td><td>3–4</td><td>256+ routed</td></tr>
+        <tr><td>Top-k</td><td>2</td><td>6</td></tr>
+        <tr><td>Total params</td><td>~50M (small model)</td><td>671B</td></tr>
+        <tr><td>Active params/token</td><td>~2/3 of FFN</td><td>~37B</td></tr>
+        <tr><td>MoE speedup</td><td>~1.5× (3 experts, k=2)</td><td>~5–7×</td></tr>
+        <tr><td>Capacity factor</td><td>1.0–2.0</td><td>Loss-free (no CF needed)</td></tr>
+        <tr><td>CV target</td><td>&lt; 0.1</td><td>Architecturally enforced</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-examples">
+  <div class="container">
+    <span class="section-num">EXAMPLES</span>
+    <h2>Extended Worked Examples</h2>
+
+    <h3>Example A: Merge Calculation for Token "the"</h3>
+    <p>Given expert selector weights for "the": w_E2 = 0.6, w_E3 = 0.4. Expert outputs (simplified 4-dim vectors):</p>
+    <div class="code-block">
+ExpertOut2["the"] = [0.12, −0.34, 0.56, 0.78]
+ExpertOut3["the"] = [0.45,  0.21, −0.11, 0.33]
+
+output["the"] = 0.6 × [0.12, −0.34, 0.56, 0.78] + 0.4 × [0.45, 0.21, −0.11, 0.33]
+              = [0.072, −0.204, 0.336, 0.468] + [0.180, 0.084, −0.044, 0.132]
+              = [0.252, −0.120, 0.292, 0.600]
+    </div>
+    <p>Element-wise multiply each expert row by its weight, then add. Result is a 4-dim vector (8-dim in full example). This vector becomes row 1 of the output matrix.</p>
+
+    <h3>Example B: Merge Calculation for Token "next"</h3>
+    <div class="code-block">
+Weights: w_E1 = 0.9, w_E3 = 0.1
+ExpertOut1["next"] = [0.88, 0.12, −0.45, 0.67]
+ExpertOut3["next"] = [0.23, −0.56, 0.34, 0.11]
+
+output["next"] = 0.9 × [0.88, 0.12, −0.45, 0.67] + 0.1 × [0.23, −0.56, 0.34, 0.11]
+               = [0.792, 0.108, −0.405, 0.603] + [0.023, −0.056, 0.034, 0.011]
+               = [0.815, 0.052, −0.371, 0.614]
+    </div>
+    <p>E1 dominates at 90% — the router is confident "next" belongs primarily to Expert 1.</p>
+
+    <h3>Example C: Capacity Factor with Numbers</h3>
+    <p>Configuration: batch_size=4, sequence_length=512, top_k=2, num_experts=8, capacity_factor=1.25.</p>
+    <ul class="content-list">
+      <li>tokens_per_batch = 4 × 512 × 2 = 4,096 expert-token assignments</li>
+      <li>fair_share = 4,096 / 8 = 512 per expert</li>
+      <li>capacity = floor(512 / 1.25) = <strong>409 tokens max per expert</strong></li>
+    </ul>
+    <p>If Expert 1 already has 409 tokens assigned and a new token wants to route there, it is rerouted to the next-highest gate expert with remaining capacity.</p>
+
+    <h3>Example D: Expert Collapse Timeline</h3>
+    <table class="data-table">
+      <thead><tr><th>Step</th><th>E1 util</th><th>E2 util</th><th>E3 util</th><th>CV</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>33%</td><td>33%</td><td>33%</td><td>0.00</td><td>Healthy</td></tr>
+        <tr><td>500</td><td>45%</td><td>30%</td><td>25%</td><td>0.08</td><td>Slight skew</td></tr>
+        <tr><td>2000</td><td>62%</td><td>22%</td><td>16%</td><td>0.19</td><td>Warning</td></tr>
+        <tr><td>5000 (no balancing)</td><td>89%</td><td>7%</td><td>4%</td><td>0.41</td><td>Collapsed</td></tr>
+        <tr><td>5000 (with balancing)</td><td>36%</td><td>34%</td><td>30%</td><td>0.04</td><td>Healthy</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Example E: 671B / 37B Breakdown</h3>
+    <p>Approximate DeepSeek-V3 parameter budget:</p>
+    <ul class="content-list">
+      <li>Total parameters: 671 billion (all experts + attention + embeddings stored)</li>
+      <li>MoE layers: majority of params in expert FFNs</li>
+      <li>Per token: top-6 of ~256 experts per MoE layer activate</li>
+      <li>Active ratio per MoE layer: 6/256 ≈ 2.3%</li>
+      <li>Non-MoE params (MLA attention, embeddings): always active</li>
+      <li>Blended active fraction: ~37B / 671B ≈ 5.5%</li>
+      <li>Effective inference: comparable to ~37B dense model FLOPs for FFN portion</li>
+      <li>Speedup vs 671B dense (hypothetical): ~671/37 ≈ 18× for FFN — practical speedup ~5–7× accounting for attention, routing, communication</li>
+    </ul>
+
+    <h3>Example F: Load Balancing — Collapsed vs Balanced</h3>
+    <p>Two experts and four tokens:</p>
+    <p><strong>Case 1 (E1 hogs):</strong> All tokens to E1 with weight 1.0. f=[1,0], P=[1,0]. Loss = 1×1 + 0×0 = 1.0.</p>
+    <p><strong>Case 2 (balanced):</strong> Split 2+2. f=[0.5,0.5], P=[0.5,0.5]. Loss = 0.5×0.5 + 0.5×0.5 = 0.5.</p>
+    <p>Case 2 loss is half of Case 1. Training minimizes this, pushing toward uniform dispatch.</p>
+
+    <h3>Example G: The "Equal Importance, Unequal Load" Trap</h3>
+    <p>Expert selector (rows do NOT sum to 1 — illustrative only):</p>
+    <table class="data-table">
+      <thead><tr><th></th><th>E1</th><th>E2</th></tr></thead>
+      <tbody>
+        <tr><td>Token 1</td><td>1.0</td><td>0.0</td></tr>
+        <tr><td>Token 2</td><td>0.0</td><td>0.25</td></tr>
+        <tr><td>Token 3</td><td>0.0</td><td>0.25</td></tr>
+        <tr><td>Token 4</td><td>0.0</td><td>0.25</td></tr>
+        <tr><td>Importance</td><td>1.0</td><td>1.0</td></tr>
+        <tr><td>Tokens to expert</td><td>1</td><td>4</td></tr>
+      </tbody>
+    </table>
+    <p>Both experts have importance 1.0. Auxiliary loss sees perfect balance. But E2 handles 4× more tokens than E1. Load balancing loss catches this: f_E1=0.25, f_E2=0.75 vs P_E1=0.5, P_E2=0.5 → high product sum. This is why both losses are needed.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-impl">
+  <div class="container">
+    <span class="section-num">IMPLEMENTATION</span>
+    <h2>Implementation Notes and Common Pitfalls</h2>
+
+    <h3>Router Initialization</h3>
+    <p>Router weights W_r are typically initialized with small random values (Xavier/Kaiming). If initialized too large, softmax saturates early — one expert wins everything from step 0, triggering immediate collapse. Some implementations add noise to router logits during early training (router z-loss or jitter) to maintain exploration.</p>
+
+    <h3>Expert Parallelism vs Tensor Parallelism</h3>
+    <p>MoE introduces a third parallelism dimension beyond data parallel (split batch) and tensor parallel (split layers):</p>
+    <ul class="content-list">
+      <li><strong>Expert parallelism:</strong> Different experts on different devices. Requires all-to-all token communication each MoE layer.</li>
+      <li><strong>Tensor parallelism within expert:</strong> Split individual expert FFN across devices. Used when single expert is too large for one GPU.</li>
+      <li><strong>Data parallelism:</strong> Same as dense models — replicate model, split batch.</li>
+    </ul>
+    <p>DeepSeek-V3 training uses a combination of all three across their GPU cluster. Load balancing directly affects expert parallelism efficiency.</p>
+
+    <h3>Top-k vs Top-1 Trade-off</h3>
+    <table class="data-table">
+      <thead><tr><th>Setting</th><th>Sparsity</th><th>Quality</th><th>Used By</th></tr></thead>
+      <tbody>
+        <tr><td>top-1</td><td>Maximum (1/N)</td><td>Lower — no expert ensemble</td><td>Switch Transformer</td></tr>
+        <tr><td>top-2</td><td>High (2/N)</td><td>Good balance</td><td>Mixtral, many models</td></tr>
+        <tr><td>top-6</td><td>Moderate (6/N)</td><td>Higher quality</td><td>DeepSeek-V3</td></tr>
+        <tr><td>top-8</td><td>Lower (8/N)</td><td>Diminishing returns</td><td>Some experimental models</td></tr>
+      </tbody>
+    </table>
+    <p>Higher k improves quality (ensemble of experts) but reduces sparsity benefit. DeepSeek-V3 uses top-6 as their quality-efficiency sweet spot with 256 routed experts.</p>
+
+    <h3>Common Pitfalls</h3>
+    <div class="card">
+      <p><strong>Pitfall 1: Forgetting multi-layer routing.</strong> Drawing MoE for one layer only. Always visualize all L layers with independent routing.</p>
+      <p><strong>Pitfall 2: Confusing importance with load.</strong> Equal column sums do not mean equal token counts. Always check both I_j and f_j.</p>
+      <p><strong>Pitfall 3: Ignoring router cost.</strong> Router is O(T·d·N). For N=256, d=7168, this is non-trivial. Still cheaper than all experts.</p>
+      <p><strong>Pitfall 4: No balancing losses.</strong> Training without L_aux and L_load virtually guarantees collapse by step ~1000.</p>
+      <p><strong>Pitfall 5: Capacity factor too high.</strong> CF > 2.0 re-enables collapse despite balancing losses.</p>
+      <p style="margin:0;"><strong>Pitfall 6: Evaluating total params as compute cost.</strong> 671B total ≠ 671B compute. Always report active params separately.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">MoE vs Dense: Decision Matrix</h3>
+    <table class="data-table">
+      <thead><tr><th>Criterion</th><th>Dense</th><th>MoE</th></tr></thead>
+      <tbody>
+        <tr><td>Implementation complexity</td><td>Simple</td><td>Complex (routing, balancing, parallelism)</td></tr>
+        <tr><td>Memory (storage)</td><td>Lower</td><td>Higher (all experts stored)</td></tr>
+        <tr><td>Compute per token</td><td>High (all active)</td><td>Low (top-k active)</td></tr>
+        <tr><td>Training stability</td><td>Stable</td><td>Requires balancing mechanisms</td></tr>
+        <tr><td>Scaling beyond 100B</td><td>Expensive</td><td>Efficient</td></tr>
+        <tr><td>Expert interpretability</td><td>N/A</td><td>Emergent specializations</td></tr>
+        <tr><td>Inference on single GPU</td><td>Easier</td><td>Harder (expert sharding)</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:28px;">Historical Models Using MoE</h3>
+    <table class="data-table">
+      <thead><tr><th>Model</th><th>Year</th><th>Experts</th><th>Top-k</th><th>Notable</th></tr></thead>
+      <tbody>
+        <tr><td>Adaptive MoE (Jordan & Jacobs)</td><td>1991</td><td>4–8</td><td>1</td><td>Vowel discrimination</td></tr>
+        <tr><td>Switch Transformer (Google)</td><td>2021</td><td>128–2048</td><td>1</td><td>Trillion-param scale</td></tr>
+        <tr><td>ST-MoE (Google)</td><td>2022</td><td>32–64</td><td>2</td><td>Auxiliary loss, expert analysis</td></tr>
+        <tr><td>Mixtral 8×7B (Mistral)</td><td>2023</td><td>8</td><td>2</td><td>Open-weight MoE LLM</td></tr>
+        <tr><td>DeepSeek-V2</td><td>2024</td><td>160+</td><td>6</td><td>Fine-grained + shared experts</td></tr>
+        <tr><td>DeepSeek-V3</td><td>2025</td><td>256+</td><td>6</td><td>671B/37B, loss-free balancing</td></tr>
+        <tr><td>Llama 4 (Meta)</td><td>2025</td><td>Undisclosed</td><td>Undisclosed</td><td>First Meta MoE flagship</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:28px;">Debugging MoE Training</h3>
+    <p>Monitor these metrics every N steps during MoE training:</p>
+    <ol class="content-list">
+      <li><strong>Expert utilization histogram:</strong> Should be roughly flat. Spikes indicate collapse.</li>
+      <li><strong>CV of importance:</strong> Should decrease over training. Target CV < 0.1.</li>
+      <li><strong>Fraction of dead experts:</strong> Experts with zero tokens in last K batches. Target: 0.</li>
+      <li><strong>Load loss (L_load):</strong> Should decrease and stabilize.</li>
+      <li><strong>Router entropy:</strong> Average −Σ G log G per token. Too low = deterministic collapse.</li>
+      <li><strong>Capacity overflow rate:</strong> Fraction of tokens dropped due to capacity. Target: 0 (DeepSeek-V3).</li>
+    </ol>
+
+    <div class="callout ok"><p>With proper balancing, MoE training is stable and produces models that match or exceed dense-model quality at the same active parameter count — while enabling total parameter counts that dense models cannot afford to compute.</p></div>
+
+    <h3 style="margin-top:28px;">Expert Parallelism Communication Pattern</h3>
+    <p>When experts are distributed across GPUs, each MoE forward pass triggers:</p>
+    <ol class="content-list">
+      <li><strong>Router compute (local):</strong> Each GPU computes router scores for its tokens</li>
+      <li><strong>Dispatch (all-to-all):</strong> Tokens are sent to GPUs hosting their selected experts</li>
+      <li><strong>Expert compute (local):</strong> Each GPU runs its experts on received tokens</li>
+      <li><strong>Combine (all-to-all):</strong> Expert outputs return to originating GPUs, weighted by gate values</li>
+    </ol>
+    <p>Load imbalance directly increases all-to-all communication wait time — hot GPUs finish last. This is why load balancing is both a machine learning concern and a systems engineering concern.</p>
+
+    <h3 style="margin-top:28px;">Hyperparameter Guidelines</h3>
+    <table class="data-table">
+      <thead><tr><th>Hyperparameter</th><th>Typical Range</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>λ (auxiliary loss scale)</td><td>0.001 – 0.1</td><td>Start small; increase if collapse observed</td></tr>
+        <tr><td>α (load balance scale)</td><td>0.001 – 0.1</td><td>Often similar magnitude to λ</td></tr>
+        <tr><td>top-k</td><td>1 – 8</td><td>2 for efficiency; 6+ for quality at scale</td></tr>
+        <tr><td>capacity_factor</td><td>1.0 – 2.0</td><td>1.25 common; avoid &gt;2.0</td></tr>
+        <tr><td>num_experts</td><td>8 – 256+</td><td>More experts = more sparsity = more savings</td></tr>
+        <tr><td>expert FFN ratio</td><td>0.25 – 1.0 × dense</td><td>Smaller experts = more sparsity benefit</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:28px;">Relationship to Switch Transformer</h3>
+    <p>Google's Switch Transformer (Fedus et al., 2021) scaled MoE to trillion-parameter models with top-1 routing and capacity factor 1.25. It demonstrated that MoE could train faster than dense models with the same compute budget. ST-MoE (2022) added auxiliary loss for stability. Mixtral (2023) brought open-weight MoE to production. DeepSeek-V2/V3 (2024–2025) pushed expert count, top-k, and balancing techniques to frontier scale. Each generation built on the previous — the pipeline covered in this chapter is the common foundation.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-deep">
+  <div class="container">
+    <span class="section-num">DEEP DIVE</span>
+    <h2>Mathematical Deep Dive: Every Formula Derived</h2>
+
+    <h3>1. Dense FFN Parameter Count</h3>
+    <p>A 2-layer FFN with expansion ratio r (typically r=4):</p>
+    <div class="formula">W_1 ∈ ℝ^{d × rd}, &nbsp; W_2 ∈ ℝ^{rd × d}</div>
+    <div class="formula">params = d·rd + rd·d = 2rd²</div>
+    <p>For d=768, r=4: params = 2 × 4 × 768² = 2 × 4 × 589,824 = 4,718,592.</p>
+
+    <h3>2. MoE Expert Parameter Count</h3>
+    <p>With N experts, each with expansion ratio r_e (may be smaller than dense r):</p>
+    <div class="formula">params_MoE = N × 2r_e d²</div>
+    <p>Active per token: k × 2r_e d². Condition for compute savings: k/N < 1 (always true) AND r_e ≤ r.</p>
+
+    <h3>3. Router Logits</h3>
+    <div class="formula">s_t = x_t W_r, &nbsp; x_t ∈ ℝ^d, &nbsp; W_r ∈ ℝ^{d×N}, &nbsp; s_t ∈ ℝ^N</div>
+    <p>For batch of T tokens: S = X W_r where X ∈ ℝ^{T×d}.</p>
+
+    <h3>4. Top-k Masking</h3>
+    <p>Define mask m_t ∈ {0,1}^N where m_t[j]=1 iff s_t[j] is among the k largest:</p>
+    <div class="formula">s'_t[j] = s_t[j] · m_t[j] + (−∞) · (1 − m_t[j])</div>
+
+    <h3>5. Softmax Gating</h3>
+    <div class="formula">G_{t,j} = exp(s'_t[j]) / Σ_i exp(s'_t[i])</div>
+    <p>Properties: G_{t,j} ∈ [0,1], Σ_j G_{t,j} = 1, G_{t,j}=0 when m_t[j]=0.</p>
+
+    <h3>6. MoE Output</h3>
+    <div class="formula">y_t = Σ_{j=1}^{N} G_{t,j} · Expert_j(x_t)</div>
+    <p>Only k terms in the sum are non-zero. Each Expert_j is a full FFN: Expert_j(x) = W_2^j · σ(W_1^j · x).</p>
+
+    <h3>7. Expert Importance</h3>
+    <div class="formula">I_j = Σ_{t=1}^{T} G_{t,j}</div>
+    <p>Column sum of gate matrix. Measures total routing probability mass assigned to expert j across the batch/sequence.</p>
+
+    <h3>8. Coefficient of Variation</h3>
+    <div class="formula">μ_I = (1/N) Σ_j I_j</div>
+    <div class="formula">σ_I = sqrt((1/N) Σ_j (I_j − μ_I)²)</div>
+    <div class="formula">CV = σ_I / μ_I</div>
+    <div class="formula">L_aux = λ · CV²</div>
+
+    <h3>9. Router Selection Probability</h3>
+    <div class="formula">P_i = I_i / T</div>
+    <p>Normalized importance — probability the router "prefers" expert i averaged across tokens.</p>
+
+    <h3>10. Hard Assignment Fraction</h3>
+    <div class="formula">f_i = (1/T) |{t : argmax_j G_{t,j} = i among active}|</div>
+    <p>Fraction of tokens where expert i receives the highest gate weight. Computed via hard assignment for load tracking.</p>
+
+    <h3>11. Load Balancing Loss</h3>
+    <div class="formula">L_load = α · N · Σ_{i=1}^{N} f_i · P_i</div>
+    <p>Minimized when both f and P are uniform. Product f_i·P_i is large when one expert dominates both metrics.</p>
+
+    <h3>12. Expert Capacity</h3>
+    <div class="formula">C = floor(T · k / (N · CF))</div>
+    <p>Maximum tokens expert i can accept in this batch. Tokens beyond C are dropped or rerouted to next-best expert.</p>
+
+    <h3>13. Total Training Loss</h3>
+    <div class="formula">L_total = L_LM + L_aux + L_load</div>
+    <p>L_LM is standard cross-entropy next-token prediction. λ and α are hyperparameters typically in range [0.001, 0.1].</p>
+
+    <h3>14. Active Parameter Fraction (DeepSeek-V3)</h3>
+    <div class="formula">active_ratio ≈ (k/N) × (N_moe_layers / L_total) × (r_e/r) + (non_MoE_params / total_params)</div>
+    <p>Non-MoE params (attention with MLA, embeddings, output head) are always active. MoE FFN params are sparsely active. Combined: ~37B / 671B ≈ 5.5%.</p>
+
+    <div class="callout"><p>These fourteen formulas are the complete mathematical toolkit for understanding vanilla MoE. DeepSeek's subsequent innovations modify routing (loss-free balancing), expert structure (fine-grained segmentation), and architecture (shared experts) — but every modification builds on this base.</p></div>
+
+    <h3 style="margin-top:28px;">Numerical Example: Load Balancing Two Scenarios</h3>
+    <p><strong>Scenario 1 — Collapsed (E1 hogs everything):</strong></p>
+    <p>4 tokens, 2 experts. E1 gets all tokens with gate weight 1.0 each. E2 gets nothing.</p>
+    <ul class="content-list">
+      <li>Importance: I_1 = 4.0, I_2 = 0.0</li>
+      <li>P_1 = 4/4 = 1.0, P_2 = 0/4 = 0.0</li>
+      <li>f_1 = 4/4 = 1.0, f_2 = 0/4 = 0.0</li>
+      <li>Σ f_i·P_i = 1.0×1.0 + 0.0×0.0 = <strong>1.0</strong></li>
+      <li>L_load = 0.01 × 2 × 1.0 = <strong>0.02</strong></li>
+    </ul>
+    <p><strong>Scenario 2 — Balanced:</strong></p>
+    <p>E1 and E2 each get 2 tokens. Gate weights 0.6/0.4 split per token.</p>
+    <ul class="content-list">
+      <li>Importance: I_1 = 2.0, I_2 = 2.0</li>
+      <li>P_1 = 0.5, P_2 = 0.5</li>
+      <li>f_1 = 0.5, f_2 = 0.5</li>
+      <li>Σ f_i·P_i = 0.5×0.5 + 0.5×0.5 = <strong>0.5</strong></li>
+      <li>L_load = 0.01 × 2 × 0.5 = <strong>0.01</strong></li>
+    </ul>
+    <p>Balanced scenario has half the load loss. Gradient descent on L_load pushes the router toward Scenario 2.</p>
+
+    <h3 style="margin-top:28px;">Expert Collapse: Formal Definition</h3>
+    <p>Let u_i = I_i / Σ_j I_j be the utilization fraction of expert i. Expert collapse occurs when:</p>
+    <div class="formula">max_i(u_i) > 1 − ε for small ε (e.g., ε = 0.1)</div>
+    <p>At collapse, one expert handles >90% of routing probability mass. Remaining experts are effectively dead. The model degenerates to a dense model with wasted parameter overhead from idle experts.</p>
+
+    <h3 style="margin-top:28px;">Distributed Training Considerations</h3>
+    <p>In production, experts are sharded across GPUs (expert parallelism). Each GPU holds 1 or more experts. When a token routes to expert j on GPU k, an all-to-all communication sends the token's embedding to GPU k and returns the result.</p>
+    <p>Load imbalance is not just a training quality issue — it is a <strong>systems issue</strong>. If E3 on GPU 2 receives 80% of tokens, GPU 2 becomes a bottleneck while other GPUs idle. Load balancing loss improves both model quality and hardware utilization.</p>
+    <p>Capacity factor provides a hard systems-level backstop: even if routing is skewed, no single GPU's experts accept more than C tokens per batch, preventing memory overflow on hot shards.</p>
+  </div>
+</section>
+
+<div class="qa-box">
+      <div class="q">How does MoE interact with MLA (multi-head latent attention)?</div>
+      <p>They optimize different bottlenecks. MLA compresses the KV cache (attention memory). MoE sparsifies the FFN (parameter compute). DeepSeek-V3 uses both simultaneously — MLA for efficient attention, MoE for efficient feed-forward processing. Together they enable frontier quality at fraction of dense-model inference cost.</p>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">What is fine-grained expert segmentation?</div>
+      <p>Instead of 8 large experts, split into 64 smaller experts with same total capacity but finer specialization. More routing choices, higher sparsity, better load distribution. DeepSeek-V2/V3 use this — detailed in Chapter 09.</p>
+    </div>
+
+    <div class="qa-box">
+      <div class="q">What are shared experts?</div>
+      <p>Some experts are always active (shared across all tokens) while others are routed. Shared experts capture common patterns ("the", basic syntax); routed experts handle specialized patterns. DeepSeek calls this shared expert isolation — Chapter 09.</p>
+    </div>
+
+    
+    <div class="qa-box">
+      <div class="q">Why do we multiply by N in the load balancing loss?</div>
+      <p>The factor N (number of experts) scales the loss to be comparable in magnitude to the LM loss regardless of expert count. Without it, models with more experts would have inherently larger load balancing sums (more terms in Σ f_i·P_i), requiring different α values for different architectures.</p>
+    </div>
+    <div class="qa-box">
+      <div class="q">Is the router trained end-to-end?</div>
+      <p>Yes. Router weights W_r receive gradients from both L_LM (through the weighted expert outputs) and L_aux + L_load (directly). The router learns to select useful experts (from LM loss) while maintaining balance (from balancing losses).</p>
+    </div>
+    <div class="qa-box">
+      <div class="q">What happens to experts that are never selected?</div>
+      <p>Their FFN weights receive zero gradient for that step. Over many steps without selection, they stagnate. This is expert death. Auxiliary and load balancing losses exist specifically to prevent this. Capacity factor provides a hard backup.</p>
+    </div>
+
+<section class="section fade-in" id="s-summary">
+  <div class="container">
+    <span class="section-num">SUMMARY</span>
+    <h2>Chapter Summary</h2>
+    <div class="card">
+      <h3 style="margin-bottom:16px;">The Expert Council — Key Takeaways</h3>
+      <ol class="content-list" style="color:var(--text);">
+        <li><strong>MoE replaces dense FFN</strong> with multiple expert FFNs per transformer layer, using sparsity to cut compute.</li>
+        <li><strong>Sparsity / top-k:</strong> only k of N experts activate per token — the core efficiency mechanism.</li>
+        <li><strong>Router:</strong> X·W_r → top-k mask → softmax → gate weights G → weighted expert output sum.</li>
+        <li><strong>Experts specialize</strong> by token category (punctuation, verbs, numbers, names) — empirically verified in ST-MoE.</li>
+        <li><strong>Routing varies per layer</strong> — same token hits different experts at different depths.</li>
+        <li><strong>Auxiliary loss:</strong> L_aux = λ·CV²(importance) — balances routing probability mass.</li>
+        <li><strong>Load balancing loss:</strong> L_load = α·N·Σ(f_i·P_i) — balances actual token counts.</li>
+        <li><strong>Capacity factor:</strong> hard cap on tokens per expert; typical range 1.125–2.0.</li>
+        <li><strong>Expert collapse</strong> occurs without balancing — idle experts waste parameters.</li>
+        <li><strong>DeepSeek-V3:</strong> 671B total, 37B active, ~5–7× speedup — MoE at frontier scale.</li>
+      </ol>
+    </div>
+    <p style="margin-top:24px;">Chapter 09 covers DeepSeek's MoE extensions: fine-grained expert segmentation, shared expert isolation, and loss-free load balancing.</p>
+  </div>
+</section>
+
+
+
+<section class="section fade-in" id="s-recap">
+  <div class="container">
+    <span class="section-num">RECAP</span>
+    <h2>Step-by-Step Recap: The Complete MoE Pipeline</h2>
+
+    <div class="callout"><p><strong>Complete MoE pipeline (tokens "the, next, day, is"; d=8; 3 experts; top-2):</strong></p>
+      <p style="margin-top:12px;margin-bottom:8px;"><strong>Forward pass (Steps 1–7):</strong> Input X (4×8) → expert outputs E1, E2, E3 (each 4×8) → top-k=2 sparsity → router S = X·W_r (4×3) → top-k mask + softmax → gate matrix G → weighted merge → output (4×8).</p>
+      <p style="margin-bottom:8px;"><strong>Training balance (Steps 8–10):</strong> Step 8 — auxiliary loss L_aux = λ·CV² on expert importance. Step 9 — load balancing loss L_load = α·N·Σf_i·P_i. Step 10 — capacity cap = T·k/(N·CF).</p>
+      <p style="margin-bottom:0;"><strong>Total training loss:</strong> L = L_LM + L_aux + L_load. DeepSeek-V3 replaces Steps 8–9 with loss-free architectural balancing (Chapter 09).</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Further Reading (Papers Cited)</h3>
+    <ul class="content-list">
+      <li><strong>Jordan & Jacobs (1991):</strong> <em>Adaptive Mixtures of Local Experts</em> — original MoE gating network for supervised learning</li>
+      <li><strong>Shazeer et al. (2017):</strong> <em>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</em> — MoE at scale for LSTM/Transformer</li>
+      <li><strong>Fedus et al. (2021):</strong> <em>Switch Transformers: Scaling to Trillion Parameter Models</em> — top-1 routing, capacity factor</li>
+      <li><strong>ST-MoE (2022):</strong> <em>Designing Stable and Transferable Sparse Expert Models</em> — auxiliary loss, expert specialization Table 13</li>
+      <li><strong>DeepSeek-MoE (2024):</strong> Fine-grained expert segmentation, shared expert isolation</li>
+      <li><strong>DeepSeek-V3 (2025):</strong> Loss-free load balancing, 671B/37B architecture</li>
+    </ul>
+
+    <h3 style="margin-top:28px;">Notation Reference</h3>
+    <table class="data-table">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Typical Shape</th></tr></thead>
+      <tbody>
+        <tr><td>X</td><td>Input embedding matrix</td><td>(T × d)</td></tr>
+        <tr><td>W_r</td><td>Router weight matrix</td><td>(d × N)</td></tr>
+        <tr><td>S, G</td><td>Expert selector (raw / after softmax)</td><td>(T × N)</td></tr>
+        <tr><td>k</td><td>Top-k experts per token</td><td>scalar (e.g. 2, 6)</td></tr>
+        <tr><td>N</td><td>Number of experts</td><td>scalar (e.g. 3, 256)</td></tr>
+        <tr><td>I_j</td><td>Expert importance (column sum of G)</td><td>scalar per expert</td></tr>
+        <tr><td>P_i</td><td>Router selection probability</td><td>I_i / T</td></tr>
+        <tr><td>f_i</td><td>Hard-routed token fraction</td><td>[0, 1]</td></tr>
+        <tr><td>λ, α</td><td>Auxiliary / load balance scaling</td><td>hyperparameter</td></tr>
+        <tr><td>CF</td><td>Capacity factor</td><td>1.0 – 2.0</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px;color:var(--text-dim);font-size:0.9rem;">End of Chapter 08 · The Expert Council · Decoding DeepSeek</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-next">
+  <div class="container">
+    <span class="section-num">NEXT</span>
+    <h2>Coming in Chapter 09</h2>
+    <p>Chapter 09 covers DeepSeek's MoE extensions — fine-grained expert segmentation, shared expert isolation, and loss-free load balancing — each addressing a specific limitation of the vanilla pipeline above.</p>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Decoding DeepSeek · Chapter 08 · The Expert Council</p>
+  <p style="margin-top:8px;"><a href="../">← Back to Decoding DeepSeek</a> · <a href="../../">All Learning Blogs</a></p>
+</footer>
+
+<script>
+// ============================================================
+// UTILITIES
+// ============================================================
+function softmax(arr) {
+  const max = Math.max(...arr);
+  const exps = arr.map(x => x === -Infinity ? 0 : Math.exp(x - max));
+  const sum = exps.reduce((a,b)=>a+b, 0) || 1;
+  return exps.map(e => e / sum);
+}
+function topKMask(scores, k) {
+  const indexed = scores.map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v);
+  const keep = new Set(indexed.slice(0,k).map(x=>x.i));
+  return scores.map((v,i) => keep.has(i) ? v : -Infinity);
+}
+function mean(a) { return a.reduce((s,x)=>s+x,0)/a.length; }
+function std(a) { const m=mean(a); return Math.sqrt(mean(a.map(x=>(x-m)**2))); }
+function cv(a) { const m=mean(a); return m===0?0:std(a)/m; }
+
+const ESW = [
+  [0, 0.6, 0.4],
+  [0.9, 0, 0.1],
+  [0, 0.4, 0.6],
+  [0.5, 0, 0.5]
+];
+const TOKENS = ['the','next','day','is'];
+const EXPERT_COLORS = ['#6c8cff','#a78bfa','#34d399','#f472b6','#fbbf24','#22d3ee','#fb923c','#e879f9'];
+
+// ============================================================
+// FFN CALCULATOR
+// ============================================================
+function updateFFN() {
+  const d = +document.getElementById('ffnDSlider').value;
+  const L = +document.getElementById('ffnLSlider').value;
+  document.getElementById('ffnDVal').textContent = d;
+  document.getElementById('ffnLVal').textContent = L;
+  const perBlock = 2 * d * 4 * d;
+  const total = perBlock * L;
+  const fmt = n => n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : (n/1e3).toFixed(0)+'K';
+  document.getElementById('ffnReadout').innerHTML =
+    `Per block: 2×${d}×${4*d} = <strong>${fmt(perBlock)}</strong> · Total (${L} layers): <strong style="color:var(--accent5)">${fmt(total)}</strong>`;
+  const chart = document.getElementById('ffnBarChart');
+  const attn = d*d*4*L;
+  const embed = 50000*d;
+  chart.innerHTML = '';
+  [{l:'Embed',v:embed,c:'#34d399'},{l:'FFN',v:total,c:'#6c8cff'},{l:'Attn',v:attn,c:'#a78bfa'}].forEach(d=>{
+    const max = Math.max(embed,total,attn);
+    const w = document.createElement('div'); w.className='bar-wrapper';
+    w.innerHTML=`<div class="bar-value">${fmt(d.v)}</div><div class="bar" style="height:${Math.max(d.v/max*100,4)}%;background:${d.c}"></div><div class="bar-label">${d.l}</div>`;
+    chart.appendChild(w);
+  });
+}
+['ffnDSlider','ffnLSlider'].forEach(id=>document.getElementById(id).oninput=updateFFN);
+updateFFN();
+
+// ============================================================
+// DENSE VS SPARSE
+// ============================================================
+function updateSparse() {
+  const N=+document.getElementById('sparseNSlider').value;
+  const k=Math.min(+document.getElementById('sparseKSlider').value,N);
+  const h=+document.getElementById('sparseHSlider').value;
+  document.getElementById('sparseNSlider').max=k;
+  document.getElementById('sparseNVal').textContent=N;
+  document.getElementById('sparseKVal').textContent=k;
+  document.getElementById('sparseHVal').textContent=h;
+  const dense = 3072;
+  const sparse = h * k;
+  const ratio = dense / sparse;
+  const c = document.getElementById('sparseCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const bars = [{l:'Dense FFN',v:dense,c:'#f87171'},{l:'MoE Active',v:sparse,c:'#34d399'},{l:'MoE Stored',v:h*N,c:'#6c8cff'}];
+  const max = Math.max(...bars.map(b=>b.v));
+  bars.forEach((b,i)=>{
+    const x=40+i*170, bh=(b.v/max)*(c.height-50);
+    ctx.fillStyle=b.c; ctx.fillRect(x,c.height-30-bh,120,bh);
+    ctx.fillStyle='#e0e0e8'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText(b.l,x+60,c.height-10);
+    ctx.fillText(b.v.toLocaleString(),x+60,c.height-35-bh);
+  });
+  document.getElementById('sparseReadout').innerHTML =
+    `Active compute: dense <strong>${dense}</strong> vs MoE <strong>${sparse}</strong> = <strong style="color:var(--accent3)">${ratio.toFixed(1)}× less</strong> · Sparsity: ${k}/${N} = ${(k/N*100).toFixed(1)}% active · ${N} experts stored (${(h*N).toLocaleString()} total hidden dim)`;
+}
+['sparseNSlider','sparseKSlider','sparseHSlider'].forEach(id=>document.getElementById(id).oninput=updateSparse);
+updateSparse();
+
+// ============================================================
+// SPECIALIZATION EXPLORER
+// ============================================================
+const SPEC = {
+  punct:{tokens:[',',';','.','?'],experts:[2],layer:'Layer 2',desc:'Punctuation specialist'},
+  conj:{tokens:['the','and','if'],experts:[1,3],layer:'Layers 3, 6',desc:'Conjunctions & articles'},
+  verb:{tokens:['falling','signed','disagree'],experts:[0],layer:'Layer 1',desc:'Verb specialist'},
+  visual:{tokens:['blue','inner','upper'],experts:[3],layer:'Layer 0',desc:'Visual/spatial descriptions'},
+  name:{tokens:['Colin','Ken','Sam'],experts:[0],layer:'Layer 1',desc:'Proper names'},
+  num:{tokens:['7','25','454'],experts:[0],layer:'Layer 1',desc:'Counting & numbers'}
+};
+function renderSpec(cat) {
+  const s = SPEC[cat];
+  document.getElementById('specTokens').innerHTML = s.tokens.map(t=>`<span class="token token-highlight">${t}</span>`).join('');
+  document.getElementById('specExperts').innerHTML = [0,1,2,3].map(i=>{
+    const active = s.experts.includes(i);
+    return `<div class="expert-box ${active?'active':'idle'}"><strong>E${i+1}</strong><span style="font-size:0.7rem;margin-top:4px;">${active?'ACTIVE':'idle'}</span></div>`;
+  }).join('');
+  document.getElementById('specReadout').textContent = `${s.desc} · Routed to ${s.layer} · Only ${s.experts.length} of 4 experts fire for these tokens`;
+}
+document.querySelectorAll('#specBtns .btn').forEach(b=>b.onclick=function(){
+  document.querySelectorAll('#specBtns .btn').forEach(x=>x.classList.remove('active'));
+  this.classList.add('active'); renderSpec(this.dataset.cat);
+});
+renderSpec('punct');
+
+// ============================================================
+// MULTI-LAYER ROUTING
+// ============================================================
+const ROUTE_MAP = {
+  0:[1,0,2,1,3,2],1:[2,1,0,3,1,2],2:[0,2,1,0,2,1],
+  3:[3,2,1,2,0,3],4:[0,1,2,3,1,0],5:[2,3,0,1,2,3]
+};
+function renderRoute(tokIdx) {
+  const map = ROUTE_MAP[tokIdx];
+  document.getElementById('routeLayers').innerHTML = map.map((e,l)=>`
+    <div class="layer-row"><span class="layer-label">L${l+1}</span>
+    ${[0,1,2,3].map(i=>`<div class="expert-box ${i===e?'active':'idle'}" style="flex:1;min-width:60px;">E${i+1}</div>`).join('')}
+    </div>`).join('');
+  document.getElementById('routeReadout').textContent =
+    `Token "${['What','is','1','+','1','?'][tokIdx]}" → ${map.map((e,l)=>`L${l+1}:E${e+1}`).join(' → ')}`;
+  document.querySelectorAll('#routeTokens .token').forEach((t,i)=>t.classList.toggle('token-highlight',i==tokIdx));
+}
+document.getElementById('routeTokSelect').onchange = function(){ renderRoute(+this.value); };
+let routeAnim = null;
+document.getElementById('routeAnimBtn').onclick = function(){
+  let l=0; clearInterval(routeAnim);
+  routeAnim = setInterval(()=>{
+    document.querySelectorAll('#routeLayers .layer-row').forEach((r,i)=>r.style.opacity=i<=l?'1':'0.3');
+    if(++l>6){clearInterval(routeAnim);document.querySelectorAll('#routeLayers .layer-row').forEach(r=>r.style.opacity='1');}
+  },400);
+};
+renderRoute(2);
+
+// ============================================================
+// SEVEN STEPS WALKTHROUGH
+// ============================================================
+const SEVEN_TEXT = [
+  'Step 1: Input matrix X is 4×8. Tokens: the, next, day, is. Each row is one token embedding after attention.',
+  'Step 2: Pass X through E1, E2, E3. Three expert output matrices, each 4×8. Same rows, different transforms.',
+  'Step 3: Sparsity decision — top-k=2. Each token activates exactly 2 of 3 experts. One expert idle per token.',
+  'Step 4: Router — X × W_r (8×3) = Expert Selector matrix (4×3). Raw scores per token per expert.',
+  'Step 5: Top-2 + softmax → Expert Selector Weight matrix. Rows sum to 1. Unselected experts get weight 0.',
+  'Step 6: Weighted merge. For "the": 0.6×E2[row1] + 0.4×E3[row1]. Repeat for all tokens.',
+  'Step 7: Output matrix 4×8 — same shape as input. MoE block complete. Only 2/3 experts computed per token.'
+];
+let sevenStep = 0;
+function renderSeven() {
+  document.querySelectorAll('#sevenPipe .pipe-node').forEach((n,i)=>n.classList.toggle('lit',i===sevenStep));
+  document.getElementById('sevenSteps').innerHTML = SEVEN_TEXT.map((_,i)=>
+    `<div class="step-dot ${i<sevenStep?'done':i===sevenStep?'active':''}" data-i="${i}">${i+1}</div>`).join('');
+  document.getElementById('sevenReadout').textContent = SEVEN_TEXT[sevenStep];
+  document.querySelectorAll('#sevenSteps .step-dot').forEach(d=>d.onclick=()=>{sevenStep=+d.dataset.i;renderSeven();});
+}
+document.getElementById('sevenPrev').onclick=()=>{if(sevenStep>0){sevenStep--;renderSeven();}};
+document.getElementById('sevenNext').onclick=()=>{if(sevenStep<6){sevenStep++;renderSeven();}};
+document.getElementById('sevenReset').onclick=()=>{sevenStep=0;renderSeven();};
+renderSeven();
+
+// MERGE VISUALIZER
+function renderMerge(row) {
+  const w = ESW[row];
+  document.getElementById('mergeWeights').innerHTML = w.map((v,i)=>`
+    <div style="margin:8px 0;font-size:0.85rem;">E${i+1}: <strong style="color:${EXPERT_COLORS[i]}">${(v*100).toFixed(0)}%</strong>
+    <div class="weight-bar"><div class="weight-fill" style="width:${v*100}%;background:${EXPERT_COLORS[i]}"></div></div></div>`).join('');
+  const active = w.map((v,i)=>({v,i})).filter(x=>x.v>0);
+  document.getElementById('mergeResult').innerHTML = `
+    <p style="font-family:var(--mono);font-size:0.82rem;color:var(--text);">
+    output["${TOKENS[row]}"] = ${active.map(x=>`${x.v}×E${x.i+1}[row${row+1}]`).join(' + ')}</p>
+    <p style="font-size:0.8rem;color:var(--text-dim);margin-top:8px;">→ 1×8 vector (8-dim prediction for token "${TOKENS[row]}")</p>`;
+}
+document.querySelectorAll('#mergeTokBtns .btn').forEach(b=>b.onclick=function(){
+  document.querySelectorAll('#mergeTokBtns .btn').forEach(x=>x.classList.remove('active'));
+  this.classList.add('active'); renderMerge(+this.dataset.row);
+});
+renderMerge(0);
+
+// ============================================================
+// ROUTER SOFTMAX
+// ============================================================
+function updateRouter() {
+  const scores = ['rs1Slider','rs2Slider','rs3Slider'].map(id=>+document.getElementById(id).value);
+  const k = +document.getElementById('rsKSlider').value;
+  ['rs1','rs2','rs3','rsK'].forEach((id,i)=>document.getElementById(id).textContent=[...scores,k][i]);
+  const masked = topKMask(scores, k);
+  const gates = softmax(masked);
+  const c = document.getElementById('routerCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  gates.forEach((g,i)=>{
+    const bh = g * (c.height-40);
+    ctx.fillStyle = EXPERT_COLORS[i];
+    ctx.fillRect(30+i*80, c.height-20-bh, 60, bh);
+    ctx.fillStyle='#e0e0e8'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText(`E${i+1}`, 60+i*80, c.height-4);
+    ctx.fillText((g*100).toFixed(1)+'%', 60+i*80, c.height-24-bh);
+  });
+  document.getElementById('routerWeights').innerHTML = gates.map((g,i)=>
+    `<span style="color:${EXPERT_COLORS[i]}">E${i+1}: ${(g*100).toFixed(1)}%${masked[i]===-Infinity?' (masked)':''}</span>`).join(' · ');
+}
+['rs1Slider','rs2Slider','rs3Slider','rsKSlider'].forEach(id=>document.getElementById(id).oninput=updateRouter);
+updateRouter();
+
+// ============================================================
+// AUXILIARY LOSS
+// ============================================================
+function updateAux() {
+  const imp = ['imp1Slider','imp2Slider','imp3Slider'].map(id=>+document.getElementById(id).value);
+  const lam = +document.getElementById('lambdaSlider').value;
+  ['imp1Val','imp2Val','imp3Val'].forEach((id,i)=>document.getElementById(id).textContent=imp[i].toFixed(1));
+  document.getElementById('lambdaVal').textContent = lam.toFixed(3);
+  const cvVal = cv(imp);
+  const aux = lam * cvVal * cvVal;
+  const m = mean(imp);
+  document.getElementById('auxReadout').innerHTML = `
+    μ = ${m.toFixed(3)} · σ = ${std(imp).toFixed(3)} · CV = ${cvVal.toFixed(4)}<br>
+    L_aux = λ × CV² = ${lam} × ${(cvVal*cvVal).toFixed(4)} = <strong style="color:var(--accent5)">${aux.toFixed(6)}</strong>`;
+  const chart = document.getElementById('auxBarChart');
+  chart.innerHTML = '';
+  imp.forEach((v,i)=>{
+    const w=document.createElement('div'); w.className='bar-wrapper';
+    w.innerHTML=`<div class="bar-value">${v.toFixed(1)}</div><div class="bar" style="height:${v/Math.max(...imp)*100}%;background:${EXPERT_COLORS[i]}"></div><div class="bar-label">E${i+1}</div>`;
+    chart.appendChild(w);
+  });
+}
+['imp1Slider','imp2Slider','imp3Slider','lambdaSlider'].forEach(id=>document.getElementById(id).oninput=updateAux);
+updateAux();
+
+// ============================================================
+// LOAD BALANCING
+// ============================================================
+let lbMode = 'balanced';
+function drawLB() {
+  const c = document.getElementById('lbCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const data = lbMode==='balanced'
+    ? {f:[0.5,0.25,0.25],p:[0.35,0.25,0.40],label:'Balanced'}
+    : {f:[1,0,0],p:[1,0,0],label:'Collapsed (E1 hogs all)'};
+  let loss = 0;
+  data.f.forEach((fi,i)=>{loss+=fi*data.p[i];});
+  const lbLoss = 0.01*3*loss;
+  [0,1,2].forEach(i=>{
+    const x=60+i*160;
+    ctx.fillStyle=EXPERT_COLORS[i];
+    ctx.fillRect(x,40,50,data.f[i]*120);
+    ctx.fillStyle='#8888a0'; ctx.font='10px monospace';
+    ctx.fillText(`f${i+1}=${data.f[i]}`,x,30);
+    ctx.fillText(`P${i+1}=${data.p[i]}`,x,180);
+    ctx.fillText(`f×P=${(data.f[i]*data.p[i]).toFixed(2)}`,x,195);
+  });
+  document.getElementById('lbReadout').innerHTML = `<strong>${data.label}</strong> · Σf_i·P_i = ${loss.toFixed(3)} · L_load = 0.01×3×${loss.toFixed(3)} = <strong style="color:var(--accent5)">${lbLoss.toFixed(4)}</strong>`;
+}
+document.getElementById('lbBalanced').onclick=function(){lbMode='balanced';this.classList.add('active');document.getElementById('lbCollapsed').classList.remove('active');drawLB();};
+document.getElementById('lbCollapsed').onclick=function(){lbMode='collapsed';this.classList.add('active');document.getElementById('lbBalanced').classList.remove('active');drawLB();};
+drawLB();
+
+// ============================================================
+// CAPACITY FACTOR
+// ============================================================
+function updateCap() {
+  const tok=+document.getElementById('capTokSlider').value;
+  const N=+document.getElementById('capNSlider').value;
+  const k=+document.getElementById('capKSlider').value;
+  const cf=+document.getElementById('capCFSlider').value;
+  ['capTokVal','capNVal','capKVal','capCFVal'].forEach((id,i)=>document.getElementById(id).textContent=[tok,N,k,cf.toFixed(3)][i]);
+  const cap = Math.floor((tok*k)/(N*cf));
+  document.getElementById('capReadout').innerHTML =
+    `Expert capacity = (${tok}×${k}) / (${N}×${cf.toFixed(2)}) = <strong style="color:var(--accent5)">${cap} tokens max/expert</strong>`;
+  const el = document.getElementById('capExperts');
+  el.innerHTML = '';
+  for(let i=0;i<N;i++){
+    const assigned = Math.min(cap, Math.floor(tok*k/N)+ (i===0?2:0));
+    const d = document.createElement('div');
+    d.className='expert-box '+(assigned>=cap?'active':'');
+    d.innerHTML=`<strong>E${i+1}</strong><span style="font-size:0.7rem;">${assigned}/${cap}</span>`;
+    el.appendChild(d);
+  }
+}
+['capTokSlider','capNSlider','capKSlider','capCFSlider'].forEach(id=>document.getElementById(id).oninput=updateCap);
+updateCap();
+
+// ============================================================
+// EXPERT UTILIZATION
+// ============================================================
+let utilBal = true;
+function updateUtil() {
+  const step = +document.getElementById('utilStepSlider').value;
+  document.getElementById('utilStepVal').textContent = step;
+  const N = 8;
+  let utils;
+  if(utilBal) {
+    utils = Array.from({length:N},(_,i)=>0.12+0.01*Math.sin(step*0.1+i));
+  } else {
+    const dom = 0.7 + 0.2*Math.min(step/50,1);
+    utils = Array.from({length:N},(_,i)=> i===0?dom:(1-dom)/(N-1));
+  }
+  const s = utils.reduce((a,b)=>a+b,0);
+  utils = utils.map(u=>u/s);
+  const chart = document.getElementById('utilBarChart');
+  chart.innerHTML = '';
+  utils.forEach((u,i)=>{
+    const w=document.createElement('div'); w.className='bar-wrapper';
+    const collapsed = !utilBal && i>0 && u<0.05;
+    w.innerHTML=`<div class="bar-value">${(u*100).toFixed(0)}%</div><div class="bar" style="height:${u*100}%;background:${collapsed?'#f87171':EXPERT_COLORS[i%8]}"></div><div class="bar-label">E${i+1}</div>`;
+    chart.appendChild(w);
+  });
+  const idle = utils.filter(u=>u<0.02).length;
+  document.getElementById('utilReadout').textContent = utilBal
+    ? `Step ${step}: Balanced — all ${N} experts active (${(Math.min(...utils)*100).toFixed(0)}–${(Math.max(...utils)*100).toFixed(0)}% range)`
+    : `Step ${step}: Collapse — E1 at ${(utils[0]*100).toFixed(0)}%, ${idle} experts near idle`;
+}
+document.getElementById('utilWithBal').onclick=function(){utilBal=true;this.classList.add('active');document.getElementById('utilNoBal').classList.remove('active');updateUtil();};
+document.getElementById('utilNoBal').onclick=function(){utilBal=false;this.classList.add('active');document.getElementById('utilWithBal').classList.remove('active');updateUtil();};
+document.getElementById('utilStepSlider').oninput=updateUtil;
+updateUtil();
+
+// ============================================================
+// 671B / 37B SCALE
+// ============================================================
+function updateScale() {
+  const total=+document.getElementById('scaleTotalSlider').value;
+  const pct=+document.getElementById('scaleActiveSlider').value;
+  document.getElementById('scaleTotalVal').textContent=total;
+  document.getElementById('scaleActiveVal').textContent=pct.toFixed(1);
+  const active = total * pct / 100;
+  const c = document.getElementById('scaleCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.fillStyle='rgba(108,140,255,0.2)'; ctx.fillRect(40,30,c.width-80,c.height-60);
+  ctx.fillStyle='#34d399';
+  const aw = (c.width-80) * (pct/100);
+  ctx.fillRect(40,30,aw,c.height-60);
+  ctx.fillStyle='#e0e0e8'; ctx.font='13px monospace';
+  ctx.fillText(`Total: ${total}B params`, c.width/2, 20);
+  ctx.fillText(`Active: ${active.toFixed(1)}B (${pct}%)`, 40+aw/2, c.height/2);
+  ctx.fillText(`Idle: ${(total-active).toFixed(1)}B`, 40+aw+(c.width-80-aw)/2, c.height/2);
+  document.getElementById('scaleReadout').innerHTML =
+    `<strong>${total}B</strong> total · <strong style="color:var(--accent3)">${active.toFixed(1)}B active</strong> · ${(total/active).toFixed(1)}× capacity multiplier · inference cost ≈ ${active.toFixed(0)}B dense model`;
+}
+['scaleTotalSlider','scaleActiveSlider'].forEach(id=>document.getElementById(id).oninput=updateScale);
+updateScale();
+
+// ============================================================
+// PLAYGROUND
+// ============================================================
+function updatePG() {
+  const N=+document.getElementById('pgNSlider').value;
+  const k=Math.min(+document.getElementById('pgKSlider').value,N);
+  const seq=+document.getElementById('pgSeqSlider').value;
+  const bal=document.getElementById('pgBalSelect').value;
+  const cf=+document.getElementById('pgCFSlider').value;
+  document.getElementById('pgKSlider').max=N;
+  ['pgNVal','pgKVal','pgSeqVal','pgCFVal'].forEach((id,i)=>document.getElementById(id).textContent=[N,k,seq,cf.toFixed(2)][i]);
+  const activeFrac = k/N;
+  const cap = Math.floor((seq*k)/(N*cf));
+  const speedup = Math.min(N/k, 7);
+  const collapseRisk = bal==='none'?'HIGH':bal==='aux'?'MEDIUM':'LOW';
+  document.getElementById('pgResults').innerHTML = `
+    <div class="card card-alt" style="font-family:var(--mono);font-size:0.82rem;">
+      <p style="color:var(--text);margin-bottom:6px;">Active: <strong style="color:var(--accent3)">${(activeFrac*100).toFixed(1)}%</strong> of FFN params</p>
+      <p style="color:var(--text);margin-bottom:6px;">Est. speedup: <strong style="color:var(--accent5)">${speedup.toFixed(1)}×</strong></p>
+      <p style="color:var(--text);margin-bottom:6px;">Expert capacity: <strong>${cap}</strong> tok/expert</p>
+      <p style="color:var(--text);margin:0;">Collapse risk: <strong style="color:${collapseRisk==='HIGH'?'var(--danger)':collapseRisk==='MEDIUM'?'var(--accent5)':'var(--accent3)'}">${collapseRisk}</strong></p>
+    </div>`;
+  const c=document.getElementById('pgChart');
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const utils = Array.from({length:N},(_,i)=>{
+    if(bal==='none') return i===0?0.85:(0.15/(N-1));
+    return 1/N + 0.02*Math.sin(i);
+  });
+  const s=utils.reduce((a,b)=>a+b,0);
+  utils.forEach((u,i)=>{
+    u=u/s;
+    const x=20+(i*(c.width-40)/N);
+    const w=(c.width-40)/N-4;
+    ctx.fillStyle=EXPERT_COLORS[i%8];
+    ctx.fillRect(x,c.height-20-u*(c.height-40),w,u*(c.height-40));
+  });
+}
+['pgNSlider','pgKSlider','pgSeqSlider','pgCFSlider'].forEach(id=>document.getElementById(id).oninput=updatePG);
+document.getElementById('pgBalSelect').onchange=updatePG;
+updatePG();
+
+// ============================================================
+// SCROLL: NAV + FADE-IN
+// ============================================================
+const nav = document.getElementById('nav');
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    if (el.getBoundingClientRect().top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+</body>
+</html>

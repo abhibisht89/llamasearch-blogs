@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAE, TRPO &amp; PPO — Reasoning from Scratch</title>
+<style>
+/* ============================================================
+   Chapter 09 — shared series tokens (match Ch.01–08)
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 60vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(167,139,250,0.12) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 760px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent2), var(--accent3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.callout.pink { border-left-color: var(--accent4); background: rgba(244,114,182,0.08); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; line-height: 1.8; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-yellow { background: rgba(251,191,36,0.15); color: var(--accent5); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent3); background: rgba(52,211,153,0.15); color: var(--accent3); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+.footer a { margin: 0 12px; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+td { color: var(--text-dim); }
+.flow-diagram { font-family: var(--mono); font-size: 0.82rem; background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 20px; line-height: 1.9; color: var(--text-dim); overflow-x: auto; }
+.flow-diagram .highlight { color: var(--accent3); }
+
+/* ============================================================
+   Ch.09-specific: GAE bias-variance bars, PPO clip canvas
+   ============================================================ */
+.viz-wrap { display: grid; grid-template-columns: 1fr 220px; gap: 20px; align-items: start; }
+@media (max-width: 700px) { .viz-wrap { grid-template-columns: 1fr; } }
+.viz-canvas { width: 100%; max-width: 560px; height: 320px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card-alt); display: block; }
+.viz-stats { font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); line-height: 1.9; }
+.viz-stats .val { color: var(--accent3); font-weight: 600; }
+.viz-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 0.75rem; color: var(--text-dim); }
+.viz-legend span { display: flex; align-items: center; gap: 6px; }
+.viz-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.slider-row { display: flex; align-items: center; gap: 16px; margin: 16px 0; flex-wrap: wrap; }
+.slider-row label { font-family: var(--mono); font-size: 0.85rem; color: var(--text); min-width: 120px; }
+.slider-row input[type=range] { flex: 1; min-width: 180px; accent-color: var(--accent); }
+.slider-val { font-family: var(--mono); font-size: 0.9rem; color: var(--accent2); min-width: 48px; }
+
+.example-steps { counter-reset: ex; list-style: none; margin: 16px 0; padding: 0; }
+.example-steps li {
+  counter-increment: ex; padding: 14px 16px 14px 48px; margin-bottom: 10px;
+  background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px;
+  position: relative; font-size: 0.9rem; color: var(--text-dim);
+}
+.example-steps li::before {
+  content: counter(ex); position: absolute; left: 14px; top: 14px;
+  width: 24px; height: 24px; border-radius: 50%; background: rgba(167,139,250,0.2);
+  color: var(--accent2); font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.example-steps li strong { color: var(--text); }
+
+.timeline { position: relative; padding-left: 28px; margin: 24px 0; }
+.timeline::before { content: ''; position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px; background: var(--border); }
+.timeline-item { position: relative; margin-bottom: 24px; padding-left: 16px; }
+.timeline-item::before {
+  content: ''; position: absolute; left: -24px; top: 6px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--accent2); border: 2px solid var(--bg);
+}
+.timeline-item h4 { color: var(--text); font-size: 1rem; margin-bottom: 4px; }
+.timeline-item p { margin-bottom: 0; font-size: 0.9rem; }
+
+/* Ch.09 canvas charts: GAE backup weights + PPO clip curves share .viz-canvas sizing */
+
+@media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<!-- Breadcrumb -->
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; background: #111118; border-bottom: 1px solid #23232f; padding: 10px 24px; font-size: 0.82rem; color: #8888a0; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Reasoning from Scratch</a><span class="bc-sep">›</span><span class="bc-current">Ch.09 — GAE, TRPO &amp; PPO</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Reasoning from Scratch</a>
+  <div class="nav-links">
+    <a href="#bridge">Bridge</a>
+    <a href="#advantage-recap">Advantage</a>
+    <a href="#gae">GAE</a>
+    <a href="#gae-viz">λ Slider</a>
+    <a href="#trpo">TRPO</a>
+    <a href="#ppo">PPO</a>
+    <a href="#ppo-viz">Clip Viz</a>
+    <a href="#example">Example</a>
+    <a href="#compare">Compare</a>
+    <a href="#llms">RLHF</a>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO — three algorithms, one clipping trick, trust regions
+     ============================================================ -->
+<div class="hero">
+  <div class="container">
+    <span class="section-num">CHAPTER 09</span>
+    <h1>GAE, TRPO &amp; PPO</h1>
+    <p class="subtitle">Chapter 08 gave us REINFORCE — direct policy optimization with brutal variance. This chapter closes the loop: GAE tames the advantage estimates, TRPO constrains how far the policy can move, and PPO replaces hard KL math with one elegant clipping trick. These three ideas power RLHF, InstructGPT, and the PPO stages behind ChatGPT-class models.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">3</span><span class="stat-label">Algorithms</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Clipping Trick</span></div>
+      <div class="stat"><span class="stat-val">0.2</span><span class="stat-label">Default ε</span></div>
+      <div class="stat"><span class="stat-val">∞</span><span class="stat-label">λ Interpolation</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 00 — Bridge from REINFORCE (Ch.08)
+     ============================================================ -->
+<section class="section fade-in" id="bridge">
+  <div class="container">
+    <span class="section-num">00 — THE ARC FROM REINFORCE</span>
+    <h2>High Variance, Then Trust, Then Clipping</h2>
+    <p>Chapter 08 established the policy gradient theorem and REINFORCE: sample trajectories, multiply returns by ∇ log π<sub>θ</sub>, update. Baselines and actor-critic helped, but two problems remained for training large neural policies at scale.</p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3><span class="tag tag-pink">Problem 1</span> Noisy Advantages</h3>
+        <p>REINFORCE uses raw returns or simple TD targets. Monte Carlo is unbiased but high-variance; one-step TD is low-variance but biased. Policy updates wobble.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag tag-yellow">Problem 2</span> Catastrophic Updates</h3>
+        <p>Large gradient steps can shift π<sub>θ</sub> so far that collected data is instantly stale — performance collapses instead of improving. We need a <em>trust region</em>.</p>
+      </div>
+    </div>
+
+    <div class="flow-diagram">
+      <span class="highlight">REINFORCE</span> (Ch.08) — high variance, unconstrained steps<br>
+      &nbsp;&nbsp;↓ GAE (Schulman et al., 2016) — better Â estimates<br>
+      &nbsp;&nbsp;↓ TRPO (Schulman et al., 2015) — KL-constrained surrogate<br>
+      &nbsp;&nbsp;↓ PPO (Schulman et al., 2017) — same idea, clipped objective<br>
+      &nbsp;&nbsp;↓ RLHF / InstructGPT / reasoning-model fine-tuning (Ch.10–12)
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Intuition to keep:</strong> GAE answers <em>“how good was this action?”</em> TRPO and PPO answer <em>“how far can we change the policy?”</em> PPO is the workhorse you will see in every modern LLM alignment stack.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 01a — Advantage function recap (Lecture 17 bridge)
+     ============================================================ -->
+<section class="section fade-in" id="advantage-recap">
+  <div class="container">
+    <span class="section-num">01a — ADVANTAGE RECAP</span>
+    <h2>Why Advantages Beat Raw Returns</h2>
+    <p>Before GAE, the lectures build intuition for the advantage function itself. At state s, suppose the policy’s default action yields Q<sup>π</sup>(s, a₀) = 50, but an alternative action yields 60. The advantage A(s, a₁) = 60 − 50 = +10 signals “this action is ten units better than average.” Actions below average get negative advantages.</p>
+
+    <div class="formula">A<sup>π</sup>(s, a) = Q<sup>π</sup>(s, a) − V<sup>π</sup>(s)</div>
+
+    <p>Using A instead of raw Q in the policy gradient subtracts a baseline per state, cutting variance without changing the expected gradient direction. GAE is the next step: a <em>better estimator</em> of this same A from sampled trajectories and a learned V(s).</p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3>One-step TD advantage</h3>
+        <p>Â ≈ r + γV(s′) − V(s) = δ<sub>t</sub>. Fast, uses critic heavily — biased if V is wrong.</p>
+      </div>
+      <div class="card">
+        <h3>GAE advantage</h3>
+        <p>Weighted sum of δ<sub>t</sub>, δ<sub>t+1</sub>, … with (γλ) weights. Tunable bias–variance via λ.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 01 — Generalized Advantage Estimation
+     ============================================================ -->
+<section class="section fade-in" id="gae">
+  <div class="container">
+    <span class="section-num">01 — GENERALIZED ADVANTAGE ESTIMATION</span>
+    <h2>GAE: One Knob Between TD(0) and Monte Carlo</h2>
+    <p>Recall the advantage function from the lectures: A<sup>π</sup>(s, a) = Q<sup>π</sup>(s, a) − V<sup>π</sup>(s). It measures how much better action <em>a</em> is compared to the policy’s average behavior in state <em>s</em>. Positive advantage → increase probability; negative → decrease.</p>
+
+    <p>The policy gradient with advantages (replacing raw returns in REINFORCE) becomes:</p>
+    <div class="formula">∇<sub>θ</sub> J(θ) ≈ E<sub>π<sub>θ</sub></sub> [ Â<sub>t</sub> · ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub> | s<sub>t</sub>) ]</div>
+
+    <p>The hard part is estimating Â<sub>t</sub>. A one-step TD residual is fast but biased because it bootstraps from V̂. A full Monte Carlo return G<sub>t</sub> − V(s<sub>t</sub>) is unbiased but noisy — every reward in the episode perturbs the estimate.</p>
+
+    <h3 style="margin-top:32px;">N-Step Returns and the Bias–Variance Tradeoff</h3>
+    <p>Chapter 06 introduced n-step backups: look ahead n rewards before bootstrapping. One-step (n=1) → low variance, high bias. Full episode (n=∞) → low bias, high variance. GAE (Schulman et al., 2016) takes an exponentially-weighted average of <em>all</em> n-step advantages instead of picking one n.</p>
+
+    <p>Define the TD error (one-step advantage residual):</p>
+    <div class="formula">δ<sub>t</sub> = r<sub>t</sub> + γ V(s<sub>t+1</sub>) − V(s<sub>t</sub>)</div>
+
+    <p>The GAE advantage at timestep t is the infinite sum of discounted TD errors:</p>
+    <div class="formula">Â<sub>t</sub><sup>GAE(γ,λ)</sup> = Σ<sub>l=0</sub><sup>∞</sup> (γλ)<sup>l</sup> δ<sub>t+l</sub></div>
+
+    <p>Equivalently, as a weighted mixture of n-step returns (weights (1−λ)λ<sup>n−1</sup> for the n-step term):</p>
+    <div class="formula">Â<sub>t</sub> = (1−λ) [ δ<sub>t</sub> + λ(δ<sub>t</sub>+δ<sub>t+1</sub>) + λ²(δ<sub>t</sub>+δ<sub>t+1</sub>+δ<sub>t+2</sub>) + … ]</div>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-blue">λ = 0</span> → TD(0)</h3>
+        <p>Only δ<sub>t</sub> matters. You look one step ahead. <strong>High bias, low variance.</strong> Updates are stable but can systematically mis-rank actions when V is wrong.</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-green">λ = 1</span> → Monte Carlo</h3>
+        <p>Full return minus baseline. <strong>Low bias, high variance.</strong> True long-term quality, but individual trajectories swing wildly.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Practical default:</strong> λ ≈ 0.95 is common in robotics and games. For LLM RLHF, λ is often 0.9–1.0 depending on episode length (a long chain-of-thought is one “episode”). The λ knob is the cleanest bias–variance dial in modern policy optimization.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Why GAE Matters for Policy Gradients</h3>
+    <p>With GAE plugged in, every policy gradient step uses a smoother, more reliable Â<sub>t</sub>. That directly reduces gradient variance without abandoning bootstrapping entirely. TRPO and PPO both assume you already have decent advantage estimates — GAE is how production code produces them.</p>
+
+    <div class="formula">∇<sub>θ</sub> J(θ) ≈ E [ Â<sub>t</sub><sup>GAE</sup> · ∇<sub>θ</sub> log π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) ]</div>
+
+    <h3 style="margin-top:32px;">Composite Returns: Building Intuition</h3>
+    <p>Before the closed-form GAE sum, the lectures walk through a two-step composite backup: half weight on the one-step TD target, half on the two-step return. Generalizing to n steps with weights (1−λ)λ<sup>n−1</sup> gives the exponential decay you see in the slider below — nearby rewards matter most; distant rewards fade unless λ → 1.</p>
+
+    <div class="card card-alt">
+      <h3>Half-and-half example (λ = 0.5 conceptually)</h3>
+      <p>One-step estimate: δ<sub>t</sub> = r<sub>t</sub> + γV(s<sub>t+1</sub>) − V(s<sub>t</sub>). Two-step: r<sub>t</sub> + γr<sub>t+1</sub> + γ²V(s<sub>t+2</sub>) − V(s<sub>t</sub>). A 50/50 blend averages bias and variance — GAE formalizes this for all n with principled weights that sum to 1.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Implementation Sketch (Backward Pass)</h3>
+    <p>In code, GAE is computed backwards along a trajectory after rollout collection. Starting from the last timestep T:</p>
+    <div class="flow-diagram">
+      gae = 0<br>
+      for t in reversed(0..T):<br>
+      &nbsp;&nbsp;δ<sub>t</sub> = r<sub>t</sub> + γ V(s<sub>t+1</sub>) − V(s<sub>t</sub>) &nbsp;&nbsp;<span class="highlight"># bootstrap V(s<sub>T+1</sub>)=0 if terminal</span><br>
+      &nbsp;&nbsp;gae = δ<sub>t</sub> + γλ · gae<br>
+      &nbsp;&nbsp;advantages[t] = gae
+    </div>
+    <p>This recurrence is equivalent to the infinite sum Σ(γλ)<sup>l</sup>δ<sub>t+l</sub> but runs in O(T) time — exactly what PPO implementations call after each rollout batch.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     INTERACTIVE — GAE λ bias-variance slider
+     ============================================================ -->
+<section class="section fade-in" id="gae-viz">
+  <div class="container">
+    <span class="section-num">01b — INTERACTIVE</span>
+    <h2>GAE λ: Bias–Variance Tradeoff</h2>
+    <p>Drag λ from 0 (pure TD) to 1 (pure Monte Carlo). The bars show relative bias and variance; the backup diagram shows how many future steps contribute.</p>
+
+    <div class="interactive-panel">
+      <div class="slider-row">
+        <label for="gae-lambda">λ (lambda)</label>
+        <input type="range" id="gae-lambda" min="0" max="100" value="90">
+        <span class="slider-val" id="gae-lambda-val">0.90</span>
+      </div>
+
+      <div class="viz-wrap">
+        <canvas id="gae-canvas" class="viz-canvas" width="560" height="320"></canvas>
+        <div class="viz-stats" id="gae-stats">
+          <div><span style="color:var(--danger)">Bias</span> <span class="val" id="gae-bias">—</span></div>
+          <div><span style="color:var(--accent5)">Variance</span> <span class="val" id="gae-var">—</span></div>
+          <div>Mode <span class="val" id="gae-mode">—</span></div>
+          <div>Effective horizon <span class="val" id="gae-horizon">—</span></div>
+        </div>
+      </div>
+
+      <div class="viz-legend">
+        <span><i style="background:#f87171"></i> Bias (lower is better)</span>
+        <span><i style="background:#fbbf24"></i> Variance (lower is better)</span>
+        <span><i style="background:#34d399"></i> TD backup depth</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 02 — Trust Region Policy Optimization
+     ============================================================ -->
+<section class="section fade-in" id="trpo">
+  <div class="container">
+    <span class="section-num">02 — TRUST REGION POLICY OPTIMIZATION</span>
+    <h2>TRPO: Don’t Destroy What You Already Know</h2>
+    <p>TRPO (Schulman et al., 2015) asks: when we improve π, can we express the new policy’s performance in terms of the old one plus a sum of advantages? Yes — but the state distribution under the <em>new</em> policy is unknown, so TRPO fixes the old policy’s state distribution and optimizes a surrogate instead.</p>
+
+    <h3>The Surrogate Objective</h3>
+    <p>Let r<sub>θ</sub>(a|s) = π<sub>θ</sub>(a|s) / π<sub>θ<sub>old</sub></sub>(a|s) be the probability ratio. The surrogate (using advantages under the old policy’s visitation distribution) is:</p>
+    <div class="formula">L(θ) = E<sub>s∼d<sup>π<sub>old</sub></sup>, a∼π<sub>θ</sub></sub> [ r<sub>θ</sub>(a|s) · Â<sub>t</sub> ]</div>
+
+    <p>Maximizing L(θ) alone is dangerous — r can blow up, making the surrogate a poor stand-in for true performance. TRPO adds a hard trust region via KL divergence:</p>
+    <div class="formula">maximize<sub>θ</sub> L(θ) &nbsp; subject to &nbsp; KL(π<sub>θ<sub>old</sub></sub> ‖ π<sub>θ</sub>) ≤ δ</div>
+
+    <p>Equivalently, the penalized form from the lectures:</p>
+    <div class="formula">L(π<sub>old</sub>, π<sub>new</sub>) − C · KL<sup>max</sup>(π<sub>old</sub>, π<sub>new</sub>)</div>
+
+    <p>When KL is small, the surrogate matches true improvement; when KL grows, the penalty dominates. δ (typically ~0.01–0.05) defines the <strong>trust region radius</strong> — you may only move π so far from π<sub>old</sub> before the constraint binds.</p>
+
+    <div class="callout warn">
+      <p><strong>Why “trust region”?</strong> Around π<sub>old</sub>, the surrogate is trustworthy. Step outside the KL ball and linear/quadratic approximations break — the policy can collapse. TRPO literally restricts each update to a neighborhood where the math still describes reality.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Surrogate Iteration Picture</h3>
+    <p>TRPO imagines a true performance landscape η(θ) you cannot write down explicitly. At each θ<sub>old</sub>, you construct a surrogate curve that touches the true curve at θ<sub>old</sub>, lies below it everywhere (underestimates improvement), and is easier to maximize. You step to the surrogate’s peak → new θ → repeat. PPO’s clipped objective is a simpler surrogate with the same “stay near θ<sub>old</sub>” flavor.</p>
+
+    <div class="card card-alt">
+      <h3>Decoupled TRPO formulation (used in practice)</h3>
+      <p>Maximize L(θ) subject to KL(π<sub>θ<sub>old</sub></sub> ‖ π<sub>θ</sub>) ≤ δ. The penalty form L − C·KL with adaptive C is equivalent in spirit: increase C until the KL constraint is satisfied after each proposed step.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Natural Gradient, Fisher Matrix, Conjugate Gradient</h3>
+    <p>Enforcing KL exactly requires second-order optimization. TRPO expands KL in a Taylor series around θ<sub>old</sub>; the second-order term involves the <strong>Fisher information matrix</strong> F:</p>
+    <div class="formula">KL(π<sub>θ<sub>old</sub></sub> ‖ π<sub>θ</sub>) ≈ ½ (θ − θ<sub>old</sub>)<sup>T</sup> F (θ − θ<sub>old</sub>)</div>
+
+    <p>The natural gradient premultiplies the ordinary gradient by F<sup>−1</sup>, scaling steps by curvature instead of raw parameter magnitude. Computing F<sup>−1</sup> for millions of neural network weights is impossible directly — TRPO uses <strong>conjugate gradient</strong> to solve Fx = g without inverting F, then performs a line search to satisfy the KL constraint δ.</p>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <h4>1. Collect trajectories under π<sub>old</sub></h4>
+        <p>Compute advantages (often with GAE) for each (s, a) pair.</p>
+      </div>
+      <div class="timeline-item">
+        <h4>2. Build surrogate L(θ) and estimate KL</h4>
+        <p>Surrogate uses old state distribution; advantages tell you which direction helps.</p>
+      </div>
+      <div class="timeline-item">
+        <h4>3. Conjugate gradient + line search</h4>
+        <p>Find the largest improving step still satisfying KL ≤ δ. Repeat until convergence.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:32px;">Why TRPO Is Hard to Implement</h3>
+    <p>TRPO works beautifully in theory and on moderate-scale benchmarks, but production teams hit friction:</p>
+    <ul style="color:var(--text-dim); margin-left:24px; margin-bottom:1em;">
+      <li>Conjugate gradient and Fisher-vector products add engineering complexity.</li>
+      <li>Multiple forward/backward passes per update — expensive for billion-parameter LMs.</li>
+      <li>Line search can fail or stall; hyperparameters δ and CG iterations need tuning.</li>
+      <li>Hard KL constraints interact badly with distributed training and mixed precision.</li>
+    </ul>
+    <p>The research community wanted TRPO’s stability without TRPO’s machinery. That motivation produced PPO.</p>
+
+    <h3 style="margin-top:32px;">Performance Decomposition (Why the Surrogate Works)</h3>
+    <p>TRPO’s theoretical backbone: the performance of a new policy η(π<sub>new</sub>) can be written as η(π<sub>old</sub>) plus an expected advantage term — but only if you evaluate states under π<sub>new</sub>’s visitation distribution. Since that distribution is unknown before training, TRPO freezes the old distribution and optimizes:</p>
+    <div class="formula">η(π<sub>new</sub>) ≈ η(π<sub>old</sub>) + E<sub>s∼d<sup>π<sub>old</sub></sup></sub> [ Σ<sub>a</sub> π<sub>new</sub>(a|s) · A<sup>π<sub>old</sub></sup>(s,a) ]</div>
+    <p>The surrogate L(θ) replaces π<sub>new</sub>(a|s) with r<sub>θ</sub>(a|s)·π<sub>old</sub>(a|s) for importance sampling while keeping states from π<sub>old</sub>. The KL constraint ensures this approximation stays valid.</p>
+
+    <div class="callout warn">
+      <p><strong>Monotonic improvement guarantee (informal):</strong> TRPO’s analysis shows that if the surrogate improves and KL ≤ δ, true policy performance improves within bounded error. PPO’s clipping heuristically enforces the same “don’t trust the surrogate too far” principle without the proof machinery at each step.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 03 — Proximal Policy Optimization
+     ============================================================ -->
+<section class="section fade-in" id="ppo">
+  <div class="container">
+    <span class="section-num">03 — PROXIMAL POLICY OPTIMIZATION</span>
+    <h2>PPO: TRPO’s Idea, One Clipping Line</h2>
+    <p>PPO (Schulman et al., 2017) keeps the probability ratio r<sub>θ</sub> = π<sub>θ</sub>(a|s) / π<sub>θ<sub>old</sub></sub>(a|s) and the surrogate r<sub>θ</sub>·Â, but replaces the KL constraint with a clipped objective. The policy cannot gain more credit than ±ε from the old probabilities — a soft trust region implemented in one min() call.</p>
+
+    <div class="formula">L<sup>CLIP</sup>(θ) = E [ min( r<sub>θ</sub>·Â , clip(r<sub>θ</sub>, 1−ε, 1+ε)·Â ) ]</div>
+
+    <p>Typical ε = 0.2, so r is clamped to [0.8, 1.2]. The clip function is:</p>
+    <div class="formula">clip(r, 1−ε, 1+ε) = max(1−ε, min(r, 1+ε))</div>
+
+    <h3 style="margin-top:32px;">Why Clipping Mimics a Trust Region</h3>
+    <div class="comparison">
+      <div class="card">
+        <h3><span class="tag tag-green">Â &gt; 0</span> (good action)</h3>
+        <p>You want to increase π<sub>θ</sub>(a|s). Unclipped objective grows linearly with r — incentive to make huge updates. Clipping at 1+ε caps the reward once r exceeds 1.2. No extra gradient for over-confidence.</p>
+      </div>
+      <div class="card">
+        <h3><span class="tag tag-pink">Â &lt; 0</span> (bad action)</h3>
+        <p>You want to decrease probability. For r &lt; 1−ε, the clipped term is <em>less</em> negative than r·Â — again limiting how aggressively you punish. Symmetric protection both ways.</p>
+      </div>
+    </div>
+
+    <p>The min() selects the pessimistic (conservative) estimate — the objective never optimistically assumes a bigger policy shift than ε allows. Empirically, this keeps KL near ε without ever computing it in the loss.</p>
+
+    <div class="callout pink">
+      <p><strong>PPO training loop (multiple epochs on same batch):</strong> collect rollouts → compute GAE advantages → optimize L<sup>CLIP</sup> for several SGD steps while π<sub>θ</sub> stays near π<sub>θ<sub>old</sub></sub>. Much simpler than TRPO’s CG line search, yet stable enough for LLM-scale RLHF.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Full PPO Objective (What Actually Gets Optimized)</h3>
+    <p>Production PPO adds a value-function loss and sometimes an entropy bonus. The complete loss minimized each step looks like:</p>
+    <div class="formula">L = −L<sup>CLIP</sup> + c<sub>1</sub> (V(s) − V<sup>target</sup>)² − c<sub>2</sub> H(π<sub>θ</sub>)</div>
+    <p>Clipping applies only to the policy term. The value network still learns to predict returns (often with its own clipping). Entropy encourages exploration early in training — less critical for fine-tuned LMs but standard in robotics benchmarks.</p>
+
+    <h3 style="margin-top:32px;">PPO Pseudocode</h3>
+    <div class="flow-diagram">
+      θ<sub>old</sub> ← θ<br>
+      for iteration = 1, 2, …:<br>
+      &nbsp;&nbsp;Run policy π<sub>θ<sub>old</sub></sub> for N steps → collect {(s,a,r)}<br>
+      &nbsp;&nbsp;Compute V(s) and GAE advantages Â<sub>t</sub> for each timestep<br>
+      &nbsp;&nbsp;for epoch = 1 .. K: &nbsp;&nbsp;<span class="highlight"># reuse same batch K times</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Shuffle and split into mini-batches<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;θ ← θ + α ∇<sub>θ</sub> L<sup>CLIP</sup>(θ) &nbsp;&nbsp;<span class="highlight"># gradient ascent on clipped objective</span><br>
+      &nbsp;&nbsp;θ<sub>old</sub> ← θ
+    </div>
+    <p>Notice θ<sub>old</sub> is fixed for all K epochs within one iteration — that is what makes r<sub>θ</sub> well-defined. After K passes, snapshots update and fresh rollouts are collected.</p>
+
+    <h3 style="margin-top:32px;">Common PPO Pitfalls</h3>
+    <ul style="color:var(--text-dim); margin-left:24px; margin-bottom:1em;">
+      <li><strong>ε too small:</strong> policy barely moves; learning stalls despite good advantages.</li>
+      <li><strong>Too many epochs K:</strong> same batch reused until r drifts far from 1 — defeats clipping purpose.</li>
+      <li><strong>Bad value function:</strong> GAE inherits critic bias; garbage V → garbage Â → wrong clip direction.</li>
+      <li><strong>Reward scale:</strong> advantages must be reasonable magnitude; normalize or clip rewards in LLM RLHF.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================
+     INTERACTIVE — PPO clipping visualization
+     ============================================================ -->
+<section class="section fade-in" id="ppo-viz">
+  <div class="container">
+    <span class="section-num">03b — INTERACTIVE</span>
+    <h2>PPO Clipping: L<sup>CLIP</sup> vs r(θ)</h2>
+    <p>Adjust ε and toggle positive vs negative advantage. Green = unclipped r·Â; purple = clipped term; orange = L<sup>CLIP</sup> = min of the two. Vertical dashed lines mark 1±ε.</p>
+
+    <div class="interactive-panel">
+      <div class="slider-row">
+        <label for="ppo-epsilon">ε (epsilon)</label>
+        <input type="range" id="ppo-epsilon" min="5" max="40" value="20">
+        <span class="slider-val" id="ppo-epsilon-val">0.20</span>
+      </div>
+      <div class="btn-group">
+        <button class="btn active" id="ppo-adv-pos" type="button">Â = +2 (positive)</button>
+        <button class="btn" id="ppo-adv-neg" type="button">Â = −2 (negative)</button>
+      </div>
+
+      <div class="viz-wrap">
+        <canvas id="ppo-canvas" class="viz-canvas" width="560" height="320"></canvas>
+        <div class="viz-stats" id="ppo-stats">
+          <div>ε bounds <span class="val" id="ppo-bounds">[0.80, 1.20]</span></div>
+          <div>At r=1.3: L<sup>CLIP</sup> <span class="val" id="ppo-at-r">—</span></div>
+          <div>Clipped? <span class="val" id="ppo-clipped">—</span></div>
+          <div>Â used <span class="val" id="ppo-adv-display">+2</span></div>
+        </div>
+      </div>
+
+      <div class="viz-legend">
+        <span><i style="background:#34d399"></i> r · Â (unclipped)</span>
+        <span><i style="background:#a78bfa"></i> clip(r) · Â</span>
+        <span><i style="background:#fbbf24"></i> L<sup>CLIP</sup> = min(·)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 04 — Worked PPO clipping example
+     ============================================================ -->
+<section class="section fade-in" id="example">
+  <div class="container">
+    <span class="section-num">04 — WORKED EXAMPLE</span>
+    <h2>PPO Clipping by Hand: r = 1.3, Â = 2, ε = 0.2</h2>
+    <p>Suppose after one SGD mini-batch the new policy assigns action <em>a</em> probability 30% where the old policy assigned 23%. The ratio r = 0.30/0.23 ≈ 1.30 — a 30% relative increase. The advantage estimate is Â = +2 (this action beat the value baseline by two units).</p>
+
+    <ul class="example-steps">
+      <li><strong>Compute the ratio.</strong> r<sub>θ</sub> = π<sub>θ</sub>(a|s) / π<sub>θ<sub>old</sub></sub>(a|s) = 1.3. Since Â &gt; 0, we want to reward increasing probability — but only up to the trust boundary.</li>
+      <li><strong>Unclipped term.</strong> r · Â = 1.3 × 2 = <strong>2.6</strong>. Vanilla policy gradient would use this; it encourages pushing r even higher.</li>
+      <li><strong>Clip the ratio.</strong> clip(1.3, 1−ε, 1+ε) = clip(1.3, 0.8, 1.2) = <strong>1.2</strong> because 1.3 &gt; 1.2 = 1+ε.</li>
+      <li><strong>Clipped term.</strong> clip(r) · Â = 1.2 × 2 = <strong>2.4</strong>. This is the maximum credit PPO allows for this (s,a) pair in this update.</li>
+      <li><strong>Take the minimum.</strong> L<sup>CLIP</sup> = min(2.6, 2.4) = <strong>2.4</strong>. The objective ignores the extra 0.2 — gradient w.r.t. θ vanishes for r beyond 1+ε when Â &gt; 0.</li>
+    </ul>
+
+    <div class="callout ok">
+      <p><strong>Interpretation:</strong> The action was good (Â &gt; 0), so PPO still increases its probability — but only until r reaches 1.2. Further increases yield zero additional surrogate reward, preventing the catastrophic “overshoot” updates TRPO’s KL constraint was designed to stop.</p>
+    </div>
+
+    <p>For contrast, if Â = −2 and r = 0.7 (policy already reduced bad action): unclipped = −1.4, clip(0.7, 0.8, 1.2) = 0.8, clipped term = −1.6, min = <strong>−1.6</strong> (more penalty than unclipped — clipping bites when you try to move too far in the direction of a negative advantage).</p>
+
+    <h3 style="margin-top:32px;">Second Numeric Case: r = 1.1, Â = +2, ε = 0.2</h3>
+    <p>When r stays inside [0.8, 1.2], clipping is inactive:</p>
+    <ul class="example-steps">
+      <li>r · Â = 1.1 × 2 = 2.2</li>
+      <li>clip(1.1, 0.8, 1.2) = 1.1 (unchanged)</li>
+      <li>L<sup>CLIP</sup> = min(2.2, 2.2) = <strong>2.2</strong> — full credit; gradients flow normally.</li>
+    </ul>
+    <p>This is the “trust but verify” sweet spot: meaningful policy change is allowed until r hits the ε rails.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 05 — Comparison table
+     ============================================================ -->
+<section class="section fade-in" id="compare">
+  <div class="container">
+    <span class="section-num">05 — ALGORITHM COMPARISON</span>
+    <h2>REINFORCE vs TRPO vs PPO</h2>
+    <p>The progression is not random — each algorithm fixes the previous one’s pain point while preserving what worked.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Aspect</th>
+          <th>REINFORCE</th>
+          <th>TRPO</th>
+          <th>PPO</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Core update</td>
+          <td>∇ log π · G<sub>t</sub> (or Â)</td>
+          <td>Surrogate L(θ) with KL ≤ δ</td>
+          <td>Clipped min(r·Â, clip(r)·Â)</td>
+        </tr>
+        <tr>
+          <td>Advantage estimate</td>
+          <td>MC return − baseline</td>
+          <td>GAE (typical)</td>
+          <td>GAE (typical)</td>
+        </tr>
+        <tr>
+          <td>Trust region</td>
+          <td>None — any step size</td>
+          <td>Hard KL constraint δ</td>
+          <td>Soft clip ε ≈ 0.2</td>
+        </tr>
+        <tr>
+          <td>Second-order math</td>
+          <td>No</td>
+          <td>Yes (Fisher, conjugate gradient)</td>
+          <td>No — first-order SGD</td>
+        </tr>
+        <tr>
+          <td>Implementation</td>
+          <td>Simple</td>
+          <td>Complex</td>
+          <td>Simple + stable</td>
+        </tr>
+        <tr>
+          <td>Multi-epoch reuse</td>
+          <td>No (on-policy once)</td>
+          <td>Limited</td>
+          <td>Yes — several epochs per batch</td>
+        </tr>
+        <tr>
+          <td>LLM RLHF usage</td>
+          <td>Too noisy at scale</td>
+          <td>Rare (cost)</td>
+          <td><strong>Industry standard</strong></td>
+        </tr>
+        <tr>
+          <td>Typical hyperparams</td>
+          <td>α ~ 1e−3, no clip</td>
+          <td>δ ~ 0.01–0.05</td>
+          <td>ε ~ 0.2, K ~ 4 epochs</td>
+        </tr>
+        <tr>
+          <td>Failure mode</td>
+          <td>Variance explosion</td>
+          <td>Slow / fragile CG</td>
+          <td>Clip too tight → no learning</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <h4>REINFORCE → GAE</h4>
+        <p>Same policy gradient skeleton; GAE replaces noisy return estimates with a bias–variance-controlled Â<sub>t</sub>.</p>
+      </div>
+      <div class="timeline-item">
+        <h4>GAE + unconstrained PG → TRPO</h4>
+        <p>Good advantages aren’t enough if one update destroys the policy. KL trust region bounds policy drift.</p>
+      </div>
+      <div class="timeline-item">
+        <h4>TRPO → PPO</h4>
+        <p>Same ratio-based surrogate spirit; clipping approximates the trust region without Fisher matrices or line search.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 06 — PPO and LLMs / RLHF
+     ============================================================ -->
+<section class="section fade-in" id="llms">
+  <div class="container">
+    <span class="section-num">06 — PPO MEETS LANGUAGE MODELS</span>
+    <h2>Why Every Alignment Pipeline Runs PPO</h2>
+    <p>When OpenAI trained InstructGPT (Ouyang et al., 2022), the RL fine-tuning stage used PPO with a learned reward model — classic RLHF. ChatGPT and successors follow the same pattern: supervised fine-tuning first, then PPO against human preference rewards. The “agent” is the language model; each token is an action; the prompt is the state; a reward model scores the completed response.</p>
+
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-blue">RL mapping</span></h3>
+        <p><strong>State s<sub>t</sub>:</strong> prompt + tokens generated so far<br>
+        <strong>Action a<sub>t</sub>:</strong> next token from vocabulary<br>
+        <strong>Reward:</strong> reward model score (often only at EOS)<br>
+        <strong>Policy:</strong> LM softmax over vocab</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-purple">Why PPO specifically</span></h3>
+        <p>Billions of parameters, distributed training, many PPO epochs per rollout batch. TRPO’s conjugate gradient would be prohibitive. Clipping gives stability; GAE (or variants) handles sparse terminal rewards across long sequences.</p>
+      </div>
+    </div>
+
+    <p>DeepSeek-R1 and other reasoning models often use GRPO (Group Relative Policy Optimization) — a PPO descendant that drops the value network and normalizes rewards within prompt groups. Chapter 11 covers GRPO in depth; the key point here: <strong>GRPO’s clipped ratio objective inherits directly from PPO</strong>, which inherits from TRPO’s trust-region insight, which sits atop GAE-cleaned policy gradients.</p>
+
+    <div class="callout">
+      <p><strong>Chapter roadmap:</strong> Ch.10 maps RL notation to LLM training pipelines (RLHF, verifiable rewards). Ch.11 dissects GRPO. Ch.12 builds a reasoning model. None of that works without the GAE → TRPO → PPO stack you just learned.</p>
+    </div>
+
+    <h3 style="margin-top:32px;">Key Formulas Cheat Sheet</h3>
+    <div class="formula">Â<sub>t</sub><sup>GAE</sup> = Σ<sub>l=0</sub><sup>∞</sup> (γλ)<sup>l</sup> δ<sub>t+l</sub> &nbsp;&nbsp;|&nbsp;&nbsp; λ=0 → TD(0), λ=1 → MC</div>
+    <div class="formula">L(θ) = E [ r<sub>θ</sub> · Â ] &nbsp;&nbsp; s.t. &nbsp;&nbsp; KL(π<sub>θ<sub>old</sub></sub> ‖ π<sub>θ</sub>) ≤ δ &nbsp;&nbsp;(TRPO)</div>
+    <div class="formula">L<sup>CLIP</sup>(θ) = E [ min( r<sub>θ</sub>·Â , clip(r<sub>θ</sub>, 1−ε, 1+ε)·Â ) ] &nbsp;&nbsp;(PPO)</div>
+
+    <h3 style="margin-top:32px;">Historical Milestones</h3>
+    <table>
+      <thead>
+        <tr><th>Year</th><th>Paper</th><th>Contribution</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>2015</td><td>TRPO (Schulman et al.)</td><td>KL-constrained surrogate; trust region concept</td></tr>
+        <tr><td>2016</td><td>GAE (Schulman et al.)</td><td>λ-interpolated advantage estimation</td></tr>
+        <tr><td>2017</td><td>PPO (Schulman et al.)</td><td>Clipped surrogate; first-order TRPO alternative</td></tr>
+        <tr><td>2022</td><td>InstructGPT (Ouyang et al.)</td><td>PPO + RLHF at LLM scale</td></tr>
+        <tr><td>2024+</td><td>DeepSeek-R1, reasoning LMs</td><td>GRPO and variants building on PPO clipping</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout ok">
+      <p><strong>You are now ready for Arc 4.</strong> You understand how advantages are estimated (GAE), how policy updates are constrained (TRPO/PPO), and why every major alignment stack defaults to PPO. Chapter 10 maps these RL objects onto tokens, prompts, and reward models.</p>
+    </div>
+  </div>
+</section>
+
+<div class="footer">
+  <p>
+    <a href="../08-policy-gradients-and-reinforce/">← Ch.08 — Policy Gradients</a>
+    <a href="../10-rl-meets-llms/">Ch.10 — RL Meets LLMs →</a>
+  </p>
+  <p style="margin-top:16px;">Reasoning from Scratch · Chapter 09 of 12</p>
+</div>
+
+<script>
+/* ============================================================
+   Chapter 09 interactive scripts
+   - Scroll-reveal + sticky nav (series standard)
+   - GAE λ slider: pedagogical bias/variance bars + TD-error weights
+   - PPO clip plot: unclipped vs clipped vs min objective vs r
+   ============================================================ */
+const nav = document.getElementById('nav');
+const faders = document.querySelectorAll('.fade-in');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+faders.forEach(f => observer.observe(f));
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+
+/* ============================================================
+   GAE λ slider — bias/variance bars + backup depth visualization
+   λ=0 → high bias low var (TD); λ=1 → low bias high var (MC)
+   ============================================================ */
+(function () {
+  const canvas = document.getElementById('gae-canvas');
+  const ctx = canvas.getContext('2d');
+  const slider = document.getElementById('gae-lambda');
+  const valEl = document.getElementById('gae-lambda-val');
+  const biasEl = document.getElementById('gae-bias');
+  const varEl = document.getElementById('gae-var');
+  const modeEl = document.getElementById('gae-mode');
+  const horEl = document.getElementById('gae-horizon');
+
+  function renderGae() {
+    const lam = slider.value / 100;
+    valEl.textContent = lam.toFixed(2);
+
+    // illustrative metrics (not measured — pedagogical)
+    const bias = lam;
+    const variance = 1 - lam;
+    const horizon = lam < 0.01 ? 1 : Math.min(20, Math.round(1 / (1 - lam + 0.001)));
+
+    biasEl.textContent = (bias * 100).toFixed(0) + '%';
+    varEl.textContent = (variance * 100).toFixed(0) + '%';
+    modeEl.textContent = lam < 0.05 ? 'TD(0)' : lam > 0.95 ? 'Monte Carlo' : 'Mixed GAE';
+    horEl.textContent = lam > 0.99 ? 'full episode' : '~' + horizon + ' steps';
+
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // bias / variance bars
+    const barW = 80, baseY = H - 50;
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px SF Mono, monospace';
+    ctx.fillText('Bias', 60, baseY + 20);
+    ctx.fillText('Variance', 180, baseY + 20);
+
+    ctx.fillStyle = '#f87171';
+    ctx.fillRect(60, baseY - bias * 120, barW, bias * 120);
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(180, baseY - variance * 120, barW, variance * 120);
+
+    // backup diagram: n steps with weights (1-lam)*lam^(n-1)
+    const ox = 320, oy = 40, stepX = 36;
+    const nSteps = 8;
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < nSteps; i++) {
+      const w = (1 - lam) * Math.pow(lam, i);
+      const x = ox + i * stepX;
+      const h = 24 + w * 100;
+      ctx.fillStyle = `rgba(52,211,153,${0.25 + w * 0.75})`;
+      ctx.fillRect(x, oy + 80 - h, 28, h);
+      ctx.strokeRect(x, oy + 80 - h, 28, h);
+      ctx.fillStyle = '#8888a0';
+      ctx.font = '9px SF Mono, monospace';
+      ctx.fillText('δ' + (i === 0 ? 'ₜ' : 'ₜ+' + i), x + 4, oy + 95);
+    }
+    ctx.fillStyle = '#e0e0e8';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText('TD errors δ weighted by (1−λ)λⁿ', ox, oy + 115);
+
+    // λ axis label
+    ctx.fillStyle = '#a78bfa';
+    ctx.font = '13px SF Mono, monospace';
+    ctx.fillText('λ = ' + lam.toFixed(2), 24, 32);
+  }
+
+  slider.addEventListener('input', renderGae);
+  renderGae();
+})();
+
+/* ============================================================
+   PPO clipping visualization — L^CLIP(r) for ± advantage
+   Shows unclipped, clipped, and min curves; ε slider moves bounds
+   ============================================================ */
+(function () {
+  const canvas = document.getElementById('ppo-canvas');
+  const ctx = canvas.getContext('2d');
+  const epsSlider = document.getElementById('ppo-epsilon');
+  const epsVal = document.getElementById('ppo-epsilon-val');
+  const boundsEl = document.getElementById('ppo-bounds');
+  const atREl = document.getElementById('ppo-at-r');
+  const clippedEl = document.getElementById('ppo-clipped');
+  const advDisplay = document.getElementById('ppo-adv-display');
+  const btnPos = document.getElementById('ppo-adv-pos');
+  const btnNeg = document.getElementById('ppo-adv-neg');
+  let adv = 2;
+
+  function clip(r, eps) {
+    return Math.max(1 - eps, Math.min(r, 1 + eps));
+  }
+
+  function lClip(r, eps, A) {
+    return Math.min(r * A, clip(r, eps) * A);
+  }
+
+  function drawLine(fn, color, W, H, pad, eps, A) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let px = 0; px <= W - 2 * pad; px++) {
+      const r = 0.3 + (px / (W - 2 * pad)) * 1.7;
+      const yVal = fn(r, eps, A);
+      const x = pad + px;
+      const y = H - pad - (yVal + 3) / 6 * (H - 2 * pad);
+      if (px === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  function renderPpo() {
+    const eps = epsSlider.value / 100;
+    epsVal.textContent = eps.toFixed(2);
+    boundsEl.textContent = '[' + (1 - eps).toFixed(2) + ', ' + (1 + eps).toFixed(2) + ']';
+    advDisplay.textContent = adv > 0 ? '+' + adv : adv;
+
+    const rTest = 1.3;
+    const lc = lClip(rTest, eps, adv);
+    atREl.textContent = lc.toFixed(2);
+    clippedEl.textContent = Math.abs(rTest * adv - clip(rTest, eps) * adv) > 0.001 ? 'yes' : 'no';
+
+    const W = canvas.width, H = canvas.height, pad = 44;
+    ctx.clearRect(0, 0, W, H);
+
+    // axes
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, pad);
+    ctx.lineTo(pad, H - pad);
+    ctx.lineTo(W - pad, H - pad);
+    ctx.stroke();
+
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px SF Mono, monospace';
+    ctx.fillText('L(r)', 12, pad + 4);
+    ctx.fillText('r(θ)', W - pad - 20, H - pad + 18);
+
+    // vertical clip bounds
+    const rMin = 0.3, rMax = 2.0;
+    [1 - eps, 1 + eps].forEach(rb => {
+      const px = pad + ((rb - rMin) / (rMax - rMin)) * (W - 2 * pad);
+      ctx.strokeStyle = 'rgba(251,191,36,0.5)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(px, pad);
+      ctx.lineTo(px, H - pad);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    drawLine((r, e, A) => r * A, '#34d399', W, H, pad, eps, adv);
+    drawLine((r, e, A) => clip(r, e) * A, '#a78bfa', W, H, pad, eps, adv);
+    drawLine((r, e, A) => lClip(r, e, A), '#fbbf24', W, H, pad, eps, adv);
+
+    // mark r=1.3
+    const px130 = pad + ((1.3 - rMin) / (rMax - rMin)) * (W - 2 * pad);
+    ctx.fillStyle = '#f472b6';
+    ctx.beginPath();
+    ctx.arc(px130, H - pad - (lc + 3) / 6 * (H - 2 * pad), 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f472b6';
+    ctx.font = '10px SF Mono, monospace';
+    ctx.fillText('r=1.3', px130 - 14, pad - 6);
+  }
+
+  epsSlider.addEventListener('input', renderPpo);
+  btnPos.addEventListener('click', () => {
+    adv = 2;
+    btnPos.classList.add('active');
+    btnNeg.classList.remove('active');
+    renderPpo();
+  });
+  btnNeg.addEventListener('click', () => {
+    adv = -2;
+    btnNeg.classList.add('active');
+    btnPos.classList.remove('active');
+    renderPpo();
+  });
+  renderPpo();
+})();
+</script>
+</body>
+</html>

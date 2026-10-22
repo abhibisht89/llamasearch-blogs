@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Transformer: Architecture, Math & Training — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Variables ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+/* ===== Base ===== */
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 24px; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 12px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 24px;
+  font-size: 0.85rem;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav.visible { transform: translateY(0); }
+.nav-title { font-weight: 700; white-space: nowrap; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 80px 24px; position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 600px; margin: 0 auto 32px; }
+.stats { display: flex; gap: 32px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap; }
+.stat { text-align: center; }
+.stat-val { display: block; font-size: 2rem; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+.stat-label { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Sections ===== */
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.85rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+
+/* ===== Cards ===== */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; margin: 16px 0;
+}
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 24px; margin: 20px 0;
+  font-family: var(--mono); font-size: 1.05rem; color: var(--accent);
+  text-align: center; overflow-x: auto;
+}
+
+/* ===== Callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 20px 0;
+}
+.callout p { margin: 0; }
+
+/* ===== Interactive Panel ===== */
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; margin: 24px 0;
+}
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.btn {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 16px; color: var(--text-dim);
+  cursor: pointer; font-family: var(--sans); font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+.btn:hover { border-color: var(--accent); color: var(--text); }
+.btn.active { background: rgba(108,140,255,0.15); border-color: var(--accent); color: var(--accent); }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem;
+  font-weight: 600; letter-spacing: 0.5px;
+  background: rgba(108,140,255,0.12); color: var(--accent);
+}
+.tag-green { background: rgba(52,211,153,0.12); color: var(--accent3); }
+.tag-purple { background: rgba(167,139,250,0.12); color: var(--accent2); }
+.tag-pink { background: rgba(244,114,182,0.12); color: var(--accent4); }
+
+/* ===== Matrix Grid ===== */
+.matrix-grid {
+  display: inline-grid; gap: 2px; margin: 12px auto;
+  background: var(--border); padding: 2px; border-radius: 8px;
+}
+.matrix-cell {
+  width: 48px; height: 36px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg-card); font-family: var(--mono); font-size: 0.75rem;
+  color: var(--text-dim); transition: all 0.3s ease;
+}
+.matrix-cell.highlight { background: rgba(108,140,255,0.2); color: var(--accent); }
+.matrix-cell.header { background: var(--bg-card-alt); color: var(--text); font-weight: 600; }
+
+/* ===== Token Row ===== */
+.token-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.token {
+  padding: 8px 14px; border-radius: 8px; font-family: var(--mono); font-size: 0.85rem;
+  background: var(--bg-card-alt); border: 1px solid var(--border); color: var(--text);
+  transition: all 0.3s ease;
+}
+.token.active { border-color: var(--accent); background: rgba(108,140,255,0.15); }
+.token.generated { border-color: var(--accent3); background: rgba(52,211,153,0.1); color: var(--accent3); }
+.token.sos { border-color: var(--accent5); color: var(--accent5); }
+.token.eos { border-color: var(--accent4); color: var(--accent4); }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 140px; margin: 16px 0; padding: 0 8px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%; border-radius: 4px 4px 0 0; transition: height 0.5s ease;
+  background: var(--accent); min-height: 2px;
+}
+.bar-label { font-size: 0.65rem; color: var(--text-dim); font-family: var(--mono); text-align: center; }
+.bar-val { font-size: 0.65rem; color: var(--accent); font-family: var(--mono); }
+
+/* ===== Slider ===== */
+input[type="range"] {
+  -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px;
+  background: var(--border); outline: none; margin: 8px 0;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+}
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; max-width: 100%; }
+
+/* ===== Fade In ===== */
+.fade-in { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Responsive ===== */
+@media (max-width: 700px) {
+  .comparison { grid-template-columns: 1fr; }
+  .stats { gap: 20px; }
+  .nav-links { display: none; }
+  .matrix-cell { width: 36px; height: 28px; font-size: 0.65rem; }
+}
+
+/* ===== Session Q&A Notes ===== */
+.qa-panel {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px dashed var(--border);
+}
+.qa-panel-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 16px;
+}
+.qa-item {
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  background: var(--bg-card);
+}
+.qa-ai { border-left: 3px solid var(--accent2); }
+.qa-user { border-left: 3px solid var(--accent3); }
+.qa-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.qa-ai .qa-label { color: var(--accent2); }
+.qa-user .qa-label { color: var(--accent3); }
+.qa-q { color: var(--text); font-weight: 600; margin-bottom: 6px; }
+.qa-a { color: var(--text-dim); font-size: 0.92rem; }
+.qa-a code {
+  background: var(--bg-card-alt);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">The Transformer: Architecture, Math &amp; Training</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Advanced NLP V2</a>
+  <div class="nav-links">
+    <a href="#s0">Why Transformers</a>
+    <a href="#s1">Embeddings</a>
+    <a href="#s2">Positional Encoding</a>
+    <a href="#s3">Self-Attention</a>
+    <a href="#s4">Multi-Head</a>
+    <a href="#s5">LayerNorm</a>
+    <a href="#s6">Decoder &amp; Masking</a>
+    <a href="#s7">Training</a>
+    <a href="#s8">Inference</a>
+    <a href="#s9">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>The Transformer: Architecture, Math &amp; Training</h1>
+    <p class="subtitle">A complete walkthrough of the "Attention Is All You Need" architecture — from RNN limitations through self-attention, multi-head attention, encoder-decoder design, to training and inference pipelines.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">10</span><span class="stat-label">Core Concepts</span></div>
+      <div class="stat"><span class="stat-val">6</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+    <p style="color:var(--text-dim);max-width:650px;margin:0 auto;font-size:0.95rem;">
+      This tutorial starts with the problems that recurrent neural networks face — slowness on long sequences and vanishing gradients — and shows how the Transformer solves every one of them. We build up the full architecture piece by piece: input embeddings, sinusoidal positional encodings, dot-product self-attention, multi-head attention with learned projections, layer normalization, the masked decoder, cross-attention, and the final linear projection. We then walk through how training works in a single pass and how autoregressive inference produces tokens one at a time.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 00: Why Transformers ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Why We Need the Transformer</h2>
+
+    <p>Before the Transformer, <strong>recurrent neural networks (RNNs)</strong> dominated sequence-to-sequence tasks. An RNN processes tokens one at a time: it takes the first input token x₁ along with an initial hidden state (usually all zeros), produces an output y₁ and a new hidden state, then feeds that hidden state along with x₂ to produce y₂, and so on. If you have <em>n</em> tokens, you need <em>n</em> sequential time steps.</p>
+
+    <p>This design has three fundamental problems:</p>
+
+    <div class="card">
+      <ul style="list-style:none;">
+        <li><span style="color:var(--danger);">✗</span> <strong>Slow for long sequences:</strong> The process is a sequential for-loop. The longer the sequence, the longer the computation. You cannot parallelize across tokens because each step depends on the previous hidden state.</li>
+        <li style="margin-top:12px;"><span style="color:var(--danger);">✗</span> <strong>Vanishing / exploding gradients:</strong> Frameworks like PyTorch convert neural networks into computation graphs. When you backpropagate through a long chain, you multiply many partial derivatives together (the chain rule). If each factor is less than 1, the product shrinks toward zero — the gradient <em>vanishes</em>. If each factor is greater than 1, the product explodes toward infinity. This is compounded by the fact that CPUs and GPUs can only represent numbers up to a certain precision (e.g., 32-bit or 64-bit). If the gradient becomes too small, its contribution to weight updates is negligible — the weight barely moves. Either way, the network struggles to learn.</li>
+        <li style="margin-top:12px;"><span style="color:var(--danger);">✗</span> <strong>Difficulty accessing distant context:</strong> The hidden state is a fixed-size vector that must carry all information about earlier tokens. After hundreds of steps, the contribution of the first token to the current hidden state has nearly disappeared. The model effectively "forgets" early context, even though as humans we know that words 200 positions back can still be relevant.</li>
+      </ul>
+    </div>
+
+    <h3>The Chain Rule in Practice</h3>
+
+    <p>To understand vanishing gradients concretely, consider a simple computation graph. We have two inputs <strong>x</strong> and <strong>y</strong>. First, a function f multiplies them: <strong>z = f(x, y) = x &times; y</strong>. Then a second function g squares the result: <strong>g(z) = z&sup2;</strong>.</p>
+
+    <p>PyTorch computes the derivative of g with respect to x using the chain rule:</p>
+
+    <div class="formula">dg/dx = dg/dz &times; dz/dx</div>
+
+    <p>The key is: the longer the chain of computation (more nodes between input and output), the longer this multiplication chain becomes. With 2 nodes, we multiply 2 partial derivatives. With 100 nodes, we multiply 100.</p>
+
+    <p>Now suppose each partial derivative is <strong>0.5</strong>. Two of them: 0.5 &times; 0.5 = <strong>0.25</strong>. The product is smaller than either factor. Ten of them: 0.5<sup>10</sup> &approx; <strong>0.001</strong>. A hundred of them: effectively <strong>zero</strong>. This is vanishing gradients. Conversely, if each factor is 1.5, then 1.5<sup>100</sup> is astronomically large — the gradient <em>explodes</em>.</p>
+
+    <p>This is exactly what happens in RNNs: the hidden state passes through dozens or hundreds of computation nodes. The gradient of the loss with respect to early weights must travel through this entire chain. By the time it reaches the first token, it has either vanished or exploded.</p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> The Transformer solves all three problems simultaneously. It processes the entire sequence in one pass (no sequential for-loop), it avoids long multiplication chains through direct attention connections, and every token can directly attend to every other token regardless of distance.</p>
+    </div>
+
+    <!-- Interactive: Vanishing gradient demo -->
+    <div class="interactive-panel">
+      <h3>Vanishing &amp; Exploding Gradients — Interactive Demo</h3>
+      <p>Each node multiplies the gradient by a factor. Adjust the factor and the chain length to see how the final gradient changes:</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0;">
+        <div>
+          <label style="font-size:0.85rem;color:var(--text-dim);">Factor per node: <span id="factorVal" style="color:var(--accent);">0.50</span></label>
+          <input type="range" id="factorSlider" min="0.1" max="2.0" step="0.01" value="0.5">
+        </div>
+        <div>
+          <label style="font-size:0.85rem;color:var(--text-dim);">Chain length: <span id="chainVal" style="color:var(--accent);">10</span></label>
+          <input type="range" id="chainSlider" min="2" max="50" step="1" value="10">
+        </div>
+      </div>
+      <div style="text-align:center;margin:16px 0;">
+        <span style="font-family:var(--mono);font-size:1.1rem;">Final gradient = <span id="gradientResult" style="color:var(--accent);font-weight:700;">0.00098</span></span>
+      </div>
+      <canvas id="gradientCanvas" width="800" height="200" style="width:100%;background:var(--bg-card-alt);"></canvas>
+    </div>
+
+    <p>The Transformer, introduced in the 2017 paper <em>"Attention Is All You Need,"</em> replaces recurrence with <strong>attention</strong> — a mechanism that lets every position in a sequence directly look at every other position in a single step. The architecture splits into two macro blocks: an <strong>encoder</strong> (the left half of the diagram) and a <strong>decoder</strong> (the right half), connected by a cross-attention link where some output of the encoder is sent as input to the decoder. A final <strong>linear layer</strong> on top projects decoder outputs back into vocabulary space — it maps embeddings back to positions in the vocabulary so we can identify actual words.</p>
+
+    <h3>Matrix Multiplication Notation</h3>
+
+    <p>Before diving into the architecture, we need to be comfortable with one operation that appears everywhere: <strong>matrix multiplication and the dot product</strong>.</p>
+
+    <p>Take an input matrix of 6 words, each represented by 512 numbers — a <strong>(6 &times; 512)</strong> matrix. Multiplying by its transpose — a <strong>(512 &times; 6)</strong> matrix — cancels the inner dimensions and yields a <strong>(6 &times; 6)</strong> output matrix.</p>
+
+    <p>How is each value in this output computed? Take the first value: it is the <strong>dot product</strong> of the first row with the first column. You take the first number of the row, multiply by the first number of the column. Second number of the row, multiply by the second number of the column. You do this for all 512 pairs, then <strong>sum</strong> all 512 products. That single sum is one cell of the output matrix. Repeat for every row-column combination, and you fill the entire (6 &times; 6) grid.</p>
+
+    <p>The cell at position (i, j) is the dot product of word <em>i</em>'s embedding with word <em>j</em>'s embedding. This is exactly the operation at the heart of self-attention, as we will see shortly.</p>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 01: Input Embeddings ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Input Embeddings</h2>
+
+    <p>The first layer of both the encoder and decoder is the <strong>input embedding</strong>. A sentence (e.g., "your cat is a lovely cat") is tokenized — in the simplest case, one token per word; modern models often use sub-word tokenization (BPE, WordPiece), but the pipeline is the same. Each token maps to an <strong>input ID</strong>: an index into the vocabulary ("your" might be 105, "cat" 6500; the same word always gets the same ID). Each ID is then looked up in a learned table and replaced by a dense vector of size <strong>d_model</strong> (512 in the original paper) — random at initialization, then trained so the numbers capture meaning.</p>
+
+    <div class="formula">
+      Input sentence → Tokens → Input IDs → Embedding vectors (seq × d_model)
+    </div>
+
+    <p>The result is a matrix of shape <strong>(sequence_length × d_model)</strong> — in our example, 6 × 512. Each row is one word's embedding. The vocabulary and input IDs are fixed, but the embedding vectors change during training as the model learns to represent meaning.</p>
+
+    <div class="callout">
+      <p><strong>Terminology note:</strong> d_model is the embedding dimension. The original Transformer paper uses d_model = 512. This same dimension is preserved throughout the encoder and decoder — every intermediate representation stays (seq × d_model). <strong>Embedding</strong> means learned (updated during training); <strong>encoding</strong> means fixed and computed (as with positional vectors below).</p>
+    </div>
+
+    <!-- Interactive: Embedding lookup -->
+    <div class="interactive-panel">
+      <h3>Embedding Lookup Visualization</h3>
+      <p>Click a word to see its input ID and embedding vector (values are illustrative):</p>
+      <div class="btn-group" id="embBtnGroup">
+        <button class="btn active" onclick="showEmb(0)">your</button>
+        <button class="btn" onclick="showEmb(1)">cat</button>
+        <button class="btn" onclick="showEmb(2)">is</button>
+        <button class="btn" onclick="showEmb(3)">a</button>
+        <button class="btn" onclick="showEmb(4)">lovely</button>
+        <button class="btn" onclick="showEmb(5)">cat</button>
+      </div>
+      <div class="card" style="margin-top:8px;">
+        <p style="margin:0;"><strong>Input ID:</strong> <span id="embId" style="color:var(--accent);font-family:var(--mono);">105</span></p>
+        <p style="margin:8px 0 0;font-size:0.85rem;color:var(--text-dim);">Embedding (first 8 of 512 dims):</p>
+        <div id="embVec" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 02: Positional Encoding ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Positional Encoding</h2>
+
+    <p>Embeddings capture meaning, but they carry no information about <em>where</em> a word sits in the sentence. The word "cat" at position 1 has the exact same embedding as "cat" at position 5. We need the model to know that nearby words are close and distant words are far apart.</p>
+
+    <p><strong>Sinusoidal positional encoding</strong> solves this. For each position <em>pos</em> in the sentence and each dimension <em>i</em> in the embedding vector, we compute a fixed value using sine and cosine functions:</p>
+
+    <div class="formula">
+      PE(pos, 2i) = sin(pos / 10000^(2i / d_model))<br>
+      PE(pos, 2i+1) = cos(pos / 10000^(2i / d_model))
+    </div>
+
+    <p>Even dimensions use sine, odd dimensions use cosine. The argument <em>pos</em> is the word's index in the sentence (0, 1, 2, ...) and <em>2i</em> is the dimension index along the d_model vector. This creates a unique "fingerprint" for each position — a vector of 512 numbers that we <strong>add</strong> (element-wise) to the word embedding.</p>
+
+    <h3>Walking Through the Calculation</h3>
+
+    <p>Consider the sentence "your cat is" (3 words). We build a PE vector of size 512 for each word. Let's compute a few values explicitly:</p>
+
+    <div class="card">
+      <p><strong>Word "your" at position 0:</strong></p>
+      <p>PE(0, 0) = sin(0 / 10000<sup>0/512</sup>) = sin(0) = <strong>0</strong></p>
+      <p>PE(0, 1) = cos(0 / 10000<sup>0/512</sup>) = cos(0) = <strong>1</strong></p>
+      <p style="color:var(--text-dim);">All even dimensions: sin(0) = 0. All odd dimensions: cos(0) = 1. So position 0 has a distinctive pattern: [0, 1, 0, 1, 0, 1, ...].</p>
+      <p style="margin-top:12px;"><strong>Word "cat" at position 1:</strong></p>
+      <p>PE(1, 0) = sin(1 / 10000<sup>0/512</sup>) = sin(1) &approx; <strong>0.841</strong></p>
+      <p>PE(1, 1) = cos(1 / 10000<sup>0/512</sup>) = cos(1) &approx; <strong>0.540</strong></p>
+      <p>PE(1, 2) = sin(1 / 10000<sup>2/512</sup>) = sin(1 / 10000<sup>0.0039</sup>) &approx; sin(0.982) &approx; <strong>0.834</strong></p>
+      <p style="color:var(--text-dim);">The first argument (<em>pos</em>) tells us which word. The second argument (2i) tells us which dimension along the vector. Even dimensions use sine, odd dimensions use cosine.</p>
+    </div>
+
+    <p>These vectors are <strong>computed once</strong> when the model is created and reused for every sentence. They are not learned during training — they are deterministic. Different sentences with different words still get the same positional encoding vectors, because position is about <em>where</em> in the sentence, not <em>which</em> word. If you have a different sentence — say "the dog runs" — you still use the exact same PE vectors for positions 0, 1, 2.</p>
+
+    <div class="callout">
+      <p><strong>Why sine and cosine?</strong> Multiple sine/cosine waves at different frequencies create a unique fingerprint per position — like clock hands rotating at different speeds. Nearby positions have similar fingerprints because the waves change smoothly. The model learns to read this pattern as spatial information.</p>
+    </div>
+
+    <!-- Interactive: Positional Encoding heatmap -->
+    <div class="interactive-panel">
+      <h3>Positional Encoding Heatmap</h3>
+      <p>This heatmap shows the positional encoding values for the first <span id="peSeqLen">20</span> positions across <span id="peDims">64</span> dimensions. Notice the wave-like patterns:</p>
+      <div style="margin:8px 0;">
+        <label style="font-size:0.85rem;color:var(--text-dim);">Positions: <span id="pePosVal">20</span></label>
+        <input type="range" id="pePosSlider" min="4" max="50" step="1" value="20">
+      </div>
+      <canvas id="peCanvas" width="800" height="300" style="width:100%;background:var(--bg-card-alt);"></canvas>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 03: Self-Attention ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Self-Attention (Single Head)</h2>
+
+    <p>Now we have embeddings enriched with positional information. The next step is to let words <strong>relate to each other</strong>. This is the job of <strong>self-attention</strong> — a mechanism that actually existed before the Transformer. The key innovation of the "Attention Is All You Need" paper was scaling it into <strong>multi-head attention</strong> and using it as the sole mechanism for sequence modeling, removing recurrence entirely.</p>
+
+    <p>Self-attention takes the input matrix (seq × d_model) and uses it as three identical copies: <strong>Q</strong> (Query), <strong>K</strong> (Key), and <strong>V</strong> (Value). The attention formula is:</p>
+
+    <div class="formula">
+      Attention(Q, K, V) = softmax(Q · K<sup>T</sup> / √d_k) · V
+    </div>
+
+    <div class="card">
+      <p><strong>Multiply Q by K<sup>T</sup>:</strong> If Q is (6 × 512) and K<sup>T</sup> is (512 × 6), the result is a <strong>(6 × 6)</strong> matrix. Q and K are both (seq × 512), so K must be transposed to make the inner dimensions match. Each cell is the dot product of one word's embedding with another's — a score for how strongly two words relate.</p>
+      <p style="margin-top:12px;"><strong>Scale by √d_k:</strong> Divide by √d_k (√512 ≈ 22.6). This prevents dot products from growing too large, which would push softmax into regions with tiny gradients.</p>
+      <p style="margin-top:12px;"><strong>Apply softmax row-wise:</strong> Each row sums to 1.0 — a probability distribution over how much each word attends to every other word.</p>
+      <p style="margin-top:12px;"><strong>Multiply by V:</strong> The (6 × 512) result has the same shape as the input, but each word's embedding now captures its <strong>relationship with every other word</strong> in the sentence.</p>
+    </div>
+
+    <h3>Properties of Self-Attention</h3>
+
+    <p><strong>Permutation invariant:</strong> If you swap two rows in the input, the corresponding output rows swap too, but their values don't change. The attention score between "cat" and "lovely" stays the same regardless of their position in the matrix.</p>
+
+    <p><strong>No learned parameters (yet):</strong> Bare self-attention as described here has zero trainable parameters. We just multiply the input by itself (transposed), scale, softmax, and multiply by V again. Parameters will be introduced when we move to multi-head attention.</p>
+
+    <p><strong>Diagonal dominance:</strong> Each word's dot product with itself is typically the largest value, so the diagonal of the attention matrix tends to be the maximum — each word attends most strongly to itself.</p>
+
+    <h3>Masking with &minus;&infin;</h3>
+
+    <p>There is a powerful property of this attention matrix. Before applying softmax, we can <strong>replace</strong> any value in the (seq &times; seq) matrix with <strong>&minus;&infin;</strong>. Why would we do this? If we don't want two words to interact — for example, we don't want "your" and "cat" to see each other — we replace their dot product score with &minus;&infin;. When softmax processes this value, it computes e<sup>&minus;&infin;</sup>, which equals zero. The interaction is completely suppressed.</p>
+
+    <p>This masking technique is used in the decoder to prevent words from attending to future words (the causal mask). It is also used to mask out padding tokens so they don't influence the attention computation. We will see both uses in detail later.</p>
+
+    <!-- Interactive: attention matrix -->
+    <div class="interactive-panel">
+      <h3>Self-Attention Score Matrix</h3>
+      <p>This simulates the (6 × 6) attention matrix after softmax. Hover over cells to see the attention score between two words:</p>
+      <div style="text-align:center;">
+        <div id="attnMatrix" style="display:inline-block;"></div>
+        <p id="attnInfo" style="margin-top:12px;font-family:var(--mono);font-size:0.9rem;color:var(--accent);">Hover a cell to see details</p>
+      </div>
+    </div>
+
+    <h3>The Query-Key-Value Analogy</h3>
+
+    <p>The names come from database terminology: a <strong>query</strong> searches against <strong>keys</strong>, and the matching scores weight the <strong>values</strong>. Dot product → softmax → weighted sum of values.</p>
+
+    <div class="callout">
+      <p><strong>Key takeaway:</strong> Self-attention is "self" because Q, K, and V all come from the same sentence — each word attends to every other word <em>within the same sequence</em>. Later, cross-attention will have Q from one sentence and K, V from another.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 04: Multi-Head Attention ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Multi-Head Attention</h2>
+
+    <p>Self-attention with a single head captures one "view" of how words relate. But words have many kinds of relationships — syntactic (subject-verb), semantic (synonym), positional (adjacent). <strong>Multi-head attention</strong> runs multiple attention computations in parallel, each looking at a different aspect of the embeddings.</p>
+
+    <p>Here is the process:</p>
+
+    <div class="card">
+      <p><strong>Linear projections:</strong> Multiply Q, K, V (each seq × d_model) by three learned weight matrices W<sup>Q</sup>, W<sup>K</sup>, W<sup>V</sup> (each d_model × d_model). This produces Q', K', V' — same shape, but now the model has <em>learned</em> what to focus on. W<sup>Q</sup>, W<sup>K</sup>, and W<sup>V</sup> project <em>before</em> attention; W<sup>O</sup> projects <em>after</em>, mixing head outputs into one representation.</p>
+      <p style="margin-top:12px;"><strong>Split into heads:</strong> Split Q', K', V' along the d_model dimension into <em>h</em> smaller matrices. If h = 8 and d_model = 512, each head gets matrices of size (seq × 64). We call this smaller dimension d_k = d_model / h.</p>
+      <p style="margin-top:12px;"><strong>Parallel attention:</strong> Apply the attention formula independently for each head: head_i = Attention(Q'_i, K'_i, V'_i). Each head sees the <strong>full sentence</strong> but only a <em>slice</em> of the embedding.</p>
+      <p style="margin-top:12px;"><strong>Concatenate:</strong> Concatenate all heads along the d_k dimension: Concat(head_1, ..., head_h) gives back (seq × d_model).</p>
+      <p style="margin-top:12px;"><strong>Final projection:</strong> Multiply by W<sup>O</sup> (d_model × d_model) to mix the independent head views into one unified output — like an editor combining separate reports into one summary.</p>
+    </div>
+
+    <div class="formula">
+      MultiHead(Q, K, V) = Concat(head₁, ..., head_h) · W<sup>O</sup><br><br>
+      where head_i = Attention(Q · W<sub>i</sub><sup>Q</sup>, K · W<sub>i</sub><sup>K</sup>, V · W<sub>i</sub><sup>V</sup>)
+    </div>
+
+    <h3>Why Multiple Heads? Specialization</h3>
+
+    <p>Each head can specialize. In language, one word may serve as a noun in some contexts, a verb in others, or an adverb in yet others — depending on the surrounding words. We want each head to capture a different kind of relationship. One head might learn to connect nouns with their adjectives, another might link verbs with their subjects, and a third might track pronoun references.</p>
+
+    <p>The original paper includes a striking visualization. Consider the word "making" in a sentence. The <strong>blue head</strong>, the <strong>red head</strong>, and the <strong>green head</strong> all strongly connect "making" to the word "difficult" — they see the verb-adjective dependency. But the <strong>violet/pink head</strong> does not connect "making" to "difficult" at all. Instead, the pink head connects "making" to the word "2009." Why? Because each head sees a different slice of the 512-dimensional embedding. The pink head's 64 dimensions happen to encode temporal or contextual information that links "making" to a year, while the blue head's 64 dimensions encode the syntactic verb-modifier relationship.</p>
+
+    <p>This is exactly why we split along d_model (embedding dimension) rather than along the sequence dimension — every head sees <strong>all words</strong>, but a different <strong>aspect</strong> of each word. If we split along the sequence instead, each head would see different words with the full embedding, defeating the purpose of learning multiple relationship types.</p>
+
+    <!-- Interactive: multi-head split visualization -->
+    <div class="interactive-panel">
+      <h3>Multi-Head Split Visualization</h3>
+      <p>See how a (seq × 512) matrix gets split across heads. Toggle the number of heads:</p>
+      <div class="btn-group" id="headBtnGroup">
+        <button class="btn" onclick="setHeads(1,event)">1 head</button>
+        <button class="btn" onclick="setHeads(2,event)">2 heads</button>
+        <button class="btn active" onclick="setHeads(4,event)">4 heads</button>
+        <button class="btn" onclick="setHeads(8,event)">8 heads</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;margin-top:16px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:4px;">Input: seq × d_model</div>
+          <div id="headInputVis" style="display:flex;height:120px;border:1px solid var(--border);border-radius:8px;overflow:hidden;"></div>
+        </div>
+        <div style="font-size:1.5rem;color:var(--accent);">→</div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:4px;">Split into <span id="headCountLabel">4</span> heads: seq × d_k</div>
+          <div id="headSplitVis" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
+      </div>
+      <p style="margin-top:12px;font-family:var(--mono);font-size:0.85rem;">d_k = 512 / <span id="headDkLabel">4</span> = <span id="headDkVal">128</span></p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Why split along d_model, not along sequence?</strong> We want every head to see the <em>full sentence</em> but different <em>aspects</em> of each word. If we split along the sequence dimension, each head would see different words but the full embedding — that defeats the purpose of learning multiple relationship types.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 05: Layer Normalization ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Layer Normalization &amp; Add-and-Norm</h2>
+
+    <p>After multi-head attention (and again after the feed-forward network), the Transformer applies an <strong>Add &amp; Norm</strong> step. This has two parts:</p>
+
+    <p><strong>1. Residual connection (Add):</strong> The output of the sub-layer is added element-wise to its input. This skip connection gives gradients a direct path backward (the same principle as ResNet), so training stays stable even when the attention path would otherwise vanish.</p>
+
+    <p><strong>2. Layer normalization (Norm):</strong> Each item in the batch is normalized independently. For a single embedding vector (one row of our matrix), we compute the mean and variance of all 512 values, then normalize:</p>
+
+    <div class="formula">
+      x̂ᵢ = (xᵢ − μ) / √(σ² + ε)<br><br>
+      output = γ · x̂ᵢ + β
+    </div>
+
+    <p>Here μ and σ² are the mean and variance computed across the 512 dimensions of that single item. γ (gamma) and β (beta) are <strong>learned parameters</strong> — the model learns to scale and shift the normalized values, amplifying dimensions it considers important.</p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Layer Norm ✓</h3>
+        <p>Normalizes across <em>features</em> (all 512 dimensions) for each item independently. Batch items don't interact. Works well for variable-length sequences.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--danger);">Batch Norm ✗</h3>
+        <p>Normalizes across the <em>batch</em> for each feature independently. Mixes information between different items. Doesn't work well with variable sequence lengths.</p>
+      </div>
+    </div>
+
+    <h3>The Feed-Forward Network</h3>
+
+    <p>After the Add &amp; Norm that follows multi-head attention, each position passes through a <strong>feed-forward network (FFN)</strong>. The paper defines it as:</p>
+
+    <div class="formula">FFN(x) = W&sub2; &middot; ReLU(W&sub1; &middot; x + b&sub1;) + b&sub2;</div>
+
+    <p>This is two linear layers with a ReLU activation in between. The dimensions are specific: <strong>W&sub1;</strong> maps from d_model (512) to d_ff (<strong>2048</strong>), and <strong>W&sub2;</strong> maps back from d_ff (2048) to d_model (512). So the input expands 4&times; into a wider internal representation, passes through ReLU (which zeros out all negative values), then compresses back to 512 dimensions. Both layers include learned bias vectors b&sub1; and b&sub2;.</p>
+
+    <p>The FFN processes each position independently — no cross-position interaction. It adds <strong>non-linearity</strong> and extra model capacity. Attention routes information via a weighted average of V vectors (linear on representations); softmax is non-linear only on scores, not on word vectors. The FFN is where complex patterns like "not + good = negative" are learned. The FFN output also goes through an Add &amp; Norm step.</p>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 06: Decoder & Masking ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>The Decoder &amp; Causal Masking</h2>
+
+    <p>The decoder mirrors the encoder structure — embeddings, positional encoding, multi-head attention, Add &amp; Norm, feed-forward — but with two critical differences:</p>
+
+    <h3>1. Masked Multi-Head Attention (Causal Mask)</h3>
+
+    <p>The decoder must be <strong>causal</strong>: when predicting the output at position <em>t</em>, it can only look at positions ≤ <em>t</em>. It must not peek at future tokens. We achieve this by modifying the attention matrix <em>before</em> applying softmax.</p>
+
+    <p>For every position above the main diagonal (where word <em>i</em> would attend to a future word <em>j > i</em>), we replace the dot product score with <strong>−∞</strong>. When softmax processes e<sup>−∞</sup>, it outputs 0. The model can't see those positions — they effectively don't exist.</p>
+
+    <!-- Interactive: Causal mask -->
+    <div class="interactive-panel">
+      <h3>Causal Mask Visualization</h3>
+      <p>Toggle between unmasked attention and masked (causal) attention. Gray cells are set to −∞ before softmax:</p>
+      <div class="btn-group">
+        <button class="btn active" id="maskBtnOff" onclick="toggleMask(false)">No Mask (Encoder)</button>
+        <button class="btn" id="maskBtnOn" onclick="toggleMask(true)">Causal Mask (Decoder)</button>
+      </div>
+      <div style="text-align:center;margin-top:16px;">
+        <div id="maskGrid" style="display:inline-grid;grid-template-columns:repeat(7,48px);gap:2px;"></div>
+      </div>
+    </div>
+
+    <h3>2. Cross-Attention</h3>
+
+    <p>After masked self-attention, the decoder has a <strong>second</strong> multi-head attention layer. This one is not self-attention — it's <strong>cross-attention</strong>. The <strong>queries</strong> come from the decoder's previous layer, but the <strong>keys and values</strong> come from the <em>encoder's output</em>.</p>
+
+    <p>This is how the decoder "reads" the source sentence. The encoder has already processed the English sentence into rich embeddings that capture meaning, position, and inter-word relationships. The decoder's cross-attention asks: "Given what I've generated so far (query), which parts of the source sentence (keys/values) should I focus on?"</p>
+
+    <div class="callout">
+      <p><strong>Summary of attention types:</strong></p>
+      <p>• <strong>Self-attention</strong> (encoder): Q, K, V all from the same sentence.</p>
+      <p>• <strong>Masked self-attention</strong> (decoder): Q, K, V all from the decoder input, with a causal mask.</p>
+      <p>• <strong>Cross-attention</strong> (decoder): Q from decoder, K and V from encoder output.</p>
+      <p style="margin-top:12px;">An encoder alone cannot generate text — it is bidirectional, so every token has already seen future tokens. A stack with causal masking but no cross-attention is a decoder-only model (GPT). The encoder/decoder split is largely historical; the mechanical difference is masking strategy plus optional cross-attention.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 07: Training ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Training: One Pass, All Tokens</h2>
+
+    <p>Consider a translation task: English → Italian. We want to translate "I love you very much" into "te amo molto."</p>
+
+    <p><strong>Encoder input:</strong> We prepend and append special tokens: <code>[SOS] I love you very much [EOS]</code>. This gets tokenized, embedded, positionally encoded, and fed through the encoder. The encoder produces a (seq × d_model) output — one rich embedding per token.</p>
+
+    <p><strong>Decoder input:</strong> We give the decoder the Italian sentence with <code>[SOS]</code> prepended: <code>[SOS] te amo molto</code>.</p>
+
+    <h3>Fixed-Length Sequences and Padding</h3>
+
+    <p>In practice, both encoder and decoder inputs are padded to a <strong>fixed sequence length</strong>. If our model supports a sequence length of 1000 and our sentence has only 4 tokens, we append <strong>996 padding tokens</strong> to fill the remaining positions. Every sentence in a batch becomes the same length. These padding tokens are special vocabulary entries that carry no meaning — we use the masking mechanism (setting attention scores to &minus;&infin;) to ensure they don't participate in attention computations.</p>
+
+    <p><strong>Label (target):</strong> The expected output is: <code>te amo molto [EOS]</code>. Notice the shift: the decoder input is shifted right by one position relative to the label. When the decoder sees [SOS], it should predict "te." When it sees "te," it should predict "amo." When it sees "molto," it should predict [EOS].</p>
+
+    <div class="formula">
+      Decoder input: &nbsp; [SOS] &nbsp; te &nbsp; amo &nbsp; molto<br>
+      Target label: &nbsp;&nbsp;&nbsp; te &nbsp; amo &nbsp; molto &nbsp; [EOS]
+    </div>
+
+    <p>The decoder output (seq × d_model) is projected through a <strong>linear layer</strong> to (seq × vocab_size), then <strong>softmax</strong> is applied. Each position now has a probability distribution over the entire vocabulary. We compute the <strong>cross-entropy loss</strong> between these predictions and the target labels, then backpropagate.</p>
+
+    <div class="callout">
+      <p><strong>The power of parallel training:</strong> Unlike RNNs, all of this happens in <strong>one forward pass</strong>. We give one input sequence to the encoder, one input sequence to the decoder, produce all outputs, compute the cross-entropy loss with the labels, and backpropagate — all in a single time step. No for-loop over tokens. This is what makes Transformers dramatically faster to train than RNNs on long sequences.</p>
+    </div>
+
+    <p>This training strategy is called <strong>teacher forcing</strong>: during training, we give the model the <em>correct</em> previous tokens as decoder input rather than the model's own predictions. The causal mask ensures the decoder can't peek at future positions, so each position genuinely predicts the next token from only the tokens before it. The result: one sentence generates multiple training examples simultaneously (position 0 predicts token 1, position 1 predicts token 2, and so on).</p>
+
+    <!-- Interactive: Training step animation -->
+    <div class="interactive-panel">
+      <h3>Training Flow — Token Alignment</h3>
+      <p>See how decoder input aligns with target labels at each position:</p>
+      <div style="margin:12px 0;">
+        <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:6px;">Decoder sees:</p>
+        <div class="token-row">
+          <span class="token sos">[SOS]</span>
+          <span class="token">te</span>
+          <span class="token">amo</span>
+          <span class="token">molto</span>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-dim);margin:12px 0 6px;">Model should predict:</p>
+        <div class="token-row">
+          <span class="token generated">te</span>
+          <span class="token generated">amo</span>
+          <span class="token generated">molto</span>
+          <span class="token eos">[EOS]</span>
+        </div>
+      </div>
+      <p style="font-size:0.85rem;color:var(--text-dim);">↳ Cross-entropy loss is computed between predictions and targets, then backpropagated through all weights.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 08: Inference ===== -->
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Inference: Token by Token</h2>
+
+    <p>During inference (generation), we don't have the target sentence. We must produce it one token at a time.</p>
+
+    <div class="card">
+      <p><strong>Time step 1:</strong> Feed the English sentence through the encoder (once). Give the decoder just <code>[SOS]</code>. The decoder produces logits → softmax → the word with the highest probability is selected. Hopefully: "te."</p>
+      <p style="margin-top:12px;"><strong>Time step 2:</strong> Append "te" to the decoder input: <code>[SOS] te</code>. Feed through the decoder again (the encoder output is reused — we don't recompute it). The model predicts: "amo."</p>
+      <p style="margin-top:12px;"><strong>Time step 3:</strong> Decoder input: <code>[SOS] te amo</code> → predicts "molto."</p>
+      <p style="margin-top:12px;"><strong>Time step 4:</strong> Decoder input: <code>[SOS] te amo molto</code> → predicts <code>[EOS]</code>. We stop.</p>
+    </div>
+
+    <p>Notice that while training is fully parallel (one pass), <strong>inference is sequential</strong> — we need the previous output to generate the next one. This is the autoregressive nature of the Transformer decoder. If the model predicts a wrong token during inference, that error is fed back as input and can compound — <strong>exposure bias</strong>, because training always used correct tokens (teacher forcing) but inference uses the model's own predictions.</p>
+
+    <div class="callout">
+      <p><strong>Encoder reuse:</strong> We compute the encoder output <strong>only once</strong> at time step 1, then reuse it at every subsequent time step. The English sentence doesn't change, so the encoder should always produce the same output. What changes at each step is only the <strong>decoder input</strong> — it grows by one token each time as we append the previous prediction.</p>
+    </div>
+
+    <!-- Interactive: Step-by-step inference -->
+    <div class="interactive-panel">
+      <h3>Autoregressive Inference — Step Through</h3>
+      <p>Click "Next Token" to simulate the inference process:</p>
+      <div class="btn-group">
+        <button class="btn active" id="nextTokenBtn" onclick="nextInferenceToken()">Next Token</button>
+        <button class="btn" onclick="resetInference()">Reset</button>
+        <button class="btn" id="autoPlayBtn" onclick="autoPlayInference()">Auto-play</button>
+      </div>
+      <div style="margin:16px 0;">
+        <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:6px;">Encoder input (computed once):</p>
+        <div class="token-row">
+          <span class="token sos">[SOS]</span>
+          <span class="token">I</span>
+          <span class="token">love</span>
+          <span class="token">you</span>
+          <span class="token">very</span>
+          <span class="token">much</span>
+          <span class="token eos">[EOS]</span>
+        </div>
+      </div>
+      <div style="margin:16px 0;">
+        <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:6px;">Decoder input (grows each step):</p>
+        <div class="token-row" id="infDecoderTokens">
+          <span class="token sos">[SOS]</span>
+        </div>
+      </div>
+      <div style="margin:16px 0;">
+        <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:6px;">Generated output:</p>
+        <div class="token-row" id="infOutputTokens"></div>
+      </div>
+      <p style="font-family:var(--mono);font-size:0.85rem;color:var(--text-dim);">Time step: <span id="infStep" style="color:var(--accent);">0</span></p>
+    </div>
+
+    <h3>Decoding Strategies</h3>
+
+    <p>The strategy described above — always picking the token with the highest softmax score — is called <strong>greedy decoding</strong>. It's simple but not always optimal. A locally best token can lead to a globally worse sequence.</p>
+
+    <p><strong>Beam search</strong> is a better alternative. Instead of keeping just the single best token at each step, beam search keeps the top <em>B</em> candidates (where B is the "beam width," typically 4&ndash;10). At each step, it expands all B candidates by generating the next possible tokens for each, scores the resulting sequences, and keeps only the top B most probable sequences. The others are discarded. This explores a wider space of possible translations and generally produces better results, because a locally sub-optimal token choice might lead to a globally superior sequence.</p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent5);">Greedy Decoding</h3>
+        <p>Pick the single highest-probability token at each step. Fast, but can miss better sequences.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3);">Beam Search</h3>
+        <p>Keep top B candidates at each step. Explores more possibilities. Slower but produces higher-quality output.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 09: Playground ===== -->
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Playground</h2>
+
+    <p>Experiment freely with the core Transformer building blocks:</p>
+
+    <!-- Playground: Softmax temperature -->
+    <div class="interactive-panel">
+      <h3>Softmax Temperature Explorer</h3>
+      <p>Adjust the temperature parameter to see how it affects the output distribution. Low temperature → peaked (confident), high temperature → flat (uncertain):</p>
+      <div>
+        <label style="font-size:0.85rem;color:var(--text-dim);">Temperature: <span id="tempVal" style="color:var(--accent);">1.00</span></label>
+        <input type="range" id="tempSlider" min="0.1" max="5.0" step="0.05" value="1.0">
+      </div>
+      <div class="bar-chart" id="tempBarChart"></div>
+      <p style="font-family:var(--mono);font-size:0.8rem;text-align:center;">
+        Entropy: <span id="tempEntropy" style="color:var(--accent);">—</span> &nbsp;|&nbsp;
+        Max prob: <span id="tempMaxProb" style="color:var(--accent3);">—</span>
+      </p>
+    </div>
+
+    <!-- Playground: Dot product similarity -->
+    <div class="interactive-panel" style="margin-top:24px;">
+      <h3>Dot Product &amp; Cosine Similarity</h3>
+      <p>Adjust two 4D vectors and see how their dot product and cosine similarity change:</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+        <div>
+          <p style="font-size:0.85rem;color:var(--accent);margin-bottom:8px;">Vector A</p>
+          <div id="vecASliders"></div>
+        </div>
+        <div>
+          <p style="font-size:0.85rem;color:var(--accent2);margin-bottom:8px;">Vector B</p>
+          <div id="vecBSliders"></div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:16px;font-family:var(--mono);">
+        <p>Dot product: <span id="dotProdVal" style="color:var(--accent);font-size:1.1rem;font-weight:700;">—</span></p>
+        <p>Cosine similarity: <span id="cosSimVal" style="color:var(--accent3);font-size:1.1rem;font-weight:700;">—</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+// ============================================================
+// HELPERS
+// ============================================================
+function softmax(arr, temp) {
+  temp = temp || 1;
+  const max = Math.max(...arr);
+  const exps = arr.map(x => Math.exp((x - max) / temp));
+  const sum = exps.reduce((a, b) => a + b, 0);
+  return exps.map(x => x / sum);
+}
+
+function dotProduct(a, b) {
+  return a.reduce((s, v, i) => s + v * b[i], 0);
+}
+
+function magnitude(a) {
+  return Math.sqrt(a.reduce((s, v) => s + v * v, 0));
+}
+
+function cosineSim(a, b) {
+  const d = dotProduct(a, b);
+  const ma = magnitude(a);
+  const mb = magnitude(b);
+  return (ma === 0 || mb === 0) ? 0 : d / (ma * mb);
+}
+
+function seededRand(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+// ============================================================
+// SECTION 00: VANISHING GRADIENT DEMO
+// ============================================================
+const factorSlider = document.getElementById('factorSlider');
+const chainSlider = document.getElementById('chainSlider');
+const factorValEl = document.getElementById('factorVal');
+const chainValEl = document.getElementById('chainVal');
+const gradientResultEl = document.getElementById('gradientResult');
+const gradientCanvas = document.getElementById('gradientCanvas');
+const gCtx = gradientCanvas.getContext('2d');
+
+function drawGradientDemo() {
+  const factor = parseFloat(factorSlider.value);
+  const chain = parseInt(chainSlider.value);
+  factorValEl.textContent = factor.toFixed(2);
+  chainValEl.textContent = chain;
+  const result = Math.pow(factor, chain);
+  gradientResultEl.textContent = result > 1e6 ? result.toExponential(2) : result < 1e-6 ? result.toExponential(2) : result.toFixed(6);
+
+  const W = gradientCanvas.width;
+  const H = gradientCanvas.height;
+  gCtx.clearRect(0, 0, W, H);
+
+  // Draw chain
+  const padding = 40;
+  const step = (W - 2 * padding) / Math.max(chain - 1, 1);
+  const midY = H / 2;
+
+  // Draw values at each node
+  gCtx.fillStyle = '#2a2a3a';
+  gCtx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < chain; i++) {
+    const x = padding + i * step;
+    const val = Math.pow(factor, i + 1);
+    const normVal = Math.min(Math.max(Math.log10(val + 1e-20) / 10 + 0.5, 0), 1);
+
+    // Line to next
+    if (i < chain - 1) {
+      gCtx.beginPath();
+      gCtx.strokeStyle = 'rgba(108,140,255,0.3)';
+      gCtx.lineWidth = 1;
+      gCtx.moveTo(x, midY);
+      gCtx.lineTo(padding + (i + 1) * step, midY);
+      gCtx.stroke();
+    }
+
+    // Node
+    const r = 6;
+    const color = factor < 1 ? `rgba(248,113,113,${0.3 + normVal * 0.7})` : `rgba(52,211,153,${0.3 + normVal * 0.7})`;
+    gCtx.beginPath();
+    gCtx.arc(x, midY, r, 0, Math.PI * 2);
+    gCtx.fillStyle = color;
+    gCtx.fill();
+
+    // Value label (only for a subset)
+    if (chain <= 20 || i % Math.ceil(chain / 15) === 0 || i === chain - 1) {
+      gCtx.fillStyle = '#8888a0';
+      gCtx.font = '10px monospace';
+      gCtx.textAlign = 'center';
+      const label = val > 1e4 ? val.toExponential(1) : val < 1e-4 ? val.toExponential(1) : val.toFixed(3);
+      gCtx.fillText(label, x, midY + 22);
+    }
+  }
+
+  // Labels
+  gCtx.fillStyle = '#e0e0e8';
+  gCtx.font = '11px sans-serif';
+  gCtx.textAlign = 'left';
+  gCtx.fillText('Start (grad=1)', padding, midY - 20);
+  gCtx.textAlign = 'right';
+  gCtx.fillText('End', W - padding, midY - 20);
+}
+
+factorSlider.addEventListener('input', drawGradientDemo);
+chainSlider.addEventListener('input', drawGradientDemo);
+drawGradientDemo();
+
+// ============================================================
+// SECTION 01: EMBEDDING LOOKUP
+// ============================================================
+const words = ['your', 'cat', 'is', 'a', 'lovely', 'cat'];
+const wordIds = [105, 6500, 23, 7, 4891, 6500];
+const rng = seededRand(42);
+const embeddings = words.map((w, wi) => {
+  // Same word same embedding
+  const seed = wordIds[wi];
+  const r = seededRand(seed);
+  return Array.from({length: 8}, () => (r() * 2 - 1).toFixed(3));
+});
+
+function showEmb(idx) {
+  document.getElementById('embId').textContent = wordIds[idx];
+  const vec = embeddings[idx];
+  const container = document.getElementById('embVec');
+  container.innerHTML = vec.map(v =>
+    `<span style="font-family:var(--mono);font-size:0.8rem;padding:4px 8px;background:var(--bg-card-alt);border:1px solid var(--border);border-radius:6px;color:var(--accent);">${v}</span>`
+  ).join('');
+  document.querySelectorAll('#embBtnGroup .btn').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+}
+showEmb(0);
+
+// ============================================================
+// SECTION 02: POSITIONAL ENCODING HEATMAP
+// ============================================================
+const peCanvas = document.getElementById('peCanvas');
+const peCtx = peCanvas.getContext('2d');
+const pePosSlider = document.getElementById('pePosSlider');
+
+function drawPE() {
+  const numPos = parseInt(pePosSlider.value);
+  document.getElementById('pePosVal').textContent = numPos;
+  document.getElementById('peSeqLen').textContent = numPos;
+
+  const dims = 64;
+  document.getElementById('peDims').textContent = dims;
+  const dModel = 512;
+
+  const W = peCanvas.width;
+  const H = peCanvas.height;
+  peCtx.clearRect(0, 0, W, H);
+
+  const cellW = W / dims;
+  const cellH = H / numPos;
+
+  for (let pos = 0; pos < numPos; pos++) {
+    for (let i = 0; i < dims; i++) {
+      const angle = pos / Math.pow(10000, (2 * Math.floor(i / 2)) / dModel);
+      const val = (i % 2 === 0) ? Math.sin(angle) : Math.cos(angle);
+
+      // Map -1..1 to color
+      const r = val > 0 ? Math.floor(val * 108 + 50) : 50;
+      const g = val > 0 ? Math.floor(val * 140 + 50) : 50;
+      const b = val > 0 ? Math.floor(val * 255 + 50) : Math.floor(-val * 180 + 50);
+      const a = Math.abs(val) * 0.7 + 0.3;
+
+      peCtx.fillStyle = val >= 0
+        ? `rgba(108,140,255,${a})`
+        : `rgba(244,114,182,${a})`;
+      peCtx.fillRect(i * cellW, pos * cellH, cellW, cellH);
+    }
+  }
+}
+
+pePosSlider.addEventListener('input', drawPE);
+drawPE();
+
+// ============================================================
+// SECTION 03: ATTENTION MATRIX
+// ============================================================
+const attnWords = ['your', 'cat', 'is', 'a', 'lovely', 'cat'];
+
+function buildAttnMatrix() {
+  const container = document.getElementById('attnMatrix');
+  const rng2 = seededRand(123);
+
+  // Generate raw scores and apply softmax per row
+  const raw = attnWords.map((_, i) => attnWords.map((_, j) => {
+    const base = rng2() * 2 - 1;
+    return i === j ? base + 2 : base; // Boost diagonal
+  }));
+  const scores = raw.map(row => softmax(row));
+
+  // Build grid
+  let html = `<div style="display:inline-grid;grid-template-columns:repeat(${attnWords.length + 1},48px);gap:2px;">`;
+
+  // Header row
+  html += `<div class="matrix-cell header"></div>`;
+  attnWords.forEach(w => { html += `<div class="matrix-cell header">${w}</div>`; });
+
+  scores.forEach((row, i) => {
+    html += `<div class="matrix-cell header">${attnWords[i]}</div>`;
+    row.forEach((val, j) => {
+      const opacity = val * 2;
+      html += `<div class="matrix-cell" onmouseover="showAttnInfo('${attnWords[i]}','${attnWords[j]}',${val.toFixed(3)})" style="background:rgba(108,140,255,${opacity});color:${val > 0.15 ? '#fff' : 'var(--text-dim)'}">${val.toFixed(2)}</div>`;
+    });
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function showAttnInfo(w1, w2, val) {
+  document.getElementById('attnInfo').textContent = `${w1} → ${w2}: attention = ${val}`;
+}
+
+buildAttnMatrix();
+
+// ============================================================
+// SECTION 04: MULTI-HEAD SPLIT
+// ============================================================
+const headColors = ['#6c8cff','#a78bfa','#34d399','#f472b6','#fbbf24','#f87171','#38bdf8','#c084fc'];
+
+function setHeads(h, e) {
+  const btns = document.querySelectorAll('#headBtnGroup .btn');
+  btns.forEach(b => b.classList.remove('active'));
+  if (e && e.target) e.target.classList.add('active');
+  else btns.forEach(b => { if (parseInt(b.textContent) === h) b.classList.add('active'); });
+
+  document.getElementById('headCountLabel').textContent = h;
+  document.getElementById('headDkLabel').textContent = h;
+  document.getElementById('headDkVal').textContent = Math.floor(512 / h);
+
+  // Input vis
+  const inputVis = document.getElementById('headInputVis');
+  inputVis.innerHTML = `<div style="width:200px;height:120px;background:linear-gradient(90deg,${headColors.slice(0, h).join(',')});"></div>`;
+
+  // Split vis
+  const splitVis = document.getElementById('headSplitVis');
+  const dkWidth = Math.max(30, 200 / h);
+  splitVis.innerHTML = Array.from({length: h}, (_, i) =>
+    `<div style="width:${dkWidth}px;height:120px;background:${headColors[i]};border-radius:6px;opacity:0.7;display:flex;align-items:flex-end;justify-content:center;padding:4px;">
+      <span style="font-size:0.6rem;color:#fff;font-family:var(--mono);">h${i+1}</span>
+    </div>`
+  ).join('');
+}
+setHeads(4);
+
+// ============================================================
+// SECTION 06: CAUSAL MASK
+// ============================================================
+const maskWords = ['[SOS]', 'te', 'amo', 'molto', 'EOS', 'PAD'];
+
+function toggleMask(masked) {
+  document.getElementById('maskBtnOff').classList.toggle('active', !masked);
+  document.getElementById('maskBtnOn').classList.toggle('active', masked);
+
+  const grid = document.getElementById('maskGrid');
+  const n = maskWords.length;
+  grid.style.gridTemplateColumns = `repeat(${n + 1}, 48px)`;
+
+  let html = `<div class="matrix-cell header"></div>`;
+  maskWords.forEach(w => { html += `<div class="matrix-cell header" style="font-size:0.6rem;">${w}</div>`; });
+
+  for (let i = 0; i < n; i++) {
+    html += `<div class="matrix-cell header" style="font-size:0.6rem;">${maskWords[i]}</div>`;
+    for (let j = 0; j < n; j++) {
+      const isMasked = masked && j > i;
+      html += `<div class="matrix-cell" style="background:${isMasked ? 'rgba(248,113,113,0.15)' : 'rgba(108,140,255,0.15)'};color:${isMasked ? 'var(--danger)' : 'var(--accent)'};">
+        ${isMasked ? '−∞' : '✓'}
+      </div>`;
+    }
+  }
+  grid.innerHTML = html;
+}
+toggleMask(false);
+
+// ============================================================
+// SECTION 08: INFERENCE STEP-BY-STEP
+// ============================================================
+const infTokens = ['te', 'amo', 'molto', '[EOS]'];
+let infIdx = 0;
+let infInterval = null;
+
+function nextInferenceToken() {
+  if (infIdx >= infTokens.length) return;
+
+  const token = infTokens[infIdx];
+  const decoderContainer = document.getElementById('infDecoderTokens');
+  const outputContainer = document.getElementById('infOutputTokens');
+
+  // Add to output
+  const cls = token === '[EOS]' ? 'token eos' : 'token generated';
+  outputContainer.innerHTML += `<span class="${cls}">${token}</span>`;
+
+  // Add to decoder input (for next step)
+  if (token !== '[EOS]') {
+    decoderContainer.innerHTML += `<span class="token">${token}</span>`;
+  }
+
+  infIdx++;
+  document.getElementById('infStep').textContent = infIdx;
+
+  if (infIdx >= infTokens.length && infInterval) {
+    clearInterval(infInterval);
+    infInterval = null;
+  }
+}
+
+function resetInference() {
+  infIdx = 0;
+  if (infInterval) { clearInterval(infInterval); infInterval = null; }
+  document.getElementById('infDecoderTokens').innerHTML = '<span class="token sos">[SOS]</span>';
+  document.getElementById('infOutputTokens').innerHTML = '';
+  document.getElementById('infStep').textContent = '0';
+}
+
+function autoPlayInference() {
+  if (infInterval) return;
+  resetInference();
+  infInterval = setInterval(() => {
+    nextInferenceToken();
+    if (infIdx >= infTokens.length) { clearInterval(infInterval); infInterval = null; }
+  }, 800);
+}
+
+// ============================================================
+// SECTION 09: PLAYGROUND — SOFTMAX TEMPERATURE
+// ============================================================
+const tempSlider = document.getElementById('tempSlider');
+const logits = [2.5, 1.8, 0.5, -0.2, -1.0, 0.3, 1.2];
+const tokenLabels = ['the', 'cat', 'sat', 'on', 'mat', 'a', 'dog'];
+
+function drawTempChart() {
+  const temp = parseFloat(tempSlider.value);
+  document.getElementById('tempVal').textContent = temp.toFixed(2);
+
+  const probs = softmax(logits, temp);
+  const container = document.getElementById('tempBarChart');
+
+  container.innerHTML = probs.map((p, i) =>
+    `<div class="bar-wrapper">
+      <div class="bar-val">${(p * 100).toFixed(1)}%</div>
+      <div class="bar" style="height:${p * 130}px;background:${i === 0 ? 'var(--accent3)' : 'var(--accent)'}"></div>
+      <div class="bar-label">${tokenLabels[i]}</div>
+    </div>`
+  ).join('');
+
+  // Entropy
+  const entropy = -probs.reduce((s, p) => s + (p > 0 ? p * Math.log2(p) : 0), 0);
+  document.getElementById('tempEntropy').textContent = entropy.toFixed(3);
+  document.getElementById('tempMaxProb').textContent = (Math.max(...probs) * 100).toFixed(1) + '%';
+}
+
+tempSlider.addEventListener('input', drawTempChart);
+drawTempChart();
+
+// ============================================================
+// SECTION 09: PLAYGROUND — DOT PRODUCT & COSINE
+// ============================================================
+const vecA = [1.0, 0.5, -0.3, 0.8];
+const vecB = [0.5, 1.0, 0.2, -0.4];
+
+function buildVecSliders() {
+  const containerA = document.getElementById('vecASliders');
+  const containerB = document.getElementById('vecBSliders');
+
+  containerA.innerHTML = vecA.map((v, i) =>
+    `<div style="margin-bottom:6px;">
+      <span style="font-family:var(--mono);font-size:0.75rem;color:var(--text-dim);">a${i}: <span id="va${i}">${v.toFixed(1)}</span></span>
+      <input type="range" min="-2" max="2" step="0.1" value="${v}" oninput="updateVec('A',${i},this.value)">
+    </div>`
+  ).join('');
+
+  containerB.innerHTML = vecB.map((v, i) =>
+    `<div style="margin-bottom:6px;">
+      <span style="font-family:var(--mono);font-size:0.75rem;color:var(--text-dim);">b${i}: <span id="vb${i}">${v.toFixed(1)}</span></span>
+      <input type="range" min="-2" max="2" step="0.1" value="${v}" oninput="updateVec('B',${i},this.value)">
+    </div>`
+  ).join('');
+
+  computeVecSimilarity();
+}
+
+function updateVec(which, idx, val) {
+  val = parseFloat(val);
+  if (which === 'A') { vecA[idx] = val; document.getElementById(`va${idx}`).textContent = val.toFixed(1); }
+  else { vecB[idx] = val; document.getElementById(`vb${idx}`).textContent = val.toFixed(1); }
+  computeVecSimilarity();
+}
+
+function computeVecSimilarity() {
+  const dp = dotProduct(vecA, vecB);
+  const cs = cosineSim(vecA, vecB);
+  document.getElementById('dotProdVal').textContent = dp.toFixed(3);
+  document.getElementById('cosSimVal').textContent = cs.toFixed(3);
+}
+
+buildVecSliders();
+
+// ============================================================
+// SCROLL HANDLER: NAV + FADE-IN
+// ============================================================
+const nav = document.getElementById('nav');
+let lastScroll = 0;
+
+window.addEventListener('scroll', function() {
+  const y = window.scrollY;
+  nav.classList.toggle('visible', y > 300);
+  lastScroll = y;
+
+  // Fade in
+  document.querySelectorAll('.fade-in:not(.visible)').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 60) {
+      el.classList.add('visible');
+    }
+  });
+}, { passive: true });
+
+// Initial fade check
+window.dispatchEvent(new Event('scroll'));
+</script>
+
+</body>
+</html>

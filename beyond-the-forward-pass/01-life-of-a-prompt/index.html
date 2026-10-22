@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life of a Prompt — How vLLM Turns Text into Tokens into Answers</title>
+<style>
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 12px; }
+h2 { font-size: 1.35rem; font-weight: 700; margin: 0 0 16px; color: var(--text); }
+h3 { font-size: 1.1rem; font-weight: 600; margin: 0 0 12px; color: var(--text); }
+.lead { color: var(--text-dim); font-size: 1.05rem; max-width: 620px; margin: 0 auto; }
+p { color: var(--text-dim); font-size: 0.95rem; margin: 0 0 12px; }
+p:last-child { margin-bottom: 0; }
+strong { color: var(--text); }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+
+/* Hero */
+.hero { min-height: 70vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 72px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.14) 0%, transparent 70%); pointer-events: none; }
+.stats { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
+.stat-val { font-size: 2.4rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.82rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* Journey strip */
+.journey-strip { display: flex; align-items: center; justify-content: center; gap: 0; margin: 28px auto; max-width: 800px; flex-wrap: wrap; }
+.journey-node { display: flex; align-items: center; gap: 0; }
+.journey-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); background: var(--bg); flex-shrink: 0; }
+.journey-node.active .journey-dot { background: var(--accent); box-shadow: 0 0 10px rgba(108,140,255,0.4); }
+.journey-label { font-family: var(--mono); font-size: 0.68rem; color: var(--text-dim); margin-left: 5px; white-space: nowrap; }
+.journey-node.active .journey-label { color: var(--accent); }
+.journey-arrow { width: 32px; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); margin: 0 4px; flex-shrink: 0; }
+
+/* Card styles */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin: 20px 0; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout-warn { background: rgba(251,191,36,0.08); border-left-color: var(--accent5); }
+.callout-success { background: rgba(52,211,153,0.08); border-left-color: var(--accent3); }
+.callout-danger { background: rgba(248,113,113,0.08); border-left-color: var(--danger); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; margin: 14px 0; font-family: var(--mono); font-size: 0.92rem; text-align: center; color: var(--text); overflow-x: auto; }
+
+/* Code panels */
+.code-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 20px 0; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.78rem; }
+.code-filename { color: var(--accent); }
+.code-block { padding: 14px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.52; color: var(--text); background: transparent; white-space: pre-wrap; word-wrap: break-word; }
+.code-block code { display: block; background: none; padding: 0; color: inherit; }
+.kw { color: var(--accent4); }
+.fn { color: var(--accent); }
+.str { color: var(--accent5); }
+.num { color: var(--accent3); }
+.cmt { color: var(--text-dim); font-style: italic; }
+.op { color: var(--accent2); }
+
+/* Step cards */
+.step-cards { display: flex; flex-direction: column; gap: 16px; margin: 20px 0; }
+.step-card { display: flex; gap: 16px; align-items: flex-start; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.step-num { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; color: #fff; flex-shrink: 0; }
+.step-content { min-width: 0; }
+.step-content h4 { font-size: 0.95rem; font-weight: 700; margin: 0 0 4px; color: var(--text); }
+.step-content p { font-size: 0.88rem; margin: 0; }
+
+/* GPU diagram */
+.gpu-diagram { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+.gpu-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; text-align: center; }
+.gpu-box-title { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+.gpu-box-val { font-size: 1.6rem; font-weight: 800; color: var(--text); }
+.gpu-box-sub { font-size: 0.78rem; color: var(--text-dim); margin-top: 4px; }
+
+/* VRAM visual */
+.vram-visual { display: flex; gap: 3px; margin: 20px 0; height: 48px; border-radius: 8px; overflow: hidden; }
+.vram-segment { display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.65rem; font-weight: 600; color: #fff; min-width: 0; }
+.vram-kv { background: linear-gradient(135deg, var(--accent3), #22c55e); flex: 10.86; }
+.vram-weights { background: linear-gradient(135deg, var(--accent), #4f73e6); flex: 2; }
+.vram-act { background: linear-gradient(135deg, var(--accent2), #8b5cf6); flex: 0.3; }
+.vram-misc { background: linear-gradient(135deg, #666, #888); flex: 0.05; }
+.vram-legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0 0; font-size: 0.78rem; }
+.vram-legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
+.vram-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* Block grid visual */
+.block-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; margin: 16px 0; }
+.block-cell { height: 44px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.65rem; font-weight: 700; border: 1px solid transparent; }
+.block-cell.p1 { background: rgba(108,140,255,0.2); color: var(--accent); border-color: rgba(108,140,255,0.3); }
+.block-cell.p2 { background: rgba(167,139,250,0.2); color: var(--accent2); border-color: rgba(167,139,250,0.3); }
+.block-cell.p3 { background: rgba(52,211,153,0.2); color: var(--accent3); border-color: rgba(52,211,153,0.3); }
+.block-cell.free { background: var(--bg-card-alt); color: var(--text-dim); border-color: var(--border); }
+
+/* Comparison */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.comparison .card { flex: 1; }
+.comparison .card h3 { font-size: 1rem; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } .gpu-diagram { grid-template-columns: 1fr; } }
+
+/* Tags */
+.tag { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 3px 8px; border-radius: 4px; margin: 2px; }
+.tag-blue { background: rgba(108,140,255,0.12); color: var(--accent); border: 1px solid rgba(108,140,255,0.2); }
+.tag-green { background: rgba(52,211,153,0.12); color: var(--accent3); border: 1px solid rgba(52,211,153,0.2); }
+.tag-purple { background: rgba(167,139,250,0.12); color: var(--accent2); border: 1px solid rgba(167,139,250,0.2); }
+.tag-pink { background: rgba(244,114,182,0.12); color: var(--accent4); border: 1px solid rgba(244,114,182,0.2); }
+.tag-yellow { background: rgba(251,191,36,0.12); color: var(--accent5); border: 1px solid rgba(251,191,36,0.2); }
+
+/* Flow diagram */
+.flow { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+.flow-step { display: flex; gap: 16px; align-items: stretch; position: relative; }
+.flow-connector { width: 24px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.flow-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 6px; }
+.flow-step:nth-child(2) .flow-dot { background: var(--accent2); }
+.flow-step:nth-child(3) .flow-dot { background: var(--accent3); }
+.flow-step:nth-child(4) .flow-dot { background: var(--accent4); }
+.flow-step:nth-child(5) .flow-dot { background: var(--accent5); }
+.flow-line { flex: 1; width: 2px; background: var(--border); }
+.flow-step:last-child .flow-line { display: none; }
+.flow-content { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; flex: 1; }
+.flow-content h4 { font-size: 0.95rem; font-weight: 700; margin: 0 0 6px; color: var(--text); }
+.flow-content p { font-size: 0.88rem; margin: 0; }
+
+/* Interactive panels */
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.interactive-panel h3 { margin-bottom: 16px; }
+.btn { display: inline-block; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--accent); background: rgba(108,140,255,0.1); color: var(--accent); font-family: var(--mono); font-size: 0.78rem; cursor: pointer; transition: all 0.2s; margin: 4px; }
+.btn:hover { background: rgba(108,140,255,0.2); }
+.btn.active { background: var(--accent); color: #fff; }
+
+/* KV cache animation container */
+.kv-visual { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.kv-row { display: flex; gap: 4px; align-items: center; }
+.kv-cell { width: 44px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 0.6rem; font-weight: 600; }
+.kv-cell.filled { background: rgba(52,211,153,0.25); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); }
+.kv-cell.new { background: rgba(248,113,113,0.25); color: var(--danger); border: 1px solid rgba(248,113,113,0.3); }
+.kv-cell.empty { background: var(--bg-card-alt); color: var(--text-dim); border: 1px solid var(--border); }
+.kv-label { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); width: 60px; flex-shrink: 0; }
+
+/* QA box */
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin: 20px 0; }
+.qa-box .question { color: var(--accent); font-weight: 600; font-size: 0.95rem; margin-bottom: 10px; }
+.qa-box .answer { color: var(--text-dim); font-size: 0.9rem; }
+
+/* Fade in */
+.fade-in { opacity: 0; transform: translateY(18px); transition: all 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* Navigation */
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 22px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 600; color: var(--text); text-decoration: none; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.nav-links a { color: var(--text-dim); text-decoration: none; font-family: var(--mono); font-size: 0.75rem; padding: 2px 4px; border-radius: 4px; }
+.nav-links a:hover { color: var(--accent); background: rgba(108,140,255,0.1); }
+
+/* Breadcrumb */
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: rgba(10, 10, 15, 0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid #2a2a3a; font-family: var(--sans); }
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: var(--text-dim); }
+body { padding-top: 44px !important; }
+
+.footer { text-align: center; padding: 48px 24px 64px; color: var(--text-dim); font-size: 0.9rem; border-top: 1px solid var(--border); }
+.footer a { color: var(--accent); }
+
+/* Two column layout */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* Source attribution */
+.source-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim); margin-top: 20px; }
+.source-badge a { color: var(--accent); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Beyond the Forward Pass</a><span class="bc-sep">›</span><span class="bc-current">Life of a Prompt</span></nav>
+
+<nav class="nav" id="nav">
+  <a href="#" class="nav-title" style="text-decoration:none;color:inherit;">Life of a Prompt</a>
+  <div class="nav-links">
+    <a href="#s01">01</a><a href="#s02">02</a><a href="#s03">03</a><a href="#s04">04</a><a href="#s05">05</a><a href="#s06">06</a><a href="#s07">07</a><a href="#s08">08</a><a href="#s09">09</a><a href="#s10">10</a><a href="#s11">11</a><a href="#s12">12</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <p class="section-num" style="margin-bottom:8px;letter-spacing:3px;">BEYOND THE FORWARD PASS · 01</p>
+  <h1>Life of a Prompt</h1>
+  <p class="lead">What actually happens when you type a prompt into an LLM? Follow three prompts through the vLLM inference engine — from raw text to tokenization, KV cache allocation, paged attention, continuous batching, and decoded output.</p>
+
+  <div class="journey-strip">
+    <span class="journey-node active"><span class="journey-dot"></span><span class="journey-label">Arrival</span></span>
+    <div class="journey-arrow"></div>
+    <span class="journey-node active"><span class="journey-dot"></span><span class="journey-label">Tokenize</span></span>
+    <div class="journey-arrow"></div>
+    <span class="journey-node active"><span class="journey-dot"></span><span class="journey-label">Queue</span></span>
+    <div class="journey-arrow"></div>
+    <span class="journey-node active"><span class="journey-dot"></span><span class="journey-label">Prefill</span></span>
+    <div class="journey-arrow"></div>
+    <span class="journey-node active"><span class="journey-dot"></span><span class="journey-label">Decode</span></span>
+    <div class="journey-arrow"></div>
+    <span class="journey-node active"><span class="journey-dot"></span><span class="journey-label">Output</span></span>
+  </div>
+
+  <div class="stats">
+    <div><span class="stat-val">5</span><span class="stat-label">Core Concepts</span></div>
+    <div><span class="stat-val">6</span><span class="stat-label">Visual Diagrams</span></div>
+    <div><span class="stat-val">3</span><span class="stat-label">Interactive Demos</span></div>
+  </div>
+
+  <div class="source-badge">Based on <a href="https://www.youtube.com/watch?v=QyHHbeXqgrQ" target="_blank">Vizuara — How the vLLM inference engine works</a></div>
+</header>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════ s01 ═══════════ -->
+<section class="section fade-in" id="s01">
+  <div class="container">
+    <span class="section-num">01 · WHY INFERENCE MATTERS</span>
+    <h2>The hidden world behind every LLM response</h2>
+
+    <p>When you chat with ChatGPT, Claude, or Gemini, you type a prompt and tokens stream back. The experience feels magical — but between your prompt and the output lies an entire engineering universe of innovations that determine <strong>speed, cost, and scale</strong>.</p>
+
+    <p>If you are OpenAI, you want to perform inference as efficiently as possible. Every wasted GPU cycle is money burned. Every idle memory block is a request that could have been served. This is why inference engines matter — they are the single biggest lever on production LLM costs.</p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Pre-training gets all the research glory, but inference is where the money is. An optimized inference engine directly translates to lower costs for users and higher throughput for providers.</p>
+    </div>
+
+    <p><strong>vLLM</strong> is one of the most popular open-source inference engines. With 58,000+ GitHub stars and 10,000+ forks, it introduced innovations like <strong>paged attention</strong>, <strong>continuous batching</strong>, and <strong>speculative decoding</strong> that have become industry standards.</p>
+
+    <p>In this tutorial, we are going to put ourselves in the shoes of a prompt and follow its entire journey through the vLLM engine. By the end, you will have a clear visual mental picture of every stage — from raw text to completed output.</p>
+
+    <div class="card">
+      <h3>What we will cover</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;">
+        <span class="tag tag-blue">Tokenization</span>
+        <span class="tag tag-purple">KV Cache</span>
+        <span class="tag tag-green">Paged Attention</span>
+        <span class="tag tag-pink">Continuous Batching</span>
+        <span class="tag tag-yellow">GPU VRAM</span>
+        <span class="tag tag-blue">Prefill vs Decode</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s02 ═══════════ -->
+<section class="section fade-in" id="s02">
+  <div class="container">
+    <span class="section-num">02 · STEP ZERO — ARRIVAL</span>
+    <h2>Three prompts enter the engine</h2>
+
+    <p>Let's work with a concrete example. Three prompts arrive at the vLLM inference engine simultaneously:</p>
+
+    <div class="two-col">
+      <div class="card">
+        <p style="color:var(--accent);font-family:var(--mono);font-size:0.78rem;margin-bottom:6px;">PROMPT P1</p>
+        <p style="color:var(--text);font-size:1.05rem;font-weight:600;margin:0;">"Hi my name is"</p>
+      </div>
+      <div class="card">
+        <p style="color:var(--accent2);font-family:var(--mono);font-size:0.78rem;margin-bottom:6px;">PROMPT P2</p>
+        <p style="color:var(--text);font-size:1.05rem;font-weight:600;margin:0;">"Today is a beautiful summer day"</p>
+      </div>
+    </div>
+    <div class="card" style="max-width:calc(50% - 10px);">
+      <p style="color:var(--accent3);font-family:var(--mono);font-size:0.78rem;margin-bottom:6px;">PROMPT P3</p>
+      <p style="color:var(--text);font-size:1.05rem;font-weight:600;margin:0;">"Hello there"</p>
+    </div>
+
+    <p>The model we are using is <strong>TinyLlama</strong> — a small language model with roughly 1 billion parameters and 22 transformer layers. Small enough to run on modest hardware, but architecturally identical to production models.</p>
+
+    <div class="code-panel">
+      <div class="code-header">
+        <span class="code-filename">vllm_inference.py</span>
+      </div>
+      <div class="code-block"><code><span class="kw">from</span> vllm <span class="kw">import</span> LLM, SamplingParams
+
+<span class="cmt"># Three prompts to complete</span>
+p1 <span class="op">=</span> <span class="str">"Hi my name is"</span>
+p2 <span class="op">=</span> <span class="str">"Today is a beautiful summer day"</span>
+p3 <span class="op">=</span> <span class="str">"Hello there"</span>
+
+<span class="cmt"># Load TinyLlama (~1B parameters, 22 transformer layers)</span>
+llm <span class="op">=</span> LLM(model<span class="op">=</span><span class="str">"TinyLlama/TinyLlama-1.1B-Chat-v1.0"</span>)
+
+<span class="cmt"># Sampling configuration</span>
+params <span class="op">=</span> SamplingParams(temperature<span class="op">=</span><span class="num">0.8</span>, top_p<span class="op">=</span><span class="num">0.95</span>, max_tokens<span class="op">=</span><span class="num">50</span>)
+
+<span class="cmt"># This is the call we want to understand inside-out</span>
+outputs <span class="op">=</span> llm.<span class="fn">generate</span>([p1, p2, p3], params)</code></div>
+    </div>
+
+    <p>When you run this code, you'll see log output mentioning <strong>CUDA blocks</strong>, <strong>CPU blocks</strong>, <strong>KV cache</strong>, and <strong>graph capturing</strong>. By the end of this tutorial, every single one of those numbers will make sense.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s03 ═══════════ -->
+<section class="section fade-in" id="s03">
+  <div class="container">
+    <span class="section-num">03 · STEP ONE — TOKENIZATION</span>
+    <h2>From English to numbers</h2>
+
+    <p>Language models cannot understand English. They operate on <strong>token IDs</strong> — integers that represent sub-word units. The first thing that happens to every prompt is tokenization.</p>
+
+    <p>The tokenizer is determined by the model itself. TinyLlama uses <strong>byte-pair encoding (BPE)</strong>, the same scheme used by most modern language models. Each prompt is split into sub-word tokens and mapped to integer IDs.</p>
+
+    <div class="interactive-panel" id="tokenizer-panel">
+      <h3>Tokenization result</h3>
+      <div class="kv-visual">
+        <div class="kv-row">
+          <span class="kv-label" style="color:var(--accent);">P1 →</span>
+          <span class="kv-cell filled">154</span>
+          <span class="kv-cell filled">11112</span>
+          <span class="kv-cell filled">42</span>
+          <span class="kv-cell filled">756</span>
+          <span class="kv-cell filled">298</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);margin-left:8px;">5 tokens</span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-label" style="color:var(--accent2);">P2 →</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">201</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">338</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">64</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">891</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">5520</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">1023</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">743</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);margin-left:8px;">7 tokens</span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-label" style="color:var(--accent3);">P3 →</span>
+          <span class="kv-cell filled">8479</span>
+          <span class="kv-cell filled">612</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);margin-left:8px;">2 tokens</span>
+        </div>
+      </div>
+      <p style="margin-top:12px;"><strong>Total tokens:</strong> 5 + 7 + 2 = <strong>14 tokens</strong></p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> From this point forward, the LLM never sees English text again. Everything is token IDs. When we say "the prompt travels through the engine," we really mean these integer sequences travel through the engine.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s04 ═══════════ -->
+<section class="section fade-in" id="s04">
+  <div class="container">
+    <span class="section-num">04 · STEP TWO — THE WAITING QUEUE</span>
+    <h2>Prefill vs. Decode — two kinds of work</h2>
+
+    <p>Before the tokens are processed by the engine, they enter a <strong>waiting queue</strong>. Think of it like a cinema lobby — you can't walk straight into the theater. You wait, and the scheduler decides when to let you in.</p>
+
+    <p>In this waiting queue, every request belongs to one of two categories:</p>
+
+    <div class="comparison">
+      <div class="card" style="border-color: rgba(108,140,255,0.3);">
+        <h3 style="color:var(--accent);">Prefill Request</h3>
+        <p>The KV cache for this prompt <strong>has not been computed yet</strong>. The engine needs to process all prompt tokens at once, compute the key-value matrices, and store them. This happens once per prompt.</p>
+        <span class="tag tag-blue">Compute-heavy</span>
+        <span class="tag tag-blue">Parallelizable</span>
+      </div>
+      <div class="card" style="border-color: rgba(52,211,153,0.3);">
+        <h3 style="color:var(--accent3);">Decode Request</h3>
+        <p>The KV cache already exists. The engine <strong>reuses</strong> the cached keys and values to generate new tokens, one at a time. This is the iterative "streaming" part you see in chat interfaces.</p>
+        <span class="tag tag-green">Memory-bound</span>
+        <span class="tag tag-green">Sequential</span>
+      </div>
+    </div>
+
+    <div class="callout-warn callout">
+      <p><strong>Priority rule:</strong> Decoding requests are always prioritized over prefill requests. Why? Because a decoding request already has allocated resources (KV cache blocks). Stalling it would waste those resources.</p>
+    </div>
+
+    <p>Every prompt starts as a prefill request. Once prefilling is done, it moves to the <strong>running queue</strong> as a decode request. Understanding this distinction is foundational to everything that follows.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s05 ═══════════ -->
+<section class="section fade-in" id="s05">
+  <div class="container">
+    <span class="section-num">05 · THE KV CACHE</span>
+    <h2>Why inference needs memory at all</h2>
+
+    <p>This is the concept you must understand before anything else makes sense. Let's walk through inference step by step.</p>
+
+    <p>Say we have four tokens: <strong>"Hi my name is"</strong>. These get converted to token embeddings and flow through the transformer layers — layer 1, layer 2, ..., up to layer 22 for TinyLlama.</p>
+
+    <p>Inside every transformer layer, three things happen:</p>
+
+    <div class="step-cards">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Compute Q, K, V matrices</h4>
+          <p>The token embeddings are projected into <strong>Query</strong>, <strong>Key</strong>, and <strong>Value</strong> matrices using learned weight matrices.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Compute attention scores</h4>
+          <p><strong>Q × K<sup>T</sup></strong> gives us the attention scores. We divide by √d<sub>k</sub>, apply causal masking, then softmax to get attention weights.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Compute context vectors</h4>
+          <p>Attention weights × <strong>V</strong> gives us the context vectors. These pass through the feed-forward network, residual connections, and normalization.</p>
+        </div>
+      </div>
+    </div>
+
+    <p>Now here's the critical insight. When we predict the <em>next</em> token (say "Alice"), we append it to the sequence and run it through all the layers again. But <strong>we don't need to recompute the K and V matrices for the original four tokens</strong> — those haven't changed.</p>
+
+    <div class="callout-success callout">
+      <p><strong>The KV cache principle:</strong> Store the previously computed Key and Value matrices so they can be reused. Only compute K and V for the <em>new</em> token. This turns an O(n²) recomputation into O(n) per step.</p>
+    </div>
+
+    <h3>The two-phase pattern</h3>
+
+    <p>This gives us the two phases we saw earlier:</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Prefill — Build the cache</h4>
+          <p>Process all prompt tokens at once. Compute the full K and V matrices for every layer. Store them. Predict the <strong>first</strong> new token. This is expensive because nothing is cached yet.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Decode — Reuse the cache</h4>
+          <p>Append the new token. Compute K and V <strong>only for the new token</strong>. Append to the cached K and V. Predict the next token. Repeat until done.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="qa-box">
+      <p class="question">A common question is: if I'm just predicting one token, why does that require GPU memory?</p>
+      <p class="answer">Because you must store the KV cache for all previous tokens across all layers. For TinyLlama with 22 layers and a 1024-token sequence, that's 22 layers × 1024 tokens × key+value matrices. The KV cache is the single largest consumer of GPU memory during inference.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s06 ═══════════ -->
+<section class="section fade-in" id="s06">
+  <div class="container">
+    <span class="section-num">06 · GPU VRAM — THE PRECIOUS LAND</span>
+    <h2>Four tenants, one piece of land</h2>
+
+    <p>Think of GPU VRAM as land. It's expensive, limited, and multiple tenants are competing for space. In vLLM, four things need to live in VRAM:</p>
+
+    <div class="gpu-diagram" style="grid-template-columns: repeat(4, 1fr);">
+      <div class="gpu-box" style="border-color:var(--accent);">
+        <div class="gpu-box-title">Model Weights</div>
+        <div class="gpu-box-val">~2 GB</div>
+        <div class="gpu-box-sub">TinyLlama parameters</div>
+      </div>
+      <div class="gpu-box" style="border-color:var(--accent3);">
+        <div class="gpu-box-title">KV Cache</div>
+        <div class="gpu-box-val">~10.86 GB</div>
+        <div class="gpu-box-sub">Largest tenant</div>
+      </div>
+      <div class="gpu-box" style="border-color:var(--accent2);">
+        <div class="gpu-box-title">Activations</div>
+        <div class="gpu-box-val">~0.3 GB</div>
+        <div class="gpu-box-sub">PyTorch peak memory</div>
+      </div>
+      <div class="gpu-box" style="border-color:var(--text-dim);">
+        <div class="gpu-box-title">Non-Torch</div>
+        <div class="gpu-box-val">~0.05 GB</div>
+        <div class="gpu-box-sub">Optimizer states etc.</div>
+      </div>
+    </div>
+
+    <h3>Visualizing the VRAM layout</h3>
+
+    <div class="vram-visual">
+      <div class="vram-kv">KV Cache</div>
+      <div class="vram-weights">Weights</div>
+      <div class="vram-act">Act</div>
+      <div class="vram-misc"></div>
+    </div>
+    <div class="vram-legend">
+      <span class="vram-legend-item"><span class="vram-legend-dot" style="background:var(--accent3);"></span> KV Cache — 10.86 GB (82%)</span>
+      <span class="vram-legend-item"><span class="vram-legend-dot" style="background:var(--accent);"></span> Model Weights — 2 GB (15%)</span>
+      <span class="vram-legend-item"><span class="vram-legend-dot" style="background:var(--accent2);"></span> Activations — 0.3 GB (2%)</span>
+      <span class="vram-legend-item"><span class="vram-legend-dot" style="background:#777;"></span> Non-Torch — 0.05 GB (1%)</span>
+    </div>
+
+    <p style="margin-top:20px;">The KV cache dominates. For our tiny model, it consumes <strong>82% of all VRAM</strong>. For larger models like LLaMA 70B or Mixtral, this ratio gets even more extreme.</p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> When you browse GPU rentals on RunPod, Lambda, or cloud providers, the most important spec is <strong>VRAM</strong>. A GPU with 48 GB VRAM can serve much larger models or many more concurrent users than one with 16 GB. VRAM directly determines throughput and cost.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s07 ═══════════ -->
+<section class="section fade-in" id="s07">
+  <div class="container">
+    <span class="section-num">07 · BLOCKS — THE BUILDING UNITS</span>
+    <h2>How KV cache is organized in memory</h2>
+
+    <p>vLLM doesn't store KV cache as one giant matrix. Instead, it divides memory into fixed-size <strong>blocks</strong>. Each block can hold the K and V matrices for up to <strong>16 tokens</strong>.</p>
+
+    <div class="card">
+      <h3>Anatomy of a single block</h3>
+      <div class="two-col" style="margin-top:12px;">
+        <div>
+          <p style="color:var(--accent);font-family:var(--mono);font-size:0.78rem;">KEY MATRIX</p>
+          <p>16 rows (tokens) × (num_heads × head_dim) columns</p>
+        </div>
+        <div>
+          <p style="color:var(--accent2);font-family:var(--mono);font-size:0.78rem;">VALUE MATRIX</p>
+          <p>16 rows (tokens) × (num_heads × head_dim) columns</p>
+        </div>
+      </div>
+    </div>
+
+    <p>Every transformer layer gets its own set of blocks. So if TinyLlama has 22 layers, and we allocate 3 blocks per layer, that's 3 × 22 = 66 blocks total.</p>
+
+    <h3>How blocks are assigned to prompts</h3>
+
+    <p>Each prompt gets its own block(s). <strong>No two prompts share a block</strong> — because we need to keep attention computations separate between prompts.</p>
+
+    <div class="interactive-panel" id="block-alloc-panel">
+      <h3>Block allocation for our three prompts</h3>
+      <p style="margin-bottom:16px;">Each prompt needs fewer than 16 tokens, so one block per prompt is sufficient.</p>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <p style="font-family:var(--mono);font-size:0.78rem;color:var(--accent);margin-bottom:6px;">LAYER 1</p>
+          <div class="block-grid" style="grid-template-columns:repeat(4,1fr);max-width:200px;">
+            <div class="block-cell p1">P1<br><span style="font-size:0.5rem;">5/16</span></div>
+            <div class="block-cell p2">P2<br><span style="font-size:0.5rem;">7/16</span></div>
+            <div class="block-cell p3">P3<br><span style="font-size:0.5rem;">2/16</span></div>
+            <div class="block-cell free">Free</div>
+          </div>
+        </div>
+        <div>
+          <p style="font-family:var(--mono);font-size:0.78rem;color:var(--accent2);margin-bottom:6px;">LAYER 2</p>
+          <div class="block-grid" style="grid-template-columns:repeat(4,1fr);max-width:200px;">
+            <div class="block-cell p1">P1<br><span style="font-size:0.5rem;">5/16</span></div>
+            <div class="block-cell p2">P2<br><span style="font-size:0.5rem;">7/16</span></div>
+            <div class="block-cell p3">P3<br><span style="font-size:0.5rem;">2/16</span></div>
+            <div class="block-cell free">Free</div>
+          </div>
+        </div>
+        <p style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);">… same pattern repeats for all 22 layers</p>
+      </div>
+    </div>
+
+    <div class="qa-box">
+      <p class="question">What if a prompt has 18 tokens — more than one block can hold?</p>
+      <p class="answer">It gets two blocks. The first block fills completely (16 tokens), and the overflow (2 tokens) goes into a second block. The other prompts are then assigned to subsequent blocks. vLLM handles this seamlessly through the page table.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s08 ═══════════ -->
+<section class="section fade-in" id="s08">
+  <div class="container">
+    <span class="section-num">08 · DERIVING THE NUMBERS</span>
+    <h2>From first principles to 32,357 CUDA blocks</h2>
+
+    <p>Let's derive the exact numbers that vLLM prints when loading our model. No hand-waving — we'll calculate every byte.</p>
+
+    <h3>Memory per block</h3>
+
+    <div class="formula">
+      block_memory = 2 × num_layers × num_tokens × num_kv_heads × head_dim × bytes_per_element
+    </div>
+
+    <p>The leading <strong>2</strong> accounts for both Key and Value matrices. For TinyLlama:</p>
+
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <p style="font-family:var(--mono);font-size:0.75rem;color:var(--accent);margin-bottom:4px;">MODEL CONFIG</p>
+          <p><strong>num_layers</strong> = 22</p>
+          <p><strong>num_kv_heads</strong> = 4 <span style="font-size:0.8rem;">(Grouped-Query Attention)</span></p>
+          <p><strong>head_dim</strong> = 64</p>
+          <p><strong>bytes_per_element</strong> = 2 <span style="font-size:0.8rem;">(FP16)</span></p>
+        </div>
+        <div>
+          <p style="font-family:var(--mono);font-size:0.75rem;color:var(--accent3);margin-bottom:4px;">DERIVED VALUES</p>
+          <p><strong>bytes_per_token</strong> = 2 × 22 × 4 × 64 × 2 = <strong>22,528 bytes</strong> (≈ 22 KB)</p>
+          <p><strong>bytes_per_block</strong> = 22,528 × 16 = <strong>360,448 bytes</strong> (≈ 0.344 MB)</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>Maximum CUDA blocks</h3>
+
+    <p>The total KV cache budget is <strong>10.86 GB</strong>. Each block takes ~0.344 MB.</p>
+
+    <div class="formula">
+      max_cuda_blocks = 10.86 GB ÷ 0.000344 GB ≈ <strong style="color:var(--accent3);">32,357 blocks</strong>
+    </div>
+
+    <h3>CPU blocks</h3>
+
+    <p>vLLM reserves a default <strong>4 GB CPU swap space</strong> per GPU. This is used when parameters need to be offloaded — for example, storing activation states during gradient computation.</p>
+
+    <div class="formula">
+      cpu_blocks = 4 GB ÷ 0.000344 GB ≈ <strong style="color:var(--accent3);">11,915 blocks</strong>
+    </div>
+
+    <div class="callout-success callout">
+      <p><strong>Verification:</strong> These are the exact numbers vLLM prints in the logs — <strong>32,357 CUDA blocks</strong> and <strong>11,915 CPU blocks</strong>. We derived them from first principles.</p>
+    </div>
+
+    <div class="interactive-panel" id="block-calc">
+      <h3>Block calculator</h3>
+      <p style="margin-bottom:16px;">Change the model parameters to see how block counts change.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-family:var(--mono);font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px;">Layers</label>
+          <input type="number" id="calc-layers" value="22" min="1" max="200" style="width:100%;padding:8px;background:var(--bg-card-alt);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:0.85rem;">
+        </div>
+        <div>
+          <label style="font-family:var(--mono);font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px;">KV Heads</label>
+          <input type="number" id="calc-heads" value="4" min="1" max="128" style="width:100%;padding:8px;background:var(--bg-card-alt);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:0.85rem;">
+        </div>
+        <div>
+          <label style="font-family:var(--mono);font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px;">Head Dim</label>
+          <input type="number" id="calc-hdim" value="64" min="1" max="256" style="width:100%;padding:8px;background:var(--bg-card-alt);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:0.85rem;">
+        </div>
+        <div>
+          <label style="font-family:var(--mono);font-size:0.75rem;color:var(--text-dim);display:block;margin-bottom:4px;">KV Budget (GB)</label>
+          <input type="number" id="calc-budget" value="10.86" step="0.01" min="0.1" style="width:100%;padding:8px;background:var(--bg-card-alt);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:0.85rem;">
+        </div>
+      </div>
+      <div id="calc-result" style="margin-top:16px;padding:14px;background:var(--bg-card-alt);border-radius:8px;font-family:var(--mono);font-size:0.85rem;">
+        <span style="color:var(--text-dim);">Bytes/token:</span> <span id="res-bpt" style="color:var(--accent3);">22,528</span> · 
+        <span style="color:var(--text-dim);">MB/block:</span> <span id="res-bpb" style="color:var(--accent3);">0.344</span> · 
+        <span style="color:var(--text-dim);">Max CUDA blocks:</span> <span id="res-blocks" style="color:var(--accent);font-weight:700;">32,357</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s09 ═══════════ -->
+<section class="section fade-in" id="s09">
+  <div class="container">
+    <span class="section-num">09 · STEP THREE — THE PREFILL PHASE</span>
+    <h2>Building the KV cache from scratch</h2>
+
+    <p>The scheduler checks: can we process all waiting prompts together? The total token count is 5 + 7 + 2 = <strong>14 tokens</strong>. The default <strong>token budget</strong> per iteration is 2,048. Since 14 << 2,048, all three prompts can be processed in a single batch.</p>
+
+    <h3>Continuous batching: everything goes together</h3>
+
+    <p>vLLM forms one <strong>continuous batch</strong> by concatenating all token IDs from all prompts, along with their position indices:</p>
+
+    <div class="card">
+      <div class="kv-visual">
+        <div class="kv-row">
+          <span class="kv-label">Tokens</span>
+          <span class="kv-cell filled">154</span>
+          <span class="kv-cell filled">11k</span>
+          <span class="kv-cell filled">42</span>
+          <span class="kv-cell filled">756</span>
+          <span class="kv-cell filled">298</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">201</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">338</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">64</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">891</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">5.5k</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">1k</span>
+          <span class="kv-cell filled" style="background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">743</span>
+          <span class="kv-cell filled" style="background:rgba(52,211,153,0.25);color:var(--accent3);border-color:rgba(52,211,153,0.3);">8.5k</span>
+          <span class="kv-cell filled" style="background:rgba(52,211,153,0.25);color:var(--accent3);border-color:rgba(52,211,153,0.3);">612</span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-label">Positions</span>
+          <span class="kv-cell empty">0</span>
+          <span class="kv-cell empty">1</span>
+          <span class="kv-cell empty">2</span>
+          <span class="kv-cell empty">3</span>
+          <span class="kv-cell empty">4</span>
+          <span class="kv-cell empty">0</span>
+          <span class="kv-cell empty">1</span>
+          <span class="kv-cell empty">2</span>
+          <span class="kv-cell empty">3</span>
+          <span class="kv-cell empty">4</span>
+          <span class="kv-cell empty">5</span>
+          <span class="kv-cell empty">6</span>
+          <span class="kv-cell empty">0</span>
+          <span class="kv-cell empty">1</span>
+        </div>
+      </div>
+      <p style="margin-top:8px;font-size:0.82rem;">Notice: positions reset for each prompt. Attention is computed separately per prompt — no cross-prompt attention.</p>
+    </div>
+
+    <h3>Block allocation</h3>
+
+    <p>For each prompt, vLLM checks how many blocks are needed:</p>
+
+    <ul style="color:var(--text-dim);font-size:0.9rem;margin:12px 0 12px 20px;">
+      <li><strong>P1</strong> — 5 tokens → 1 block (5/16 slots used)</li>
+      <li><strong>P2</strong> — 7 tokens → 1 block (7/16 slots used)</li>
+      <li><strong>P3</strong> — 2 tokens → 1 block (2/16 slots used)</li>
+    </ul>
+
+    <p>That's <strong>3 blocks per layer × 22 layers = 66 blocks total</strong> out of 32,357 available. The engine barely breaks a sweat.</p>
+
+    <h3>What happens during prefill</h3>
+
+    <p>All tokens are processed through every transformer layer. The K and V matrices are computed and stored in the allocated blocks. At the end of prefill, <strong>one new token is predicted for each prompt</strong>.</p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Prefill is like building the foundation. It's the most compute-intensive step — all tokens must be processed from scratch. But it only happens once per prompt. Everything after this reuses the cache.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s10 ═══════════ -->
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10 · PAGED ATTENTION</span>
+    <h2>The page table and free block queue</h2>
+
+    <p>vLLM maintains two critical data structures on the CPU to manage blocks efficiently:</p>
+
+    <div class="comparison">
+      <div class="card" style="border-color:rgba(108,140,255,0.3);">
+        <h3 style="color:var(--accent);">Page Table</h3>
+        <p>Maps each sequence to the block(s) it occupies. These are <strong>pointers</strong> — the table itself uses no GPU memory. The blocks it points to are the ones taking real space in VRAM.</p>
+        <div style="margin-top:12px;font-family:var(--mono);font-size:0.78rem;">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+            <span style="color:var(--accent);">Seq 1 →</span>
+            <span class="tag tag-blue">Block 1</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+            <span style="color:var(--accent2);">Seq 2 →</span>
+            <span class="tag tag-purple">Block 2</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="color:var(--accent3);">Seq 3 →</span>
+            <span class="tag tag-green">Block 3</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(52,211,153,0.3);">
+        <h3 style="color:var(--accent3);">Free Block Queue</h3>
+        <p>A per-layer list of blocks that are currently <strong>unoccupied</strong>. When a sequence finishes, its blocks return here immediately for reuse.</p>
+        <div style="margin-top:12px;font-family:var(--mono);font-size:0.78rem;">
+          <div style="margin-bottom:4px;">
+            <span style="color:var(--text-dim);">Layer 1:</span>
+            <span class="tag tag-yellow">Block 4</span>
+          </div>
+          <div style="margin-bottom:4px;">
+            <span style="color:var(--text-dim);">Layer 2:</span>
+            <span class="tag tag-yellow">Block 4</span>
+          </div>
+          <div>
+            <span style="color:var(--text-dim);">… same for all layers</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p>This is the concept borrowed from <strong>operating system virtual memory</strong>. Just like an OS uses page tables to map virtual addresses to physical RAM, vLLM uses page tables to map sequences to GPU memory blocks. That's why it's called <strong>Paged Attention</strong>.</p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> Paged Attention is not a new attention algorithm. It's a <strong>memory management strategy</strong>. The attention computation itself (Q × K<sup>T</sup> × V) is unchanged. What's new is how the K and V matrices are organized, allocated, and freed in GPU memory.</p>
+    </div>
+
+    <div class="qa-box">
+      <p class="question">Why can't two prompts share a block?</p>
+      <p class="answer">Because the KV cache is used to compute attention scores. If two prompts shared a block, their tokens would attend to each other — which would corrupt the output. Each prompt must have its own isolated attention computation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s11 ═══════════ -->
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11 · THE DECODING PHASE</span>
+    <h2>Generating tokens one at a time</h2>
+
+    <p>After prefill, all three prompts move from the <strong>waiting queue</strong> to the <strong>running queue</strong>. Now the real generation begins.</p>
+
+    <h3>Iteration 1 — First decoded token</h3>
+
+    <p>Each prompt now has one new token appended from the prefill step. The KV cache grows by one row per prompt per layer:</p>
+
+    <div class="interactive-panel" id="decode-visual">
+      <h3>KV cache growth during decoding</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div>
+          <p style="font-family:var(--mono);font-size:0.78rem;color:var(--accent);margin-bottom:6px;">P1 — Block 1 (Layer 1)</p>
+          <div class="kv-row">
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;">Hi</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;">my</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;">name</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;">is</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;">_</span>
+            <span class="kv-cell new" style="width:36px;height:22px;font-size:0.55rem;">new</span>
+            <span class="kv-cell empty" style="width:36px;height:22px;font-size:0.55rem;">—</span>
+            <span class="kv-cell empty" style="width:36px;height:22px;font-size:0.55rem;">—</span>
+            <span class="kv-cell empty" style="width:36px;height:22px;font-size:0.55rem;">—</span>
+            <span class="kv-cell empty" style="width:36px;height:22px;font-size:0.55rem;">—</span>
+          </div>
+          <p style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;"><span style="color:var(--accent3);">Green</span> = cached from prefill (not recomputed) · <span style="color:var(--danger);">Red</span> = new KV entry</p>
+        </div>
+        <div>
+          <p style="font-family:var(--mono);font-size:0.78rem;color:var(--accent2);margin-bottom:6px;">P2 — Block 2 (Layer 1)</p>
+          <div class="kv-row">
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">To..</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">is</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">a</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">bea</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">sum</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">mer</span>
+            <span class="kv-cell filled" style="width:36px;height:22px;font-size:0.55rem;background:rgba(167,139,250,0.25);color:var(--accent2);border-color:rgba(167,139,250,0.3);">day</span>
+            <span class="kv-cell new" style="width:36px;height:22px;font-size:0.55rem;">new</span>
+            <span class="kv-cell empty" style="width:36px;height:22px;font-size:0.55rem;">—</span>
+            <span class="kv-cell empty" style="width:36px;height:22px;font-size:0.55rem;">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p>The critical efficiency here: only the <strong>red cells</strong> require new K and V computation. All green cells are reused from cache. This is why decoding is much cheaper per token than prefilling.</p>
+
+    <h3>When a sequence finishes</h3>
+
+    <p>Sequences end when they hit one of two stop conditions:</p>
+    <ul style="color:var(--text-dim);font-size:0.9rem;margin:12px 0 12px 20px;">
+      <li>The model generates an <strong>end-of-sequence</strong> (EOS) token</li>
+      <li>The <strong>max_tokens</strong> limit is reached (50 in our example)</li>
+    </ul>
+
+    <p>When a sequence finishes, something beautiful happens:</p>
+
+    <div class="step-cards">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Remove from page table</h4>
+          <p>The sequence-to-block mapping is deleted.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Return blocks to free queue</h4>
+          <p>All blocks that were allocated to this sequence are <strong>immediately added back</strong> to the free block queue across all layers.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>New prompts can use freed blocks</h4>
+          <p>If there are waiting prompts, they can immediately be allocated the freed blocks and begin prefilling.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout-success callout">
+      <p><strong>This is the magic of paged attention.</strong> Freed blocks can be reused instantly. There's no memory fragmentation, no wasted space, no waiting for a full batch to finish. Sequences come and go independently, and the block pool continuously recycles.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ s12 ═══════════ -->
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12 · CONTINUOUS BATCHING vs. STATIC BATCHING</span>
+    <h2>Why vLLM is so much faster</h2>
+
+    <p>The final piece of the puzzle. Traditional inference engines use <strong>static batching</strong>. vLLM uses <strong>continuous batching</strong>. The difference is enormous.</p>
+
+    <div class="comparison">
+      <div class="card" style="border-color:rgba(248,113,113,0.3);">
+        <h3 style="color:var(--danger);">Static Batching</h3>
+        <p>All sequences in a batch must wait for the <strong>longest</strong> one to finish. If sequence 1 generates 2 tokens and sequence 4 generates 50, sequence 1's block sits idle for 48 iterations.</p>
+        <p><strong>Wasted memory.</strong> <strong>Wasted compute.</strong> <strong>Lower throughput.</strong></p>
+      </div>
+      <div class="card" style="border-color:rgba(52,211,153,0.3);">
+        <h3 style="color:var(--accent3);">Continuous Batching</h3>
+        <p>The moment a sequence finishes, its blocks are freed and a <strong>new sequence from the waiting queue immediately takes its place</strong>. No idle memory. No waiting.</p>
+        <p><strong>Maximum utilization.</strong> <strong>Higher throughput.</strong> <strong>Lower latency.</strong></p>
+      </div>
+    </div>
+
+    <h3>How it works together</h3>
+
+    <p>Continuous batching is only possible <em>because</em> of paged attention. The two innovations are deeply interlinked:</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Paged attention tracks block ownership</h4>
+          <p>The page table knows exactly which blocks belong to which sequence. The free block queue knows which blocks are available.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Sequence finishes → blocks freed instantly</h4>
+          <p>No need to wait for other sequences. The freed blocks return to the pool immediately.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>New sequence enters → grabs freed blocks</h4>
+          <p>A waiting prompt can start prefilling using the just-freed blocks. The batch size dynamically adjusts every iteration.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-connector"><div class="flow-dot"></div><div class="flow-line"></div></div>
+        <div class="flow-content">
+          <h4>Result: GPU never sits idle</h4>
+          <p>Some blocks serve decoding requests, others serve prefilling — at the same time. Maximum GPU utilization.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> vLLM can handle hundreds of concurrent prompts efficiently because it allocates blocks independently per prompt. With 32,357 blocks available and each short prompt needing just one block, the theoretical concurrency is massive.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ CLOSING ═══════ -->
+<section class="section fade-in" id="s-closing">
+  <div class="container">
+    <span class="section-num">CLOSING · THE FULL PICTURE</span>
+    <h2>Close your eyes and visualize</h2>
+
+    <p>Let's trace the complete journey one final time:</p>
+
+    <div class="step-cards">
+      <div class="step-card">
+        <div class="step-num" style="background:linear-gradient(135deg, var(--accent), var(--accent));">0</div>
+        <div class="step-content">
+          <h4>Arrival</h4>
+          <p>A user types a prompt. Raw text enters the vLLM engine.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Tokenization</h4>
+          <p>Text is converted to token IDs using the model's BPE tokenizer. From here on, the model only sees integers.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Waiting queue</h4>
+          <p>Tokens enter the waiting queue. Each request is classified as prefill or decode. Decode requests get priority.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Prefill phase</h4>
+          <p>All prompt tokens are processed together in a continuous batch. KV cache is computed and stored in allocated blocks. One new token is predicted per prompt.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>Decode phase</h4>
+          <p>New tokens are generated one at a time, reusing the KV cache. Blocks grow as new KV entries are appended. When a sequence finishes, its blocks are freed and recycled.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h4>Output</h4>
+          <p>The completed text is returned. Blocks are returned to the free pool. The engine is ready for the next prompt.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout-success callout">
+      <p><strong>Exercise:</strong> Close your eyes. Put yourself in the shoes of the prompt. Walk through every step — from text to tokens, from the waiting queue to block allocation, from prefill to decode, from the first generated token to the last. If you can visualize this entire journey, you understand how production LLM inference works.</p>
+    </div>
+
+    <h3>What's next</h3>
+
+    <p>This tutorial covered the two foundational concepts: <strong>paged attention</strong> and <strong>continuous batching</strong>. The vLLM engine has many more innovations waiting to be explored:</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:16px 0;">
+      <span class="tag tag-purple">Prefix Caching</span>
+      <span class="tag tag-pink">Speculative Decoding</span>
+      <span class="tag tag-yellow">Chunked Prefill</span>
+      <span class="tag tag-green">Multimodal Serving</span>
+      <span class="tag tag-blue">Dynamic Batching</span>
+    </div>
+
+    <p>These will be covered in future posts in the <strong>Beyond the Forward Pass</strong> series. Stay tuned.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <p><a href="../">← Beyond the Forward Pass</a></p>
+  <p style="margin-top:8px;">Based on <a href="https://www.youtube.com/watch?v=QyHHbeXqgrQ" target="_blank">Vizuara — How the vLLM inference engine works</a></p>
+</footer>
+
+<script>
+// Fade-in on scroll
+const faders = document.querySelectorAll('.fade-in');
+const obsOpts = { threshold: 0.12 };
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, obsOpts);
+faders.forEach(f => observer.observe(f));
+
+// Sticky nav on scroll
+const nav = document.getElementById('nav');
+const heroEnd = document.querySelector('.hero').offsetHeight;
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > heroEnd - 80);
+});
+
+// Block calculator
+function updateCalc() {
+  const layers = parseInt(document.getElementById('calc-layers').value) || 22;
+  const heads = parseInt(document.getElementById('calc-heads').value) || 4;
+  const hdim = parseInt(document.getElementById('calc-hdim').value) || 64;
+  const budget = parseFloat(document.getElementById('calc-budget').value) || 10.86;
+
+  const bpt = 2 * layers * heads * hdim * 2;
+  const bpb = bpt * 16;
+  const mbpb = bpb / (1024 * 1024);
+  const maxBlocks = Math.floor((budget * 1024 * 1024 * 1024) / bpb);
+
+  document.getElementById('res-bpt').textContent = bpt.toLocaleString();
+  document.getElementById('res-bpb').textContent = mbpb.toFixed(3);
+  document.getElementById('res-blocks').textContent = maxBlocks.toLocaleString();
+}
+
+document.querySelectorAll('#block-calc input').forEach(inp => {
+  inp.addEventListener('input', updateCalc);
+});
+</script>
+</body>
+</html>

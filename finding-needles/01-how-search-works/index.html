@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How Search Works — From Documents to Results | Search Zero to Hero</title>
+<style>
+    /* -------------------------------------------------------------------------
+       Design tokens — dark theme (required palette)
+       ------------------------------------------------------------------------- */
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c8cff;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+
+    /* Breadcrumb — exact spec */
+    .breadcrumb-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+      background: #111118; border-bottom: 1px solid #23232f;
+      padding: 10px 24px; font-size: 0.82rem; color: #8888a0;
+      font-family: var(--sans);
+    }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+
+    /* Sticky section nav */
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .main-nav a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+    .main-nav a:hover { color: var(--accent); }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108, 140, 255, 0.18), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(167, 139, 250, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.85rem, 5vw, 3rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle {
+      max-width: 640px;
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      margin-bottom: 36px;
+    }
+    .hero-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+    }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .num {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+
+    /* Sections */
+    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
+    .section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--border);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      scroll-margin-top: 96px;
+    }
+    .section.fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .section h2 {
+      font-size: 1.55rem;
+      margin: 0 0 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .section-num {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--accent2);
+      font-weight: 600;
+    }
+    .section p { margin: 0 0 1em; color: var(--text); }
+    .section p:last-child { margin-bottom: 0; }
+
+    /* Shared components */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .card h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      color: var(--accent3);
+    }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 22px 0;
+    }
+    @media (max-width: 700px) {
+      .comparison { grid-template-columns: 1fr; }
+    }
+    .comparison > div {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .comparison h4 { margin: 0 0 10px; font-size: 0.95rem; color: var(--accent5); }
+
+    .interactive-panel {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+    .interactive-panel textarea,
+    .interactive-panel input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .interactive-panel textarea { min-height: 100px; resize: vertical; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #0a0a0f; font-weight: 600; }
+    .btn.primary:hover { filter: brightness(1.08); color: #0a0a0f; }
+
+    .tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--accent4);
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+
+    .token-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+      min-height: 36px;
+      align-items: center;
+    }
+    .token {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+    .token.dim { opacity: 0.45; text-decoration: line-through; }
+
+    .bar-chart { margin: 16px 0; }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 72px 1fr minmax(100px, auto);
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+    }
+    .bar-row .bar {
+      height: 22px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 4px;
+      min-width: 4px;
+    }
+
+    .index-visual {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .index-term {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .index-term strong { color: var(--accent3); min-width: 100px; font-family: var(--mono); }
+    .doc-pill {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+    }
+    .doc-pill.hit { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+    .pipeline-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .pipeline-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      opacity: 0.35;
+      transition: opacity 0.3s, border-color 0.3s;
+    }
+    .pipeline-step.active {
+      opacity: 1;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(108, 140, 255, 0.25);
+    }
+    .pipeline-step .step-idx {
+      font-family: var(--mono);
+      font-weight: 700;
+      color: var(--accent5);
+      min-width: 28px;
+    }
+
+    .merge-canvas-wrap {
+      margin-top: 16px;
+      overflow-x: auto;
+    }
+    canvas.merge-viz {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: 180px;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    ul.fine-list { margin: 12px 0 12px 1.2em; color: var(--text-dim); }
+    ul.fine-list li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+
+    .step-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 16px 0;
+    }
+    .step-table th, .step-table td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+    .step-table th { background: var(--bg-card-alt); color: var(--accent2); }
+    .out-area {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 48px;
+    }
+    footer {
+      text-align: center;
+      padding: 40px 24px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">How Search Works</span>
+  </nav>
+
+  <nav class="main-nav" id="mainNav" aria-label="Chapter sections">
+    <a href="#s0">00 Search problem</a>
+    <a href="#s1">01 Text pipeline</a>
+    <a href="#s2">02 Inverted index</a>
+    <a href="#s3">03 Boolean retrieval</a>
+    <a href="#s4">04 Compression</a>
+    <a href="#s5">05 Query parsing</a>
+    <a href="#s6">06 Engine anatomy</a>
+    <a href="#s7">07 Playground</a>
+  </nav>
+
+  <header class="hero">
+    <h1>How Search Works — From Documents to Results</h1>
+    <p class="subtitle">
+      Turning messy text into fast retrieval: tokenization, indexes, Boolean matching, compression, query structure,
+      and the path from raw bytes to ranked results.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">6</div><div class="lbl">Interactive demos</div></div>
+      <div class="hero-stat"><div class="num">1</div><div class="lbl">Playground</div></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ========================= Section 00 ========================= -->
+    <section class="section fade-in" id="s0">
+      <h2><span class="section-num">00</span> The Search Problem</h2>
+
+      <p>
+        Search is easy to describe and hard to do well: a few typed words must surface the <em>most useful</em> matches
+        from a vast collection in milliseconds—a needle-in-a-haystack problem where intent is ambiguous and patience is tiny.
+      </p>
+
+      <p>
+        The difficulty is not only size. A query like <code>python threading</code> is short, but it compresses intent:
+        someone may want tutorials, API docs, Stack Overflow threads, or a specific PEP. The same words appear in many
+        documents for different reasons. Conversely, the right answer might use different vocabulary—<code>concurrency</code>
+        instead of <code>threading</code>—so literal word matching is not enough once you care about quality. Even before
+        ranking enters the picture, you must solve a more basic question: <strong>which documents even mention the ideas
+        the query might refer to?</strong> That is where text processing and inverted indexes come in.
+      </p>
+
+      <div class="comparison">
+        <div>
+          <h4>Structured data</h4>
+          <p style="margin:0;font-size:0.92rem;color:var(--text-dim);">
+            Rows and columns with explicit types: IDs, dates, prices. Queries map cleanly to predicates
+            (<code>WHERE price &lt; 100</code>). The engine can index fields directly. Semantics are mostly in the schema.
+          </p>
+        </div>
+        <div>
+          <h4>Unstructured (and semi-structured) text</h4>
+          <p style="margin:0;font-size:0.92rem;color:var(--text-dim);">
+            Natural language, markup, typos, synonyms, multiple languages. Meaning is distributed across tokens and
+            context. You must <em>derive</em> searchable structure via tokenization, normalization, and statistical signals.
+          </p>
+        </div>
+      </div>
+
+      <p>
+        Relevance goals differ by domain, but almost every system shares the same backbone: turn text into terms, map
+        terms to documents with an <code>inverted_index</code>, and evaluate queries over posting lists. Ranking layers
+        then reorder candidates using signals beyond yes/no matching.
+      </p>
+
+      <div class="card">
+        <h3>From card catalogs to inverted files</h3>
+        <p style="margin:0;color:var(--text-dim);font-size:0.95rem;">
+          Card catalogs map from book to metadata; search inverts that direction—each term maps to the documents
+          containing it. That layout, refined since Salton’s SMART and the first web engines, remains the core trick
+          that makes large-scale text lookup tractable.
+        </p>
+      </div>
+
+      <div class="callout">
+        <strong>Takeaway.</strong> Search begins by reducing unstructured text to normalized <code>terms</code>, then
+        precomputing a term → document mapping. Everything else—Boolean logic, phrase search, ranking—is layered on that
+        spine.
+      </div>
+    </section>
+
+    <!-- ========================= Section 01 ========================= -->
+    <section class="section fade-in" id="s1">
+      <h2><span class="section-num">01</span> Text Processing Pipeline</h2>
+
+      <p>
+        Raw text on disk or over the wire is rarely ready to index. It includes capitalization, punctuation, invisible
+        Unicode characters, markup, and morphological variants (<code>jump</code>, <code>jumps</code>, <code>jumped</code>).
+        A <strong>text processing pipeline</strong> (often called an <em>analyzer</em> in Lucene and Elasticsearch)
+        transforms raw strings into the <code>tokens</code> that the indexer records. The same pipeline (or a compatible
+        one) must run at query time so that query terms land in the same coordinate system as indexed terms.
+      </p>
+
+      <p>
+        <strong>Tokenization</strong> splits character streams into words or word-like units. Simple whitespace splitters
+        break on spaces; language-aware tokenizers handle punctuation attached to words, URLs, hashtags, and CJK scripts
+        without spaces. A bad tokenizer either merges distinct concepts (<code>foo.bar</code> as one token) or shatters
+        meaningful units (splitting product SKUs). Tokenization is therefore both mechanical and product-specific.
+      </p>
+
+      <p>
+        <strong>Lowercasing</strong> folds case so <code>Apple</code> and <code>apple</code> share a term—usually desirable
+        for prose, wrong for proper nouns and some identifiers. <strong>Stemming</strong> chops suffixes with heuristic rules;
+        the Porter stemmer is a classic English algorithm that normalizes <code>jumped</code> → <code>jump</code>.
+        <strong>Lemmatization</strong> uses vocabulary and morphology (often with POS tags) to map to dictionary lemmas
+        (<code>better</code> → <code>good</code>), which is linguistically cleaner but slower and language-dependent.
+      </p>
+
+      <p>
+        <strong>Stop word removal</strong> drops extremely frequent terms (<code>the</code>, <code>and</code>, <code>of</code>).
+        Pros: smaller indexes, less noise for Boolean AND. Cons: hurts phrase queries and disambiguation
+        (<code>To be or not to be</code>), and frequency signals for ranking. Many systems keep stop words in a
+        separate field or phase-dependent strategy instead of deleting them outright.
+      </p>
+
+      <p>
+        <strong>Character filtering</strong> strips HTML, zero-width spaces, or control characters.
+        <strong>Unicode normalization</strong> (e.g., NFC) ensures that different byte sequences that <em>look</em> identical
+        hash and compare identically. Without it, duplicate entries proliferate in the index and queries miss obvious
+        matches.
+      </p>
+
+      <div class="card">
+        <h3>Analyzers as chains</h3>
+        <p style="margin:0;color:var(--text-dim);font-size:0.95rem;">
+          In Lucene-style systems, an <code>analyzer</code> composes a <code>char_filter</code> → <code>tokenizer</code> →
+          zero or more <code>token_filter</code> stages. Each stage sees a stream of tokens with positions and offsets,
+          which matters for highlighting and phrase queries. Changing one filter can invalidate assumptions elsewhere, so
+          analyzer definitions are versioned carefully in production clusters.
+        </p>
+      </div>
+
+      <div class="interactive-panel" id="pipelineDemo">
+        <span class="tag">Demo</span>
+        <strong style="display:block;margin-bottom:8px;">Pipeline visualizer</strong>
+        <p style="margin:0 0 12px;font-size:0.9rem;color:var(--text-dim);">
+          Toggle each stage; Porter stemming runs on the official algorithm.
+          Stop-word removal drops high-frequency English function words after stemming.
+        </p>
+        <label for="pipeInput">Input text</label>
+        <textarea id="pipeInput">The quick brown foxes jumped</textarea>
+        <div class="btn-group">
+          <button type="button" class="btn" id="btnTokenize">1. Tokenize</button>
+          <button type="button" class="btn" id="btnLower">2. Lowercase</button>
+          <button type="button" class="btn" id="btnStem">3. Porter stem</button>
+          <button type="button" class="btn" id="btnStop">4. Remove stop words</button>
+          <button type="button" class="btn primary" id="btnRunAll">Run full pipeline</button>
+        </div>
+        <div style="margin-top:16px;">
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:6px;">Live tokens</div>
+          <div class="token-row" id="tokenDisplay"></div>
+        </div>
+        <div class="out-area" id="pipeLog" aria-live="polite"></div>
+      </div>
+
+      <div class="callout">
+        <strong>Takeaway.</strong> Analysis defines the <em>vocabulary</em> of your index. Queries and documents must be
+        analyzed consistently, or retrieval silently degrades.
+      </div>
+    </section>
+
+    <!-- ========================= Section 02 ========================= -->
+    <section class="section fade-in" id="s2">
+      <h2><span class="section-num">02</span> The Inverted Index</h2>
+
+      <p>
+        A <strong>forward index</strong> stores, for each document, the list of terms it contains—natural for displaying a
+        document, expensive for ad hoc term lookup across the whole corpus. An <strong>inverted index</strong> flips the
+        direction: for each term, it stores a <code>posting_list</code> of documents where the term appears. Lookup by
+        term becomes an array or tree hop to the list head, hence near <strong>O(1)</strong> term lookup (plus scanning
+        the list), rather than scanning every document.
+      </p>
+
+      <p>
+        Each posting is typically more than a document ID. Common fields include <code>term_frequency</code> within the
+        document and <code>positions</code> (token offsets) for phrase and proximity operators. A minimal posting might be
+        <code>(docId)</code>; richer postings enable scoring and positional constraints:
+      </p>
+      <div class="formula">
+        posting ∈ { docId, tf, [pos₁, pos₂, …] }
+      </div>
+
+      <div class="card">
+        <h3>Building an inverted index (three documents)</h3>
+        <p style="margin:0 0 12px;color:var(--text-dim);font-size:0.95rem;">
+          After simple lowercasing and splitting on spaces:
+        </p>
+        <table class="step-table">
+          <thead><tr><th>Doc</th><th>Text</th></tr></thead>
+          <tbody>
+            <tr><td><code>D1</code></td><td>the quick brown fox</td></tr>
+            <tr><td><code>D2</code></td><td>the lazy dog</td></tr>
+            <tr><td><code>D3</code></td><td>the quick dog jumps</td></tr>
+          </tbody>
+        </table>
+        <p style="margin:0;color:var(--text-dim);font-size:0.95rem;">
+          Scan each document sequentially. For every term, append the document identifier to that term’s posting list.
+          Merge duplicate entries within the same document if you store only presence; aggregate counts if you store
+          <code>tf</code>. The result:
+        </p>
+        <ul class="fine-list">
+          <li><code>the</code> → [<code>D1</code>, <code>D2</code>, <code>D3</code>]</li>
+          <li><code>quick</code> → [<code>D1</code>, <code>D3</code>]</li>
+          <li><code>brown</code> → [<code>D1</code>]</li>
+          <li><code>fox</code> → [<code>D1</code>]</li>
+          <li><code>lazy</code> → [<code>D2</code>]</li>
+          <li><code>dog</code> → [<code>D2</code>, <code>D3</code>]</li>
+          <li><code>jumps</code> → [<code>D3</code>]</li>
+        </ul>
+      </div>
+
+      <div class="interactive-panel" id="indexLookupDemo">
+        <span class="tag">Demo</span>
+        <strong style="display:block;margin-bottom:8px;">Visual inverted index</strong>
+        <p style="margin:0 0 12px;font-size:0.9rem;color:var(--text-dim);">
+          Type a term to see which of the three tutorial documents contain it. Lists use sorted <code>docId</code> order,
+          the invariant merge algorithms rely on.
+        </p>
+        <label for="lookupTerm">Term lookup</label>
+        <input type="text" id="lookupTerm" placeholder="e.g. quick" autocomplete="off" />
+        <div class="index-visual" id="indexVisual" aria-live="polite"></div>
+      </div>
+
+    </section>
+
+    <!-- ========================= Section 03 ========================= -->
+    <section class="section fade-in" id="s3">
+      <h2><span class="section-num">03</span> Boolean Retrieval</h2>
+
+      <p>
+        In the Boolean model, each query is a combination of literals with <code>AND</code>, <code>OR</code>, and
+        <code>NOT</code>. A document either matches or does not; there is no graded score within the model itself. That
+        simplicity makes Boolean retrieval a building block inside real engines, even when the outer query language adds
+        ranking on top.
+      </p>
+
+      <p>
+        Evaluating <code>term1 AND term2</code> reduces to <strong>intersecting</strong> two sorted posting lists. Because
+        both lists are sorted by <code>docId</code>, a linear-time merge walk compares heads and advances the smaller ID,
+        emitting matches when IDs are equal. The complexity is <strong>O(n + m)</strong> for lists of length
+        <code>n</code> and <code>m</code>—far better than scanning the full corpus. <code>OR</code> is a union merge;
+        <code>NOT</code> requires a universe list or skipping against the complement, often implemented with skip pointers
+        or bitsets at scale.
+      </p>
+
+      <div class="formula">
+        merge_intersect(L₁, L₂): advance pointers; if id₁ = id₂ → output id; else advance min(id₁, id₂)
+      </div>
+
+      <p>
+        <strong>Limitations:</strong> no notion of “better” match—all conjuncts are equal. Frequent terms blow up
+        intermediate lists unless optimized. Users rarely think in pure Boolean form, so interfaces translate natural
+        queries into soft-Boolean or ranked retrieval. <strong>Extended Boolean</strong> models (e.g., weighted AND,
+        p-norm) blend strict logic with partial satisfaction.
+      </p>
+
+      <div class="interactive-panel">
+        <span class="tag">Demo</span>
+        <strong style="display:block;margin-bottom:8px;">Posting list intersection</strong>
+        <p style="margin:0 0 12px;font-size:0.9rem;color:var(--text-dim);">
+          Lists: <code>quick</code> = [1, 3] and <code>dog</code> = [2, 3] (tutorial doc IDs). Step through the merge to
+          see where pointers align.
+        </p>
+        <div class="btn-group">
+          <button type="button" class="btn primary" id="mergeStep">Next merge step</button>
+          <button type="button" class="btn" id="mergeReset">Reset</button>
+        </div>
+        <div class="merge-canvas-wrap">
+          <canvas class="merge-viz" id="mergeCanvas" width="860" height="180" aria-label="Merge visualization"></canvas>
+        </div>
+        <div class="out-area" id="mergeLog"></div>
+      </div>
+
+      <div class="interactive-panel" id="boolDemoSmall">
+        <span class="tag">Demo</span>
+        <strong style="display:block;margin-bottom:8px;">Boolean query on tutorial index</strong>
+        <label for="boolQuery">Query (terms: quick, brown, fox, lazy, dog, jumps, the — use AND / OR / NOT)</label>
+        <input type="text" id="boolQuery" value="quick AND dog" />
+        <div class="btn-group">
+          <button type="button" class="btn primary" id="boolEval">Evaluate</button>
+        </div>
+        <div class="out-area" id="boolOut"></div>
+      </div>
+
+    </section>
+
+    <!-- ========================= Section 04 ========================= -->
+    <section class="section fade-in" id="s4">
+      <h2><span class="section-num">04</span> Posting List Compression</h2>
+
+      <p>
+        At web scale, inverted indexes consume terabytes. Posting lists are long integer sequences with skewed
+        distributions: a few terms appear everywhere, most are rare. <strong>Compression</strong> reduces RAM and disk
+        bandwidth, improving cache efficiency and I/O throughput. The design space trades <strong>compression ratio</strong>
+        against <strong>decode speed</strong>—query latency often depends on how fast lists can be decompressed and traversed.
+      </p>
+
+      <p>
+        <strong>Variable-byte (VByte) encoding</strong> represents integers in 7-bit chunks with a high continuation bit.
+        Small IDs use one byte; larger values use more. Decoding is branchy but simple and fast enough for many engines.
+      </p>
+
+      <p>
+        Sorted posting lists store monotonically increasing <code>docId</code>s. <strong>Delta encoding</strong> stores the
+        gaps between successive IDs instead of absolute values. Gaps are smaller on average, so they compress better under
+        VByte or bit packing. After decoding a prefix of gaps, reconstruct absolutes with a running sum.
+      </p>
+
+      <div class="formula">
+        Δᵢ = docIdᵢ − docIdᵢ₋₁ &nbsp;(with docId₀ = 0); &nbsp;decode: docIdᵢ = docIdᵢ₋₁ + Δᵢ
+      </div>
+
+      <p>
+        <strong>Bit-packing</strong> exploits known maximum bit widths for blocks of integers (PForDelta, SIMD-friendly
+        layouts). Blocks are decompressed in bulk, trading more complex encoders for higher throughput on modern CPUs.
+      </p>
+
+      <div class="card">
+        <h3>Example: deltas on a short list</h3>
+        <p style="margin:0 0 10px;color:var(--text-dim);font-size:0.95rem;">
+          Posting list: [107, 110, 120, 130]. Deltas: [107, 3, 10, 10]. The first gap is large; subsequent gaps shrink
+          when documents cluster in segments—common when crawl order correlates with site structure.
+        </p>
+        <div class="bar-chart" id="deltaBars"></div>
+      </div>
+
+      <div class="callout">
+        <strong>Takeaway.</strong> Compression is not archival—it is a latency tool. Choose codecs that align with query
+        patterns: skip-friendly layouts, block decoders, and caching of hot postings dominate engineering decisions.
+      </div>
+    </section>
+
+    <!-- ========================= Section 05 ========================= -->
+    <section class="section fade-in" id="s5">
+      <h2><span class="section-num">05</span> Query Parsing</h2>
+
+      <p>
+        Users type strings; executors need structured operations. A <strong>query parser</strong> turns surface syntax into
+        an operator tree (or an intermediate representation) that the retrieval layer understands. Along the way, the
+        query undergoes the same textual analysis as documents so that <code>Foxes</code> matches an index containing
+        <code>fox</code> if that was the analyzed form.
+      </p>
+
+      <p>
+        Common <strong>query types</strong> include:
+      </p>
+      <ul class="fine-list">
+        <li><span class="tag">Term</span> single-token lookup in the inverted index.</li>
+        <li><span class="tag">Phrase</span> requires consecutive positions—needs positional postings.</li>
+        <li><span class="tag">Boolean</span> combines subqueries with set logic.</li>
+        <li><span class="tag">Wildcard / n-gram</span> expands to many terms via prefix or n-gram indexes.</li>
+      </ul>
+
+      <p>
+        A typical <strong>parsing pipeline</strong> is: tokenize the query string → apply the same analyzer (or a
+        query-time variant) → map tokens to internal nodes → build a tree with operators (<code>must</code>,
+        <code>should</code>, <code>must_not</code> in Elasticsearch parlance mirrors Boolean structure while allowing
+        soft clauses for ranking).
+      </p>
+
+      <p>
+        <strong>Phrase queries</strong> intersect postings on term equality <em>and</em> enforce that positions align
+        (e.g., second term at position <code>p+1</code> if slop=0). <strong>Proximity queries</strong> generalize phrase
+        constraints to windows (“within <code>n</code> positions”), useful for legal and patent search where exact order
+        is flexible but closeness matters.
+      </p>
+
+      <div class="card">
+        <h3>Parse tree sketch</h3>
+        <p style="margin:0;font-family:var(--mono);font-size:0.85rem;color:var(--accent3);">
+          MUST( AND( TERM(quick), TERM(brown) ), SHOULD( TERM(fox) ) )
+        </p>
+        <p style="margin:12px 0 0;color:var(--text-dim);font-size:0.92rem;">
+          Real parsers handle precedence, field scoping (<code>title:fox</code>), fuzziness, and boosts. The tree is the
+          contract between the language surface and low-level iterators over postings.
+        </p>
+      </div>
+
+    </section>
+
+    <!-- ========================= Section 06 ========================= -->
+    <section class="section fade-in" id="s6">
+      <h2><span class="section-num">06</span> The Anatomy of a Search Engine</h2>
+
+      <p>
+        End-to-end search stacks separate concerns: acquiring data, transforming it, indexing it, serving queries, and
+        learning from signals. While products differ, the pattern is stable: <strong>ingestion</strong>,
+        <strong>indexing</strong>, and <strong>query serving</strong> pipelines connected by segment files or shards.
+      </p>
+
+      <div class="card">
+        <h3>Major subsystems</h3>
+        <ul class="fine-list" style="color:var(--text);">
+          <li><strong>Crawling / ingestion:</strong> fetch or receive documents, extract text, assign IDs, enqueue for indexing.</li>
+          <li><strong>Indexing:</strong> analyze text, accumulate postings, flush compressed segments, merge periodically.</li>
+          <li><strong>Query path:</strong> parse → plan → open iterators → score → rank → render snippets with highlights.</li>
+        </ul>
+      </div>
+
+      <p>
+        <strong>Where ranking fits:</strong> after candidate generation. Inverted indexes answer “who matches?” cheaply;
+        scoring functions (BM25, vector similarity, click models) reorder candidates for presentation. Hybrid systems run
+        lexical and semantic retrievers in parallel, then fuse results. Boolean or weak-AND retrieval produces a set or
+        heap of candidates; ranking consumes features from terms, fields, anchors, freshness, and behavioral data.
+      </p>
+
+      <div class="formula" style="color:var(--text-dim);">
+        Query → Parser → Analyzer → Plan → Posting iterators → Score → Top-K → Snippets
+      </div>
+
+      <div class="card">
+        <h3>Architecture diagram (logical view)</h3>
+        <pre style="margin:0;font-family:var(--mono);font-size:0.78rem;line-height:1.45;color:var(--text-dim);overflow-x:auto;">┌─────────────────────────────────────────────────────────────────────────────┐
+│                           INGESTION / CRAWL LAYER                            │
+│  Sources → Fetchers → Extractors → Normalizers → Document store (raw + IDs) │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           INDEXING PIPELINE                                  │
+│  Analyze (char/token filters) → Build postings → Compress → Commit segments │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+            ┌──────────────┐                 ┌──────────────┐
+            │ Segment files │                 │  Live index  │
+            │ (immutable)   │◀── merges ─────│   updates    │
+            └───────┬──────┘                 └──────┬───────┘
+                    │                               │
+                    └───────────────┬───────────────┘
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           QUERY SERVICE                                      │
+│  Parse → Plan iterators → Open postings → Score/Rank → Snippets + facets    │
+└─────────────────────────────────────────────────────────────────────────────┘</pre>
+      </div>
+
+      <div class="interactive-panel" id="enginePipelineDemo">
+        <span class="tag">Demo</span>
+        <strong style="display:block;margin-bottom:8px;">Query flow step-through</strong>
+        <p style="margin:0 0 12px;font-size:0.9rem;color:var(--text-dim);">
+          Walk a query through simplified stages. Each step mirrors a production boundary (API → parser → analyzer →
+          postings → scoring hook → response assembly).
+        </p>
+        <label for="pipelineQuery">Sample query</label>
+        <input type="text" id="pipelineQuery" value="quick brown fox" />
+        <div class="btn-group">
+          <button type="button" class="btn primary" id="pipelineNext">Advance step</button>
+          <button type="button" class="btn" id="pipelineReset">Reset</button>
+        </div>
+        <div class="pipeline-steps" id="pipelineSteps"></div>
+      </div>
+
+    </section>
+
+    <!-- ========================= Section 07 Playground ========================= -->
+    <section class="section fade-in" id="s7">
+      <h2><span class="section-num">07</span> Playground — Build an Index, Run Boolean Queries</h2>
+
+      <p>
+        Each non-empty line is a document in order (<code>D1</code>, <code>D2</code>, …). The builder lowercases, splits on
+        whitespace and punctuation boundaries, and applies the same Porter stemmer as earlier. Query terms are stemmed the same way before lookup, so
+        <code>jumps</code> and <code>jumping</code> align with the same posting list. Boolean expressions may use
+        <code>AND</code>, <code>OR</code>, <code>NOT</code>, and parentheses.
+      </p>
+
+      <div class="interactive-panel" id="playground">
+        <label for="pgDocs">Documents (one per line)</label>
+        <textarea id="pgDocs">The quick brown fox
+A lazy dog sleeps
+Quick dogs jump high</textarea>
+        <div class="btn-group">
+          <button type="button" class="btn primary" id="pgBuild">Rebuild inverted index</button>
+        </div>
+        <div style="margin-top:16px;">
+          <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:6px;">Live inverted index (stemmed terms)</div>
+          <div class="index-visual" id="pgIndexOut"></div>
+        </div>
+        <label for="pgBool" style="margin-top:20px;">Boolean query</label>
+        <input type="text" id="pgBool" value="quick AND dog" />
+        <div class="btn-group">
+          <button type="button" class="btn primary" id="pgEval">Run query</button>
+        </div>
+        <div class="out-area" id="pgOut"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <footer>
+    Chapter 01 — How Search Works · Search Zero to Hero · Single-file reference chapter
+  </footer>
+
+  <script>
+  /* ==========================================================================
+     Porter stemmer (Martin Porter; JS by McKenzie) — official algorithm for
+     consistent English stemming in demos. Source: tartarus.org PorterStemmer.
+     ========================================================================== */
+  var porterStem = (function () {
+    var step2list = {
+      ational: 'ate', tional: 'tion', enci: 'ence', anci: 'ance', izer: 'ize',
+      bli: 'ble', alli: 'al', entli: 'ent', eli: 'e', ousli: 'ous',
+      ization: 'ize', ation: 'ate', ator: 'ate', alism: 'al',
+      iveness: 'ive', fulness: 'ful', ousness: 'ous', aliti: 'al',
+      iviti: 'ive', biliti: 'ble', logi: 'log'
+    };
+    var step3list = {
+      icate: 'ic', ative: '', alize: 'al', iciti: 'ic', ical: 'ic', ful: '', ness: ''
+    };
+    var c = '[^aeiou]';
+    var v = '[aeiouy]';
+    var C = c + '[^aeiouy]*';
+    var V = v + '[^aeiou]*';
+    var mgr0 = '^(' + C + ')?' + V + C;
+    var meq1 = '^(' + C + ')?' + V + C + '(' + V + ')?$';
+    var mgr1 = '^(' + C + ')?' + V + C + V + C;
+    var s_v = '^(' + C + ')?' + v;
+    return function (w) {
+      var stem, suffix, firstch, re, re2, re3, re4;
+      if (w.length < 3) return w;
+      firstch = w.substr(0, 1);
+      if (firstch === 'y') w = firstch.toUpperCase() + w.substr(1);
+      re = /^(.+?)(ss|i)es$/;
+      re2 = /^(.+?)([^s])s$/;
+      if (re.test(w)) w = w.replace(re, '$1$2');
+      else if (re2.test(w)) w = w.replace(re2, '$1$2');
+      re = /^(.+?)eed$/;
+      re2 = /^(.+?)(ed|ing)$/;
+      if (re.test(w)) {
+        var fp = re.exec(w);
+        re = new RegExp(mgr0);
+        if (re.test(fp[1])) { re = /.$/; w = w.replace(re, ''); }
+      } else if (re2.test(w)) {
+        var fp2 = re2.exec(w);
+        stem = fp2[1];
+        re2 = new RegExp(s_v);
+        if (re2.test(stem)) {
+          w = stem;
+          re2 = /(at|bl|iz)$/;
+          re3 = new RegExp('([^aeiouylsz])\\1$');
+          re4 = new RegExp('^' + C + v + '[^aeiouwxy]$');
+          if (re2.test(w)) w = w + 'e';
+          else if (re3.test(w)) { re = /.$/; w = w.replace(re, ''); }
+          else if (re4.test(w)) w = w + 'e';
+        }
+      }
+      re = /^(.+?)y$/;
+      if (re.test(w)) {
+        var fp3 = re.exec(w);
+        stem = fp3[1];
+        re = new RegExp(s_v);
+        if (re.test(stem)) w = stem + 'i';
+      }
+      re = /^(.+?)(ational|tional|enci|anci|izer|bli|alli|entli|eli|ousli|ization|ation|ator|alism|iveness|fulness|ousness|aliti|iviti|biliti|logi)$/;
+      if (re.test(w)) {
+        var fp4 = re.exec(w);
+        stem = fp4[1];
+        suffix = fp4[2];
+        re = new RegExp(mgr0);
+        if (re.test(stem)) w = stem + step2list[suffix];
+      }
+      re = /^(.+?)(icate|ative|alize|iciti|ical|ful|ness)$/;
+      if (re.test(w)) {
+        var fp5 = re.exec(w);
+        stem = fp5[1];
+        suffix = fp5[2];
+        re = new RegExp(mgr0);
+        if (re.test(stem)) w = stem + step3list[suffix];
+      }
+      re = /^(.+?)(al|ance|ence|er|ic|able|ible|ant|ement|ment|ent|ou|ism|ate|iti|ous|ive|ize)$/;
+      re2 = /^(.+?)(s|t)(ion)$/;
+      if (re.test(w)) {
+        var fp6 = re.exec(w);
+        stem = fp6[1];
+        re = new RegExp(mgr1);
+        if (re.test(stem)) w = stem;
+      } else if (re2.test(w)) {
+        var fp7 = re2.exec(w);
+        stem = fp7[1] + fp7[2];
+        re2 = new RegExp(mgr1);
+        if (re2.test(stem)) w = stem;
+      }
+      re = /^(.+?)e$/;
+      if (re.test(w)) {
+        var fp8 = re.exec(w);
+        stem = fp8[1];
+        re = new RegExp(mgr1);
+        re2 = new RegExp(meq1);
+        re3 = new RegExp('^' + C + v + '[^aeiouwxy]$');
+        if (re.test(stem) || (re2.test(stem) && !re3.test(stem))) w = stem;
+      }
+      re = /ll$/;
+      re2 = new RegExp(mgr1);
+      if (re.test(w) && re2.test(w)) { re = /.$/; w = w.replace(re, ''); }
+      if (firstch === 'y') w = firstch.toLowerCase() + w.substr(1);
+      return w;
+    };
+  })();
+
+  // Minimal English stop words for pipeline / playground demos (not exhaustive).
+  var STOP_WORDS = new Set([
+    'a', 'an', 'the', 'and', 'or', 'but', 'if', 'of', 'at', 'by', 'for', 'with',
+    'to', 'in', 'on', 'is', 'are', 'was', 'were', 'be', 'been', 'it', 'this', 'that'
+  ]);
+
+  /* --------------------------------------------------------------------------
+     Text utilities: tokenize on word boundaries, normalize unicode loosely.
+     -------------------------------------------------------------------------- */
+  function tokenizeRaw(text) {
+    return text.match(/[A-Za-z0-9_]+/g) || [];
+  }
+
+  function logPipe(msg) {
+    var el = document.getElementById('pipeLog');
+    el.textContent = (el.textContent ? el.textContent + '\n' : '') + msg;
+  }
+
+  /* --------------------------------------------------------------------------
+     Section 01 demo: staged pipeline with visual token row.
+     -------------------------------------------------------------------------- */
+  var pipeState = { stage: 0, tokens: [] };
+
+  function renderTokens(tokens, dimSet) {
+    var row = document.getElementById('tokenDisplay');
+    row.innerHTML = '';
+    tokens.forEach(function (t) {
+      var span = document.createElement('span');
+      span.className = 'token' + (dimSet && dimSet.has(t) ? ' dim' : '');
+      span.textContent = t;
+      row.appendChild(span);
+    });
+  }
+
+  function syncPipeDisplayFull() {
+    var input = document.getElementById('pipeInput').value;
+    var tokens = tokenizeRaw(input).map(function (t) { return t.toLowerCase(); }).map(function (t) { return porterStem(t); });
+    var dimSet = new Set();
+    tokens.forEach(function (t) { if (STOP_WORDS.has(t)) dimSet.add(t); });
+    var display = tokenizeRaw(input).map(function (t) { return t.toLowerCase(); }).map(function (t) { return porterStem(t); });
+    renderTokens(display, dimSet);
+    var kept = display.filter(function (t) { return !STOP_WORDS.has(t); });
+    document.getElementById('pipeLog').textContent =
+      'Full pipeline result: ' + JSON.stringify(kept) + '\n(target example: ["quick","brown","fox","jump"] with jumped→jump, foxes→fox, stop words removed).';
+  }
+
+  document.getElementById('btnTokenize').addEventListener('click', function () {
+    document.getElementById('pipeLog').textContent = '';
+    pipeState.tokens = tokenizeRaw(document.getElementById('pipeInput').value);
+    logPipe('Tokens: ' + JSON.stringify(pipeState.tokens));
+    renderTokens(pipeState.tokens, null);
+  });
+  document.getElementById('btnLower').addEventListener('click', function () {
+    if (!pipeState.tokens.length) pipeState.tokens = tokenizeRaw(document.getElementById('pipeInput').value);
+    pipeState.tokens = pipeState.tokens.map(function (t) { return t.toLowerCase(); });
+    logPipe('Lowercase: ' + JSON.stringify(pipeState.tokens));
+    renderTokens(pipeState.tokens, null);
+  });
+  document.getElementById('btnStem').addEventListener('click', function () {
+    if (!pipeState.tokens.length) pipeState.tokens = tokenizeRaw(document.getElementById('pipeInput').value).map(function (t) { return t.toLowerCase(); });
+    else pipeState.tokens = pipeState.tokens.map(function (t) { return porterStem(t.toLowerCase()); });
+    logPipe('Stemmed: ' + JSON.stringify(pipeState.tokens));
+    renderTokens(pipeState.tokens, null);
+  });
+  document.getElementById('btnStop').addEventListener('click', function () {
+    /* Always recompute from the textarea so prior steps need not be clicked in order. */
+    document.getElementById('pipeLog').textContent = '';
+    var display = tokenizeRaw(document.getElementById('pipeInput').value).map(function (t) {
+      return porterStem(t.toLowerCase());
+    });
+    var dimSet = new Set();
+    display.forEach(function (t) {
+      if (STOP_WORDS.has(t)) dimSet.add(t);
+    });
+    pipeState.tokens = display.filter(function (t) { return !STOP_WORDS.has(t); });
+    logPipe('Stemmed stream: ' + JSON.stringify(display));
+    logPipe('Stop words struck through; kept for index: ' + JSON.stringify(pipeState.tokens));
+    renderTokens(display, dimSet);
+  });
+  document.getElementById('btnRunAll').addEventListener('click', syncPipeDisplayFull);
+
+  /* --------------------------------------------------------------------------
+     Section 02: tutorial documents + inverted index lookup UI.
+     -------------------------------------------------------------------------- */
+  var TUTORIAL_DOCS = [
+    { id: 'D1', text: 'the quick brown fox' },
+    { id: 'D2', text: 'the lazy dog' },
+    { id: 'D3', text: 'the quick dog jumps' }
+  ];
+
+  function buildSimpleIndex(docs) {
+    var index = {};
+    docs.forEach(function (d) {
+      var terms = d.text.toLowerCase().match(/[a-z0-9_]+/g) || [];
+      terms.forEach(function (term) {
+        if (!index[term]) index[term] = [];
+        if (index[term].indexOf(d.id) === -1) index[term].push(d.id);
+      });
+    });
+    Object.keys(index).forEach(function (k) { index[k].sort(); });
+    return index;
+  }
+
+  var tutorialIndex = buildSimpleIndex(TUTORIAL_DOCS);
+
+  function renderIndexVisual(highlightTerm) {
+    var root = document.getElementById('indexVisual');
+    root.innerHTML = '';
+    var terms = Object.keys(tutorialIndex).sort();
+    terms.forEach(function (term) {
+      var row = document.createElement('div');
+      row.className = 'index-term';
+      var strong = document.createElement('strong');
+      strong.textContent = term;
+      row.appendChild(strong);
+      tutorialIndex[term].forEach(function (docId) {
+        var pill = document.createElement('span');
+        pill.className = 'doc-pill' + (highlightTerm && term === highlightTerm ? ' hit' : '');
+        pill.textContent = docId;
+        row.appendChild(pill);
+      });
+      root.appendChild(row);
+    });
+  }
+
+  document.getElementById('lookupTerm').addEventListener('input', function (e) {
+    var t = e.target.value.trim().toLowerCase();
+    renderIndexVisual(t);
+  });
+  renderIndexVisual('');
+
+  /* --------------------------------------------------------------------------
+     Section 03: merge intersection visualization + small Boolean evaluator.
+     -------------------------------------------------------------------------- */
+  var mergeState = {
+    L1: [1, 3],
+    L2: [2, 3],
+    i: 0,
+    j: 0,
+    out: []
+  };
+
+  function drawMergeCanvas() {
+    var canvas = document.getElementById('mergeCanvas');
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width;
+    var h = canvas.height;
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, w, h);
+    function drawList(arr, y, label, ptr) {
+      ctx.fillStyle = '#8888a0';
+      ctx.font = '12px ' + getComputedStyle(document.documentElement).getPropertyValue('--mono').split(',')[0];
+      ctx.fillText(label, 16, y - 8);
+      var startX = 72;
+      var cell = 48;
+      arr.forEach(function (v, idx) {
+        ctx.fillStyle = idx === ptr ? '#6c8cff' : '#12121a';
+        ctx.strokeStyle = idx === ptr ? '#6c8cff' : '#2a2a3a';
+        ctx.beginPath();
+        ctx.roundRect(startX + idx * cell, y, cell - 8, 36, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = idx === ptr ? '#0a0a0f' : '#e0e0e8';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(v), startX + idx * cell + (cell - 8) / 2, y + 23);
+      });
+    }
+    drawList(mergeState.L1, 28, 'quick', mergeState.i);
+    drawList(mergeState.L2, 98, 'dog', mergeState.j);
+    ctx.fillStyle = '#34d399';
+    ctx.textAlign = 'left';
+    ctx.fillText('Intersection: [' + mergeState.out.join(', ') + ']', 16, 160);
+  }
+
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      this.beginPath();
+      this.moveTo(x + r, y);
+      this.arcTo(x + w, y, x + w, y + h, r);
+      this.arcTo(x + w, y + h, x, y + h, r);
+      this.arcTo(x, y + h, x, y, r);
+      this.arcTo(x, y, x + w, y, r);
+      this.closePath();
+    };
+  }
+
+  function mergeStep() {
+    var L1 = mergeState.L1;
+    var L2 = mergeState.L2;
+    var log = document.getElementById('mergeLog');
+    if (mergeState.i >= L1.length && mergeState.j >= L2.length) {
+      log.textContent = 'Merge complete. Result: [' + mergeState.out.join(', ') + ']';
+      drawMergeCanvas();
+      return;
+    }
+    var v1 = mergeState.i < L1.length ? L1[mergeState.i] : Infinity;
+    var v2 = mergeState.j < L2.length ? L2[mergeState.j] : Infinity;
+    var line = '';
+    if (v1 === v2) {
+      mergeState.out.push(v1);
+      line = 'IDs equal (' + v1 + ') → add to intersection; advance both pointers.';
+      mergeState.i++;
+      mergeState.j++;
+    } else if (v1 < v2) {
+      line = 'min(' + v1 + ', ' + v2 + ') = ' + v1 + ' → advance quick pointer.';
+      mergeState.i++;
+    } else {
+      line = 'min(' + v1 + ', ' + v2 + ') = ' + v2 + ' → advance dog pointer.';
+      mergeState.j++;
+    }
+    log.textContent = (log.textContent ? log.textContent + '\n' : '') + line;
+    drawMergeCanvas();
+  }
+
+  document.getElementById('mergeStep').addEventListener('click', mergeStep);
+  document.getElementById('mergeReset').addEventListener('click', function () {
+    mergeState.i = 0; mergeState.j = 0; mergeState.out = [];
+    document.getElementById('mergeLog').textContent = 'Reset. Lists: quick=[1,3], dog=[2,3].';
+    drawMergeCanvas();
+  });
+  drawMergeCanvas();
+  document.getElementById('mergeLog').textContent = 'Reset. Lists: quick=[1,3], dog=[2,3].';
+
+  /* Map tutorial terms to numeric doc IDs for Boolean demo */
+  var DOC_IDS = ['D1', 'D2', 'D3'];
+  var termToNums = {};
+  Object.keys(tutorialIndex).forEach(function (term) {
+    termToNums[term] = tutorialIndex[term].map(function (id) { return DOC_IDS.indexOf(id) + 1; }).sort(function (a, b) { return a - b; });
+  });
+
+  function intersect(a, b) {
+    var i = 0, j = 0, out = [];
+    while (i < a.length && j < b.length) {
+      if (a[i] === b[j]) { out.push(a[i]); i++; j++; }
+      else if (a[i] < b[j]) i++;
+      else j++;
+    }
+    return out;
+  }
+
+  function union(a, b) {
+    var i = 0, j = 0, out = [];
+    while (i < a.length || j < b.length) {
+      var va = i < a.length ? a[i] : Infinity;
+      var vb = j < b.length ? b[j] : Infinity;
+      if (va === vb) { out.push(va); i++; j++; }
+      else if (va < vb) { out.push(va); i++; }
+      else { out.push(vb); j++; }
+    }
+    return out;
+  }
+
+  function subtract(universe, neg) {
+    var out = [];
+    var set = new Set(neg);
+    universe.forEach(function (x) { if (!set.has(x)) out.push(x); });
+    return out;
+  }
+
+  /* Recursive descent Boolean parser for lowercase queries */
+  function parseBoolQuery(str) {
+    var tokens = str.toLowerCase().match(/[a-z0-9_]+|\(|\)|and|or|not/g) || [];
+    var pos = 0;
+    function peek() { return tokens[pos]; }
+    function eat(v) { if (peek() === v) { pos++; return true; } return false; }
+    function parseExpr() { return parseOr(); }
+    function parseOr() {
+      var n = parseAnd();
+      while (peek() === 'or') {
+        pos++;
+        n = { op: 'OR', left: n, right: parseAnd() };
+      }
+      return n;
+    }
+    function parseAnd() {
+      var n = parseNot();
+      while (peek() === 'and') {
+        pos++;
+        n = { op: 'AND', left: n, right: parseNot() };
+      }
+      return n;
+    }
+    function parseNot() {
+      if (eat('not')) {
+        return { op: 'NOT', child: parsePrimary() };
+      }
+      return parsePrimary();
+    }
+    function parsePrimary() {
+      if (eat('(')) {
+        var e = parseExpr();
+        eat(')');
+        return e;
+      }
+      var t = peek();
+      if (t && /^[a-z0-9_]+$/.test(t)) {
+        pos++;
+        return { op: 'TERM', term: t };
+      }
+      throw new Error('Unexpected token: ' + t);
+    }
+    var tree = parseExpr();
+    if (pos !== tokens.length) throw new Error('Trailing tokens');
+    return tree;
+  }
+
+  function evalBool(node, universe) {
+    if (node.op === 'TERM') {
+      var arr = termToNums[node.term] || [];
+      return arr.slice();
+    }
+    if (node.op === 'AND') return intersect(evalBool(node.left, universe), evalBool(node.right, universe));
+    if (node.op === 'OR') return union(evalBool(node.left, universe), evalBool(node.right, universe));
+    if (node.op === 'NOT') return subtract(universe, evalBool(node.child, universe));
+    return [];
+  }
+
+  document.getElementById('boolEval').addEventListener('click', function () {
+    var q = document.getElementById('boolQuery').value;
+    var out = document.getElementById('boolOut');
+    try {
+      var tree = parseBoolQuery(q);
+      var u = [1, 2, 3];
+      var nums = evalBool(tree, u);
+      var labels = nums.map(function (n) { return DOC_IDS[n - 1]; });
+      out.textContent = 'Matched doc IDs: ' + JSON.stringify(nums) + ' → ' + JSON.stringify(labels);
+    } catch (e) {
+      out.textContent = 'Parse error: ' + e.message;
+    }
+  });
+
+  /* --------------------------------------------------------------------------
+     Section 04: delta bar visualization.
+     -------------------------------------------------------------------------- */
+  (function renderDeltaBars() {
+    var root = document.getElementById('deltaBars');
+    if (!root) return;
+    var ids = [107, 110, 120, 130];
+    var deltas = [107, 3, 10, 10];
+    var maxD = Math.max.apply(null, deltas);
+    ids.forEach(function (id, idx) {
+      var row = document.createElement('div');
+      row.className = 'bar-row';
+      var lab = document.createElement('span');
+      lab.textContent = 'Δ' + idx + '=' + deltas[idx];
+      var barWrap = document.createElement('div');
+      var bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.width = Math.max(8, (deltas[idx] / maxD) * 100) + '%';
+      var val = document.createElement('span');
+      val.textContent = '→ id ' + id;
+      row.appendChild(lab);
+      barWrap.appendChild(bar);
+      row.appendChild(barWrap);
+      row.appendChild(val);
+      root.appendChild(row);
+    });
+  })();
+
+  /* --------------------------------------------------------------------------
+     Section 06: pipeline step-through (precomputed descriptions per step).
+     -------------------------------------------------------------------------- */
+  var pipelineStepDefs = [
+    { title: 'API receives query', detail: 'HTTP/gRPC boundary; auth, rate limits, logging; raw string preserved for UI.' },
+    { title: 'Query parser', detail: 'Syntax → operator tree; handles fields, parentheses, default operators.' },
+    { title: 'Analyzer (query side)', detail: 'Same token filters as index time (usually); expands synonyms if configured.' },
+    { title: 'Planner selects postings', detail: 'Chooses iterators, skip lists, cache-friendly order for intersections.' },
+    { title: 'Iterator execution', detail: 'Merge posting lists; optional phrase/proximity filters on positions.' },
+    { title: 'Scoring hook', detail: 'BM25 / vector / boosts combine into a score; top-K heap retained.' },
+    { title: 'Response assembly', detail: 'Fetch stored fields, highlight, snippets, aggregations; serialize JSON.' }
+  ];
+
+  var pipelineIdx = 0;
+
+  function renderPipelineSteps() {
+    var root = document.getElementById('pipelineSteps');
+    var q = document.getElementById('pipelineQuery').value;
+    root.innerHTML = '';
+    pipelineStepDefs.forEach(function (def, i) {
+      var div = document.createElement('div');
+      div.className = 'pipeline-step' + (i === pipelineIdx ? ' active' : '');
+      div.innerHTML = '<span class="step-idx">' + (i + 1) + '</span><div><strong>' + def.title + '</strong><div style="font-size:0.88rem;color:var(--text-dim);margin-top:4px;">' + def.detail + (i === 1 ? ' Example query string: "' + q.replace(/</g, '') + '".' : '') + '</div></div>';
+      root.appendChild(div);
+    });
+  }
+
+  document.getElementById('pipelineNext').addEventListener('click', function () {
+    pipelineIdx = (pipelineIdx + 1) % pipelineStepDefs.length;
+    renderPipelineSteps();
+  });
+  document.getElementById('pipelineReset').addEventListener('click', function () {
+    pipelineIdx = 0;
+    renderPipelineSteps();
+  });
+  renderPipelineSteps();
+
+  /* --------------------------------------------------------------------------
+     Section 07: playground index + boolean on user documents.
+     -------------------------------------------------------------------------- */
+  var pgIndex = {};
+
+  function analyzeLine(line) {
+    var parts = line.toLowerCase().match(/[a-z0-9_]+/g) || [];
+    return parts.map(function (p) { return porterStem(p); });
+  }
+
+  function rebuildPlaygroundIndex() {
+    var lines = document.getElementById('pgDocs').value.split('\n');
+    pgIndex = {};
+    lines.forEach(function (line, idx) {
+      if (!line.trim()) return;
+      var docId = 'D' + (idx + 1);
+      var terms = analyzeLine(line);
+      terms.forEach(function (t) {
+        if (!pgIndex[t]) pgIndex[t] = [];
+        if (pgIndex[t].indexOf(docId) === -1) pgIndex[t].push(docId);
+      });
+    });
+    Object.keys(pgIndex).forEach(function (k) { pgIndex[k].sort(); });
+    var out = document.getElementById('pgIndexOut');
+    out.innerHTML = '';
+    Object.keys(pgIndex).sort().forEach(function (term) {
+      var row = document.createElement('div');
+      row.className = 'index-term';
+      var strong = document.createElement('strong');
+      strong.textContent = term;
+      row.appendChild(strong);
+      pgIndex[term].forEach(function (docId) {
+        var pill = document.createElement('span');
+        pill.className = 'doc-pill';
+        pill.textContent = docId;
+        row.appendChild(pill);
+      });
+      out.appendChild(row);
+    });
+    document.getElementById('pgOut').textContent = 'Index rebuilt. Terms: ' + Object.keys(pgIndex).length;
+  }
+
+  document.getElementById('pgBuild').addEventListener('click', rebuildPlaygroundIndex);
+
+  document.getElementById('pgEval').addEventListener('click', function () {
+    var lines = document.getElementById('pgDocs').value.split('\n').filter(function (l) { return l.trim(); });
+    var docIds = lines.map(function (_, i) { return 'D' + (i + 1); });
+    var universe = docIds.map(function (_, i) { return i + 1; });
+    var termMap = {};
+    Object.keys(pgIndex).forEach(function (t) {
+      termMap[t] = pgIndex[t].map(function (id) { return docIds.indexOf(id) + 1; }).filter(function (n) { return n > 0; }).sort(function (a, b) { return a - b; });
+    });
+    function evalLocal(node) {
+      /* Stem query terms to match the playground index vocabulary (same analyzer as indexing). */
+      if (node.op === 'TERM') {
+        var st = porterStem(node.term.toLowerCase());
+        return termMap[st] || [];
+      }
+      if (node.op === 'AND') return intersect(evalLocal(node.left), evalLocal(node.right));
+      if (node.op === 'OR') return union(evalLocal(node.left), evalLocal(node.right));
+      if (node.op === 'NOT') return subtract(universe, evalLocal(node.child));
+      return [];
+    }
+    try {
+      var tree = parseBoolQuery(document.getElementById('pgBool').value);
+      var nums = evalLocal(tree);
+      var labels = nums.map(function (n) { return docIds[n - 1]; });
+      document.getElementById('pgOut').textContent = 'Matched: ' + JSON.stringify(labels) + ' (numeric ' + JSON.stringify(nums) + ')';
+    } catch (e) {
+      document.getElementById('pgOut').textContent = 'Error: ' + e.message;
+    }
+  });
+
+  rebuildPlaygroundIndex();
+
+  /* --------------------------------------------------------------------------
+     Scroll: sticky nav visibility + section fade-in using IntersectionObserver.
+     -------------------------------------------------------------------------- */
+  var mainNav = document.getElementById('mainNav');
+  window.addEventListener('scroll', function () {
+    if (window.scrollY > 420) mainNav.classList.add('visible');
+    else mainNav.classList.remove('visible');
+  });
+
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) en.target.classList.add('visible');
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.section.fade-in').forEach(function (sec) {
+    observer.observe(sec);
+  });
+
+  /* Initialize pipeline demo with the canonical example output in the log + token row. */
+  (function initPipe() {
+    syncPipeDisplayFull();
+  })();
+  </script>
+</body>
+</html>

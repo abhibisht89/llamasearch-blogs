@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Benchmarking LLMs & Retrieval-Augmented Generation — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+
+.callout.warn {
+  background: rgba(248, 113, 113, 0.08);
+  border-left-color: var(--danger);
+}
+.callout.warn p { color: var(--text); }
+
+.callout.ok {
+  background: rgba(52, 211, 153, 0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text); }
+
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--accent2);
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); font-size: 0.92rem; line-height: 1.65; }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Text input ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Decision tree ===== */
+.decision-node {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin: 8px 0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.decision-node:hover { border-color: var(--accent); background: rgba(108,140,255,0.08); }
+.decision-node.selected { border-color: var(--accent3); background: rgba(52,211,153,0.1); }
+
+/* ===== Interview questions (hint / reveal) ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.hint-btn:hover, .reveal-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: rgba(167,139,250,0.06);
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.hint-box.open { display: block; }
+.answer {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.answer.open { display: block; }
+.solution-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent3);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.explanation { font-size: 0.92rem; color: var(--text-dim); line-height: 1.6; }
+.explanation strong { color: var(--text); }
+#s-interview .card > div:nth-of-type(3) { white-space: pre-line; }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Benchmarking And Rag</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">Benchmarking LLMs & RAG</a>
+  <div class="nav-links">
+    <a href="#s0">Why Evaluation</a>
+    <a href="#s1">Benchmark Types</a>
+    <a href="#s2">Contamination</a>
+    <a href="#s3">LLM-as-Judge</a>
+    <a href="#s4">RAG Overview</a>
+    <a href="#s5">Retrieval</a>
+    <a href="#s6">Tool Use</a>
+    <a href="#s7">RAG vs Fine-tune</a>
+    <a href="#s8">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Benchmarking LLMs & Retrieval-Augmented Generation</h1>
+    <p class="subtitle">
+      How we measure language model quality, why benchmarks break, and how retrieval-augmented generation extends LLMs with external knowledge and tools.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">18</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">6</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">2</span>
+        <span class="stat-label">Major Topics</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Evaluation and retrieval are two pillars of modern LLM systems: how benchmarks work, why they fail (contamination, saturation, LLM judges), and how RAG and tool use extend models with external data and APIs.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 0: WHY EVALUATION MATTERS ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Why Evaluation Matters</h2>
+
+    <p>
+      After pre-training, post-training, and deployment, we need to know: <strong>how good is our model?</strong> Users have diverse needs — translation, coding, reasoning, creative writing — and we must measure whether the model handles them appropriately.
+    </p>
+
+    <p>
+      A benchmark generally consists of three components: <strong>data</strong> (prompts to feed the model), a <strong>metric</strong> (how to score responses), and a <strong>protocol</strong> (decoding settings, pass@K vs pass@1, tool use allowed or not).
+    </p>
+
+    <h3>Static vs Dynamic Benchmarks</h3>
+    <p>
+      <strong>Static benchmarks</strong> use a fixed set of prompts. Whenever a new model is released, you generate responses for each prompt and evaluate them with the same metric. <strong>Dynamic benchmarks</strong> evolve over time — the most prominent example is the Chatbot Arena (now LM Arena), where models are ranked by user preferences on prompts that users submit in real time.
+    </p>
+
+    <h3>Single Task vs Broad Task Distribution</h3>
+    <p>
+      <strong>Single-task benchmarks</strong> focus on one capability (translation, summarization) with specialized metrics. <strong>Broad task distribution</strong> benchmarks collect diverse tasks — like a random sample of real user prompts — to measure general-purpose chatbot quality across many domains.
+    </p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> The easier a task is to evaluate automatically, the more attractive it is to benchmark designers. Multiple-choice exams are trivial to score; story generation is subjective and hard. That's why you see far more work on multiple-choice evals than on creative writing evals.</p>
+    </div>
+
+    <p>
+      For any new task, a practical workflow is to collect <strong>human judgments first</strong>, then search for an automatic metric whose scores agree with those labels. As metrics grow more elaborate and tasks more open-ended, the metric itself may need evaluation—often by correlating it again with human ratings. For the most subjective outputs (for example, short-story quality), even careful human protocols struggle: incoherence and grammar errors are easy to agree on, but “creativity” or “enjoyment” rarely yield high inter-annotator agreement.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="font-size:1rem; color:var(--accent); margin-bottom:10px;">Human evaluation</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">High cost in time and money; rubrics for open-ended work are hard to design; agreement can be low on aesthetic or narrative qualities. Still the reference when you need to know whether an automatic scorer is meaningful.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:1rem; color:var(--accent3); margin-bottom:10px;">Automatic metrics</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">Fast and cheap at scale. The goal is correlation with human judgments on the task you care about—not intrinsic “correctness” of the number the script prints.</p>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Reward models as evaluators:</strong> Reusing a reward model trained on preference data to rank benchmark outputs is tempting because it mirrors post-training. In practice, scores are hard to interpret (what does a 0.5-point gap mean?), and the same failure modes as training appear at test time—<strong>reward hacking</strong> and mismatch between the latent objective and the construct you wanted to measure. Goodhart’s Law applies in force once the reward becomes both training target and leaderboard score. Benchmarks still favor <strong>agreement-heavy, task-specific signals</strong>—exact match, unit tests, or validated rubrics—over a single monolithic reward.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 1: TYPES OF BENCHMARKS ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Types of Benchmarks</h2>
+
+    <p>
+      Benchmarks span a spectrum from <strong>easy to evaluate</strong> (multiple choice, code with unit tests) to <strong>hard to evaluate</strong> (long-form writing, story generation). They also vary in how automatable the evaluation is.
+    </p>
+
+    <p>
+      Benchmarks cluster by how answers are scored: multiple-choice suites (MMLU, GPQA), executable code with pass@1 vs pass@K (HumanEval), numeric or exact-match math (GSM8K), reference-based text metrics (BLEU, ROUGE for translation and summarization), and open-ended chat judged by humans or LLMs (MT-Bench, Chatbot Arena). Frontier models have largely saturated many static MCQ and code suites; static prompts also face contamination risk once they circulate widely.
+    </p>
+
+    <h3>Two Axes: Task Open-Endedness vs. Automatability</h3>
+    <p>
+      A useful mental model plots <strong>how open-ended the output is</strong> against <strong>how easily evaluation can be automated</strong>. In one corner sit multiple-choice suites like MMLU and many GPQA-style items: constrained outputs, crisp correctness. Nearby, machine translation with BLEU is still relatively automatable even though the linguistic task is richer than picking A–D.
+    </p>
+    <p>
+      Toward the middle, benchmarks like <strong>MT-Bench</strong> and <strong>EQ-Bench</strong> ask for paragraphs of reasoning or fiction; automation usually means an LLM judge or pairwise preference model, with all the biases that come with it. In another corner, <strong>Chatbot Arena</strong> is dynamic and human-driven—slow, expensive, but not reducible to a single closed-form score. Agentic and tool-heavy tasks push even farther: evaluation may require long horizons, environment interaction, or subjective review of entire workflows.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="font-size:1rem; color:var(--accent3); margin-bottom:8px;">High automatability, constrained output</h3>
+        <p style="font-size:0.88rem; margin-bottom:0;">MMLU-style MCQ, many code benchmarks with unit tests, reference-based MT metrics when references exist.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:1rem; color:var(--accent4); margin-bottom:8px;">Lower automatability, open generation</h3>
+        <p style="font-size:0.88rem; margin-bottom:0;">Creative writing rubrics (EQ-Bench), pairwise chat judging (MT-Bench), arena Elo from humans, emerging agent evals.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Benchmark Explorer</h3>
+      <p>Select a benchmark to see what it tests, its metric, and typical use cases.</p>
+
+      <div class="btn-group" id="benchmarkBtns">
+        <button class="btn active" data-bench="mmlu" onclick="showBenchmark('mmlu')">MMLU</button>
+        <button class="btn" data-bench="gpqa" onclick="showBenchmark('gpqa')">GPQA</button>
+        <button class="btn" data-bench="humaneval" onclick="showBenchmark('humaneval')">HumanEval</button>
+        <button class="btn" data-bench="gsm8k" onclick="showBenchmark('gsm8k')">GSM8K</button>
+        <button class="btn" data-bench="mtbench" onclick="showBenchmark('mtbench')">MT-Bench</button>
+        <button class="btn" data-bench="arena" onclick="showBenchmark('arena')">Chatbot Arena</button>
+      </div>
+
+      <div id="benchmarkContent" class="card card-alt" style="margin-top:20px; min-height:180px;"></div>
+    </div>
+
+    <h3>Protocol Considerations</h3>
+    <p>
+      Benchmark designers must specify: <strong>decoding hyperparameters</strong> (temperature, top-p), <strong>reasoning budget</strong> (how many tokens the model can use for chain-of-thought), <strong>system prompt</strong> (standardized or minimal to avoid prompt tuning), and <strong>tool use</strong> (allowed or forbidden). Comparing a model with 20K reasoning tokens to one with zero is unfair.
+    </p>
+    <p>
+      Protocols increasingly spell out whether models may call <strong>search, code execution, calculators, or corporate knowledge bases</strong>. A “closed book” leaderboard entry is not comparable to a stack that shells out to compilers and browsers. As products blend retrieval, tools, and memory, the benchmark’s environment contract matters as much as the raw prompts.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 2: CONTAMINATION ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Contamination and Data Leakage</h2>
+
+    <p>
+      <strong>Data contamination</strong> occurs when a model is trained on benchmark data — directly or indirectly. If the test set appears in the pre-training corpus, SFT data, or RL data, scores become inflated. The benchmark no longer measures capability; it measures memorization.
+    </p>
+
+    <p>
+      Closed-source models have no transparency. Developers have every incentive to train on as many benchmarks as possible to juice numbers. One analysis took popular benchmarks, created <em>new</em> test examples with the same format and difficulty, and re-evaluated saturated models. Some dropped from 90% on the public benchmark to 30% on the fresh set — strong evidence of contamination.
+    </p>
+
+    <h3>Mitigation Strategies</h3>
+    <p>
+      Benchmark authors use <strong>canary strings</strong> — unique identifiers embedded in the data so training corpora can filter them out. They request that examples not be published in plain text. But with static benchmarks, the prompts and answers are eventually exposed. The robust solution is <strong>dynamic or interactive benchmarks</strong> where prompts change every time — like the Chatbot Arena.
+    </p>
+    <p>
+      GPQA’s authors explicitly asked teams not to redistribute items verbatim and embedded canary text to make leakage easier to detect. Partial mitigations—publishing prompts without answers behind a submission API—still leak over time through reverse engineering and distillation. Closed training stacks make external auditing nearly impossible, which is why <strong>held-out isomorphs</strong> of public benchmarks (same format and difficulty distribution, new items) have become a blunt instrument for spotting memorization.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Contamination Demo</h3>
+      <p>See how data leakage inflates scores. Toggle "Model trained on benchmark?" and compare reported accuracy.</p>
+
+      <div class="btn-group">
+        <button class="btn" id="contamNo" onclick="setContamination(false)">No contamination</button>
+        <button class="btn active" id="contamYes" onclick="setContamination(true)">Contaminated</button>
+      </div>
+
+      <div class="bar-chart" id="contaminationChart" style="height:200px; margin-top:20px;"></div>
+
+      <div id="contaminationExplanation" style="margin-top:16px; font-size:0.9rem; color:var(--text-dim);"></div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Goodhart's Law:</strong> "When a measure becomes a target, it ceases to be a good measure." If we train models to maximize benchmark scores, those scores no longer reflect true capability. This is why using reward models for evaluation is risky — they're the same targets we optimized during RL.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: LLM-AS-JUDGE ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>LLM-as-Judge Evaluation</h2>
+
+    <p>
+      For open-ended tasks — creative writing, essays, multi-turn dialogue — there's no reference output. <strong>LLM-as-judge</strong> uses another LLM to score or compare responses. EQ-Bench grades stories on rubrics (instruction adherence, emotional complexity, etc.); MT-Bench uses pairwise comparisons: "Which response is better, A or B?"
+    </p>
+
+    <h3>Problems with LLM Judges</h3>
+    <p>
+      LLM judges share biases with reward models: they prefer <strong>longer responses</strong>, and they often prefer responses from <strong>their own model family</strong>. GPT-5 may rate GPT-5 stories higher than Gemini's. Judges may not be deterministic — sampling can yield different scores. And there's no guarantee the judge correlates with human preferences; many benchmarks don't validate against human judgments at all.
+    </p>
+    <p>
+      Rubric-heavy setups like <strong>EQ-Bench</strong> ask a judge model to narrate strengths and weaknesses, then assign sub-scores (for example, instruction following versus emotional depth). Some implementations re-sample the judge several times per item and average—stability of the number does <em>not</em> imply the number is <em>right</em>, only that the judge is self-consistent. Auxiliary “slop” diagnostics (repeated phrases across generations) highlight stylistic tics but are still heuristic.
+    </p>
+    <p>
+      <strong>MT-Bench</strong>-style tasks often pair a multiple-choice or short stem with a <strong>follow-up that demands paragraphs</strong>; a strong model judges pairwise which assistant answer is better. The same length and vendor biases appear, so leaderboard shifts can track judge upgrades as much as true quality gains.
+    </p>
+    <div class="callout warn">
+      <p><strong>Judge churn:</strong> When the state of the art moves, teams face an expensive choice: re-score everything with a new judge or leave historical numbers incomparable. Ensemble judges from multiple families reduce self-preference but raise cost and complexity—and still do not replace human calibration on the task you care about.</p>
+    </div>
+
+    <h3>Human Evaluation Challenges</h3>
+    <p>
+      Human eval is expensive and slow. For highly subjective tasks (e.g., "how enjoyable is this story?"), even humans disagree. It's hard to design a rubric that yields high inter-annotator agreement. Automatic metrics are fast and cheap but must be validated against human judgments when possible.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>LLM-as-Judge Demo</h3>
+      <p>Simulate how an LLM judge evaluates two responses. The "judge" applies rubric criteria and outputs a verdict. Notice how subtle differences in length or phrasing can sway the score.</p>
+
+      <div class="two-col">
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Response A</label>
+          <textarea class="text-input" id="judgeRespA" rows="4" style="resize:vertical;">The Fed buying bonds increases the money supply, which can lower interest rates. This affects my daily life by making mortgages and car loans cheaper. It may also influence inflation over time.</textarea>
+        </div>
+        <div>
+          <label style="font-size:0.85rem; color:var(--text-dim);">Response B</label>
+          <textarea class="text-input" id="judgeRespB" rows="4" style="resize:vertical;">When the Fed buys bonds, it injects liquidity into the financial system. This typically lowers interest rates, which means I might get a better rate on a mortgage or car loan. Additionally, it can affect savings account yields and the overall cost of borrowing for businesses, which may trickle down to consumer prices.</textarea>
+        </div>
+      </div>
+
+      <button class="btn" onclick="runJudge()" style="margin-top:16px;">Run LLM Judge</button>
+
+      <div id="judgeOutput" class="card card-alt" style="margin-top:16px; min-height:80px; display:none;"></div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Reality check:</strong> Many researchers at frontier labs say they don't rely on these metrics during development. They use "vibes" — reading a few responses and deciding if the model feels better. Benchmarking is in a rough state: contamination, LLM judges no one can verify, and tasks that don't reflect real usage.</p>
+    </div>
+
+    <p>
+      Aggregator analyses plot how long a median human would need to solve tasks drawn from many public suites — from minutes for standard math items to hours for competition-style problems. Similar tracks order software-engineering tasks from quick lookups to multi-hour projects. These views help visualize how scattered leaderboard points compose into capability over time; they are not substitutes for careful task validation.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: RAG OVERVIEW ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Retrieval-Augmented Generation (RAG)</h2>
+
+    <p>
+      <strong>RAG</strong> (retrieval-augmented generation) augments a frozen LLM with external information. The term crystallized in industry research circles (Meta/Facebook-era work; later popularized broadly) for the pattern: keep a strong general model fixed, and <strong>change what it reads</strong> at inference time. Given a prompt, you retrieve the top-K most relevant documents from a data store, concatenate them to the prompt, and generate. By default the base weights are untouched; the knowledge arrives through context.
+    </p>
+    <p>
+      In practice, teams often still add <strong>supervised fine-tuning examples</strong> where the input includes retrieved passages and the target shows faithful use of those passages—so the model learns formatting, citation habits, and refusal behavior when evidence is missing. That hybrid is still “RAG” at deployment if retrieval supplies the live facts.
+    </p>
+
+    <div class="formula">
+      Given prompt X → Retrieve top-K docs (z₁, z₂, ..., zₖ) → Generate Y from P_θ(Y | X, z₁, ..., zₖ)
+    </div>
+
+    <h3>Why Use RAG?</h3>
+    <p>
+      <strong>Knowledge cutoff:</strong> Models are trained on data up to some date. RAG lets you inject fresh information — news, quarterly reports, new documentation. <strong>Proprietary data:</strong> Your internal documents aren't in the training set. RAG lets the model operate over them. <strong>Attribution:</strong> You can encourage the model to cite retrieved documents, linking generated text to sources. <strong>Reduce hallucinations:</strong> Grounding in retrieved docs can help, though it's not guaranteed — the model can still misinterpret or ignore them.
+    </p>
+
+    <h3>Knowledge Conflicts</h3>
+    <p>
+      If retrieved documents conflict with what the model memorized during pre-training, behavior is unpredictable. Sometimes the model overrides its parameters with the document; sometimes it ignores the document. There's no reliable schema for handling this. <strong>Knowledge editing</strong> and <strong>model unlearning</strong> are active research areas.
+    </p>
+    <p>
+      Real deployments hit this when world facts change—leadership titles, product names, scientific consensus—and the model’s parametric prior is “sticky.” Retrieval can nudge answers, but strong memorized associations may not disappear without retraining. <strong>Unlearning</strong> remains unreliable: models may suppress one phrasing of a fact while retaining paraphrases, and there is no clean map from parameters to individual assertions.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Inference cost:</strong> Concatenating dozens of long chunks blows up prompt tokens, latency, and spend. The defense is task-dependent: if the answer truly is not in weights, you pay for context or you fail silently. When the corpus is small enough to fit entirely in-window, brute-force “no retrieval” can beat a brittle retriever—<strong>bad retrieval</strong> often hurts more than it helps.</p>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="font-size:1rem; color:var(--accent); margin-bottom:8px;">Web search as retrieval</h3>
+        <p style="font-size:0.88rem; margin-bottom:0;">Issuing the user query to a search API and stuffing top results into the prompt is a strong baseline for <strong>public</strong> information: ranking is outsourced to the search engine. You pay per query and inherit policy constraints.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:1rem; color:var(--accent2); margin-bottom:8px;">Private vector store</h3>
+        <p style="font-size:0.88rem; margin-bottom:0;">Required when documents are proprietary or offline. You own indexing, embedding refresh, and security—but must fund approximate nearest-neighbor infrastructure yourself.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>RAG Pipeline Visualizer</h3>
+      <p>RAG pipeline: Query → Retrieve → Augment → Generate.</p>
+
+      <div class="flow" id="ragFlow">
+        <div class="flow-step" id="ragStep1">Query: "What date was Iribe open to the public?"</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="ragStep2">Retrieve: Top-K docs from vector DB (e.g., Iribe Wikipedia, UMD CS page)</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="ragStep3">Augment: Concatenate docs to prompt with special tokens</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="ragStep4">Generate: LLM produces answer using augmented context</div>
+      </div>
+
+      <div class="btn-group" style="margin-top:20px;">
+        <button class="btn" onclick="ragStepPrev()">Previous</button>
+        <button class="btn" onclick="ragStepNext()">Next Step</button>
+        <button class="btn" onclick="ragStepReset()">Reset</button>
+      </div>
+
+      <div id="ragStepLabel" style="margin-top:12px; font-size:0.85rem; color:var(--accent);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: RETRIEVAL ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Dense vs Sparse Retrieval</h2>
+
+    <p>
+      Retrieval means measuring <strong>similarity</strong> between the prompt and documents. Two main approaches: <strong>sparse</strong> (string matching) and <strong>dense</strong> (vector embeddings).
+    </p>
+
+    <h3>Sparse Retrieval: BM25</h3>
+    <p>
+      <strong>BM25</strong> is a phrase-matching algorithm that upweights important words and downweights frequent ones. It's cheap and effective when texts are long and share keywords. <strong>Cons:</strong> No semantic similarity — "car" and "automobile" don't match. Paraphrases fail. It assumes relevance requires string overlap, which isn't always true.
+    </p>
+
+    <h3>Dense Retrieval: Vector Database</h3>
+    <p>
+      Use a <strong>pre-trained encoder</strong> (Transformer encoder blocks with bidirectional attention) to map text to a fixed vector—often the final-layer <span style="font-family:var(--mono);">[CLS]</span> state or a mean pool over tokens. Embed the prompt and every chunk in the corpus. Score candidates with <strong>dot product</strong> or <strong>cosine similarity</strong>; retrieve the <strong>K nearest neighbors</strong>. Exact brute-force search over billions of vectors is usually intractable, so production systems rely on <strong>approximate nearest neighbors</strong>; <strong>Faiss</strong> is the de facto library family for GPU/CPU ANN at scale.
+    </p>
+    <p>
+      A plain BERT-style encoder trained only for masked-language modeling yields embeddings that reflect <em>similarity</em> more than <em>query relevance</em>. Retrieval pipelines therefore <strong>fine-tune on query–document pairs</strong>—often contrastive objectives that push matching pairs together and negatives apart—so inner products align with human judgments about whether a passage answers a question.
+    </p>
+    <div class="formula">
+      Store: one embedding per chunk (typ. 1024–2048 dims) × corpus size → TB-scale indices that live on disk/CPU tiers, not entirely in GPU HBM
+    </div>
+    <p>
+      Empirically, if cost were ignored, stuffing <strong>more</strong> retrieved text often helps up to the point where at least one chunk contains the answer—attention over long contexts can surface a needle—but noise, contradictions, and context limits eventually bite.
+    </p>
+
+    <h3>Chunking</h3>
+    <p>
+      Long documents exceed the encoder's max length. <strong>Chunking</strong> splits documents into smaller pieces, each embedded separately. Chunking loses context — a chunk in isolation may be ambiguous. Chunk size and overlap are hyperparameters.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Dense vs Sparse Retrieval</h3>
+      <p>Enter a query and see how sparse (BM25-style) and dense retrieval might rank different document chunks. Sparse matches keywords; dense captures semantic relevance.</p>
+
+      <input type="text" class="text-input" id="retrievalQuery" value="When did the transformer architecture for NLP first appear?" placeholder="Enter your query" style="margin-bottom:16px;">
+
+      <div class="two-col">
+        <div class="card">
+          <h3 style="font-size:1rem;">Sparse (BM25-style)</h3>
+          <p style="font-size:0.85rem; margin-bottom:8px;">Ranks by keyword overlap. "Transformer" and "NLP" must appear.</p>
+          <div id="sparseResults" style="font-family:var(--mono); font-size:0.8rem;"></div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:1rem;">Dense (Embeddings)</h3>
+          <p style="font-size:0.85rem; margin-bottom:8px;">Ranks by semantic similarity. "Attention is All You Need" matches even without exact words.</p>
+          <div id="denseResults" style="font-family:var(--mono); font-size:0.8rem;"></div>
+        </div>
+      </div>
+
+      <button class="btn" onclick="runRetrievalDemo()" style="margin-top:16px;">Run Retrieval</button>
+    </div>
+
+    <h3>RAG Failure Modes</h3>
+    <p>
+      <strong>Poor retrieval:</strong> If none of the top-K docs is relevant, RAG can perform <em>worse</em> than no retrieval — irrelevant text may overwrite correct parametric knowledge. <strong>Information loss:</strong> Squeezing a document into one vector loses detail. <strong>Inference cost:</strong> More retrieved chunks mean longer prompts and higher cost. We don't know what the model has memorized, so we don't know when retrieval helps versus hurts. For open-web facts, search-engine ranking plus snippet injection is often strong; proprietary corpora require your own index — and hybrid stacks may query both.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 6: TOOL USE ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Tool Use and Function Calling</h2>
+
+    <p>
+      <strong>Tool use</strong> generalizes RAG. Instead of retrieval happening once before generation, the model can <strong>call tools during generation</strong>. The model produces special tokens indicating a tool call (name + arguments); the tool runs; the result is fed back; the model continues generating.
+    </p>
+
+    <p>
+      <strong>Toolformer</strong> was an early paper showing that a fine-tuned LLM could autonomously decide when to call APIs — a QA system, calculator, Wikipedia search, machine translation. The model generates <code>&lt;tool&gt;calculator(400/400)&lt;/tool&gt;</code>; the calculator returns "1.0"; that replaces the tool call; the model continues with "out of 400 participants..."
+    </p>
+    <p>
+      Training used a bootstrap: sample model completions, execute candidate tool spans, and keep trajectories where tool use <strong>lowered perplexity</strong> on the ground-truth continuation versus a no-tool baseline. Fine-tuning on those successes teaches when invoking an API helps—an empirical substitute for hand-writing thousands of rules.
+    </p>
+    <p>
+      At decode time a <strong>streaming parser</strong> watches partial text. As soon as a tool call is syntactically complete, the runtime executes it, splices the observation back into the token stream, and lets the LM continue—execution is interleaved with generation rather than deferred to the end of the passage.
+    </p>
+
+    <h3>RAG vs Tool Use</h3>
+    <p>
+      In vanilla RAG, retrieval happens <strong>once, before</strong> generation. The LLM doesn't control when to retrieve. In tool use, the model <strong>decides</strong> when to call a tool — including retrieval — and can do so multiple times. Tool use is a step toward <strong>agents</strong>: LLMs with dynamic control flow, multiple tool calls, and state that evolves over many steps.
+    </p>
+
+    <div class="callout">
+      <p><strong>Parametric vs non-parametric knowledge:</strong> <strong>Parametric</strong> knowledge is encoded in the model's parameters (from pre-training and post-training). <strong>Non-parametric</strong> knowledge lives in external documents. The challenge: we don't know what's in parametric memory, so we don't know when the model needs to retrieve.</p>
+    </div>
+
+    <h3>From Tool Loops to Agents</h3>
+    <p>
+      Tool-augmented decoding still imagines a mostly linear path: one forward pass (with tool insertions) yields the user-visible answer. <strong>Agents</strong> add <strong>dynamic control flow</strong>: multiple LLM calls, branching on observations, mutable environment state, and no fixed cap on steps until a halting condition triggers. Informally, some researchers describe agents as “<strong>LLMs in a for-loop</strong>” with a planner/controller deciding which tool fires next; others stress that any coupling between a model and the outside world counts, making even one-shot RAG a minimal agent under the broadest definition.
+    </p>
+    <div class="callout ok">
+      <p><strong>Evaluation cliff:</strong> Once systems write code, browse, file tickets, or draft papers end-to-end, benchmarks inherit all the pathologies of LLM scoring <em>plus</em> environment non-stationarity, tool latency, and ethical cost (for example, flooding human reviewers with synthetic submissions). The measurement problem scales with the system’s freedom.</p>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="font-size:1rem; color:var(--accent); margin-bottom:8px;">Vanilla RAG pipeline</h3>
+        <p style="font-size:0.88rem; margin-bottom:0;">Retrieve once, prepend chunks, generate once. The model does not choose retrieval timing; orchestration is external.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:1rem; color:var(--accent3); margin-bottom:8px;">Tool use &amp; agents</h3>
+        <p style="font-size:0.88rem; margin-bottom:0;">The LM emits tool calls mid-stream (search, calculators, SQL, browsers) and may loop: observe → replan → act until done.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 7: RAG VS FINE-TUNING ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>RAG vs Fine-Tuning: When to Use Which</h2>
+
+    <p>
+      Both RAG and fine-tuning extend an LLM with new knowledge. The choice depends on your constraints and goals.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>RAG vs Fine-tuning Decision Tree</h3>
+      <p>Answer the questions to get a recommendation. Click each node to select your situation.</p>
+
+      <div id="decisionTree" style="margin-top:16px;"></div>
+
+      <div id="decisionResult" class="card card-alt" style="margin-top:20px; min-height:60px; display:none;"></div>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3);">Use RAG when</h3>
+        <ul style="list-style:none; font-size:0.9rem;">
+          <li style="margin-bottom:8px;"><span style="color:var(--accent3);">✓</span> Data changes frequently (news, docs)</li>
+          <li style="margin-bottom:8px;"><span style="color:var(--accent3);">✓</span> Proprietary or internal documents</li>
+          <li style="margin-bottom:8px;"><span style="color:var(--accent3);">✓</span> You need attribution to sources</li>
+          <li style="margin-bottom:8px;"><span style="color:var(--accent3);">✓</span> You can't retrain (cost, time)</li>
+          <li><span style="color:var(--accent3);">✓</span> Knowledge is large and external</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2);">Use Fine-tuning when</h3>
+        <ul style="list-style:none; font-size:0.9rem;">
+          <li style="margin-bottom:8px;"><span style="color:var(--accent2);">●</span> Data is stable and well-curated</li>
+          <li style="margin-bottom:8px;"><span style="color:var(--accent2);">●</span> You need consistent behavior</li>
+          <li style="margin-bottom:8px;"><span style="color:var(--accent2);">●</span> Retrieval would be unreliable</li>
+          <li style="margin-bottom:8px;"><span style="color:var(--accent2);">●</span> You have compute for training</li>
+          <li><span style="color:var(--accent2);">●</span> Knowledge fits in parameters</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 8: PLAYGROUND ===== -->
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Playground</h2>
+
+    <p>
+      Interactive demos for benchmark saturation, contamination effects, and RAG context sizing.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Benchmark Saturation Explorer</h3>
+      <p>Simulate how benchmark scores evolve as models improve. Drag the slider to see "saturation" — when most models hit the ceiling.</p>
+
+      <div class="slider-container">
+        <label>Model generation (year): <span class="slider-value" id="saturationVal">2023</span></label>
+        <input type="range" id="saturationSlider" min="2020" max="2026" value="2023" step="1">
+      </div>
+
+      <div class="bar-chart" id="saturationChart" style="height:180px;"></div>
+
+      <div id="saturationNote" style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>RAG Context Length Calculator</h3>
+      <p>Estimate token usage for RAG. K = number of chunks retrieved; chunk size = tokens per chunk.</p>
+
+      <div class="two-col">
+        <div class="slider-container">
+          <label>K (chunks retrieved): <span class="slider-value" id="ragKVal">50</span></label>
+          <input type="range" id="ragKSlider" min="5" max="200" value="50" step="5">
+        </div>
+        <div class="slider-container">
+          <label>Chunk size (tokens): <span class="slider-value" id="ragChunkVal">256</span></label>
+          <input type="range" id="ragChunkSlider" min="64" max="1024" value="256" step="64">
+        </div>
+      </div>
+
+      <div id="ragContextResult" class="formula" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p>
+    Benchmarking LLMs & Retrieval-Augmented Generation — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+// ============================================================
+// BENCHMARK EXPLORER
+// ============================================================
+
+const benchmarks = {
+  mmlu: {
+    name: 'MMLU',
+    full: 'Massive Multitask Language Understanding',
+    task: 'Multiple choice (A–D) across 57 subjects',
+    metric: 'Exact match accuracy',
+    tests: 'Math, economics, biology, physics, law, etc.',
+    note: 'Saturated; most frontier models exceed 80%.'
+  },
+  gpqa: {
+    name: 'GPQA',
+    full: 'Graduate-level Google-proof QA',
+    task: 'Multiple choice, expert-written, Google-proof',
+    metric: 'Exact match accuracy',
+    tests: 'Graduate-level STEM; humans with Google often fail',
+    note: 'Released 2023; saturated within months by GPT-4 class models.'
+  },
+  humaneval: {
+    name: 'HumanEval',
+    full: 'OpenAI HumanEval',
+    task: 'Generate Python code from function spec',
+    metric: 'Pass@1 or Pass@K (unit tests)',
+    tests: '164 programming problems',
+    note: 'Heavily contaminated; many models trained on it.'
+  },
+  gsm8k: {
+    name: 'GSM8K',
+    full: 'Grade School Math 8K',
+    task: 'Solve grade-school math word problems',
+    metric: 'Exact match on final answer',
+    tests: '8,500 problems, multi-step reasoning',
+    note: 'Tests chain-of-thought; reasoning budget matters.'
+  },
+  mtbench: {
+    name: 'MT-Bench',
+    full: 'Multi-Turn Benchmark',
+    task: 'Multi-turn dialogue, long-form responses',
+    metric: 'LLM-as-judge (GPT-4 pairwise)',
+    tests: 'Writing, reasoning, coding, math, roleplay',
+    note: 'Uses pairwise comparison: which response is better?'
+  },
+  arena: {
+    name: 'Chatbot Arena',
+    full: 'LM Arena (formerly Chatbot Arena)',
+    task: 'User-submitted prompts, blind A/B comparison',
+    metric: 'Elo rating (human preference)',
+    tests: 'Anything users ask; dynamic, evolving',
+    note: 'No automatic metric; avoids contamination by design.'
+  }
+};
+
+function showBenchmark(id) {
+  document.querySelectorAll('#benchmarkBtns .btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.bench === id);
+  });
+
+  const b = benchmarks[id];
+  const el = document.getElementById('benchmarkContent');
+  el.innerHTML = `
+    <h3 style="margin-bottom:12px;">${b.name} — ${b.full}</h3>
+    <p><strong>Task:</strong> ${b.task}</p>
+    <p><strong>Metric:</strong> ${b.metric}</p>
+    <p><strong>Tests:</strong> ${b.tests}</p>
+    <p style="margin-bottom:0; color:var(--accent5);"><strong>Note:</strong> ${b.note}</p>
+  `;
+}
+
+showBenchmark('mmlu');
+
+// ============================================================
+// CONTAMINATION DEMO
+// ============================================================
+
+let contaminated = true;
+
+function setContamination(val) {
+  contaminated = val;
+  document.getElementById('contamNo').classList.toggle('active', !val);
+  document.getElementById('contamYes').classList.toggle('active', val);
+  renderContamination();
+}
+
+function renderContamination() {
+  const chart = document.getElementById('contaminationChart');
+  chart.innerHTML = '';
+
+  const models = ['Model A', 'Model B', 'Model C', 'Model D'];
+  const cleanScores = [72, 78, 85, 88];
+  const contaminatedScores = [72, 78, 92, 95]; // B and D contaminated
+
+  const scores = contaminated ? contaminatedScores : cleanScores;
+  const maxScore = Math.max(...scores);
+
+  models.forEach((name, i) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bar-wrapper';
+
+    const value = document.createElement('div');
+    value.className = 'bar-value';
+    value.textContent = scores[i] + '%';
+
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (scores[i] / maxScore) * 100 + '%';
+    bar.style.background = contaminated && (i === 2 || i === 3) ? 'var(--danger)' : 'var(--accent)';
+
+    const label = document.createElement('div');
+    label.className = 'bar-label';
+    label.textContent = name;
+
+    wrapper.appendChild(value);
+    wrapper.appendChild(bar);
+    wrapper.appendChild(label);
+    chart.appendChild(wrapper);
+  });
+
+  const expl = document.getElementById('contaminationExplanation');
+  if (contaminated) {
+    expl.innerHTML = '<span style="color:var(--danger);">Models C and D show inflated scores (red) — they were trained on benchmark data. On a fresh, uncontaminated test set, they might drop to ~30–40%.</span>';
+  } else {
+    expl.innerHTML = 'Clean evaluation. Scores reflect actual capability. No benchmark data in training.';
+  }
+}
+
+renderContamination();
+
+// ============================================================
+// LLM-AS-JUDGE DEMO
+// ============================================================
+
+function runJudge() {
+  const a = document.getElementById('judgeRespA').value;
+  const b = document.getElementById('judgeRespB').value;
+
+  // Simulate judge: prefer longer, more detailed
+  const aLen = a.split(/\s+/).length;
+  const bLen = b.split(/\s+/).length;
+  const winner = bLen > aLen ? 'B' : 'A';
+  const scoreA = winner === 'A' ? 8 : 6;
+  const scoreB = winner === 'B' ? 8 : 6;
+
+  const output = document.getElementById('judgeOutput');
+  output.style.display = 'block';
+  output.innerHTML = `
+    <p><strong>Judge verdict:</strong> Response ${winner} is better.</p>
+    <p style="margin:8px 0;">Rubric scores — Helpfulness: A=${scoreA}, B=${scoreB} | Relevance: A=${scoreA}, B=${scoreB} | Detail: A=${scoreA}, B=${scoreB}</p>
+    <p style="margin-bottom:0; font-size:0.85rem; color:var(--text-dim);">(Simulated. Real LLM judges often prefer longer, more detailed responses — a known bias.)</p>
+  `;
+}
+
+// ============================================================
+// RAG PIPELINE VISUALIZER
+// ============================================================
+
+let ragStep = 0;
+const ragSteps = ['Query', 'Retrieve', 'Augment', 'Generate'];
+
+function updateRagFlow() {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('ragStep' + i);
+    el.classList.toggle('active', i === ragStep + 1);
+  }
+  document.getElementById('ragStepLabel').textContent = `Step ${ragStep + 1}/4: ${ragSteps[ragStep]}`;
+}
+
+function ragStepNext() {
+  ragStep = Math.min(3, ragStep + 1);
+  updateRagFlow();
+}
+
+function ragStepPrev() {
+  ragStep = Math.max(0, ragStep - 1);
+  updateRagFlow();
+}
+
+function ragStepReset() {
+  ragStep = 0;
+  updateRagFlow();
+}
+
+updateRagFlow();
+
+// ============================================================
+// DENSE VS SPARSE RETRIEVAL
+// ============================================================
+
+const docChunks = [
+  'The Transformer architecture was introduced in the paper "Attention Is All You Need" in 2017.',
+  'BERT and GPT use different variants of the attention mechanism for NLP tasks.',
+  'Recurrent neural networks were the dominant approach before transformers.',
+  'Vaswani et al. proposed the transformer for machine translation.'
+];
+
+function runRetrievalDemo() {
+  const q = document.getElementById('retrievalQuery').value.toLowerCase();
+
+  // Sparse: keyword match
+  const sparse = docChunks.map((d, i) => {
+    const words = q.split(/\s+/);
+    let score = 0;
+    words.forEach(w => {
+      if (d.toLowerCase().includes(w)) score++;
+    });
+    return { i, score, text: d };
+  }).sort((a, b) => b.score - a.score);
+
+  // Dense: semantic (simulate - "attention", "2017", "transformer" get boost)
+  const dense = docChunks.map((d, i) => {
+    let score = 0;
+    if (d.includes('Attention') || d.includes('2017')) score += 2;
+    if (d.includes('transformer') || d.includes('Transformer')) score += 2;
+    if (d.includes('Vaswani')) score += 1;
+    if (q.includes('first') && d.includes('2017')) score += 1;
+    return { i, score: score || 0.5, text: d };
+  }).sort((a, b) => b.score - a.score);
+
+  document.getElementById('sparseResults').innerHTML = sparse.map((s, j) =>
+    `${j + 1}. [${s.score} matches] ${s.text.substring(0, 50)}...`
+  ).join('<br>');
+
+  document.getElementById('denseResults').innerHTML = dense.map((s, j) =>
+    `${j + 1}. [sim ${s.score.toFixed(1)}] ${s.text.substring(0, 50)}...`
+  ).join('<br>');
+}
+
+runRetrievalDemo();
+
+// ============================================================
+// RAG VS FINE-TUNING DECISION TREE
+// ============================================================
+
+const decisionTreeData = [
+  { id: 'q1', q: 'Does your data change frequently?', y: 'rag1', n: 'q2' },
+  { id: 'rag1', q: '→ Use RAG', result: 'RAG is ideal for dynamic data (news, docs, knowledge bases that update).' },
+  { id: 'q2', q: 'Do you need source attribution?', y: 'rag2', n: 'q3' },
+  { id: 'rag2', q: '→ Use RAG', result: 'RAG lets you cite retrieved documents. Fine-tuning bakes knowledge into parameters with no trace.' },
+  { id: 'q3', q: 'Is retrieval reliable for your domain?', y: 'q4', n: 'ft1' },
+  { id: 'ft1', q: '→ Prefer Fine-tuning', result: 'If retrieval often returns irrelevant docs, RAG can hurt. Fine-tuning encodes knowledge directly.' },
+  { id: 'q4', q: 'Can you afford training compute?', y: 'q5', n: 'rag3' },
+  { id: 'rag3', q: '→ Use RAG', result: 'RAG requires no training. Add docs to the data store and go.' },
+  { id: 'q5', q: 'Is the knowledge stable and curated?', y: 'ft2', n: 'rag4' },
+  { id: 'ft2', q: '→ Fine-tuning', result: 'Stable, high-quality data fits well in fine-tuning. More consistent behavior than RAG.' },
+  { id: 'rag4', q: '→ Use RAG', result: 'When data is messy or changes, RAG is more flexible than retraining.' }
+];
+
+let selectedDecision = null;
+
+function renderDecisionTree() {
+  const container = document.getElementById('decisionTree');
+  container.innerHTML = '';
+
+  const start = decisionTreeData.find(d => d.id === 'q1');
+  if (!start) return;
+
+  let html = '<div style="display:flex; flex-direction:column; gap:8px;">';
+  html += '<div class="decision-node" data-id="q1" onclick="selectDecision(\'q1\')">Does your data change frequently? → Yes: RAG | No: next</div>';
+  html += '<div class="decision-node" data-id="q2" onclick="selectDecision(\'q2\')">Do you need source attribution? → Yes: RAG | No: next</div>';
+  html += '<div class="decision-node" data-id="q3" onclick="selectDecision(\'q3\')">Is retrieval reliable? → No: Fine-tune | Yes: next</div>';
+  html += '<div class="decision-node" data-id="q4" onclick="selectDecision(\'q4\')">Can you afford training? → No: RAG | Yes: next</div>';
+  html += '<div class="decision-node" data-id="q5" onclick="selectDecision(\'q5\')">Is knowledge stable? → Yes: Fine-tune | No: RAG</div>';
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function selectDecision(id) {
+  selectedDecision = id;
+  document.querySelectorAll('.decision-node').forEach(n => n.classList.remove('selected'));
+  document.querySelector(`[data-id="${id}"]`)?.classList.add('selected');
+
+  const results = {
+    q1: 'RAG — Your data changes frequently. RAG lets you update the data store without retraining.',
+    q2: 'RAG — You need to cite sources. RAG provides attribution; fine-tuning does not.',
+    q3: 'Fine-tuning — Retrieval is unreliable for your domain. Encoding knowledge in parameters is safer.',
+    q4: 'RAG — Limited compute. RAG avoids training costs.',
+    q5: 'Fine-tuning — Stable, curated knowledge. Fine-tuning gives consistent, predictable behavior.'
+  };
+
+  const res = document.getElementById('decisionResult');
+  res.style.display = 'block';
+  res.innerHTML = '<p><strong>Recommendation:</strong> ' + (results[id] || 'Select a node above.') + '</p>';
+}
+
+renderDecisionTree();
+
+// ============================================================
+// PLAYGROUND: SATURATION
+// ============================================================
+
+const saturationData = {
+  2020: [45, 52, 58, 62],
+  2021: [55, 62, 68, 72],
+  2022: [65, 72, 78, 82],
+  2023: [78, 84, 88, 91],
+  2024: [85, 90, 93, 95],
+  2025: [88, 92, 95, 97],
+  2026: [90, 94, 96, 98]
+};
+
+const saturationSlider = document.getElementById('saturationSlider');
+const saturationVal = document.getElementById('saturationVal');
+
+function renderSaturation() {
+  const year = parseInt(saturationSlider.value);
+  saturationVal.textContent = year;
+  const scores = saturationData[year] || saturationData[2023];
+
+  const chart = document.getElementById('saturationChart');
+  chart.innerHTML = '';
+  const models = ['GPT-3', 'PaLM', 'GPT-4', 'Claude'];
+  const maxS = Math.max(...scores);
+
+  models.forEach((m, i) => {
+    const w = document.createElement('div');
+    w.className = 'bar-wrapper';
+    w.innerHTML = `
+      <div class="bar-value">${scores[i]}%</div>
+      <div class="bar" style="height:${(scores[i]/maxS)*100}%; background:var(--accent);"></div>
+      <div class="bar-label">${m}</div>
+    `;
+    chart.appendChild(w);
+  });
+
+  const note = document.getElementById('saturationNote');
+  note.textContent = year >= 2024 ? 'Benchmark saturated — most models exceed 90%. New benchmarks needed.' : 'Scores still differentiating models.';
+}
+
+saturationSlider.addEventListener('input', renderSaturation);
+renderSaturation();
+
+// ============================================================
+// PLAYGROUND: RAG CONTEXT
+// ============================================================
+
+const ragKSlider = document.getElementById('ragKSlider');
+const ragChunkSlider = document.getElementById('ragChunkSlider');
+
+function updateRagContext() {
+  const k = parseInt(ragKSlider.value);
+  const chunk = parseInt(ragChunkSlider.value);
+  document.getElementById('ragKVal').textContent = k;
+  document.getElementById('ragChunkVal').textContent = chunk;
+
+  const total = k * chunk;
+  document.getElementById('ragContextResult').textContent = `Total retrieval tokens ≈ ${total.toLocaleString()} (K × chunk size)`;
+}
+
+ragKSlider.addEventListener('input', updateRagContext);
+ragChunkSlider.addEventListener('input', updateRagContext);
+updateRagContext();
+
+// ============================================================
+// INTERVIEW QUESTIONS (hint / reveal)
+// ============================================================
+
+function toggleHint(id) {
+  const el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('open');
+}
+
+function reveal(id) {
+  const el = document.getElementById(id + '-answer');
+  if (el) el.classList.toggle('open');
+}
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+</body>
+</html>

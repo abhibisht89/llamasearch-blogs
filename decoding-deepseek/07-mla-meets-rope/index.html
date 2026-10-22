@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLA Meets RoPE — How DeepSeek Solved the Position Problem</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 60px 24px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.15rem; color: var(--text-dim); max-width: 640px; margin: 0 auto 40px; }
+.stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.card-alt { background: var(--bg-card-alt); }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; }
+.interactive-panel h3, .interactive-panel h4 { margin-bottom: 16px; }
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar { width: 100%; border-radius: 6px 6px 0 0; transition: height 0.5s ease; min-height: 4px; }
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; }
+.bar-value { font-size: 0.7rem; font-family: var(--mono); color: var(--text); text-align: center; margin-bottom: 4px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token { display: inline-flex; padding: 6px 14px; border-radius: 8px; font-family: var(--mono); font-size: 0.9rem; font-weight: 600; }
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); }
+.token-cached { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+canvas { border-radius: var(--radius); display: block; width: 100%; background: var(--bg-card-alt); }
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { background: rgba(251,191,36,0.08); border-left-color: var(--accent5); }
+.callout.ok { background: rgba(52,211,153,0.08); border-left-color: var(--accent3); }
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin: 24px 0; }
+.qa-box .q { font-weight: 700; color: var(--accent); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } .stats { gap: 24px; } .section { padding: 48px 0; } }
+.comparison .card { margin: 0; }
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 14px 24px; text-align: center; font-size: 0.9rem; width: 100%; max-width: 500px; transition: all 0.3s; }
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow { font-size: 1.2rem; color: var(--text-dim); padding: 4px 0; }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+.data-table { border-collapse: collapse; font-family: var(--mono); font-size: 0.82rem; width: 100%; margin: 16px 0; }
+.data-table th, .data-table td { padding: 10px 12px; border: 1px solid var(--border); text-align: center; }
+.data-table th { background: var(--bg-card-alt); color: var(--accent); }
+.data-table td { background: var(--bg-card); color: var(--text-dim); }
+.output-readout { font-family: var(--mono); font-size: 0.85rem; color: var(--text); background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-top: 12px; min-height: 48px; }
+.step-indicator { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.step-dot { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-family: var(--mono); color: var(--text-dim); transition: all 0.2s; }
+.step-dot.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.step-dot.done { border-color: var(--accent3); color: var(--accent3); }
+.code-block { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin: 20px 0; font-family: var(--mono); font-size: 0.82rem; line-height: 1.6; overflow-x: auto; color: var(--text-dim); }
+.code-block .kw { color: var(--accent2); } .code-block .fn { color: var(--accent); }
+.code-block .str { color: var(--accent3); } .code-block .num { color: var(--accent5); }
+.code-block .cmt { color: #666; font-style: italic; }
+.split-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+@media (max-width: 700px) { .split-panel { grid-template-columns: 1fr; } }
+.split-box { background: var(--bg-card-alt); border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; min-height: 180px; }
+.split-box.rope { border-color: var(--accent4); }
+.split-box.norope { border-color: var(--accent3); }
+.split-box h4 { font-size: 0.9rem; margin-bottom: 12px; }
+.matrix-grid { display: grid; gap: 4px; font-family: var(--mono); font-size: 0.75rem; margin: 8px 0; }
+.matrix-cell { background: var(--bg-card); border: 1px solid var(--border); padding: 6px; text-align: center; border-radius: 4px; }
+.matrix-cell.highlight { background: rgba(108,140,255,0.25); color: var(--accent); font-weight: 700; }
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid #2a2a3a; font-family: var(--sans); }
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<nav class="breadcrumb-nav">
+  <a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span>
+  <a href="../../">Learning Blogs</a><span class="bc-sep">›</span>
+  <a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span>
+  <span class="bc-current">MLA Meets RoPE</span>
+</nav>
+
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">MLA Meets RoPE</a>
+  <div class="nav-links">
+    <a href="#s0">Overview</a><a href="#s1">Absorption</a><a href="#s2">Conflict</a>
+    <a href="#s3">Decoupled</a><a href="#s4">No-RoPE Path</a><a href="#s5">RoPE Path</a>
+    <a href="#s6">Attention</a><a href="#s7">Inference</a><a href="#s8">Cache</a>
+    <a href="#s9">Memory</a><a href="#s-rope-math">RoPE Math</a>
+    <a href="#s-implementation">Code</a><a href="#s10">Playground</a>
+<a href="#s-summary">Summary</a>
+  </div>
+</nav>
+
+
+<header class="hero" id="top">
+  <div class="container">
+    <p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 07</p>
+    <h1>MLA Meets RoPE</h1>
+    <p class="subtitle">How DeepSeek Solved the Position Problem — decoupled rotary embeddings, the two-part key structure, and the complete MLA + RoPE implementation.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">13</span><span class="stat-label">Core Sections</span></div>
+      <div class="stat"><span class="stat-val">8</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">57×</span><span class="stat-label">Memory Savings</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:720px;margin:0 auto;">
+      Multi-head latent attention compresses the KV cache through the absorption trick — but rotary positional embeddings are position-dependent and break that trick.
+      DeepSeek's answer is <strong>decoupled RoPE</strong>: split queries and keys into content and position halves, cache only C<sub>KV</sub> and K<sub>R</sub>,
+      and add two attention score matrices. Every matrix multiplication is traced on the whiteboard.
+    </p>
+  </div>
+</header>
+
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Two Innovations That Must Coexist</h2>
+    <p>DeepSeek-V3 and DeepSeek-R1 are built on <strong>multi-head latent attention (MLA)</strong> — a compression mechanism that stores a low-rank latent representation in the KV cache instead of full keys and values. They also use <strong>rotary positional embeddings (RoPE)</strong>, the dominant positional encoding in modern LLMs because it injects position information without contaminating token embeddings.</p>
+    <p>These two ideas solve different problems. MLA solves the <em>memory</em> problem: how to cache attention state without storing N×H-dimensional keys and values for every token. RoPE solves the <em>position</em> problem: how to tell the model where each token sits in the sequence. Both are essential. Combining them is not obvious — and naively combining them breaks MLA entirely.</p>
+    <p>The DeepSeek-V2 paper documents this journey in two sections. <strong>Section 2.1.2</strong> describes <em>low-rank key-value joint compression</em> — the basic MLA schematic where only a latent matrix is cached. <strong>Section 2.1.3</strong> introduces <em>decoupled rotary position embedding</em> — the fix that makes RoPE and MLA work together. DeepSeek-V3 presents only the advanced version (MLA + RoPE combined) in its architecture section, with equations 1–19 packed into a single dense page. Many blog posts start there and leave readers lost among symbols: D, D<sub>C</sub>, D<sub>C</sub>′, D<sub>H</sub>, D<sub>HR</sub>, N<sub>H</sub>, and more.</p>
+    <p>This chapter unpacks every symbol. By the end, the DeepSeek architecture diagram — with its shaded "cache during inference" regions — will read as clearly as a whiteboard derivation.</p>
+    <div class="comparison">
+      <div class="card"><h3>DeepSeek-V2 Paper</h3><p>Explains basic MLA (§2.1.2) first, then decoupled RoPE (§2.1.3). Easier to follow historically.</p></div>
+      <div class="card card-alt"><h3>DeepSeek-V3 Paper</h3><p>Jumps directly to MLA + RoPE. Powerful but dense — assumes you already understand the decoupling trick.</p></div>
+    </div>
+    <div class="callout"><p><strong>Prerequisites:</strong> You should understand MLA's absorption trick (compress K/V into a latent cache) and RoPE (rotate pairs of dimensions based on position). This chapter shows exactly where they collide — and how DeepSeek resolves the collision.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Why Latent Attention Works — The Absorption Trick</h2>
+    <p>As derived in Chapter 5, the absorption trick folds W<sub>UK</sub> into W<sub>Q</sub> (or W<sub>DQ</sub>·W<sub>UQ</sub> in DeepSeek-V3), so inference caches only the latent matrix C<sub>KV</sub> = X·W<sub>DKV</sub>. Attention scores become a dot product between an absorbed query and cached latents — no full keys stored.</p>
+    <div class="formula">Scores = (X · W<sub>DKV</sub><sup>T</sup>) · (X · W<sub>absorbed</sub>)<sup>T</sup> &nbsp;&nbsp;where&nbsp;&nbsp; W<sub>absorbed</sub> = W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup></div>
+    <p>During inference, only C<sub>KV</sub> is appended per token. When a new query arrives, it multiplies with the absorbed weights and dots against cached latent vectors.</p>
+    <div class="callout ok"><p><strong>Key constraint for this chapter:</strong> For absorption to work, W<sub>Q</sub> and W<sub>UK</sub><sup>T</sup> must be <em>directly adjacent</em> in the matrix product chain — with nothing position-dependent between them.</p></div>
+    <div class="interactive-panel">
+      <h4>Interactive · Absorption Trick Flow</h4>
+      <canvas id="conflictCanvas" width="560" height="180"></canvas>
+      <div class="btn-group">
+        <button class="btn conflict-btn active" data-m="mla">Standard MLA (works)</button>
+        <button class="btn conflict-btn" data-m="rope">Naive MLA + RoPE (broken)</button>
+      </div>
+      <div class="output-readout" id="conflictReadout"></div>
+    </div>
+    <h3 style="margin-top:28px;">What Gets Cached</h3>
+    <p>In basic MLA, the cache holds C<sub>KV</sub> with shape (num_tokens × D<sub>C</sub>), where D<sub>C</sub> is the latent compression dimension — typically much smaller than N<sub>H</sub> × D<sub>H</sub>. Values are recovered on-the-fly by multiplying the cache with W<sub>UV</sub>. Keys are never stored explicitly; they are absorbed into the query projection.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>The RoPE Incompatibility Problem</h2>
+    <p>Rotary positional embedding (RoPE), introduced in the RoFormer paper and adopted by LLaMA, Mistral, and DeepSeek, operates on query and key vectors — not on token embeddings. Given a vector at position m, RoPE divides it into pairs (x<sub>1</sub>, x<sub>2</sub>), (x<sub>3</sub>, x<sub>4</sub>), … and rotates each pair by an angle that depends on position m:</p>
+    <div class="formula">R<sub>m</sub>(x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>) → (x′<sub>1</sub>, x′<sub>2</sub>, x′<sub>3</sub>, x′<sub>4</sub>)</div>
+    <p>If the original vector was [x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>], after RoPE it becomes [x′<sub>1</sub>, x′<sub>2</sub>, x′<sub>3</sub>, x′<sub>4</sub>]. The rotation angle for pair (x<sub>1</sub>, x<sub>2</sub>) at position 0 differs from the rotation for the same pair at position 5. <strong>R<sub>m</sub> is position-dependent.</strong> That is exactly what makes RoPE work — and exactly what breaks absorption.</p>
+    <h3 style="margin-top:28px;">What Happens When You Naively Add RoPE</h3>
+    <p>Suppose we apply RoPE to both queries and keys in MLA:</p>
+    <div class="formula">Q = R<sub>m</sub>(X · W<sub>Q</sub>) &nbsp;&nbsp;&nbsp; K = R<sub>m</sub>(X · W<sub>UK</sub> · W<sub>DKV</sub>)</div>
+    <p>The attention product becomes:</p>
+    <div class="formula">R<sub>m_q</sub>(X · W<sub>Q</sub>) · [R<sub>m_k</sub>(X · W<sub>UK</sub> · W<sub>DKV</sub>)]<sup>T</sup></div>
+    <p>Now R<sub>m</sub> sits <em>between</em> W<sub>Q</sub> and W<sub>UK</sub><sup>T</sup>. Because R<sub>m</sub> changes with position m, we cannot fold W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> into a single constant matrix. <strong>Absorption is impossible.</strong></p>
+    <div class="callout warn"><p>The DeepSeek-V2 paper states this precisely: <em>"Rotary positional encoding is incompatible with key-value compression. To be specific, rotary positional encoding is position-sensitive for both keys and queries. If we apply rotary positional encodings, W<sup>UK</sup> cannot be absorbed into W<sup>Q</sup> anymore during inference."</em></p></div>
+    <h3 style="margin-top:28px;">The Consequences</h3>
+    <p>If absorption fails, two disasters follow:</p>
+    <ul class="dim">
+      <li><strong>Keys must be recomputed for every token during inference.</strong> The whole point of caching the latent C<sub>KV</sub> was to avoid recomputing keys. With RoPE in the middle, you must apply R<sub>m</sub> to reconstruct full keys at every decode step.</li>
+      <li><strong>MLA's memory advantage vanishes.</strong> You are back to storing or recomputing position-sensitive key representations — the exact problem MLA was invented to solve.</li>
+    </ul>
+    <p>Why bother with RoPE at all, then? Because RoPE has decisive advantages over sinusoidal positional encodings: it does not add anything to token embeddings (preserving semantic purity), it operates at the Q/K level where relative position matters most, and empirically it delivers better length generalization and benchmark performance. DeepSeek wanted both — MLA's cache compression <em>and</em> RoPE's positional quality.</p>
+    <div class="qa-box">
+      <div class="q">Why not use learned positional embeddings with MLA?</div>
+      <p>Learned absolute embeddings could be added to X before projection, but they contaminate the semantic representation and do not provide the same relative-position inductive bias that RoPE gives through its rotation structure. DeepSeek's own benchmark results show MLA + RoPE outperforming basic MLA on MMLU, CMMLU, and other evaluations — the positional quality matters for capability, not just for correctness.</p>
+    </div>
+    <h3 style="margin-top:28px;">Why RoPE Is Position-Dependent — A Concrete Example</h3>
+    <p>Consider a single key vector with four dimensions: [x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>]. RoPE treats (x<sub>1</sub>, x<sub>2</sub>) as one 2D vector and (x<sub>3</sub>, x<sub>4</sub>) as another. At position 0, pair 1 might rotate by 0°. At position 3, the same pair rotates by a different angle θ<sub>3</sub>. The output [x′<sub>1</sub>, x′<sub>2</sub>] depends on <em>both</em> the input values and the position index. This is why R<sub>pos</sub> cannot be treated as a constant matrix multiplier that commutes with W<sub>Q</sub> and W<sub>UK</sub> — it is a function R(pos) that varies row-by-row across the sequence.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Decoupled RoPE — The Core Insight</h2>
+    <p>DeepSeek's solution is called <strong>decoupled RoPE</strong> (Section 2.1.3 in DeepSeek-V2). The name tells you the strategy: <em>decouple</em> the part of attention that needs RoPE from the part that must remain RoPE-free for absorption to work.</p>
+    <h3 style="margin-top:28px;">Split Queries and Keys in Two</h3>
+    <p>Instead of one query matrix Q and one key matrix K, DeepSeek constructs <strong>two</strong> query matrices and <strong>two</strong> key matrices:</p>
+    <div class="comparison">
+      <div class="card norope split-box"><h4 style="color:var(--accent3);">Content Path (No RoPE)</h4>
+        <p style="margin:0;color:var(--text-dim);font-size:0.9rem;"><strong>Q<sub>C</sub></strong> — queries without RoPE<br><strong>K<sub>C</sub></strong> — keys without RoPE<br><span class="tag tag-green">Absorption works here</span></p></div>
+      <div class="card rope split-box"><h4 style="color:var(--accent4);">Position Path (With RoPE)</h4>
+        <p style="margin:0;color:var(--text-dim);font-size:0.9rem;"><strong>Q<sub>R</sub></strong> — queries with RoPE applied<br><strong>K<sub>R</sub></strong> — keys with RoPE applied<br><span class="tag tag-pink">Extra compute, but small</span></p></div>
+    </div>
+    <p>The full query and key are formed by <strong>concatenation</strong> along the feature dimension:</p>
+    <div class="formula">Q = [Q<sub>C</sub> ; Q<sub>R</sub>] &nbsp;&nbsp;&nbsp; K = [K<sub>C</sub> ; K<sub>R</sub>]</div>
+    <p>Attention scores decompose by the bilinearity of the dot product:</p>
+    <div class="formula">Q · K<sup>T</sup> = Q<sub>C</sub> · K<sub>C</sub><sup>T</sup> + Q<sub>R</sub> · K<sub>R</sub><sup>T</sup></div>
+    <p>The first term Q<sub>C</sub> · K<sub>C</sub><sup>T</sup> involves no RoPE at all — <strong>the absorption trick applies fully</strong>. The second term Q<sub>R</sub> · K<sub>R</sub><sup>T</sup> carries all positional information. We accept extra computation for this smaller RoPE-specific subspace, but retain MLA's cache compression for the content subspace.</p>
+    <div class="callout"><p>It sounds like a cheat — solve the hard problem by splitting it in two. But the split is principled: content similarity and positional alignment are different signals, and DeepSeek allocates separate capacity to each. The content path uses the full latent compression machinery; the position path uses a deliberately small D<sub>HR</sub> dimensional subspace.</p></div>
+    <div class="interactive-panel">
+      <h4>Interactive · Decoupled Key Structure Explorer</h4>
+      <canvas id="decCanvas" width="560" height="120"></canvas>
+      <div class="two-col" style="margin-top:16px;">
+        <div class="slider-container"><label>D (model dim): <span class="slider-value" id="dVal">512</span></label><input type="range" id="dSlider" min="64" max="1024" step="64" value="512"></div>
+        <div class="slider-container"><label>d<sub>h</sub> (head dim): <span class="slider-value" id="dhVal">128</span></label><input type="range" id="dhSlider" min="32" max="256" step="32" value="128"></div>
+        <div class="slider-container"><label>d<sub>hr</sub> (RoPE head dim): <span class="slider-value" id="dhrVal">64</span></label><input type="range" id="dhrSlider" min="16" max="128" step="16" value="64"></div>
+        <div class="slider-container"><label>N<sub>H</sub> (num heads): <span class="slider-value" id="nhVal">8</span></label><input type="range" id="nhSlider" min="1" max="32" step="1" value="8"></div>
+      </div>
+      <div class="output-readout" id="decReadout"></div>
+    </div>
+    <h3 style="margin-top:28px;">The Trade-Off Stated Clearly</h3>
+    <p>DeepSeek increases computation slightly by adding Q<sub>R</sub> and K<sub>R</sub> matrices and their RoPE operations. In exchange, it <strong>retains the old magic of MLA</strong> on the Q<sub>C</sub>/K<sub>C</sub> path. The RoPE path is small (D<sub>HR</sub> × N<sub>H</sub> dimensions, with K<sub>R</sub> shared across heads — more on that later), so the extra cost is bounded. The content path still caches only C<sub>KV</sub>.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Part One — The No-RoPE Path (Left Side)</h2>
+    <p>The complete implementation uses a concrete whiteboard example: four tokens, <strong>"The next day is"</strong>. All dimensions are chosen small so every matrix multiplication can be traced by hand.</p>
+    <h3 style="margin-top:28px;">Notation and Dimensions</h3>
+    <table class="data-table">
+      <tr><th>Symbol</th><th>Meaning</th><th>Example Value</th></tr>
+      <tr><td>D</td><td>Model / embedding dimension</td><td>8</td></tr>
+      <tr><td>N<sub>H</sub></td><td>Number of attention heads</td><td>2</td></tr>
+      <tr><td>D<sub>H</sub></td><td>Head dimension (content path)</td><td>4 (= D / N<sub>H</sub>)</td></tr>
+      <tr><td>D<sub>C</sub></td><td>Latent compression dimension</td><td>4</td></tr>
+      <tr><td>D<sub>C</sub>′</td><td>Query down-projection dimension</td><td>4 (same as D<sub>C</sub> here)</td></tr>
+      <tr><td>D<sub>HR</sub></td><td>RoPE subspace head dimension</td><td>4</td></tr>
+    </table>
+    <p>Input embedding matrix X has shape <strong>(4 × 8)</strong>: four tokens, eight features each.</p>
+    <h3 style="margin-top:28px;">Step 1 — Latent Compression (C<sub>KV</sub>)</h3>
+    <p>Project X into latent space via W<sub>DKV</sub> with shape (8 × 4):</p>
+    <div class="formula">C<sub>KV</sub> = X · W<sub>DKV</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 8) · (8 × 4) = (4 × 4)</div>
+    <p>This C<sub>KV</sub> matrix is the <strong>only latent cache</strong> on the content path. Its column count D<sub>C</sub> = 4 determines KV cache size per token. The dotted-box notation in the DeepSeek diagram marks C<sub>KV</sub> as "cache during inference."</p>
+    <h3 style="margin-top:28px;">Step 2 — Keys and Values from Latent</h3>
+    <p>Up-project C<sub>KV</sub> into key and value spaces. W<sub>UK</sub> and W<sub>UV</sub> each have shape (4 × 8) — that is (D<sub>C</sub> × D):</p>
+    <div class="formula">K<sub>C</sub> = C<sub>KV</sub> · W<sub>UK</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4) · (4 × 8) = (4 × 8)</div>
+    <div class="formula">V<sub>C</sub> = C<sub>KV</sub> · W<sub>UV</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4) · (4 × 8) = (4 × 8)</div>
+    <p>W<sub>UK</sub> is <strong>different per head</strong> (not shared). K<sub>C</sub> and V<sub>C</sub> have full model dimension D = 8. No RoPE is applied anywhere on this path.</p>
+    <h3 style="margin-top:28px;">Step 3 — Queries via Down-Projection and Up-Projection</h3>
+    <p>DeepSeek-V3 adds a change from basic MLA: queries are not computed as X · W<sub>Q</sub> directly. Instead:</p>
+    <div class="flow">
+      <div class="flow-step">C<sub>Q</sub> = X · W<sub>DQ</sub> &nbsp;&nbsp;(4×8)·(8×4) → (4×4)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Q<sub>C</sub> = C<sub>Q</sub> · W<sub>UQ</sub> &nbsp;&nbsp;(4×4)·(4×8) → (4×8)</div>
+    </div>
+    <p>W<sub>DQ</sub> down-projects queries into D<sub>C</sub>′ = 4 dimensions. W<sub>UQ</sub> up-projects back to D = 8. The DeepSeek paper notes this <strong>saves activation memory during training</strong> and empirically improves performance — two extra matrices (W<sub>DQ</sub>, W<sub>UQ</sub>) replace the single W<sub>Q</sub> from basic MLA.</p>
+    <p>At inference, absorption uses W<sub>DQ</sub> · W<sub>UQ</sub> · W<sub>UK</sub><sup>T</sup> as the absorbed query-side matrix (replacing W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> from basic MLA).</p>
+    <div class="callout ok"><p><strong>Left-side summary:</strong> Three matrices produced — K<sub>C</sub> (4×8), V<sub>C</sub> (4×8), Q<sub>C</sub> (4×8). Zero RoPE. Absorption fully valid. Cache: C<sub>KV</sub> only (4×4).</p></div>
+    <div class="interactive-panel">
+      <h4>Interactive · Whiteboard Step Animator (Equations 9–13)</h4>
+      <div class="step-indicator" id="wbDots"></div>
+      <div class="btn-group">
+        <button class="btn" id="wbPrev">← Previous</button>
+        <button class="btn" id="wbNext">Next →</button>
+        <button class="btn" id="wbAuto">Auto-play</button>
+      </div>
+      <div class="output-readout" id="wbReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Part Two — The RoPE Path (Right Side)</h2>
+    <p>The right side of the decoupled schematic constructs <strong>new</strong> query and key matrices whose sole purpose is carrying positional information via RoPE. These are Q<sub>R</sub> and K<sub>R</sub>.</p>
+    <h3 style="margin-top:28px;">Building K<sub>R</sub> — Shared Key Across Heads</h3>
+    <p>Start from the same input X (4×8). Multiply by W<sub>KR</sub> with shape (8 × D<sub>HR</sub>) = (8 × 4):</p>
+    <div class="formula">K<sub>R,base</sub> = X · W<sub>KR</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 8) · (8 × 4) = (4 × 4)</div>
+    <p>Apply RoPE position-by-position. RoPE preserves dimension, so output remains (4 × 4). Now expand across N<sub>H</sub> = 2 heads by <strong>replicating</strong> the same rotated key for each head:</p>
+    <div class="formula">K<sub>R</sub> = expand_heads(RoPE(K<sub>R,base</sub>)) &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 8)</div>
+    <p>Critical design choice from the DeepSeek paper: <em>"We use a shared key across all heads which carry the rotary positional embedding component."</em> W<sub>KR</sub> has D<sub>HR</sub> columns, not N<sub>H</sub> × D<sub>HR</sub>. If each head had its own W<sub>KR</sub>, the weight matrix would be (8 × 8) for two heads — and the cache would need N<sub>H</sub> × D<sub>HR</sub> per token instead of just D<sub>HR</sub>.</p>
+    <h3 style="margin-top:28px;">Building Q<sub>R</sub> — Per-Head Queries (Not Shared)</h3>
+    <p>Queries on the RoPE path reuse the down-projected C<sub>Q</sub> from the left side — the same (4×4) matrix. Multiply by W<sub>QR</sub> with shape (D<sub>C</sub>′ × N<sub>H</sub> × D<sub>HR</sub>) = (4 × 8):</p>
+    <div class="formula">Q<sub>R,pre</sub> = C<sub>Q</sub> · W<sub>QR</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4) · (4 × 8) = (4 × 8)</div>
+    <p>Apply RoPE to get the final Q<sub>R</sub> (4×8). Unlike K<sub>R</sub>, W<sub>QR</sub> already spans all heads — its column dimension is N<sub>H</sub> × D<sub>HR</sub> = 8. <strong>Queries are not shared across heads; only the RoPE key is shared.</strong> This preserves head diversity in the positional query subspace while minimizing K<sub>R</sub> cache size.</p>
+    <div class="comparison">
+      <div class="card"><h3>K<sub>R</sub> (shared)</h3><p>W<sub>KR</sub>: (8 × D<sub>HR</sub>). Same rotated key replicated across heads. Cache: D<sub>HR</sub> per token.</p></div>
+      <div class="card card-alt"><h3>Q<sub>R</sub> (per-head)</h3><p>W<sub>QR</sub>: (D<sub>C</sub>′ × N<sub>H</sub>·D<sub>HR</sub>). Different query per head. Not cached — computed fresh for new token only.</p></div>
+    </div>
+    <h3 style="margin-top:28px;">Mapping to Paper Equations 14–15</h3>
+    <p><strong>Equation 14:</strong> Q<sub>R</sub> = RoPE(C<sub>Q</sub> · W<sub>QR</sub>). Start from down-projected queries, up-project into RoPE subspace, apply rotation.</p>
+    <p><strong>Equation 15:</strong> K<sub>R</sub> = expand(RoPE(X · W<sub>KR</sub>)). Project input directly, rotate, replicate across heads.</p>
+    <p>Both Q<sub>R</sub> and K<sub>R</sub> end up as (4 × 8) = (tokens × N<sub>H</sub>·D<sub>HR</sub>) matrices, but they arrive there differently — K<sub>R</sub> via sharing and expansion, Q<sub>R</sub> via per-head W<sub>QR</sub>.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Concatenation, Attention Scores, and Output</h2>
+    <p>With Q<sub>C</sub>, Q<sub>R</sub>, K<sub>C</sub>, K<sub>R</sub>, and V<sub>C</sub> computed, we assemble full queries and keys by concatenation along the feature axis (Equations 16–17):</p>
+    <div class="formula">Q = [Q<sub>C</sub> ; Q<sub>R</sub>] &nbsp;&nbsp; (4 × 16) &nbsp;&nbsp;&nbsp; K = [K<sub>C</sub> ; K<sub>R</sub>] &nbsp;&nbsp; (4 × 16)</div>
+    <p>In our toy example each half is (4×8), so the concatenated dimension is 8 + 8 = 16 per token. The attention score matrix (Equation 18) decomposes:</p>
+    <div class="formula">S = Q · K<sup>T</sup> = Q<sub>C</sub>·K<sub>C</sub><sup>T</sup> + Q<sub>R</sub>·K<sub>R</sub><sup>T</sup> &nbsp;&nbsp; each term (4 × 4)</div>
+    <p>First term: no RoPE → absorption applies. Second term: pure positional dot-product in the D<sub>HR</sub> subspace. Add the two (4×4) score matrices element-wise to get the final pre-softmax scores.</p>
+    <h3 style="margin-top:28px;">Scaling, Softmax, and Context</h3>
+    <p>Scale by √(D<sub>H</sub> + D<sub>HR</sub>) — in our example √(4 + 4) = √8. This keeps dot-product variance near 1 when query and key each have D<sub>H</sub> + D<sub>HR</sub> total dimensions split across content and RoPE parts:</p>
+    <div class="formula">Weights = softmax(S / √(D<sub>H</sub> + D<sub>HR</sub>)) &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4)</div>
+    <p>Multiply weights by V<sub>C</sub> (4×8) — values come only from the content path; the RoPE path contributes to <em>where</em> to attend, not <em>what</em> to retrieve:</p>
+    <div class="formula">O = Weights · V<sub>C</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4) · (4 × 8) = (4 × 8)</div>
+    <p>Output O passes through the output projection W<sub>O</sub> to produce logits (Equation 19, denoted u<sup>T</sup> in the paper).</p>
+    <div class="interactive-panel">
+      <h4>Interactive · Two-Path Attention Flow</h4>
+      <canvas id="flowCanvas" width="560" height="220"></canvas>
+    </div>
+    <div class="callout"><p><strong>Reading the DeepSeek diagram:</strong> On the query side, C<sub>Q</sub> branches — one path up-projects to Q<sub>C</sub>, the other multiplies W<sub>QR</sub> and gets RoPE to become Q<sub>R</sub>, then Q<sub>C</sub> and Q<sub>R</sub> concatenate. On the key side, C<sub>KV</sub> yields K<sub>C</sub> and V<sub>C</sub>; separately X · W<sub>KR</sub> → RoPE → expand → K<sub>R</sub>, then K<sub>C</sub> and K<sub>R</sub> concatenate. Shaded boxes = cached at inference.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Inference — When "bright" Arrives</h2>
+    <p>During autoregressive inference, prefix <em>"The next day is"</em> is already processed. The model predicts <strong>"bright"</strong> as the next token. Trace exactly what happens when "bright" enters the MLA + RoPE pipeline.</p>
+    <h3 style="margin-top:28px;">Path 1 — Content (Absorption, No RoPE)</h3>
+    <p>For the new token x = embed("bright") with shape (1 × 8):</p>
+    <div class="formula">q<sub>absorbed</sub> = x · W<sub>DQ</sub> · W<sub>UQ</sub> · W<sub>UK</sub><sup>T</sup> &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 4)</div>
+    <p>Compute new latent row and append to cache:</p>
+    <div class="formula">c<sub>new</sub> = x · W<sub>DKV</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 4) appended to C<sub>KV</sub>: (4×4) → (5×4)</div>
+    <p>Attention scores via absorption:</p>
+    <div class="formula">s<sub>1</sub> = q<sub>absorbed</sub> · C<sub>KV</sub><sup>T</sup> &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 5)</div>
+    <p>Five positions: The, next, day, is, bright. No key recomputation for old tokens — only one new latent row added.</p>
+    <h3 style="margin-top:28px;">Path 2 — RoPE</h3>
+    <p>Compute and cache new K<sub>R</sub> row:</p>
+    <div class="formula">k<sub>R,new</sub> = expand(RoPE(x · W<sub>KR</sub>)) &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 8), append to K<sub>R</sub> cache: (4×8) → (5×8)</div>
+    <p>Compute Q<sub>R</sub> for the new token (not cached — query is always fresh):</p>
+    <div class="formula">q<sub>R</sub> = RoPE(x · W<sub>DQ</sub> · W<sub>QR</sub>) &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 8)</div>
+    <p>RoPE path scores:</p>
+    <div class="formula">s<sub>2</sub> = q<sub>R</sub> · K<sub>R</sub><sup>T</sup> &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 5)</div>
+    <h3 style="margin-top:28px;">Combine and Predict</h3>
+    <div class="formula">s = s<sub>1</sub> + s<sub>2</sub> &nbsp;&nbsp;→&nbsp;&nbsp; softmax(s / √8) · V<sub>C</sub> &nbsp;&nbsp;→&nbsp;&nbsp; context (1 × 8)</div>
+    <p>Only the last token's context vector (1×8) feeds the output head for next-token prediction. Values V<sub>C</sub> recovered by V<sub>C</sub> = C<sub>KV</sub> · W<sub>UV</sub> on the updated (5×4) cache.</p>
+    <div class="interactive-panel">
+      <h4>Interactive · Inference Token Step</h4>
+      <div class="token-row" id="inferRow"></div>
+      <div class="btn-group">
+        <button class="btn" id="inferAddBtn">Add token "bright"</button>
+        <button class="btn" id="inferResetBtn">Reset</button>
+      </div>
+      <div class="output-readout" id="inferReadout"></div>
+    </div>
+    <div class="callout ok"><p><strong>Two caches updated:</strong> C<sub>KV</sub> grows by D<sub>C</sub> = 4 floats per new token. K<sub>R</sub> grows by D<sub>HR</sub> = 4 floats per new token (shared across heads, stored once). Total per token per layer: <strong>D<sub>C</sub> + D<sub>HR</sub></strong> — not N<sub>H</sub> × D<sub>HR</sub> thanks to K<sub>R</sub> sharing.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>What Gets Cached — Reading the Diagram</h2>
+    <p>The DeepSeek architecture diagram marks two regions with dashed boxes labeled <em>"cache during inference"</em>:</p>
+    <ul class="dim">
+      <li><strong>C<sub>KV</sub></strong> — the latent KV matrix from the content path (same as basic MLA)</li>
+      <li><strong>K<sub>R</sub></strong> — the RoPE key matrix, stored at D<sub>HR</sub> per token (one head's worth, replicated at attention time)</li>
+    </ul>
+    <p>What is <em>not</em> cached: Q<sub>C</sub>, Q<sub>R</sub>, K<sub>C</sub>, V<sub>C</sub> in full. Q vectors are computed fresh for the current token. K<sub>C</sub> and V<sub>C</sub> are derived from C<sub>KV</sub> via W<sub>UK</sub> and W<sub>UV</sub> — the up-projection weights are fixed and applied on-the-fly or partially absorbed.</p>
+    <h3 style="margin-top:28px;">Why K<sub>R</sub> Must Be Cached</h3>
+    <p>Unlike the content path, the RoPE path cannot absorb W<sub>QR</sub> and W<sub>KR</sub><sup>T</sup> because RoPE(R<sub>m</sub>(·)) depends on position m. Each cached K<sub>R</sub> row stores the <em>already-rotated</em> key for that position. When a new query at position 5 arrives, it dots against all five cached rotated keys — no recomputation of old keys needed.</p>
+    <h3 style="margin-top:28px;">Head Sharing and Memory</h3>
+    <p>If K<sub>R</sub> were not shared across heads, cache per token would be D<sub>C</sub> + N<sub>H</sub> × D<sub>HR</sub>. By sharing W<sub>KR</sub> and replicating at compute time, DeepSeek reduces the RoPE cache to D<sub>HR</sub> only. Queries remain per-head (W<sub>QR</sub> has N<sub>H</sub> · D<sub>HR</sub> columns) so model quality is preserved — only the positional <em>key</em> side shares across heads, not the content path.</p>
+    <div class="qa-box">
+      <div class="q">Does sharing K<sub>R</sub> across heads hurt performance?</div>
+      <p>DeepSeek's benchmarks show MLA + RoPE matching or beating standard MHA — the shared RoPE key carries positional alignment signal that all heads can use, while head-specific diversity lives in Q<sub>C</sub>, Q<sub>R</sub>, and W<sub>UK</sub>. The content path (the bulk of representational capacity) shares nothing across heads.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Memory Comparison — MHA vs MQA vs GQA vs MLA vs MLA+RoPE</h2>
+    <p>The entire motivation chain begins with KV cache memory. Here are the formulas for cache size (16-bit / 2 bytes per element), batch B, context length S, layers L:</p>
+    <div class="formula">MHA: &nbsp; 2 × 2 × L × B × S × N × D<sub>H</sub></div>
+    <p>The leading 2×2: one factor for K vs V, one for 2 bytes (fp16). N = number of heads, D<sub>H</sub> = head dimension.</p>
+    <div class="formula">MQA: &nbsp; 2 × 2 × L × B × S × D<sub>H</sub> &nbsp;&nbsp;(N removed — one shared K/V set)</div>
+    <div class="formula">GQA: &nbsp; 2 × 2 × L × B × S × G × D<sub>H</sub> &nbsp;&nbsp;(G groups instead of N heads)</div>
+    <div class="formula">MLA (basic): &nbsp; 2 × L × B × S × D<sub>L</sub> &nbsp;&nbsp;(one 2 gone — joint latent, no separate K/V)</div>
+    <div class="formula">MLA + RoPE: &nbsp; 2 × L × B × S × (D<sub>L</sub> + D<sub>HR</sub>)</div>
+    <p>DeepSeek's chosen dimensions: <strong>D<sub>L</sub> = 4 × D<sub>H</sub></strong> and <strong>D<sub>HR</sub> = D<sub>H</sub> / 2</strong>. Substituting:</p>
+    <div class="formula">D<sub>L</sub> + D<sub>HR</sub> = 4D<sub>H</sub> + D<sub>H</sub>/2 = 4.5 D<sub>H</sub></div>
+    <div class="formula">MHA / MLA+RoPE = (2 × N × D<sub>H</sub>) / (D<sub>L</sub> + D<sub>HR</sub>) = 2N D<sub>H</sub> / (4.5 D<sub>H</sub>) = 4N / 9</div>
+    <p>With N = 128 heads (DeepSeek-V3):</p>
+    <div class="formula">4 × 128 / 9 ≈ 56.9 ≈ <strong>57×</strong> memory reduction vs MHA</div>
+    <p>DeepSeek's own reported numbers: KV cache per token ~860 KB (MHA) vs ~34.6 KB (MLA) — roughly <strong>25×</strong> in one comparison, <strong>6–7×</strong> in another configuration. The formula gives the asymptotic ratio; constants depend on layer count, batch, and whether MOE layers are included.</p>
+    <div class="interactive-panel">
+      <h4>Interactive · KV Cache Memory Comparison</h4>
+      <div class="two-col">
+        <div class="slider-container"><label>N (heads): <span class="slider-value" id="memNVal">128</span></label><input type="range" id="memNSlider" min="8" max="128" step="8" value="128"></div>
+        <div class="slider-container"><label>D<sub>H</sub>: <span class="slider-value" id="memHVal">128</span></label><input type="range" id="memHSlider" min="64" max="256" step="64" value="128"></div>
+      </div>
+      <div class="bar-chart" id="memChart"></div>
+      <div class="output-readout" id="memReadout"></div>
+    </div>
+    <h3 style="margin-top:28px;">Performance vs Memory Trade-Off</h3>
+    <table class="data-table">
+      <tr><th>Method</th><th>KV Memory</th><th>Quality (MMLU etc.)</th></tr>
+      <tr><td>MHA</td><td>Highest</td><td>Best baseline</td></tr>
+      <tr><td>MQA</td><td>Lowest (~N× less)</td><td>Much worse — Appendix D.1 in DeepSeek paper</td></tr>
+      <tr><td>GQA</td><td>Medium</td><td>Better than MQA, still below MHA</td></tr>
+      <tr><td>MLA + RoPE</td><td>~57× less than MHA</td><td>Equivalent or better than MHA</td></tr>
+    </table>
+    <p>That is the best of both worlds this chapter explains.</p>
+    <div class="callout ok"><p><strong>57× is not a typo.</strong> It comes directly from 4N/9 with N=128. The 9 in the denominator is 4.5 × 2 (the factor 2 from K+V in MHA numerator vs single latent+KR in MLA+RoPE denominator structure). Understanding the whiteboard derivation makes this formula inevitable rather than magical.</p></div>
+    <div class="interactive-panel">
+      <h4>Interactive · RoPE Rotation by Position</h4>
+      <canvas id="ropeVizCanvas" width="560" height="200"></canvas>
+      <div class="slider-container"><label>Token position m: <span class="slider-value" id="ropePosVal">0</span></label>
+      <input type="range" id="ropePosSlider" min="0" max="15" value="0"></div>
+    </div>
+    <div class="interactive-panel">
+      <h4>Interactive · Cache Bytes Calculator</h4>
+      <div class="two-col">
+        <div class="slider-container"><label>Seq length: <span class="slider-value" id="cacheSeqVal">4096</span></label><input type="range" id="cacheSeqSlider" min="128" max="131072" step="128" value="4096"></div>
+        <div class="slider-container"><label>D_C: <span class="slider-value" id="cacheDCVal">512</span></label><input type="range" id="cacheDCSlider" min="64" max="1024" step="64" value="512"></div>
+        <div class="slider-container"><label>D_HR: <span class="slider-value" id="cacheDHRVal">64</span></label><input type="range" id="cacheDHRSlider" min="32" max="256" step="32" value="64"></div>
+      </div>
+      <div class="output-readout" id="cacheCalcOut"></div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s-rope-math">
+  <div class="container">
+    <span class="section-num">A</span>
+    <h2>RoPE Mathematics — Rotation by Position</h2>
+    <p>Rotary positional embedding treats consecutive dimension pairs as coordinates in 2D planes and rotates each plane by an angle proportional to token position. For dimension pair (2i, 2i+1) at position m:</p>
+    <div class="formula">R<sub>m</sub>(x<sub>2i</sub>, x<sub>2i+1</sub>) = (x<sub>2i</sub> cos(mθ<sub>i</sub>) − x<sub>2i+1</sub> sin(mθ<sub>i</sub>), &nbsp; x<sub>2i</sub> sin(mθ<sub>i</sub>) + x<sub>2i+1</sub> cos(mθ<sub>i</sub>))</div>
+    <p>Base frequencies θ<sub>i</sub> = 10000<sup>−2i/d</sup> (standard RoPE schedule). Position m enters through mθ<sub>i</sub> — that is why R<sub>m</sub> is <em>not</em> a single constant matrix: row m of the sequence uses rotation angle mθ, row n uses nθ.</p>
+    <h3 style="margin-top:28px;">Concrete Four-Dimensional Example</h3>
+    <p>Vector at position 0: [x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>]. Two pairs: (x<sub>1</sub>, x<sub>2</sub>) and (x<sub>3</sub>, x<sub>4</sub>). At position 0, rotation angle is 0 for both pairs (cos 0 = 1, sin 0 = 0), so the vector is unchanged: [x′<sub>1</sub>, x′<sub>2</sub>, x′<sub>3</sub>, x′<sub>4</sub>] = [x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>].</p>
+    <p>Same vector at position 3: pair (x<sub>1</sub>, x<sub>2</sub>) rotates by 3θ<sub>0</sub>, pair (x<sub>3</sub>, x<sub>4</sub>) rotates by 3θ<sub>1</sub> where θ<sub>1</sub> ≠ θ<sub>0</sub>. Output [x′<sub>1</sub>, x′<sub>2</sub>, x′<sub>3</sub>, x′<sub>4</sub>] differs from the position-0 output even with identical input values. <strong>Position is baked into the rotated vector.</strong></p>
+    <p>Attention dot-products between RoPE-transformed Q and K depend on relative position (m − n) — the elegant property that makes RoPE work for autoregressive models. But this same property means R<sub>m</sub> cannot commute with fixed weight matrices W<sub>Q</sub> and W<sub>UK</sub> in a way that allows absorption across positions.</p>
+    <h3 style="margin-top:28px;">Why Not Apply RoPE Only to Queries?</h3>
+    <p>If keys cause the caching problem, why not apply RoPE only to queries? Attention scores Q·K<sup>T</sup> must encode relative position symmetrically — both Q and K need compatible positional transformations for the dot product to measure positional alignment. Applying RoPE to only one side breaks the relative-position property that makes RoPE effective. DeepSeek applies RoPE to both Q<sub>R</sub> and K<sub>R</sub> in the position subspace while keeping Q<sub>C</sub> and K<sub>C</sub> free of RoPE in the content subspace.</p>
+    <div class="callout warn"><p>Applying RoPE to the full Q and K in MLA forces per-position key reconstruction: for each cached token at position m, you need R<sub>m</sub>(x·W<sub>UK</sub>·W<sub>DKV</sub>) — the rotation depends on m, so the absorbed form X·W<sub>DKV</sub> alone is insufficient.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-absorption-deep">
+  <div class="container">
+    <span class="section-num">B</span>
+    <h2>Absorption Trick — Inference Algebra</h2>
+    <p>Chapter 5 derives the full absorption identity. At inference, scores reduce to <strong>(x · W<sub>abs</sub>) · C<sub>KV</sub><sup>T</sup></strong> where W<sub>abs</sub> = W<sub>DQ</sub> · W<sub>UQ</sub> · W<sub>UK</sub><sup>T</sup> in DeepSeek-V3. Only x · W<sub>DKV</sub> is appended to C<sub>KV</sub> for each new token.</p>
+    <p>Naive RoPE breaks this: <strong>score = R<sub>m</sub>(x · W<sub>Q</sub>) · (R<sub>k</sub>(c<sub>k</sub> · W<sub>UK</sub>))<sup>T</sup></strong>. Rotation matrices R<sub>m</sub> and R<sub>k</sub> differ per position and cannot fold into a fixed W<sub>abs</sub>.</p>
+    <h3 style="margin-top:28px;">Values Recovery</h3>
+    <p>Values are not absorbed into queries. After softmax weights w (1×S):</p>
+    <div class="formula">output = w · V<sub>C</sub> = w · C<sub>KV</sub> · W<sub>UV</sub></div>
+    <p>W<sub>UV</sub> is applied to the full cached C<sub>KV</sub> (S × D<sub>C</sub>) to get V<sub>C</sub> (S × D), then weighted by attention. The cache itself remains C<sub>KV</sub>, never full V.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-whiteboard-full">
+  <div class="container">
+    <span class="section-num">C</span>
+    <h2>Complete Whiteboard — Every Matrix Shape</h2>
+    <p>Tokens: <span class="token token-word">The</span> <span class="token token-word">next</span> <span class="token token-word">day</span> <span class="token token-word">is</span> — four tokens, S = 4.</p>
+    <table class="data-table">
+      <tr><th>Step</th><th>Operation</th><th>Shapes</th><th>Output Name</th></tr>
+      <tr><td>1</td><td>X</td><td>(4 × 8)</td><td>Input embeddings</td></tr>
+      <tr><td>2</td><td>X · W<sub>DKV</sub></td><td>(4×8)·(8×4)</td><td>C<sub>KV</sub> (4×4) ★ CACHE</td></tr>
+      <tr><td>3</td><td>C<sub>KV</sub> · W<sub>UK</sub></td><td>(4×4)·(4×8)</td><td>K<sub>C</sub> (4×8)</td></tr>
+      <tr><td>4</td><td>C<sub>KV</sub> · W<sub>UV</sub></td><td>(4×4)·(4×8)</td><td>V<sub>C</sub> (4×8)</td></tr>
+      <tr><td>5</td><td>X · W<sub>DQ</sub></td><td>(4×8)·(8×4)</td><td>C<sub>Q</sub> (4×4)</td></tr>
+      <tr><td>6</td><td>C<sub>Q</sub> · W<sub>UQ</sub></td><td>(4×4)·(4×8)</td><td>Q<sub>C</sub> (4×8)</td></tr>
+      <tr><td>7</td><td>X · W<sub>KR</sub></td><td>(4×8)·(8×4)</td><td>pre-RoPE K (4×4)</td></tr>
+      <tr><td>8</td><td>RoPE + expand heads</td><td>(4×4) → (4×8)</td><td>K<sub>R</sub> (4×8) ★ CACHE</td></tr>
+      <tr><td>9</td><td>C<sub>Q</sub> · W<sub>QR</sub></td><td>(4×4)·(4×8)</td><td>pre-RoPE Q (4×8)</td></tr>
+      <tr><td>10</td><td>RoPE</td><td>(4×8)</td><td>Q<sub>R</sub> (4×8)</td></tr>
+      <tr><td>11</td><td>Q<sub>C</sub>·K<sub>C</sub><sup>T</sup> + Q<sub>R</sub>·K<sub>R</sub><sup>T</sup></td><td>(4×8)·(8×4) each</td><td>Scores (4×4)</td></tr>
+      <tr><td>12</td><td>softmax(Scores/√8) · V<sub>C</sub></td><td>(4×4)·(4×8)</td><td>O (4×8)</td></tr>
+    </table>
+    <p>★ = stored during inference. Two caches: C<sub>KV</sub> (4×4) and K<sub>R</sub> (4×8). Note K<sub>R</sub> stores only D<sub>HR</sub>=4 unique dims per token replicated across 2 heads — effective cache width for K<sub>R</sub> is 4, not 8.</p>
+    <h3 style="margin-top:28px;">Head Structure with N<sub>H</sub> = 2, D<sub>H</sub> = 4</h3>
+    <p>Q<sub>C</sub> and K<sub>C</sub> with dimension 8 = N<sub>H</sub> × D<sub>H</sub> = 2 × 4. Head 1 occupies dims 0–3, head 2 dims 4–7. W<sub>UK</sub> is per-head — different up-projection for each head's slice. Q<sub>R</sub> and K<sub>R</sub> also span 8 dims (N<sub>H</sub> × D<sub>HR</sub> = 2 × 4), but K<sub>R</sub>'s head slices are copies of the same D<sub>HR</sub>=4 rotated vector.</p>
+    <div class="code-block"><span class="cmt"># Pseudocode: K_R expansion across heads</span>
+k_base = rope(x @ W_KR)          <span class="cmt"># (1, D_HR) e.g. (1, 4)</span>
+K_R = k_base.repeat(NH, axis=-1) <span class="cmt"># (1, NH * D_HR) e.g. (1, 8) — same 4 dims twice</span>
+
+<span class="cmt"># Q_R: per-head — W_QR already has NH * D_HR columns</span>
+Q_R = rope(c_q @ W_QR)           <span class="cmt"># (1, 8) — different per head slice</span></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-paper-equations">
+  <div class="container">
+    <span class="section-num">D</span>
+    <h2>Paper Equations 1–19 — Line by Line</h2>
+    <p>DeepSeek-V3 packs the full MLA + RoPE forward pass into equations numbered 1 through 19. Here is what each group does, mapped to our whiteboard.</p>
+    <h3 style="margin-top:28px;">Equations 1–8: Setup and Basic Projections</h3>
+    <p>Define input H<sup>t</sup> (our X), dimension variables d, d<sub>c</sub>, d′<sub>c</sub>, d<sub>h</sub>, d<sup>R</sup><sub>h</sub>, n<sub>h</sub>. Introduce weight matrices W<sup>DKV</sup>, W<sup>UK</sup>, W<sup>UV</sup>, W<sup>DQ</sup>, W<sup>UQ</sup>, W<sup>KR</sup>, W<sup>QR</sup>, W<sup>O</sup>. These are the trainable parameters — none are cached at inference except the latent outputs they produce.</p>
+    <h3 style="margin-top:28px;">Equations 9–11: Latent Cache and Content K/V</h3>
+    <div class="formula">c<sup>KV</sup> = H<sup>t</sup> W<sup>DKV</sup> &nbsp;(9)&nbsp;&nbsp; k<sup>C</sup> = c<sup>KV</sup> W<sup>UK</sup> &nbsp;(10)&nbsp;&nbsp; v = c<sup>KV</sup> W<sup>UV</sup> &nbsp;(11)</div>
+    <p>Equation 9 produces the latent cache. Equations 10–11 up-project to content keys and values. Our whiteboard steps 2–4.</p>
+    <h3 style="margin-top:28px;">Equations 12–13: Content Queries</h3>
+    <div class="formula">c<sup>Q</sup> = H<sup>t</sup> W<sup>DQ</sup> &nbsp;(12)&nbsp;&nbsp; q<sup>C</sup> = c<sup>Q</sup> W<sup>UQ</sup> &nbsp;(13)</div>
+    <p>Query down-projection and up-projection. Whiteboard steps 5–6. No RoPE on q<sup>C</sup>.</p>
+    <h3 style="margin-top:28px;">Equations 14–15: RoPE Queries and Keys</h3>
+    <div class="formula">q<sup>R</sup> = RoPE(c<sup>Q</sup> W<sup>QR</sup>) &nbsp;(14)&nbsp;&nbsp; k<sup>R</sup> = Expand(RoPE(H<sup>t</sup> W<sup>KR</sup>)) &nbsp;(15)</div>
+    <p>RoPE applied after projecting into the positional subspace. Whiteboard steps 7–10. Shared key in (15), per-head queries in (14).</p>
+    <h3 style="margin-top:28px;">Equations 16–18: Attention</h3>
+    <div class="formula">q = [q<sup>C</sup>; q<sup>R</sup>] &nbsp;(16)&nbsp;&nbsp; k = [k<sup>C</sup>; k<sup>R</sup>] &nbsp;(17)</div>
+    <div class="formula">o = softmax(qk<sup>T</sup> / √(d<sub>h</sub>+d<sup>R</sup><sub>h</sub>)) · v &nbsp;(18)</div>
+    <p>Concatenate, compute scores as sum of two bilinear terms, scale, softmax, apply to content values v only. RoPE path affects attention weights, not value content directly.</p>
+    <h3 style="margin-top:28px;">Equation 19: Output Projection</h3>
+    <div class="formula">u<sup>T</sup> = o W<sup>O</sup> &nbsp;(19)</div>
+    <p>Standard output projection to residual stream / logits. Completes the attention block.</p>
+    <div class="callout"><p>When you open the DeepSeek-V3 PDF and see this wall of symbols, use this mapping: <strong>left side of whiteboard = eqs 9–13</strong>, <strong>right side = eqs 14–15</strong>, <strong>concatenation + softmax = eqs 16–18</strong>. The dashed "cache" boxes in the diagram correspond to c<sup>KV</sup> from (9) and k<sup>R</sup> from (15).</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-implementation">
+  <div class="container">
+    <span class="section-num">E</span>
+    <h2>Implementation Sketch — PyTorch Structure</h2>
+    <p>A minimal MLA + RoPE attention module exposes the decoupled structure clearly in code:</p>
+    <div class="code-block"><span class="kw">class</span> <span class="cls">MLAAttention</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, d_model, n_heads, d_c, d_hr):
+        self.w_dkv = nn.Linear(d_model, d_c, bias=<span class="kw">False</span>)
+        self.w_uk  = nn.Linear(d_c, d_model, bias=<span class="kw">False</span>)  <span class="cmt"># per-head in full impl</span>
+        self.w_uv  = nn.Linear(d_c, d_model, bias=<span class="kw">False</span>)
+        self.w_dq  = nn.Linear(d_model, d_c, bias=<span class="kw">False</span>)
+        self.w_uq  = nn.Linear(d_c, d_model, bias=<span class="kw">False</span>)
+        self.w_kr  = nn.Linear(d_model, d_hr, bias=<span class="kw">False</span>)  <span class="cmt"># shared across heads</span>
+        self.w_qr  = nn.Linear(d_c, n_heads * d_hr, bias=<span class="kw">False</span>)
+        self.rope  = RotaryEmbedding(d_hr)
+        self.scale = (d_model // n_heads + d_hr) ** <span class="num">-0.5</span>
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x, c_kv_cache=<span class="kw">None</span>, kr_cache=<span class="kw">None</span>):
+        c_kv = self.w_dkv(x)
+        k_c  = self.w_uk(c_kv)
+        v_c  = self.w_uv(c_kv)
+        c_q  = self.w_dq(x)
+        q_c  = self.w_uq(c_q)
+
+        k_r_base = self.w_kr(x)
+        k_r = self.rope(k_r_base).repeat_interleave(n_heads, dim=-1)  <span class="cmt"># expand</span>
+        q_r = self.rope(self.w_qr(c_q))
+
+        q = torch.cat([q_c, q_r], dim=-1)
+        k = torch.cat([k_c, k_r], dim=-1)
+        scores = (q @ k.transpose(-2,-1)) * self.scale
+        out = F.softmax(scores, dim=-1) @ v_c
+        <span class="kw">return</span> out, c_kv, k_r  <span class="cmt"># return caches for inference</span></div>
+    <p>Production DeepSeek code splits W<sub>UK</sub>, W<sub>UV</sub> per head and fuses operations — but the dataflow matches this skeleton. Inference passes c_kv_cache and kr_cache from prior steps, appending new rows for each generated token.</p>
+    <h3 style="margin-top:28px;">Inference Path with Cache</h3>
+    <div class="code-block"><span class="kw">def</span> <span class="fn">decode_step</span>(x_new, caches, w_absorbed):
+    <span class="cmt"># Path 1: content (absorption)</span>
+    c_new = x_new @ W_DKV
+    q_abs = x_new @ w_absorbed  <span class="cmt"># W_DQ @ W_UQ @ W_UK.T precomputed</span>
+    c_kv  = torch.cat([caches.c_kv, c_new], dim=0)
+    s1 = q_abs @ c_kv.T
+
+    <span class="cmt"># Path 2: RoPE</span>
+    kr_new = expand(rope(x_new @ W_KR))
+    kr = torch.cat([caches.kr, kr_new], dim=0)
+    q_r = rope(x_new @ W_DQ @ W_QR)
+    s2 = q_r @ kr.T
+
+    scores = s1 + s2
+    weights = softmax(scores / sqrt(d_h + d_hr))
+    v_c = c_kv @ W_UV
+    <span class="kw">return</span> weights @ v_c, c_kv, kr</div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-memory-worked">
+  <div class="container">
+    <span class="section-num">F</span>
+    <h2>Memory Formulas — Worked Example at DeepSeek Scale</h2>
+    <p>DeepSeek-V3 uses approximately: L = 61 layers, N = 128 heads, D<sub>H</sub> = 128, D<sub>L</sub> = 512 (= 4×128), D<sub>HR</sub> = 64 (= 128/2). Context S = 100,000 tokens, batch B = 1, fp16 (2 bytes).</p>
+    <h3 style="margin-top:28px;">Multi-Head Attention</h3>
+    <div class="formula">2 × 2 × L × B × S × N × D<sub>H</sub> = 4 × 61 × 100000 × 128 × 128 × 2 bytes</div>
+    <p>= 4 × 61 × 10<sup>5</sup> × 16384 × 2 ≈ <strong>800 GB</strong> (order of magnitude — matches the ~860 KB/token × 10<sup>5</sup> tokens scale cited in DeepSeek materials).</p>
+    <h3 style="margin-top:28px;">MLA + RoPE</h3>
+    <div class="formula">2 × L × B × S × (D<sub>L</sub> + D<sub>HR</sub>) = 2 × 61 × 10<sup>5</sup> × (512 + 64) × 2 bytes</div>
+    <p>= 2 × 61 × 10<sup>5</sup> × 576 × 2 ≈ <strong>14 GB</strong>. Ratio ≈ 800/14 ≈ <strong>57×</strong>.</p>
+    <h3 style="margin-top:28px;">Per-Token Cache Footprint</h3>
+    <table class="data-table">
+      <tr><th>Method</th><th>Bytes / token / layer</th><th>DeepSeek reported</th></tr>
+      <tr><td>MHA</td><td>2 × 2 × N × D<sub>H</sub> = 65536</td><td>~860 KB (incl. all layers)</td></tr>
+      <tr><td>MLA + RoPE</td><td>2 × (D<sub>L</sub> + D<sub>HR</sub>) = 1152</td><td>~34.6 KB (incl. all layers)</td></tr>
+    </table>
+    <p>860 / 34.6 ≈ 24.9× — close to the 25–30× factor DeepSeek plots. The 57× formula compares per-layer single-precision element counts; reported totals include implementation details, layer types (MoE vs dense), and rounding.</p>
+    <p>Section 09 compares MHA, MQA, GQA, MLA, and MLA+RoPE cache sizes. The key distinction for this chapter: MQA/GQA save memory by sharing heads; MLA+RoPE compresses representation while keeping content head diversity — only the small RoPE key subspace shares W<sub>KR</sub>.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-design-rationale">
+  <div class="container">
+    <span class="section-num">G</span>
+    <h2>Design Rationale — Why Each Choice Was Made</h2>
+    <h3 style="margin-top:28px;">Why Decouple Instead of Dropping RoPE?</h3>
+    <p>Basic MLA without RoPE works and compresses well, but DeepSeek's benchmark table shows MLA + RoPE outperforming basic MLA on knowledge and reasoning tasks. RoPE provides relative positional inductive bias that absolute or learned embeddings do not match. The decoupling trick adds minimal cache overhead (D<sub>HR</sub> per token, with D<sub>HR</sub> = D<sub>H</sub>/2) while unlocking RoPE's quality benefits.</p>
+    <h3 style="margin-top:28px;">Why Share K<sub>R</sub> But Not Q<sub>R</sub>?</h3>
+    <p>Positional keys answer "where is this token?" — a scalar location signal shared across heads is sufficient for aligning positions. Positional queries answer "what relative position am I looking for?" — different heads attend at different syntactic/semantic granularities and need distinct positional query patterns. Sharing K<sub>R</sub> saves N<sub>H</sub>× in RoPE cache; not sharing Q<sub>R</sub> preserves head expressivity.</p>
+    <h3 style="margin-top:28px;">Why Query Down-Projection?</h3>
+    <p>Training activations for Q<sub>C</sub> path: storing full (batch × seq × D) query activations is expensive. Down-projecting to D<sub>C</sub>′ first reduces memory during backpropagation. DeepSeek reports this also improves final model quality — possibly by acting as a bottleneck regularizer on query representations.</p>
+    <h3 style="margin-top:28px;">Why Values Only from Content Path?</h3>
+    <p>V<sub>C</sub> carries semantic content retrieved by attention. The RoPE subspace encodes position, not lexical semantics. Adding a V<sub>R</sub> would mix positional artifacts into the retrieved content. Keeping values on the content path ensures attention weights (informed by both content and position scores) select semantic information from V<sub>C</sub> only.</p>
+    <div class="qa-box"><div class="q">Does decoupling increase compute cost?</div>
+    <p>Yes, modestly: extra Q<sub>R</sub>, K<sub>R</sub> projections and RoPE ops per token. But inference is memory-bandwidth bound — reducing cache size (57×) improves throughput more than the extra FLOPs hurt. The RoPE subspace is small (D<sub>HR</sub> = D<sub>H</sub>/2 per head slice, shared on K side).</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-diagram-reading">
+  <div class="container">
+    <span class="section-num">H</span>
+    <h2>Reading the DeepSeek Architecture Diagram</h2>
+    <p>The official MLA diagram in DeepSeek-V2/V3 shows input H<sup>t</sup> at top, branching into query and key/value trees, with concatenation before the attention dot-product. Here is how to read it after this chapter.</p>
+    <h3 style="margin-top:28px;">Query Branch (Left Side of Diagram)</h3>
+    <p>H<sup>t</sup> → W<sup>DQ</sup> → c<sup>Q</sup>. From c<sup>Q</sup>, two paths: (1) W<sup>UQ</sup> → q<sup>C</sup> with no RoPE; (2) W<sup>QR</sup> → RoPE → q<sup>R</sup>. Concatenate q<sup>C</sup> and q<sup>R</sup> → full q. The down-projection box (W<sup>DQ</sup>) appears once — both paths share c<sup>Q</sup>.</p>
+    <h3 style="margin-top:28px;">Key/Value Branch (Right Side)</h3>
+    <p>H<sup>t</sup> → W<sup>DKV</sup> → c<sup>KV</sup> [CACHED]. c<sup>KV</sup> → W<sup>UK</sup> → k<sup>C</sup> and W<sup>UV</sup> → v. Separately: H<sup>t</sup> → W<sup>KR</sup> → RoPE → expand → k<sup>R</sup> [CACHED]. Concatenate k<sup>C</sup> and k<sup>R</sup> → full k.</p>
+    <h3 style="margin-top:28px;">Shaded "Cache During Inference" Regions</h3>
+    <p>Two dashed boxes: around c<sup>KV</sup> and around k<sup>R</sup>. Everything else — q<sup>C</sup>, q<sup>R</sup>, k<sup>C</sup>, v — is computed on-the-fly or derived from cached latents via fixed weights. The dash notation explains why cache memory is D<sub>L</sub> + D<sub>HR</sub>, not 2×N×D<sub>H</sub>.</p>
+    <h3 style="margin-top:28px;">Attention Block Output</h3>
+    <p>Full q and k enter scaled dot-product attention. Output o multiplies softmax weights against v (content values only). o → W<sup>O</sup> → back to residual stream.</p>
+    <div class="callout ok"><p>You should now be able to trace any symbol in the DeepSeek-V3 architecture figure back to a specific matrix multiplication on the whiteboard — and explain why it is or is not cached.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-factory-analogy">
+  <div class="container">
+    <span class="section-num">★</span>
+    <h2>The Warehouse Analogy — Why Decoupling Works</h2>
+    <p>Imagine a warehouse matching customer orders (queries) to packages (keys). Each package carries a <strong>content barcode</strong> and a <strong>shelf location code</strong>. MLA stores compressed SKU codes (C<sub>KV</sub>) instead of full labels; absorption lets orders match against SKUs via a fixed template.</p>
+    <p>RoPE makes location codes position-sensitive — you cannot merge the order template with the SKU decoder because shelf rotation depends on when each package arrived. DeepSeek splits matching into two halves: <strong>content</strong> (Q<sub>C</sub>, K<sub>C</sub> — SKU matching, absorption works) and <strong>location</strong> (Q<sub>R</sub>, K<sub>R</sub> — rotated shelf codes, small K<sub>R</sub> cache). Final score = content match + location match.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-benchmarks">
+  <div class="container">
+    <span class="section-num">★</span>
+    <h2>Benchmark Evidence — Quality Is Not Sacrificed</h2>
+    <p>DeepSeek's technical report includes capability comparisons across MHA, GQA, MQA, and MLA+RoPE ("Ours"). The pattern is consistent: MQA and GQA sacrifice significant quality for memory; MLA+RoPE sits at or above MHA while using a fraction of the KV cache.</p>
+    <p>On MMLU (massive multitask language understanding), CMMLU (Chinese MMLU), and other knowledge benchmarks cited in Appendix D.1, MQA scores substantially below MHA. GQA recovers some ground but remains below MHA on several tasks. MLA+RoPE matches or exceeds MHA — validating that decoupled RoPE adds positional quality without the sharing penalties of MQA/GQA.</p>
+    <p>The KV cache per token chart in the paper shows ~860 KB (MHA) vs ~34.6 KB (MLA) — roughly 25× at the reported configuration. Another comparison in the same figure shows factors of 6–7× depending on layer type and MoE vs dense blocks. The theoretical 57× (4N/9) is the asymptotic ratio for the attention cache in isolation; end-to-end numbers include all layers and implementation constants.</p>
+    <p>DeepSeek's low API pricing is downstream of this architecture: smaller cache → more concurrent users per GPU → lower cost per token. MLA+RoPE is not merely an academic compression trick — it is the economic engine of DeepSeek's inference stack.</p>
+    <div class="comparison">
+      <div class="card"><h3>Without RoPE (basic MLA)</h3><p>Strong compression. Good quality. Weaker positional extrapolation than RoPE models.</p></div>
+      <div class="card card-alt"><h3>With decoupled RoPE</h3><p>Strong compression retained. Quality at MHA level or above. Production config for V3 and R1.</p></div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>DeepSeek-V2 Paper Structure</h2>
+
+<p>The DeepSeek-V2 technical report is the Rosetta Stone for understanding V3's attention block. Section 2.1.2 titled <em>Low-Rank Key-Value Joint Compression</em> presents the foundational MLA architecture. The input hidden state H is projected through W_DKV into a rank-d_c latent space. Keys and values are recovered through separate up-projections W_UK and W_UV, but only the latent c_KV is stored during inference.</p>
+<p>Section 2.1.3, <em>Decoupled Rotary Position Embedding</em>, addresses the elephant in the room: every modern frontier model uses RoPE, but RoPE is provably incompatible with naive KV compression. The authors do not hand-wave this — they state explicitly that W_UK cannot be absorbed into W_Q when rotary encodings sit between them.</p>
+<p>The V2 paper shows both schematics side by side. The basic MLA diagram has a single query path and a single latent KV path. The decoupled diagram adds parallel RoPE branches for q_R and k_R, with concatenation before the attention dot product. If you read V2 first, V3's unified presentation becomes a compression of material you already understand rather than a wall of symbols.</p>
+<p>DeepSeek-R1 inherits this exact attention mechanism from V3. The reinforcement learning training in R1 does not modify the MLA+RoPE structure — it modifies behavior on top of a frozen architectural foundation. Understanding this chapter therefore covers both V3 pretraining and R1 inference.</p>
+
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>The Absorption Trick — Why It Is Lossless</h2>
+
+<p>Absorption is not an approximation. Matrix multiplication is associative: (X W<sub>Q</sub>)(W<sub>UK</sub><sup>T</sup> C<sub>KV</sub><sup>T</sup>) = X (W<sub>Q</sub> W<sub>UK</sub><sup>T</sup>) C<sub>KV</sub><sup>T</sup>. What changes at inference is order of operations, not result.</p>
+<p>RoPE(R<sub>m</sub>(·)) is position-dependent and prevents constant folding of W<sub>Q</sub> and W<sub>UK</sub><sup>T</sup> across the sequence — the core conflict this chapter resolves via decoupling.</p>
+
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>RoPE on Queries and Keys — Pairwise Rotation</h2>
+
+<p>RoPE operates on the last dimension of Q and K, treating consecutive pairs as 2D coordinates. For a vector [x_1, x_2, x_3, x_4, ..., x_{d-1}, x_d], pairs (x_1,x_2), (x_3,x_4), etc. each rotate independently.</p>
+<p>The rotation angle for pair i at position m is m * theta_i where theta_i = 10000^{-2i/d}. Low-index pairs rotate slowly (capture long-range position). High-index pairs rotate quickly (capture fine local position). This frequency spectrum is what gives RoPE its extrapolation behavior.</p>
+<p>When DeepSeek applies RoPE in the decoupled path, it applies only to the D_HR-dimensional subspace — not the full D-dimensional Q and K. With D_HR = D_H/2 = 64 per head slice and N_H = 128 heads, the RoPE subspace is 8192 dimensions total in Q_R and K_R concatenation — but K_R cache stores only D_HR = 64 per token due to head sharing on the key side.</p>
+<p>Preserving dimension through RoPE is critical: ||RoPE(v)|| = ||v||. The rotation is orthonormal. Scaling attention by sqrt(d_h + d_h^R) accounts for the increased total dimension after concatenating content and RoPE subspaces.</p>
+
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Decoupled RoPE — The Concatenation Identity</h2>
+
+<p>Why does Q K^T = Q_C K_C^T + Q_R K_R^T work without cross terms? Because Q_C and Q_R live in disjoint subspaces produced by different projection matrices, and K_C and K_R similarly. The full Q vector is [Q_C; Q_R] and full K is [K_C; K_R].</p>
+<p>Computing [Q_C; Q_R] [K_C; K_R]^T expands to Q_C K_C^T + Q_R K_R^T when cross blocks Q_C K_R^T and Q_R K_C^T are zero — which holds when the projection matrices are constructed so content and RoPE subspaces do not overlap in the naive concatenation layout.</p>
+<p>In implementation, W_UQ projects to content dims and W_QR projects to RoPE dims from the same c_Q — the network learns during training to keep semantic and positional information factored across these branches.</p>
+<p>This is mathematically equivalent to a single attention with structured Q/K, but algorithmically it allows the content block to use absorption while the RoPE block uses explicit caching of k_R.</p>
+
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Whiteboard Dimensions — Complete Reference</h2>
+
+<p>Our pedagogical example uses minimal dimensions so every shape is traceable. Production DeepSeek-V3 scales proportionally:</p>
+<table class="data-table">
+<tr><th>Parameter</th><th>Toy Example</th><th>DeepSeek-V3 Scale</th></tr>
+<tr><td>Tokens S</td><td>4</td><td>up to 128K</td></tr>
+<tr><td>D</td><td>8</td><td>7168 (varies by layer)</td></tr>
+<tr><td>N_H</td><td>2</td><td>128</td></tr>
+<tr><td>D_H</td><td>4</td><td>128</td></tr>
+<tr><td>D_C</td><td>4</td><td>512</td></tr>
+<tr><td>D_HR</td><td>4</td><td>64</td></tr>
+<tr><td>C_KV cache</td><td>4×4</td><td>seq × 512</td></tr>
+<tr><td>K_R cache (effective)</td><td>4×4 stored</td><td>seq × 64</td></tr>
+</table>
+<p>The ratio of content to RoPE dimensions in the concatenated Q/K is D : N_H D_HR = 7168 : 8192 in production — comparable splits, with RoPE carrying roughly half the total Q/K width.</p>
+
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Inference Efficiency — Two Paths, Two Caches</h2>
+
+<p>Each decode step appends one row to C_KV and one row to K_R. No O(S) key recomputation for prior tokens on either path. Path 1 uses absorption: O(D_C) dot product against full cache. Path 2 uses Q_R K_R^T: O(N_H D_HR) — smaller than content path when D_HR is small.</p>
+<p>Compare to naive MLA+RoPE without decoupling: would need O(S * D) key recomputation per step as RoPE rotates all historical keys. At S=100K, that is catastrophic for latency.</p>
+<p>Values V_C are derived from C_KV via W_UV at each step — O(S * D_C * D) but can be optimized by not materializing full V_C when only weighted sum is needed. FlashAttention-style fused kernels combine these operations.</p>
+<p>DeepSeek's inference stack (custom CUDA kernels, expert parallelism) builds on this cache structure. The 57× memory reduction translates directly to more tokens served per GPU hour.</p>
+
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>The 57× Formula — Full Derivation</h2>
+
+<p>Start with bytes per token per layer (fp16, batch=1):</p>
+<div class="formula">MHA: 2 (K+V) × 2 (bytes) × N × D_H = 4 N D_H</div>
+<div class="formula">MLA+RoPE: 2 (bytes) × (D_L + D_HR) = 2 (4 D_H + D_H/2) = 2 × 4.5 D_H = 9 D_H</div>
+<div class="formula">Ratio = 4 N D_H / (9 D_H) = 4N/9</div>
+<p>For N=128: 512/9 ≈ 56.89. Rounding gives ~57×.</p>
+<p>The factor 9 in the denominator is (D_L + D_HR) / D_H = 4.5, times 2 bytes. The factor 4N in the numerator is 2 (K+V) × 2 (bytes) × N / (2 bytes) simplified — or equivalently 2×2×N/2 = 4N when comparing element counts.</p>
+<p>Reported 25× in DeepSeek charts includes all layers (some MoE without full attention), implementation overhead, and possibly different precision. The 57× is the pure attention-cache theoretical ratio — both numbers are correct in context.</p>
+
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Shared K_R vs Per-Head Q_R — Design Deep Dive</h2>
+<p>The asymmetry between shared RoPE keys and per-head RoPE queries is one of the most subtle details in the DeepSeek implementation. Many readers assume both Q_R and K_R are treated identically — they are not.</p>
+<p>W_KR has shape (D × D_HR). Multiplying X (S × D) gives (S × D_HR). After RoPE and head expansion, K_R appears as (S × N_H × D_HR) but only D_HR values per row are unique — the rest are copies. Cache stores the (S × D_HR) unique values.</p>
+<p>W_QR has shape (D_C′ × N_H × D_HR). Multiplying C_Q (S × D_C′) gives (S × N_H × D_HR) directly — each head slice of Q_R is different because W_QR columns partition across heads. No expansion step needed; diversity is built into the weight matrix.</p>
+<p>Intuition: all heads need to know <em>where</em> each token is (shared K_R), but each head asks <em>different positional questions</em> (distinct Q_R). Head 1 might attend locally; head 2 might attend to sentence boundaries — different Q_R patterns enable this while K_R provides common positional landmarks.</p>
+<p>If W_KR were per-head (D × N_H × D_HR), cache would grow to D_C + N_H × D_HR — erasing much of the RoPE-side savings. DeepSeek explicitly chose sharing to keep cache at D_C + D_HR.</p>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Values Only from V_C — Why No V_R</h2>
+<p>Attention output is softmax(scores) · V. In MLA+RoPE, V comes exclusively from the content path: V_C = C_KV W_UV. There is no V_R.</p>
+<p>The RoPE subspace influences <em>where</em> the model looks (attention weights) but not <em>what information</em> is retrieved. Retrieved content is always from the semantic latent cache, up-projected through W_UV.</p>
+<p>If values also split into content and RoPE parts, the output would mix positional artifacts into the residual stream — potentially destabilizing layer normalization and FFN inputs downstream.</p>
+<p>Scores combine content and position: w = softmax(Q_C K_C^T + Q_R K_R^T). Then output = w V_C. Position modulates the weighting; semantics flow through V_C alone. Clean separation of concerns.</p>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Complete PyTorch Forward — Annotated</h2>
+<div class="code-block">
+<span class="kw">def</span> <span class="fn">mla_rope_forward</span>(x, layer, cache=<span class="kw">None</span>):
+    <span class="cmt"># x: (batch, 1, d) during decode OR (batch, seq, d) during prefill</span>
+    c_kv = layer.w_dkv(x)                    <span class="cmt"># → cache append</span>
+    k_c = layer.w_uk(c_kv)                   <span class="cmt"># content keys, no RoPE</span>
+    v_c = layer.w_uv(c_kv)                   <span class="cmt"># values for output</span>
+
+    c_q = layer.w_dq(x)
+    q_c = layer.w_uq(c_q)                    <span class="cmt"># content queries</span>
+
+    k_r = layer.rope(x @ layer.w_kr)         <span class="cmt"># (b,s,d_hr) shared</span>
+    k_r = k_r.repeat_interleave(layer.nh, -1) <span class="cmt"># expand to (b,s,nh*d_hr)</span>
+    q_r = layer.rope(c_q @ layer.w_qr)       <span class="cmt"># per-head RoPE queries</span>
+
+    q = torch.cat([q_c, q_r], dim=-1)
+    k = torch.cat([k_c, k_r], dim=-1)
+    scale = (layer.dh + layer.dhr) ** -0.5
+    scores = (q @ k.transpose(-2,-1)) * scale
+    <span class="kw">if</span> cache.causal: scores = scores.masked_fill(causal_mask, -inf)
+    out = F.softmax(scores, dim=-1) @ v_c
+    <span class="kw">return</span> out, c_kv, k_r[..., :layer.dhr]  <span class="cmt"># store unexpanded k_r</span>
+</div>
+<p>This skeleton matches open-source DeepSeek implementations (e.g. deepseek-v3 inference code). Production code fuses matmuls and uses custom CUDA for cache management.</p>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Reading Equations 16–18 as One Operation</h2>
+<p>Equation 16 concatenates q_C and q_R. Equation 17 concatenates k_C and k_R. Equation 18 performs scaled dot-product attention and multiplies by v. Visually in the paper diagram, these three steps appear as one attention block after the branching converges.</p>
+<p>The scale factor sqrt(d_h + d^R_h) is essential. Without it, concatenating two subspaces of dimensions d_h and d^R_h would increase dot-product variance by factor (d_h + d^R_h)/d_h — softmax would sharpen excessively. DeepSeek generalizes the standard 1/sqrt(d_h) scaling to account for both subspaces contributing to the dot product.</p>
+<p>In our toy example: d_h = 4, d^R_h = 4, scale = 1/sqrt(8) ≈ 0.354. Standard MHA with d_h = 8 would use 1/sqrt(8) as well — same total Q/K width, consistent scaling philosophy.</p>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Chapter Synthesis — From Problem to Solution</h2>
+<p><strong>Problem:</strong> MLA compresses KV cache via absorption. RoPE is position-dependent and breaks absorption. Naive combination forces O(S) key recomputation — defeating MLA's purpose.</p>
+<p><strong>Insight:</strong> Content similarity and positional alignment are separable signals. Split Q and K into content (no RoPE) and position (RoPE) subspaces.</p>
+<p><strong>Mechanism:</strong> Q_C K_C^T uses absorption on C_KV cache. Q_R K_R^T uses cached K_R (D_HR per token). Scores add. Values from V_C only.</p>
+<p><strong>Result:</strong> Cache O(D_L + D_HR) vs O(N D_H). ~57× vs MHA. Quality ≥ MHA. DeepSeek-V3 and R1 production architecture.</p>
+<p>You now possess the full nuts-and-bolts understanding that the DeepSeek paper compresses into one diagram and nineteen equations. Return to the paper — every symbol should now have a name, a shape, and a reason.</p>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Common Pitfalls When Implementing MLA+RoPE</h2>
+<p><strong>Pitfall 1:</strong> Applying RoPE to C_KV or K_C. RoPE belongs only on the RoPE subspace (Q_R, K_R), never on latent cache or content keys.</p>
+<p><strong>Pitfall 2:</strong> Caching full K_R with N_H duplication. Store D_HR per token; expand at matmul time.</p>
+<p><strong>Pitfall 3:</strong> Using single W_Q instead of W_DQ · W_UQ. Breaks training memory optimization and changes absorption to W_DQ · W_UQ · W_UK^T.</p>
+<p><strong>Pitfall 4:</strong> Forgetting to add score paths before softmax. Must compute S = S_C + S_R, not separate softmaxes.</p>
+<p><strong>Pitfall 5:</strong> Scaling by sqrt(d_h) only. Concatenated Q/K have effective dimension d_h + d_h^R — scale must match.</p>
+<p><strong>Pitfall 6:</strong> Materializing full K_C during inference. Use absorption — never store or recompute full content keys.</p>
+<p><strong>Pitfall 7:</strong> Adding V_R. Values come from V_C only. RoPE path has no value projection.</p>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<span class="section-num">◆</span>
+<h2>Full Forward Pass — Pseudocode with Cache Management</h2>
+<div class="code-block">
+<span class="cmt"># ============ PREFILL (process prompt) ============</span>
+<span class="kw">def</span> <span class="fn">prefill</span>(x, weights):
+    c_kv = x @ weights.W_DKV              <span class="cmt"># (S, DC)</span>
+    c_q  = x @ weights.W_DQ               <span class="cmt"># (S, DC')</span>
+    q_c  = c_q @ weights.W_UQ             <span class="cmt"># (S, D)</span>
+    k_c  = c_kv @ weights.W_UK            <span class="cmt"># (S, D)</span>
+    v_c  = c_kv @ weights.W_UV            <span class="cmt"># (S, D)</span>
+    k_r_base = x @ weights.W_KR           <span class="cmt"># (S, DHR)</span>
+    k_r  = expand_heads(apply_rope(k_r_base, positions=0..S-1))
+    q_r  = apply_rope(c_q @ weights.W_QR, positions=0..S-1)
+    q = concat(q_c, q_r, dim=-1)
+    k = concat(k_c, k_r, dim=-1)
+    scores = (q @ k.T) / sqrt(DH + DHR)
+    scores = apply_causal_mask(scores)
+    out = softmax(scores) @ v_c
+    cache = Cache(c_kv=c_kv, k_r=k_r_base)  <span class="cmt"># store unexpanded k_r</span>
+    <span class="kw">return</span> out, cache
+
+<span class="cmt"># ============ DECODE (one new token) ============</span>
+<span class="kw">def</span> <span class="fn">decode_step</span>(x_new, pos, cache, weights):
+    <span class="cmt"># Path 1: content with absorption</span>
+    w_abs = weights.W_DQ @ weights.W_UQ @ weights.W_UK.T
+    q_abs = x_new @ w_abs                 <span class="cmt"># (1, DC)</span>
+    c_new = x_new @ weights.W_DKV         <span class="cmt"># (1, DC)</span>
+    cache.c_kv = append(cache.c_kv, c_new)
+    s1 = q_abs @ cache.c_kv.T             <span class="cmt"># (1, S+1)</span>
+
+    <span class="cmt"># Path 2: RoPE</span>
+    k_r_new = apply_rope(x_new @ weights.W_KR, position=pos)
+    cache.k_r = append(cache.k_r, k_r_new)
+    c_q = x_new @ weights.W_DQ
+    q_r = apply_rope(c_q @ weights.W_QR, position=pos)
+    k_r_full = expand_heads(cache.k_r)
+    s2 = q_r @ k_r_full.T                 <span class="cmt"># (1, S+1)</span>
+
+    scores = (s1 + s2) / sqrt(DH + DHR)
+    weights_attn = softmax(scores)
+    v_c = cache.c_kv @ weights.W_UV
+    out = weights_attn @ v_c
+    <span class="kw">return</span> out, cache
+</div>
+<p>This pseudocode mirrors the whiteboard walkthrough and inference section. Production code batches decode steps, fuses matmuls, and uses paged KV cache allocators — but the dataflow is identical.</p>
+<h3 style="margin-top:28px;">Prefill vs Decode — Cache Behavior</h3>
+<p>During <strong>prefill</strong>, the entire prompt is processed in parallel. C_KV and K_R are computed for all S tokens simultaneously and stored. Absorption can still be used for Q_C K_C^T during prefill, or full Q_C and K_C computed directly — both are equivalent.</p>
+<p>During <strong>decode</strong>, one token arrives per step. Only the new row is appended to caches. Absorption is critical here — without it, each decode step would require O(S) work scaling linearly with context, negating MLA benefits when combined with RoPE.</p>
+<p>DeepSeek serving systems optimize both phases: prefill is compute-bound (parallel matmuls), decode is memory-bandwidth-bound (cache reads). MLA+RoPE shrinks the decode bottleneck by 57× — the primary economic win.</p>
+</div></section>
+
+
+<section class="section fade-in"><div class="container"><div class="qa-box"><div class="q">What breaks if you apply RoPE to C_KV directly?</div><p>C_KV is position-agnostic latent storage. Applying RoPE to it would entangle position into the compressed representation, forcing position-specific latent caches — defeating compression.</p></div></div></section><section class="section fade-in"><div class="container"><div class="qa-box"><div class="q">Can D_HR be zero?</div><p>Then Q_R and K_R are empty — you recover basic MLA without RoPE. DeepSeek finds D_HR = D_H/2 optimal for quality.</p></div></div></section><section class="section fade-in"><div class="container"><div class="qa-box"><div class="q">Is concatenation along features equivalent to separate attentions?</div><p>No — single softmax over combined scores. The decomposition Q_C K_C^T + Q_R K_R^T works because cross terms Q_C K_R^T and Q_R K_C^T are zero when subspaces are orthogonal by construction (different projection matrices).</p></div></div></section><section class="section fade-in"><div class="container"><div class="qa-box"><div class="q">How are subspaces kept separate?</div><p>W_UK and W_QR project from different latent paths into orthogonal-ish learned subspaces. Training learns to factor content vs position.</p></div></div></section><section class="section fade-in"><div class="container"><div class="qa-box"><div class="q">Does this work with multi-head?</div><p>Yes — N_H heads. Content path: per-head W_UK slices. RoPE path: per-head Q_R, shared K_R expanded.</p></div></div></section>
+
+<section class="section fade-in"><div class="container">
+<h3>RoPE on K<sub>R</sub> — Position-by-Position Example</h3>
+<p>For each token in the whiteboard sequence, K<sub>R</sub> applies RoPE at that token's position m. Pair (x<sub>1</sub>, x<sub>2</sub>) rotates by angle m·θ<sub>0</sub>; pair (x<sub>3</sub>, x<sub>4</sub>) rotates by m·θ<sub>1</sub> (with θ<sub>1</sub> ≠ θ<sub>0</sub>). At m=0 ("The"), all angles are zero and RoPE is the identity. At m=1, 2, 3 ("next", "day", "is"), rotations accumulate — the same pre-RoPE projection yields different rotated vectors per position.</p>
+<p>Each rotated (D<sub>HR</sub>=4) vector is replicated across N<sub>H</sub>=2 heads and stored as one row of the K<sub>R</sub> cache (4 floats stored, 8 displayed after expansion). Attention scores between query position q and key position j depend on relative offset (q − j) through the RoPE dot product.</p>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<h3>Implementation Notes</h3>
+<p>Production DeepSeek code fuses W<sub>DKV</sub> projection with cache append operations to minimize memory bandwidth. The explicit matrix forms in this chapter are for clarity; deployed systems apply these optimizations:</p>
+<ul class="dim">
+<li><strong>Fuse W<sub>DQ</sub> and W<sub>UQ</sub></strong> into the absorbed query path at inference time.</li>
+<li><strong>Store K<sub>R</sub> at D<sub>HR</sub></strong>, not N<sub>H</sub>×D<sub>HR</sub>, thanks to head sharing.</li>
+<li><strong>Use FlashAttention</strong> on concatenated Q/K after reconstruction.</li>
+<li><strong>Apply YaRN scaling</strong> to the RoPE subspace for long context in R1.</li>
+</ul>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<h2>Step-by-Step Score Computation — Numeric Template</h2>
+<p>For tokens indexed 0..3 at positions m=0..3, the score matrix S[i,j] = score from query token i to key token j.</p>
+<p><strong>Content component:</strong> S_C = Q_C @ K_C.T. Q_C[i] from C_Q[i] @ W_UQ. K_C[j] from C_KV[j] @ W_UK. Absorption form: S_C[i,j] = (X[i] @ W_abs) @ C_KV[j].</p>
+<p><strong>RoPE component:</strong> S_R = Q_R @ K_R.T. Q_R[i] = RoPE_m(i)(C_Q[i] @ W_QR). K_R[j] = expand(RoPE_m(j)(X[j] @ W_KR)). Relative position (i-j) encoded in dot product.</p>
+<p><strong>Combined:</strong> S = S_C + S_R. Apply causal mask: S[i,j] = -inf if j > i. Scale: S /= sqrt(8). Weights: W = softmax(S, dim=-1). Output[i] = W[i] @ V_C.</p>
+<p>For inference token 4 ("bright"): only row i=4 computed. S[4,:] shape (1×5). Caches provide C_KV (5×4) and K_R (5×8 effective 5×4 unique).</p>
+</div></section>
+
+<section class="section fade-in"><div class="container">
+<h2>DeepSeek-V3 Attention Config Reference</h2>
+<table class="data-table">
+<tr><th>Parameter</th><th>Value</th><th>Role in MLA+RoPE</th></tr>
+<tr><td>Layers</td><td>61 (dense) + MoE</td><td>MLA in every attention layer</td></tr>
+<tr><td>N_H</td><td>128</td><td>Content heads; Q_R per-head</td></tr>
+<tr><td>D_H</td><td>128</td><td>Content head dimension</td></tr>
+<tr><td>D_L (D_C)</td><td>512</td><td>Latent cache width = 4×128</td></tr>
+<tr><td>D_HR</td><td>64</td><td>RoPE subspace = 128/2</td></tr>
+<tr><td>Cache/token/layer</td><td>1152 bytes</td><td>2×(512+64) fp16</td></tr>
+<tr><td>vs MHA</td><td>65536 bytes</td><td>2×2×128×128 fp16</td></tr>
+<tr><td>Ratio</td><td>~57×</td><td>65536/1152</td></tr>
+</table>
+<p>These production values explain DeepSeek's inference cost advantage. At 128K context, efficient cache structure is the difference between serving thousands vs dozens of concurrent users per GPU.</p>
+    <p>Memory bandwidth on A100 is ~1.9 TB/s vs ~19.5 TFLOPS compute — a 10× imbalance. Reducing cache bytes moved per decode step directly increases throughput, which is why MLA+RoPE is an engineering win beyond theoretical FLOPs savings.</p>
+<p>DeepSeek-V3 reports 34.6 KB KV cache per token vs 860 KB for MHA-equivalent — enabling long-context serving at scale. The architecture diagram in the paper, once decoded via this chapter, shows exactly two cached tensors: c_KV and k_R.</p>
+<p>This completes the numeric picture: theoretical 57× from 4N/9, empirical 25× from reported KB/token, both confirming MLA+RoPE as the production attention mechanism for DeepSeek-V3 and R1.</p>
+</div></section>
+
+
+<section class="section fade-in" id="s-inference-deep">
+  <div class="container">
+    <span class="section-num">I</span>
+    <h2>Inference Deep Dive — Token "bright" Step by Step</h2>
+    <p>Prefix after four tokens: <em>The next day is</em>. Caches: C<sub>KV</sub> is (4×4), K<sub>R</sub> is (4×8). New token "bright" arrives as the fifth token at position index 4 (0-based). Every operation below uses our toy dimensions D=8, D<sub>C</sub>=4, D<sub>HR</sub>=4, N<sub>H</sub>=2.</p>
+    <h3 style="margin-top:28px;">Step A — Embed the New Token</h3>
+    <p>x<sub>bright</sub> = Embedding("bright") + positional component if using learned pos (RoPE applied later in attention, not here). Shape: (1×8).</p>
+    <h3 style="margin-top:28px;">Step B — Path 1: Content Attention Scores</h3>
+    <p><strong>B1.</strong> Compute absorbed query: q<sub>abs</sub> = x · W<sub>DQ</sub> · W<sub>UQ</sub> · W<sub>UK</sub><sup>T</sup>. Shapes: (1×8)·(8×4)·(4×8)·(8×4) — wait, W<sub>UK</sub><sup>T</sup> maps from D to D<sub>C</sub>, so absorbed path is (1×8)·(8×4)·(4×8) for W<sub>DQ</sub>·W<sub>UQ</sub> giving (1×8), then · W<sub>UK</sub><sup>T</sup> (8×4) → (1×4). Correct final: (1×4).</p>
+    <p><strong>B2.</strong> Compute new latent row: c<sub>new</sub> = x · W<sub>DKV</sub> → (1×4).</p>
+    <p><strong>B3.</strong> Append to cache: C<sub>KV</sub> goes from (4×4) to (5×4).</p>
+    <p><strong>B4.</strong> Scores path 1: s<sub>1</sub> = q<sub>abs</sub> · C<sub>KV</sub><sup>T</sup> → (1×4)·(4×5) = (1×5). Entry s<sub>1</sub>[0,4] is "bright attends to bright"; s<sub>1</sub>[0,0] is "bright attends to The", etc.</p>
+    <h3 style="margin-top:28px;">Step C — Path 2: RoPE Attention Scores</h3>
+    <p><strong>C1.</strong> k<sub>r,base</sub> = x · W<sub>KR</sub> → (1×8)·(8×4) = (1×4).</p>
+    <p><strong>C2.</strong> Apply RoPE at position 4: rotate pairs in the (1×4) vector using angle 4θ<sub>i</sub> for each pair i.</p>
+    <p><strong>C3.</strong> Expand across heads: replicate the (1×4) vector twice → (1×8). This is k<sub>r,new</sub>.</p>
+    <p><strong>C4.</strong> Append to K<sub>R</sub> cache: (4×8) → (5×8).</p>
+    <p><strong>C5.</strong> Compute Q<sub>R</sub>: c<sub>q</sub> = x · W<sub>DQ</sub> → (1×4). q<sub>r,pre</sub> = c<sub>q</sub> · W<sub>QR</sub> → (1×8). q<sub>R</sub> = RoPE(q<sub>r,pre</sub>) at position 4 → (1×8).</p>
+    <p><strong>C6.</strong> s<sub>2</sub> = q<sub>R</sub> · K<sub>R</sub><sup>T</sup> → (1×8)·(8×5) = (1×5).</p>
+    <h3 style="margin-top:28px;">Step D — Combine, Softmax, Output</h3>
+    <p><strong>D1.</strong> s = s<sub>1</sub> + s<sub>2</sub> element-wise → (1×5).</p>
+    <p><strong>D2.</strong> Apply causal mask if any future positions existed (none here — all five are past/current).</p>
+    <p><strong>D3.</strong> w = softmax(s / √8) → (1×5).</p>
+    <p><strong>D4.</strong> V<sub>C</sub> = C<sub>KV</sub> · W<sub>UV</sub> → (5×4)·(4×8) = (5×8).</p>
+    <p><strong>D5.</strong> context = w · V<sub>C</sub> → (1×5)·(5×8) = (1×8). This is the context vector for "bright".</p>
+    <p><strong>D6.</strong> Feed context through FFN, output head → logits → argmax → next token prediction.</p>
+    <div class="callout"><p>Notice: we never stored full K<sub>C</sub> or V<sub>C</sub> in cache. We stored C<sub>KV</sub> (4 floats per token) and K<sub>R</sub> (4 effective floats per token due to head sharing). Total 8 floats/tok/layer vs MHA's 2×N×D<sub>H</sub> = 2×2×4 = 16 floats/tok/layer in toy dims — or 2×128×128 = 32768 in production.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-glossary">
+  <div class="container">
+    <span class="section-num">K</span>
+    <h2>Glossary — Every Symbol in the DeepSeek Paper</h2>
+    <table class="data-table" style="text-align:left;">
+      <tr><th>Symbol</th><th>Name</th><th>Typical DeepSeek-V3 Value</th><th>Description</th></tr>
+      <tr><td>H<sup>t</sup> or X</td><td>Hidden states</td><td>(seq × 7168)</td><td>Input to attention layer at step t</td></tr>
+      <tr><td>d or D</td><td>Model dimension</td><td>7168 (MoE layers vary)</td><td>Full embedding width</td></tr>
+      <tr><td>n<sub>h</sub> or N<sub>H</sub></td><td>Number of heads</td><td>128</td><td>Attention head count</td></tr>
+      <tr><td>d<sub>h</sub> or D<sub>H</sub></td><td>Head dimension</td><td>128 (= D/N<sub>H</sub> in many configs)</td><td>Content subspace per head</td></tr>
+      <tr><td>d<sub>c</sub> or D<sub>C</sub></td><td>Latent rank</td><td>512 (= 4×128)</td><td>MLA compression dimension</td></tr>
+      <tr><td>d′<sub>c</sub></td><td>Query latent rank</td><td>512</td><td>Query down-projection width</td></tr>
+      <tr><td>d<sup>R</sup><sub>h</sub> or D<sub>HR</sub></td><td>RoPE head dim</td><td>64 (= 128/2)</td><td>Positional subspace per head</td></tr>
+      <tr><td>c<sup>KV</sup></td><td>Latent KV</td><td>(seq × 512)</td><td>Cached compressed representation</td></tr>
+      <tr><td>q<sup>C</sup>, k<sup>C</sup></td><td>Content Q/K</td><td>No RoPE</td><td>Semantic similarity subspace</td></tr>
+      <tr><td>q<sup>R</sup>, k<sup>R</sup></td><td>RoPE Q/K</td><td>RoPE applied</td><td>Positional alignment subspace</td></tr>
+      <tr><td>W<sup>DKV</sup></td><td>Down-project KV</td><td>(D × D<sub>C</sub>)</td><td>Input → latent cache</td></tr>
+      <tr><td>W<sup>UK</sup>, W<sup>UV</sup></td><td>Up-project K/V</td><td>(D<sub>C</sub> × D)</td><td>Latent → content K/V</td></tr>
+      <tr><td>W<sup>DQ</sup>, W<sup>UQ</sup></td><td>Query proj.</td><td>Down then up</td><td>Replaces single W<sup>Q</sup></td></tr>
+      <tr><td>W<sup>KR</sup></td><td>RoPE key proj.</td><td>(D × D<sub>HR</sub>)</td><td>Shared across heads</td></tr>
+      <tr><td>W<sup>QR</sup></td><td>RoPE query proj.</td><td>(D<sub>C</sub>′ × N<sub>H</sub>D<sub>HR</sub>)</td><td>Per-head columns</td></tr>
+      <tr><td>RoPE(·)</td><td>Rotation</td><td>Position-dependent</td><td>Rotates dimension pairs by mθ</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-0">
+  <div class="container">
+    <div class="qa-box"><div class="q">Can you use YaRN or other RoPE extensions with MLA+RoPE?</div><p>Yes — RoPE extensions modify the θ schedule or apply scaling to the RoPE subspace. They apply to Q_R and K_R the same as standard RoPE. The content path Q_C/K_C is unaffected.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-1">
+  <div class="container">
+    <div class="qa-box"><div class="q">Does MLA+RoPE work with FlashAttention?</div><p>Yes. Concatenated Q and K can be passed to fused attention kernels. Cache stores compressed c_KV and k_R separately; kernels reconstruct or use decomposed scores depending on implementation.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-2">
+  <div class="container">
+    <div class="qa-box"><div class="q">Why not use ALiBi instead of RoPE with MLA?</div><p>ALiBi adds position bias to attention scores without rotating Q/K. It might avoid the absorption conflict — but DeepSeek chose RoPE for empirical performance. ALiBi+MLA is unexplored in their papers.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-3">
+  <div class="container">
+    <div class="qa-box"><div class="q">Is W_UK different per head?</div><p>Yes on the content path. Each head has its own slice of W_UK and W_UV. Only W_KR is shared on the RoPE key path.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-4">
+  <div class="container">
+    <div class="qa-box"><div class="q">What happens at context lengths beyond training?</div><p>RoPE subspace handles length extrapolation (especially with YaRN in R1). Content path behaves like standard MLA — cache grows linearly with D_C + D_HR per token regardless of length.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-5">
+  <div class="container">
+    <div class="qa-box"><div class="q">How does batching affect cache?</div><p>Cache shape includes batch dimension B. Each sequence in batch has independent C_KV and K_R caches. Memory formula: 2 × L × B × S × (D_L + D_HR).</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-6">
+  <div class="container">
+    <div class="qa-box"><div class="q">Is the absorption trick used at training time?</div><p>Yes — training computes gradients through W_DQ, W_UQ, W_UK normally. Absorption is an inference optimization that precomputes W_DQ·W_UQ·W_UK^T for faster decode.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-7">
+  <div class="container">
+    <div class="qa-box"><div class="q">Why 4× head dim for D_L?</div><p>Empirical choice in DeepSeek-V2/V3. Provides enough latent capacity to preserve MHA-level quality while staying much smaller than N×D_H. Ablation in paper shows performance sensitive to D_C rank.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-8">
+  <div class="container">
+    <div class="qa-box"><div class="q">Does DeepSeek-R1 use the same MLA+RoPE?</div><p>Yes. R1 builds on V3 architecture with reinforcement learning — the attention mechanism including decoupled RoPE is inherited from V3.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-faq-9">
+  <div class="container">
+    <div class="qa-box"><div class="q">What's the FLOPs overhead of the RoPE path?</div><p>Two extra projections (W_QR, W_KR) and RoPE rotations on D_HR dims — O(S·D·D_HR) vs content path O(S·D·D_C). D_HR << D, so overhead is small relative to FFN and MoE layers.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-checklist">
+  <div class="container">
+    <span class="section-num">L</span>
+    <h2>Mastery Checklist</h2>
+    <div class="card card-alt">
+      <p style="color:var(--text);margin-bottom:12px;"><strong>After this chapter, you should be able to:</strong></p>
+      <ul class="dim">
+        <li>Explain why R_pos blocks W_Q · W_UK^T absorption</li>
+        <li>Write the decoupled score decomposition Q_C K_C^T + Q_R K_R^T</li>
+        <li>Trace all whiteboard matrix shapes for the 4-token example</li>
+        <li>Identify what is cached (C_KV and K_R) vs computed fresh</li>
+        <li>Explain why K_R is shared but Q_R is per-head</li>
+        <li>Derive the 4N/9 ≈ 57× memory ratio for N=128</li>
+        <li>Map paper equations 9–19 to implementation steps</li>
+        <li>Walk through inference when a fifth token arrives</li>
+        <li>Compare MHA/MQA/GQA/MLA/MLA+RoPE on memory and quality</li>
+        <li>Read the DeepSeek architecture diagram without confusion</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-extended-glossary">
+  <div class="container">
+    <span class="section-num">P</span>
+    <h2>Extended Glossary — Implementation Terms</h2>
+    <table class="data-table" style="text-align:left;font-size:0.8rem;">
+      <tr><th>Term</th><th>Definition</th></tr>
+      <tr><td>Absorption trick</td><td>Inference optimization: pre-multiply W_Q and W_UK^T (or W_DQ W_UQ W_UK^T) into single matrix so attention scores need only latent cache dot product</td></tr>
+      <tr><td>C_KV / c_KV</td><td>Latent compressed representation cached per token; shape (seq, D_C)</td></tr>
+      <tr><td>Content path</td><td>Q_C, K_C, V_C branch without RoPE; supports absorption</td></tr>
+      <tr><td>Decoupled RoPE</td><td>DeepSeek's separation of RoPE into dedicated Q_R/K_R subspace concatenated with content Q/K</td></tr>
+      <tr><td>D_C / d_c / D_L</td><td>Latent compression rank; DeepSeek uses 4× head dim = 512</td></tr>
+      <tr><td>D_HR / d^R_h</td><td>RoPE subspace dimension per head slice; DeepSeek uses D_H/2 = 64</td></tr>
+      <tr><td>expand_heads</td><td>Replicate shared K_R across N_H heads for attention matmul</td></tr>
+      <tr><td>K_R cache</td><td>Stored rotated keys at D_HR per token (not N_H×D_HR due to sharing)</td></tr>
+      <tr><td>Low-rank KV joint compression</td><td>DeepSeek-V2 §2.1.2 name for basic MLA before RoPE integration</td></tr>
+      <tr><td>MLA</td><td>Multi-Head Latent Attention — DeepSeek's KV compression mechanism</td></tr>
+      <tr><td>MLA+RoPE</td><td>Production DeepSeek attention: MLA with decoupled rotary embeddings</td></tr>
+      <tr><td>Position path</td><td>Q_R, K_R branch with RoPE; requires K_R cache</td></tr>
+      <tr><td>Prefill</td><td>Processing full prompt in parallel; populate initial caches</td></tr>
+      <tr><td>Decode</td><td>Autoregressive single-token generation; append to caches each step</td></tr>
+      <tr><td>RoPE</td><td>Rotary Positional Embedding — rotate Q/K dimension pairs by position-dependent angles</td></tr>
+      <tr><td>Shared K_R</td><td>Single W_KR across heads; reduces cache from N_H×D_HR to D_HR per token</td></tr>
+      <tr><td>W_DKV</td><td>Down-projection matrix: hidden → latent cache space</td></tr>
+      <tr><td>W_DQ / W_UQ</td><td>Query down/up projection replacing monolithic W_Q in DeepSeek-V3</td></tr>
+      <tr><td>W_KR</td><td>RoPE key projection; shared across heads; shape (D, D_HR)</td></tr>
+      <tr><td>W_QR</td><td>RoPE query projection from C_Q; per-head; shape (D_C', N_H×D_HR)</td></tr>
+      <tr><td>W_UK / W_UV</td><td>Up-project latent to content keys and values; per-head in full impl</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-numeric-57">
+  <div class="container">
+    <span class="section-num">N</span>
+    <h2>Numeric Walkthrough — 57× Memory Ratio</h2>
+    <p>Let D_H = 128, N = 128. MHA cache per token per layer (K and V, fp16):</p>
+    <p>2 matrices × 2 bytes × 128 heads × 128 dims = <strong>65,536 bytes = 64 KB</strong> per token per layer.</p>
+    <p>MLA+RoPE with D_L = 4×128 = 512, D_HR = 64:</p>
+    <p>2 bytes × (512 + 64) = <strong>1,152 bytes ≈ 1.1 KB</strong> per token per layer.</p>
+    <p>Ratio: 65536 / 1152 = <strong>56.89 ≈ 57×</strong>.</p>
+    <p>Over 61 layers and 100K context (ignoring batch): MHA ≈ 64KB × 61 × 100K ≈ 390 GB. MLA+RoPE ≈ 1.1KB × 61 × 100K ≈ 6.7 GB. Same ratio.</p>
+    <p>DeepSeek reports ~860 KB vs ~34.6 KB per token aggregate — includes all layers, MoE routing, and implementation details. The 25× figure is an end-to-end measured ratio; 57× is the attention-theoretic ratio. Both validate massive savings.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-history">
+  <div class="container">
+    <span class="section-num">O</span>
+    <h2>Historical Context — V2 to V3 to R1</h2>
+    <p>DeepSeek-V2 (2024) introduced MLA with decoupled RoPE in Section 2.1.2–2.1.3. The model demonstrated that frontier-quality LLMs could run with dramatically reduced inference cost. V2 was the proof of concept.</p>
+    <p>DeepSeek-V3 scaled MLA+RoPE to 671B total parameters (37B active per token with MoE), 128K context, and competitive benchmark scores against GPT-4 and Claude. The attention block in V3 is the advanced MLA+RoPE form — no separate basic MLA mode.</p>
+    <p>DeepSeek-R1 (2025) applied reinforcement learning (GRPO) on top of V3 base models. R1's reasoning capabilities come from post-training — the attention architecture including decoupled RoPE is inherited unchanged. Efficient inference enables affordable RL rollouts at scale.</p>
+    <p>Understanding this chapter is prerequisite for reading any DeepSeek open-source inference codebase, the V3 technical report architecture section, and derivative implementations in the community.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Playground — Scale the Cache Yourself</h2>
+    <div class="interactive-panel">
+      <h4>Interactive · MLA+RoPE Cache Calculator</h4>
+      <div class="two-col">
+        <div class="slider-container"><label>Layers (L): <span class="slider-value" id="pgLv">61</span></label><input type="range" id="pgL" min="1" max="80" value="61"></div>
+        <div class="slider-container"><label>Context (S): <span class="slider-value" id="pgSv">100000</span></label><input type="range" id="pgS" min="1000" max="128000" step="1000" value="100000"></div>
+        <div class="slider-container"><label>Heads (N): <span class="slider-value" id="pgNv">128</span></label><input type="range" id="pgN" min="8" max="128" step="8" value="128"></div>
+        <div class="slider-container"><label>D<sub>H</sub>: <span class="slider-value" id="pgHv">128</span></label><input type="range" id="pgH" min="64" max="256" step="64" value="128"></div>
+      </div>
+      <div class="output-readout" id="pgOut"></div>
+    </div>
+    <h3 style="margin-top:28px;">Complete Variable Reference</h3>
+    <table class="data-table">
+      <tr><th>Symbol</th><th>DeepSeek Paper Name</th><th>Role</th></tr>
+      <tr><td>D</td><td>d</td><td>Model hidden dimension</td></tr>
+      <tr><td>D<sub>C</sub></td><td>d<sub>c</sub></td><td>Latent compression rank (KV cache width)</td></tr>
+      <tr><td>D<sub>C</sub>′</td><td>d′<sub>c</sub></td><td>Query down-projection rank</td></tr>
+      <tr><td>D<sub>H</sub></td><td>d<sub>h</sub></td><td>Content head dimension</td></tr>
+      <tr><td>D<sub>HR</sub></td><td>d<sup>R</sup><sub>h</sub></td><td>RoPE subspace head dimension</td></tr>
+      <tr><td>N<sub>H</sub></td><td>n<sub>h</sub></td><td>Number of attention heads</td></tr>
+      <tr><td>W<sub>DKV</sub></td><td>W<sup>DKV</sup></td><td>Down-project to latent C<sub>KV</sub></td></tr>
+      <tr><td>W<sub>UK</sub>, W<sub>UV</sub></td><td>W<sup>UK</sup>, W<sup>UV</sup></td><td>Up-project latent to K<sub>C</sub>, V<sub>C</sub></td></tr>
+      <tr><td>W<sub>DQ</sub>, W<sub>UQ</sub></td><td>W<sup>DQ</sup>, W<sup>UQ</sup></td><td>Query down/up projection</td></tr>
+      <tr><td>W<sub>KR</sub></td><td>W<sup>KR</sup></td><td>RoPE key projection (shared across heads)</td></tr>
+      <tr><td>W<sub>QR</sub></td><td>W<sup>QR</sup></td><td>RoPE query projection (per head)</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="section fade-in" id="s-summary">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Summary — The Complete Picture</h2>
+    <p>Multi-head latent attention compresses the KV cache via the absorption trick: W<sub>Q</sub>·W<sub>UK</sub><sup>T</sup> merges at train time, leaving only C<sub>KV</sub> = X·W<sub>DKV</sub> to cache. Rotary positional embeddings are position-dependent and sit between those matrices if applied naively — destroying absorption and forcing full key recomputation.</p>
+    <p>DeepSeek's decoupled RoPE solves this by splitting attention into two parallel paths:</p>
+    <ol class="dim">
+      <li><strong>Content path (Q<sub>C</sub>, K<sub>C</sub>, V<sub>C</sub>):</strong> No RoPE. Full MLA compression. Cache C<sub>KV</sub>.</li>
+      <li><strong>Position path (Q<sub>R</sub>, K<sub>R</sub>):</strong> RoPE injected. Small D<sub>HR</sub> subspace. Cache K<sub>R</sub> (shared across heads).</li>
+    </ol>
+    <p>Scores add: S = Q<sub>C</sub>K<sub>C</sub><sup>T</sup> + Q<sub>R</sub>K<sub>R</sub><sup>T</sup>. Scale by √(D<sub>H</sub>+D<sub>HR</sub>). Softmax. Multiply V<sub>C</sub>. The result: ~57× smaller cache than MHA with equivalent or superior benchmark performance — the architectural foundation that makes DeepSeek-V3 and R1 inference-efficient at frontier quality.</p>
+    <div class="flow">
+      <div class="flow-step">Problem: RoPE breaks MLA absorption</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Insight: decouple content and position into separate Q/K subspaces</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Implementation: 19 equations, 2 caches (C<sub>KV</sub> + K<sub>R</sub>)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Result: best of both worlds — compression + positional quality</div>
+    </div>
+    <div class="callout ok"><p>You can now read DeepSeek-V3's architecture section equations 1–19, interpret the MLA diagram's shaded cache regions, and explain exactly why D<sub>L</sub> + D<sub>HR</sub> appears in the memory formula. The position problem is solved.</p></div>
+    <h3 style="margin-top:28px;">Related Chapters in Decoding DeepSeek</h3>
+    <div class="flow">
+      <div class="flow-step"><a href="../04-the-cache-chronicles/">Chapter 04</a> — KV cache, MQA, GQA: why compression was needed</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Chapter 05–06 — Multi-Head Latent Attention foundations</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step"><strong>Chapter 07 (this chapter)</strong> — MLA + RoPE: decoupled positional encoding</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Chapter 08+ — Mixture of Experts, multi-token prediction</div>
+    </div>
+    <p>The arc from KV cache pain to MLA+RoPE resolution is the central engineering story of DeepSeek-V3. This chapter is the climax of the attention compression narrative — everything before motivates it; everything after builds on an efficient inference foundation.</p>
+    <div class="card card-alt">
+      <p style="color:var(--text);margin:0;"><strong>Key formulas to remember:</strong><br>
+      Q·K<sup>T</sup> = Q<sub>C</sub>K<sub>C</sub><sup>T</sup> + Q<sub>R</sub>K<sub>R</sub><sup>T</sup><br>
+      Cache per token = D<sub>L</sub> + D<sub>HR</sub> (fp16: 2× bytes)<br>
+      MHA/MLA+RoPE = 4N/9 ≈ 57× for N=128<br>
+      Scale = 1/√(D<sub>H</sub> + D<sub>HR</sub>)</p>
+    </div>
+    <h3 style="margin-top:28px;">Serve Locally</h3>
+    <p>Open this chapter in any browser. From the chapter directory:</p>
+    <div class="code-block">python3 -m http.server 8765</div>
+    <p>Then visit <code style="font-family:var(--mono);color:var(--accent);">http://localhost:8765/</code>. All CSS and JavaScript are inlined — no build step required.</p>
+    <div class="qa-box"><div class="q">What should I read next in the DeepSeek paper?</div>
+    <p>Return to DeepSeek-V3 Section 2 (Architecture) with this chapter open. Map each equation to the whiteboard steps. Then proceed to Mixture of Experts (MoE) — the next major DeepSeek innovation where routing and MLA+RoPE interact in the full forward pass.</p></div>
+    <h3 style="margin-top:28px;">References</h3>
+    <ul class="dim">
+      <li>DeepSeek-AI (2024). DeepSeek-V2 Technical Report — Sections 2.1.2, 2.1.3</li>
+      <li>DeepSeek-AI (2024). DeepSeek-V3 Technical Report — Architecture, Appendix D.1</li>
+      <li>Su et al. (2021). RoFormer: Enhanced Transformer with Rotary Position Embedding</li>
+      <li>Shazeer (2019). Fast Transformer Decoding: One Write-Head is All You Need (MQA)</li>
+      <li>Ainslie et al. (2023). GQA: Training Generalized Multi-Query Transformer Models</li>
+      <li>DeepSeek-AI (2025). DeepSeek-R1 — inherits V3 MLA+RoPE architecture</li>
+    </ul>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin-top:16px;">Chapter complete. You understand MLA + RoPE end to end.</p>
+  </div>
+</section>
+
+
+<footer class="footer">
+  <p>Decoding DeepSeek · Chapter 07 · MLA Meets RoPE</p>
+  <p style="margin-top:8px;">How DeepSeek Solved the Position Problem — decoupled RoPE, two-part keys, and 57× KV cache compression.</p>
+  <p style="margin-top:8px;"><a href="../">← Back to Decoding DeepSeek</a> · <a href="../../">All Learning Blogs</a> · <a href="https://llamasearch.dev/">The Context Window</a></p>
+</footer>
+
+<script>
+
+// Fade-in on scroll
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.08 });
+document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+
+// Nav visibility
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+
+// ============================================================
+// DEMO 1: Absorption vs RoPE Conflict
+// ============================================================
+const conflictCanvas = document.getElementById('conflictCanvas');
+const conflictCtx = conflictCanvas.getContext('2d');
+let conflictMode = 'mla';
+
+function drawConflict() {
+  const c = conflictCanvas, ctx = conflictCtx;
+  const w = c.width, h = c.height;
+  ctx.clearRect(0, 0, w, h);
+  const blocks = conflictMode === 'mla'
+    ? [{x:40,y:80,w:70,h:40,l:'X',c:'#6c8cff'},{x:130,y:80,w:70,h:40,l:'W_DKV^T',c:'#a78bfa'},{x:220,y:80,w:70,h:40,l:'Cache',c:'#34d399'}]
+    : [{x:30,y:60,w:55,h:35,l:'R(X)',c:'#f472b6'},{x:100,y:60,w:55,h:35,l:'W_Q',c:'#6c8cff'},{x:170,y:60,w:55,h:35,l:'R_pos',c:'#f87171'},{x:240,y:60,w:55,h:35,l:'W_UK^T',c:'#a78bfa'},{x:310,y:60,w:55,h:35,l:'R_pos',c:'#f87171'}];
+  ctx.font = '13px monospace';
+  ctx.fillStyle = '#8888a0';
+  ctx.fillText(conflictMode === 'mla' ? 'MLA: absorption works — single cache' : 'Naive MLA+RoPE: R_pos blocks absorption', 20, 30);
+  blocks.forEach(b => {
+    ctx.fillStyle = b.c + '33'; ctx.strokeStyle = b.c; ctx.lineWidth = 2;
+    ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = b.c; ctx.textAlign = 'center';
+    ctx.fillText(b.l, b.x + b.w/2, b.y + b.h/2 + 5);
+  });
+  if (conflictMode === 'rope') {
+    ctx.strokeStyle = '#f87171'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(155,95); ctx.lineTo(195,95); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f87171'; ctx.fillText('BLOCKS', 175, 120);
+  } else {
+    ctx.fillStyle = '#34d399'; ctx.fillText('✓ W_Q·W_UK^T absorbed at train time', 40, 160);
+  }
+  document.getElementById('conflictReadout').textContent = conflictMode === 'mla'
+    ? 'Standard MLA: attention scores = (X·W_DKV^T) · (W_Q·W_UK^T)^T. Only latent cache X·W_DKV^T stored.'
+    : 'Naive RoPE injection: R_pos(X·W_Q) · (R_pos(X·W_UK))^T. Position-dependent R_pos prevents matrix absorption. Keys must be recomputed every step.';
+}
+document.querySelectorAll('.conflict-btn').forEach(b => {
+  b.onclick = () => { document.querySelectorAll('.conflict-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); conflictMode = b.dataset.m; drawConflict(); };
+});
+drawConflict();
+
+// ============================================================
+// DEMO 2: Decoupled Key Structure Explorer
+// ============================================================
+function updateDecoupled() {
+  const d = +document.getElementById('dSlider').value;
+  const dh = +document.getElementById('dhSlider').value;
+  const dhr = +document.getElementById('dhrSlider').value;
+  const nh = +document.getElementById('nhSlider').value;
+  document.getElementById('dVal').textContent = d;
+  document.getElementById('dhVal').textContent = dh;
+  document.getElementById('dhrVal').textContent = dhr;
+  document.getElementById('nhVal').textContent = nh;
+  const kcDim = d;
+  const krDim = nh * dhr;
+  const qFull = d + krDim;
+  const kFull = d + krDim;
+  document.getElementById('decReadout').innerHTML =
+    `<strong>Q</strong> = concat(Q<sub>C</sub>, Q<sub>R</sub>): ${d} + ${krDim} = <strong>${qFull}</strong><br>` +
+    `<strong>K</strong> = concat(K<sub>C</sub>, K<sub>R</sub>): ${d} + ${krDim} = <strong>${kFull}</strong><br>` +
+    `Scale factor: √(d<sub>h</sub> + d<sub>hr</sub>) = √(${dh} + ${dhr}) = <strong>${Math.sqrt(dh+dhr).toFixed(2)}</strong>`;
+  const c = document.getElementById('decCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const total = qFull;
+  const qcW = (d/total)*c.width;
+  const qrW = c.width - qcW;
+  ctx.fillStyle = 'rgba(52,211,153,0.4)'; ctx.fillRect(0,40,qcW,60);
+  ctx.fillStyle = 'rgba(244,114,182,0.4)'; ctx.fillRect(qcW,40,qrW,60);
+  ctx.strokeStyle = '#888'; ctx.strokeRect(0,40,c.width,60);
+  ctx.fillStyle = '#e0e0e8'; ctx.font='12px monospace'; ctx.textAlign='center';
+  ctx.fillText(`Q_C (${d})`, qcW/2, 75);
+  ctx.fillText(`Q_R (${krDim})`, qcW+qrW/2, 75);
+  ctx.fillText('Full Query Vector', c.width/2, 25);
+}
+['dSlider','dhSlider','dhrSlider','nhSlider'].forEach(id =>
+  document.getElementById(id).oninput = updateDecoupled);
+updateDecoupled();
+
+// ============================================================
+// DEMO 3: Whiteboard Step Animator
+// ============================================================
+const wbSteps = [
+  'Input X (4×8): tokens [The, next, day, is]',
+  'CKV = X · W_DKV → latent cache (4×4), DC=4',
+  'K_C = CKV · W_UK (4×8), V_C = CKV · W_UV (4×8)',
+  'C_Q = X · W_DQ (4×4), Q_C = C_Q · W_UQ (4×8)',
+  'K_R base = X · W_KR (4×4), apply RoPE, expand → K_R (4×8)',
+  'Q_R = RoPE(C_Q · W_QR) → (4×8)',
+  'Scores = Q_C·K_C^T + Q_R·K_R^T → (4×4), scale ÷√8, softmax',
+  'Output = softmax(scores) · V_C → context (4×8)'
+];
+let wbIdx = 0;
+function renderWB() {
+  document.querySelectorAll('.wb-dot').forEach((d,i) => {
+    d.classList.remove('active','done');
+    if (i < wbIdx) d.classList.add('done');
+    if (i === wbIdx) d.classList.add('active');
+  });
+  document.getElementById('wbReadout').textContent = wbSteps[wbIdx];
+}
+document.getElementById('wbPrev').onclick = () => { wbIdx = Math.max(0, wbIdx-1); renderWB(); };
+document.getElementById('wbNext').onclick = () => { wbIdx = Math.min(wbSteps.length-1, wbIdx+1); renderWB(); };
+document.getElementById('wbAuto').onclick = () => {
+  const iv = setInterval(() => { wbIdx++; if (wbIdx >= wbSteps.length) { wbIdx=0; } renderWB(); }, 1500);
+  setTimeout(() => clearInterval(iv), wbSteps.length*1500+100);
+};
+renderWB();
+
+// ============================================================
+// DEMO 4: Memory Comparison
+// ============================================================
+function renderMem() {
+  const N = +document.getElementById('memNSlider').value;
+  const H = +document.getElementById('memHSlider').value;
+  document.getElementById('memNVal').textContent = N;
+  document.getElementById('memHVal').textContent = H;
+  const DL = 4 * H, DHR = H / 2;
+  const mha = 2 * 2 * N * H;
+  const mqa = 2 * 2 * H;
+  const gqa = 2 * 2 * 8 * H;
+  const mla = 2 * DL;
+  const mlarope = 2 * (DL + DHR);
+  const ratio = (mha / mlarope).toFixed(1);
+  const data = [
+    {l:'MHA',v:mha,c:'#6c8cff'},{l:'GQA',v:gqa,c:'#a78bfa'},{l:'MQA',v:mqa,c:'#34d399'},
+    {l:'MLA',v:mla,c:'#fbbf24'},{l:'MLA+RoPE',v:mlarope,c:'#f472b6'}
+  ];
+  const max = mha;
+  const chart = document.getElementById('memChart');
+  chart.innerHTML = '';
+  data.forEach(d => {
+    const wrap = document.createElement('div');
+    wrap.className = 'bar-wrapper';
+    wrap.innerHTML = `<div class="bar-value">${(d.v/H).toFixed(1)}H</div><div class="bar" style="height:${Math.max(d.v/max*100,4)}%;background:${d.c};"></div><div class="bar-label">${d.l}</div>`;
+    chart.appendChild(wrap);
+  });
+  document.getElementById('memReadout').innerHTML =
+    `D<sub>L</sub>=4H=${DL}, D<sub>HR</sub>=H/2=${DHR}. Per token per layer (16-bit): ` +
+    `MHA=<strong>${mha}</strong> bytes, MLA+RoPE=<strong>${mlarope}</strong> bytes. ` +
+    `Ratio: <strong>${ratio}×</strong> (DeepSeek N=${N}: ~57× at H=128).`;
+}
+document.getElementById('memNSlider').oninput = renderMem;
+document.getElementById('memHSlider').oninput = renderMem;
+renderMem();
+
+// ============================================================
+// DEMO 5: Attention Flow (Two Paths)
+// ============================================================
+function drawFlow() {
+  const c = document.getElementById('flowCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const paths = [
+    {y:50, label:'Path 1 (No RoPE)', cols:['Q_C','K_C^T','→','S₁','+'], color:'#34d399'},
+    {y:130, label:'Path 2 (RoPE)', cols:['Q_R','K_R^T','→','S₂','+'], color:'#f472b6'}
+  ];
+  paths.forEach(p => {
+    ctx.fillStyle = p.color; ctx.font='bold 13px sans-serif'; ctx.textAlign='left';
+    ctx.fillText(p.label, 20, p.y - 10);
+    let x = 20;
+    p.cols.forEach(col => {
+      ctx.fillStyle = p.color + '33'; ctx.strokeStyle = p.color;
+      ctx.fillRect(x, p.y, 70, 36); ctx.strokeRect(x, p.y, 70, 36);
+      ctx.fillStyle = p.color; ctx.textAlign='center'; ctx.font='11px monospace';
+      ctx.fillText(col, x+35, p.y+22); x += 80;
+    });
+  });
+  ctx.fillStyle = '#6c8cff'; ctx.fillRect(420, 90, 80, 36); ctx.strokeStyle='#6c8cff'; ctx.strokeRect(420,90,80,36);
+  ctx.fillStyle='#e0e0e8'; ctx.fillText('S_final', 460, 112);
+  ctx.fillStyle='#8888a0'; ctx.font='12px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('S_final = S₁ + S₂  →  softmax(S_final/√(d_h+d_hr)) · V_C', 20, 200);
+}
+drawFlow();
+
+// ============================================================
+// DEMO 6: Inference Token Step
+// ============================================================
+const inferTokens = ['The','next','day','is'];
+let inferStep = 4;
+function renderInfer() {
+  const row = document.getElementById('inferRow');
+  row.innerHTML = '';
+  inferTokens.forEach(t => { const s=document.createElement('span'); s.className='token token-word'; s.textContent=t; row.appendChild(s); });
+  if (inferStep >= 4) { const s=document.createElement('span'); s.className='token token-new'; s.textContent='bright'; row.appendChild(s); }
+  const ckSize = inferStep >= 4 ? '5×4' : '4×4';
+  const krSize = inferStep >= 4 ? '5×8' : '4×8';
+  document.getElementById('inferReadout').innerHTML =
+    inferStep >= 4
+      ? `<strong>Token "bright" arrives.</strong> Path 1: absorbed query (1×4) × CKV cache (${ckSize})^T → scores (1×5). Path 2: Q_R (1×8) × K_R cache (${krSize})^T → scores (1×5). Add → softmax → × V_C → context (1×8).`
+      : `Prefix cached: CKV (${ckSize}), K_R (${krSize}). Waiting for next token...`;
+}
+document.getElementById('inferAddBtn').onclick = () => { inferStep = 5; renderInfer(); };
+document.getElementById('inferResetBtn').onclick = () => { inferStep = 4; renderInfer(); };
+renderInfer();
+
+// ============================================================
+// PLAYGROUND
+// ============================================================
+function updatePG() {
+  const L=+document.getElementById('pgL').value, S=+document.getElementById('pgS').value;
+  const N=+document.getElementById('pgN').value, H=+document.getElementById('pgH').value;
+  ['pgL','pgS','pgN','pgH'].forEach((id,i)=>document.getElementById(id+'v').textContent=[L,S,N,H][i]);
+  const DL=4*H, DHR=H/2;
+  const mha = L*S*2*2*N*H, mlarope = L*S*2*(DL+DHR);
+  document.getElementById('pgOut').innerHTML =
+    `<p style="color:var(--text);margin-bottom:8px;">Context ${S} tokens, ${L} layers, ${N} heads, d<sub>h</sub>=${H}</p>` +
+    `<p style="color:var(--text);margin-bottom:8px;">MHA KV cache: <strong style="color:var(--accent5)">${(mha/1e9).toFixed(2)} GB</strong></p>` +
+    `<p style="color:var(--text);margin:0;">MLA+RoPE cache: <strong style="color:var(--accent3)">${(mlarope/1e9).toFixed(3)} GB</strong> (${(mha/mlarope).toFixed(0)}× smaller)</p>`;
+}
+['pgL','pgS','pgN','pgH'].forEach(id => document.getElementById(id).oninput = updatePG);
+updatePG();
+
+// ============================================================
+// DEMO 7: RoPE rotation visualizer
+// ============================================================
+function drawRopeViz() {
+  const pos = +document.getElementById('ropePosSlider').value;
+  document.getElementById('ropePosVal').textContent = pos;
+  const c = document.getElementById('ropeVizCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const cx = c.width/2, cy = c.height/2, r = 70;
+  const angle = pos * 0.4;
+  ctx.strokeStyle = '#444'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(cx-r,cy); ctx.lineTo(cx+r,cy); ctx.stroke();
+  ctx.strokeStyle = '#6c8cff'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+r*Math.cos(0),cy+r*Math.sin(0)); ctx.stroke();
+  ctx.strokeStyle = '#f472b6';
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+r*Math.cos(angle),cy+r*Math.sin(angle)); ctx.stroke();
+  ctx.fillStyle='#e0e0e8'; ctx.font='12px monospace'; ctx.textAlign='center';
+  ctx.fillText('Position '+pos+': rotation = '+pos+'·θ', cx, 24);
+  ctx.fillText('RoPE preserves |v| — only angle changes', cx, c.height-12);
+}
+if (document.getElementById('ropePosSlider')) {
+  document.getElementById('ropePosSlider').oninput = drawRopeViz;
+  drawRopeViz();
+}
+
+// ============================================================
+// DEMO 8: Cache size live calculator (secondary)
+// ============================================================
+function updateCacheCalc() {
+  const s = +document.getElementById('cacheSeqSlider').value;
+  const dc = +document.getElementById('cacheDCSlider').value;
+  const dhr = +document.getElementById('cacheDHRSlider').value;
+  document.getElementById('cacheSeqVal').textContent = s;
+  document.getElementById('cacheDCVal').textContent = dc;
+  document.getElementById('cacheDHRVal').textContent = dhr;
+  const perTok = 2 * (dc + dhr);
+  const total = perTok * s;
+  document.getElementById('cacheCalcOut').innerHTML =
+    `Per token: 2×(${dc}+${dhr}) = <strong>${perTok}</strong> bytes (fp16)<br>` +
+    `Sequence ${s}: <strong>${(total/1024).toFixed(1)} KB</strong> per layer`;
+}
+['cacheSeqSlider','cacheDCSlider','cacheDHRSlider'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.oninput = updateCacheCalc;
+});
+if (document.getElementById('cacheSeqSlider')) updateCacheCalc();
+
+
+document.getElementById('wbDots').innerHTML = wbSteps.map((_,i) =>
+  `<div class="step-dot wb-dot" data-i="${i}">${i+1}</div>`).join('');
+
+</script>
+</body>
+</html>

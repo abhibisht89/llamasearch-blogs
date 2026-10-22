@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Category J — defaultdict Mastery | Interview Coding Problems</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+  --border: #2a2a3a; --text: #e0e0e8; --text-dim: #8888a0;
+  --accent: #6c8cff; --accent2: #a78bfa; --accent3: #34d399;
+  --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; min-height: 100vh; }
+
+/* ===== Nav ===== */
+.nav { position: sticky; top: 0; background: rgba(10,10,15,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 100; }
+.nav-back { font-family: var(--mono); font-size: 0.82rem; color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+.nav-back:hover { color: var(--accent2); }
+.nav-chapter { font-family: var(--mono); font-size: 0.78rem; color: var(--accent2); letter-spacing: 1px; }
+
+/* ===== Hero ===== */
+.hero { padding: 52px 24px 40px; text-align: center; border-bottom: 1px solid var(--border); position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -80px; left: 50%; transform: translateX(-50%); width: 600px; height: 400px; background: radial-gradient(ellipse, rgba(167,139,250,0.08) 0%, transparent 70%); pointer-events: none; }
+.cat-label { font-family: var(--mono); font-size: 0.72rem; color: var(--accent2); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; }
+.hero h1 { font-size: clamp(1.6rem, 4vw, 2.6rem); font-weight: 800; margin-bottom: 12px; }
+.hero h1 span { color: var(--accent2); }
+.hero p { color: var(--text-dim); max-width: 600px; margin: 0 auto 20px; font-size: 0.95rem; }
+.hero-meta { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); }
+.hero-meta span { color: var(--text); }
+.stats { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+.stats > div { text-align: center; }
+.stat-val { display: block; font-size: 2rem; font-weight: 800; color: var(--accent2); line-height: 1; }
+.stat-label { font-family: var(--mono); font-size: 0.68rem; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; }
+
+/* ===== Container ===== */
+.container { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+/* ===== Callout ===== */
+.callout { background: rgba(167,139,250,0.05); border: 1px solid rgba(167,139,250,0.18); border-left: 3px solid var(--accent2); border-radius: 8px; padding: 14px 18px; font-size: 0.88rem; margin-bottom: 32px; color: var(--text-dim); }
+.callout strong { color: var(--text); }
+.callout code { font-family: var(--mono); background: var(--bg-card-alt); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: var(--accent2); }
+
+/* ===== Mental Model Box ===== */
+.mental-model { background: var(--bg-card); border: 1px solid rgba(167,139,250,0.25); border-radius: var(--radius); padding: 24px; margin-bottom: 32px; }
+.mental-model h3 { font-family: var(--mono); font-size: 0.85rem; color: var(--accent2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1px; }
+.mm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mm-col { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-size: 0.88rem; }
+.mm-col .label { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+.mm-col code { display: block; font-family: var(--mono); font-size: 0.82rem; line-height: 1.6; color: #c9d1e8; white-space: pre; }
+.mm-col.good { border-color: rgba(52,211,153,0.3); }
+.mm-col.bad  { border-color: rgba(248,113,113,0.3); }
+.mm-col.good .label { color: var(--accent3); }
+.mm-col.bad  .label { color: var(--danger); }
+
+/* ===== Problem Card ===== */
+.problem { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; margin-bottom: 24px; transition: border-color 0.2s; }
+.problem:hover { border-color: #3a3a5a; }
+.p-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.p-num { font-family: var(--mono); font-size: 0.78rem; font-weight: 700; color: var(--text-dim); background: var(--bg-card-alt); border: 1px solid var(--border); padding: 3px 10px; border-radius: 6px; letter-spacing: 1px; }
+.badge-po { font-family: var(--mono); font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; text-transform: uppercase; background: rgba(108,140,255,0.1); color: var(--accent); border: 1px solid rgba(108,140,255,0.25); }
+.badge-mc { font-family: var(--mono); font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; text-transform: uppercase; background: rgba(167,139,250,0.1); color: var(--accent2); border: 1px solid rgba(167,139,250,0.25); }
+.badge-cp { font-family: var(--mono); font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; text-transform: uppercase; background: rgba(244,114,182,0.1); color: var(--accent4); border: 1px solid rgba(244,114,182,0.25); }
+.badge-lc { font-family: var(--mono); font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; text-transform: uppercase; background: rgba(251,191,36,0.1); color: var(--accent5); border: 1px solid rgba(251,191,36,0.25); }
+.diff-easy   { font-family: var(--mono); font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; background: rgba(52,211,153,0.1); color: var(--accent3); border: 1px solid rgba(52,211,153,0.25); }
+.diff-medium { font-family: var(--mono); font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; background: rgba(251,191,36,0.1); color: var(--accent5); border: 1px solid rgba(251,191,36,0.25); }
+.diff-hard   { font-family: var(--mono); font-size: 0.68rem; padding: 3px 10px; border-radius: 20px; background: rgba(248,113,113,0.1); color: var(--danger); border: 1px solid rgba(248,113,113,0.25); }
+
+.p-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 10px; }
+.p-desc { color: var(--text-dim); font-size: 0.92rem; line-height: 1.65; margin-bottom: 16px; }
+.p-desc code { font-family: var(--mono); background: var(--bg-card-alt); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: var(--text); }
+
+/* ===== Code Blocks ===== */
+.code-block { background: #0d0d14; border: 1px solid var(--border); border-radius: 8px; padding: 20px; font-family: var(--mono); font-size: 0.84rem; line-height: 1.75; color: #c9d1e8; overflow-x: auto; white-space: pre; margin-bottom: 16px; tab-size: 4; }
+.kw  { color: #a78bfa; }
+.fn  { color: #6c8cff; }
+.str { color: #34d399; }
+.num { color: #fbbf24; }
+.cmt { color: #444466; font-style: italic; }
+.cls { color: #f472b6; }
+.deco { color: #f472b6; }
+
+/* ===== Example block ===== */
+.example { background: #0d0d14; border: 1px solid var(--border); border-left: 3px solid var(--accent3); border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; font-family: var(--mono); font-size: 0.82rem; line-height: 1.7; color: #c9d1e8; overflow-x: auto; white-space: pre; }
+.example-label { font-family: var(--mono); font-size: 0.68rem; color: var(--accent3); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+
+/* ===== Options (MC) ===== */
+.options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.option-btn { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-family: var(--mono); font-size: 0.82rem; color: var(--text-dim); cursor: pointer; text-align: left; transition: all 0.2s; line-height: 1.5; }
+.option-btn:hover { border-color: var(--accent2); color: var(--text); }
+.option-btn.correct { border-color: var(--accent3); background: rgba(52,211,153,0.08); color: var(--accent3); }
+.option-btn.wrong   { border-color: var(--danger); background: rgba(248,113,113,0.06); color: var(--danger); }
+
+/* ===== Reveal button ===== */
+.reveal-btn { background: transparent; border: 1px solid rgba(167,139,250,0.35); color: var(--accent2); font-family: var(--mono); font-size: 0.8rem; padding: 9px 20px; border-radius: 8px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px; }
+.reveal-btn:hover { background: rgba(167,139,250,0.08); border-color: var(--accent2); }
+
+/* ===== Answer block ===== */
+.answer { display: none; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px; }
+.answer.open { display: block; }
+.output-label { font-family: var(--mono); font-size: 0.68rem; color: var(--accent3); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; display: block; }
+.output-code { background: #0a0a0f; border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; font-family: var(--mono); font-size: 0.85rem; color: var(--accent3); white-space: pre; overflow-x: auto; margin-bottom: 14px; }
+.solution-label { font-family: var(--mono); font-size: 0.68rem; color: var(--accent2); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+.explanation { background: rgba(108,140,255,0.04); border: 1px solid rgba(108,140,255,0.14); border-radius: 8px; padding: 16px 18px; font-size: 0.9rem; color: var(--text-dim); line-height: 1.7; }
+.explanation strong { color: var(--text); }
+.explanation code { font-family: var(--mono); background: var(--bg-card-alt); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: var(--accent2); }
+
+/* ===== Skills tags ===== */
+.skills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.skill { font-family: var(--mono); font-size: 0.68rem; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim); background: rgba(255,255,255,0.03); }
+
+/* ===== Section divider ===== */
+.section-divider { font-family: var(--mono); font-size: 0.72rem; color: var(--accent2); letter-spacing: 3px; text-transform: uppercase; margin: 40px 0 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+/* ===== Gotcha box ===== */
+.gotcha { background: rgba(248,113,113,0.05); border: 1px solid rgba(248,113,113,0.2); border-left: 3px solid var(--danger); border-radius: 8px; padding: 14px 18px; margin: 16px 0; font-size: 0.88rem; color: var(--text-dim); }
+.gotcha strong { color: var(--danger); }
+.gotcha code { font-family: var(--mono); background: var(--bg-card-alt); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: var(--text); }
+
+/* ===== Chapter nav ===== */
+.ch-nav { display: flex; justify-content: space-between; margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--border); }
+.ch-nav a { font-family: var(--mono); font-size: 0.82rem; color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+.ch-nav a:hover { color: var(--accent2); }
+
+@media(max-width: 640px) {
+  .options { grid-template-columns: 1fr; }
+  .mm-row { grid-template-columns: 1fr; }
+  .code-block { font-size: 0.78rem; }
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: rgba(10, 10, 15, 0.92); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../../">The Gauntlet</a><span class="bc-sep">›</span><a href="../">Python Coding</a><span class="bc-sep">›</span><span class="bc-current">defaultdict Mastery</span></nav>
+
+<nav class="nav">
+  <a href="../" class="nav-back">← Python Coding Problems</a>
+  <span class="nav-chapter">CATEGORY J — defaultdict Mastery</span>
+</nav>
+
+<header class="hero">
+  <div class="cat-label">Category J · 27 Problems</div>
+  <h1><span>defaultdict</span> Mastery</h1>
+  <p>From <code>defaultdict(int)</code> to nested lambdas, graph adjacency lists, and LeetCode problems.
+     Every pattern you need — predict outputs, spot gotchas, and write real solutions.</p>
+  <div class="hero-meta">
+    <div>Problems: <span>27</span></div>
+    <div>Difficulty: <span>Easy → Hard</span></div>
+    <div>Key libs: <span>collections.defaultdict · lambda · Counter</span></div>
+  </div>
+  <div class="stats">
+    <div><span class="stat-val">27</span><span class="stat-label">Problems</span></div>
+    <div><span class="stat-val">6</span><span class="stat-label">Sections</span></div>
+    <div><span class="stat-val">5</span><span class="stat-label">Factory Types</span></div>
+    <div><span class="stat-val">5</span><span class="stat-label">LeetCode</span></div>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="callout">
+    <strong>The core idea:</strong> <code>defaultdict(factory)</code> auto-creates a default value when you access a missing key.
+    The <code>factory</code> is a <em>callable</em> — called with no arguments to produce the default.
+    This eliminates the <code>KeyError</code> and replaces clunky <code>if key not in d: d[key] = ...</code> boilerplate.
+    <br><br>
+    <strong>Rule of thumb:</strong> <code>int</code> → counters. <code>list</code> → grouping. <code>set</code> → unique grouping.
+    <code>lambda</code> → any custom default.
+  </div>
+
+  <!-- ===== MENTAL MODEL ===== -->
+  <div class="mental-model">
+    <h3>Mental Model — dict vs defaultdict</h3>
+    <div class="mm-row">
+      <div class="mm-col bad">
+        <div class="label">Regular dict — crashes</div>
+        <code>d = {}
+d["x"] += 1    # KeyError!
+
+# Must write:
+if "x" not in d:
+    d["x"] = 0
+d["x"] += 1</code>
+      </div>
+      <div class="mm-col good">
+        <div class="label">defaultdict(int) — just works</div>
+        <code>from collections import defaultdict
+d = defaultdict(int)
+d["x"] += 1    # auto-init to 0
+
+# Clean, readable, fast</code>
+      </div>
+    </div>
+    <div class="mm-row" style="margin-top:12px;">
+      <div class="mm-col">
+        <div class="label">Factory → Default value</div>
+        <code>int          →  0
+list         →  []
+set          →  set()
+str          →  ""
+float        →  0.0
+lambda: 42   →  42
+lambda: {}   →  {}
+lambda: defaultdict(int) → nested dd</code>
+      </div>
+      <div class="mm-col">
+        <div class="label">How it works internally</div>
+        <code># When d[key] is missing:
+# Python calls d.__missing__(key)
+# Which calls: default_factory()
+# And stores the result at d[key]
+
+# You can override __missing__
+# yourself on a plain dict subclass</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 1: defaultdict(int) — Counting                       -->
+  <!-- ============================================================ -->
+  <div class="section-divider">Section 1 — defaultdict(int) · Counting</div>
+
+  <!-- Q01 -->
+  <div class="problem" id="q01">
+    <div class="p-header">
+      <span class="p-num">Q 01</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-easy">Easy</span>
+    </div>
+    <div class="p-title">Basic Counter</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+d = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+words = [<span class="str">"apple"</span>, <span class="str">"banana"</span>, <span class="str">"apple"</span>, <span class="str">"cherry"</span>, <span class="str">"banana"</span>, <span class="str">"apple"</span>]
+<span class="kw">for</span> w <span class="kw">in</span> words:
+    d[w] += <span class="num">1</span>
+
+<span class="fn">print</span>(d[<span class="str">"apple"</span>])
+<span class="fn">print</span>(d[<span class="str">"banana"</span>])
+<span class="fn">print</span>(d[<span class="str">"mango"</span>])   <span class="cmt"># key does not exist</span>
+<span class="fn">print</span>(<span class="fn">len</span>(d))</pre>
+    <button class="reveal-btn" onclick="reveal('q01')">Show Answer</button>
+    <div class="answer" id="q01-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">3
+2
+0
+4</div>
+      <div class="explanation">
+        <strong>Why?</strong> <code>defaultdict(int)</code> calls <code>int()</code> — which returns <code>0</code> — when a missing key is accessed.
+        So <code>d["mango"]</code> silently creates the key with value <code>0</code> and returns it.
+        That's why <code>len(d)</code> is 4 — <code>"mango"</code> was added to the dict the moment you accessed it.
+        This is the most common gotcha: <strong>reading a missing key creates it.</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q02 -->
+  <div class="problem" id="q02">
+    <div class="p-header">
+      <span class="p-num">Q 02</span>
+      <span class="badge-mc">Multiple Choice</span>
+      <span class="diff-easy">Easy</span>
+    </div>
+    <div class="p-title">What does the factory do?</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+d = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+<span class="fn">print</span>(d[<span class="str">"x"</span>])</pre>
+    <p class="p-desc">What is printed, and what happens to <code>d</code>?</p>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q02',false)">a) KeyError is raised</button>
+      <button class="option-btn" onclick="checkMC(this,'q02',false)">b) None is printed, d unchanged</button>
+      <button class="option-btn" onclick="checkMC(this,'q02',true)">c) 0 is printed, "x":0 added to d</button>
+      <button class="option-btn" onclick="checkMC(this,'q02',false)">d) 0 is printed, d unchanged</button>
+    </div>
+    <div class="answer" id="q02-answer">
+      <div class="explanation">
+        <strong>Answer: c.</strong> When a missing key is accessed, <code>defaultdict</code> calls <code>int()</code>
+        to produce <code>0</code>, <em>stores it</em> at <code>d["x"]</code>, then returns it.
+        The dict is now <code>{"x": 0}</code>. This is different from <code>dict.get("x", 0)</code>
+        which returns 0 without creating the key. Use <code>.get()</code> when you don't want side effects.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q03 -->
+  <div class="problem" id="q03">
+    <div class="p-header">
+      <span class="p-num">Q 03</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-easy">Easy</span>
+    </div>
+    <div class="p-title">Nested access trap</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+d = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+d[<span class="str">"a"</span>] = <span class="num">5</span>
+
+<span class="fn">print</span>(d[<span class="str">"a"</span>])
+<span class="fn">print</span>(d[<span class="str">"b"</span>])
+<span class="fn">print</span>(<span class="str">"b"</span> <span class="kw">in</span> d)
+<span class="fn">print</span>(d.get(<span class="str">"c"</span>))
+<span class="fn">print</span>(<span class="str">"c"</span> <span class="kw">in</span> d)</pre>
+    <button class="reveal-btn" onclick="reveal('q03')">Show Answer</button>
+    <div class="answer" id="q03-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">5
+0
+True
+None
+False</div>
+      <div class="explanation">
+        <strong>Key contrast:</strong> <code>d["b"]</code> triggers <code>__missing__</code> → creates <code>"b": 0</code> → <code>"b" in d</code> is now <code>True</code>.
+        But <code>d.get("c")</code> does NOT trigger <code>__missing__</code> — it returns <code>None</code> without creating the key.
+        So <code>"c" in d</code> stays <code>False</code>.
+        <br><br>
+        <strong>Rule:</strong> Use <code>d.get(key)</code> when you want to check a value without creating the key.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q04 — Coding -->
+  <div class="problem" id="q04">
+    <div class="p-header">
+      <span class="p-num">Q 04</span>
+      <span class="badge-cp">Coding Problem</span>
+      <span class="diff-easy">Easy</span>
+    </div>
+    <div class="p-title">Character Frequency</div>
+    <div class="p-desc">
+      Given a string, return a <code>defaultdict(int)</code> with the frequency of each character.
+      Then return the character with the highest frequency. If tied, return the lexicographically smallest.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">char_freq("mississippi")
+→ defaultdict: {'m':1, 'i':4, 's':4, 'p':2}
+→ most_frequent: "i"   (tied 's' and 'i' at 4, 'i' < 's')</div>
+    <div class="skills">
+      <span class="skill">defaultdict(int)</span>
+      <span class="skill">sorted + lambda</span>
+      <span class="skill">two-key sort</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q04')">Show Solution</button>
+    <div class="answer" id="q04-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">char_freq</span>(s: str):
+    <span class="cmt"># Count every character in one pass</span>
+    freq = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+    <span class="kw">for</span> ch <span class="kw">in</span> s:
+        freq[ch] += <span class="num">1</span>
+    <span class="cmt"># Two-key sort: highest count first, then lex smallest on tie</span>
+    best = <span class="fn">sorted</span>(freq, key=<span class="kw">lambda</span> ch: (-freq[ch], ch))[<span class="num">0</span>]
+    <span class="kw">return</span> freq, best</pre>
+      <div class="explanation">
+        <strong>Two-key sort:</strong> <code>(-freq[ch], ch)</code> — negative count puts higher counts first;
+        the character string itself breaks ties lexicographically.
+        This is the same pattern as LeetCode 692 Top K Frequent Words.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 2: defaultdict(list) — Grouping                      -->
+  <!-- ============================================================ -->
+  <div class="section-divider">Section 2 — defaultdict(list) · Grouping</div>
+
+  <!-- Q05 -->
+  <div class="problem" id="q05">
+    <div class="p-header">
+      <span class="p-num">Q 05</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-easy">Easy</span>
+    </div>
+    <div class="p-title">Group by first letter</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+words = [<span class="str">"apple"</span>, <span class="str">"avocado"</span>, <span class="str">"banana"</span>, <span class="str">"blueberry"</span>, <span class="str">"cherry"</span>]
+groups = <span class="fn">defaultdict</span>(<span class="fn">list</span>)
+
+<span class="kw">for</span> w <span class="kw">in</span> words:
+    groups[w[<span class="num">0</span>]].append(w)
+
+<span class="fn">print</span>(groups[<span class="str">"a"</span>])
+<span class="fn">print</span>(groups[<span class="str">"b"</span>])
+<span class="fn">print</span>(groups[<span class="str">"z"</span>])</pre>
+    <button class="reveal-btn" onclick="reveal('q05')">Show Answer</button>
+    <div class="answer" id="q05-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">['apple', 'avocado']
+['banana', 'blueberry']
+[]</div>
+      <div class="explanation">
+        <strong>Why?</strong> <code>defaultdict(list)</code> calls <code>list()</code> — returns <code>[]</code> — for any missing key.
+        Accessing <code>groups["z"]</code> creates an empty list. No <code>KeyError</code>, no pre-check needed.
+        This replaces the pattern: <code>if key not in d: d[key] = []</code> / <code>d[key].append(...)</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q06 -->
+  <div class="problem" id="q06">
+    <div class="p-header">
+      <span class="p-num">Q 06</span>
+      <span class="badge-mc">Multiple Choice</span>
+      <span class="diff-easy">Easy</span>
+    </div>
+    <div class="p-title">setdefault vs defaultdict</div>
+    <pre class="code-block"><span class="cmt"># Option A</span>
+d1 = {}
+d1.setdefault(<span class="str">"x"</span>, []).append(<span class="num">1</span>)
+d1.setdefault(<span class="str">"x"</span>, []).append(<span class="num">2</span>)
+
+<span class="cmt"># Option B</span>
+<span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+d2 = <span class="fn">defaultdict</span>(<span class="fn">list</span>)
+d2[<span class="str">"x"</span>].append(<span class="num">1</span>)
+d2[<span class="str">"x"</span>].append(<span class="num">2</span>)</pre>
+    <p class="p-desc">What is <code>d1["x"]</code> and <code>d2["x"]</code>?</p>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q06',false)">a) [1] and [1, 2]</button>
+      <button class="option-btn" onclick="checkMC(this,'q06',true)">b) [1, 2] and [1, 2]</button>
+      <button class="option-btn" onclick="checkMC(this,'q06',false)">c) [2] and [1, 2]</button>
+      <button class="option-btn" onclick="checkMC(this,'q06',false)">d) KeyError in d1</button>
+    </div>
+    <div class="answer" id="q06-answer">
+      <div class="explanation">
+        <strong>Answer: b.</strong> Both produce <code>[1, 2]</code>. <code>setdefault</code> returns the existing value if the key exists,
+        so the second call returns the same list (already <code>[1]</code>) and appends 2 to it.
+        <code>defaultdict(list)</code> does the same thing more cleanly — no need to pass the default on every access.
+        <br><br>
+        <strong>When to use which:</strong> <code>defaultdict</code> when you always use the same default type.
+        <code>setdefault</code> when the default might vary per call.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q07 — Coding -->
+  <div class="problem" id="q07">
+    <div class="p-header">
+      <span class="p-num">Q 07</span>
+      <span class="badge-cp">Coding Problem</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Invert a Dictionary</div>
+    <div class="p-desc">
+      Given a dict where values might not be unique, invert it so keys become values and values become lists of original keys.
+      Use <code>defaultdict(list)</code>.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">original = {"a": 1, "b": 2, "c": 1, "d": 3, "e": 2}
+invert(original)
+→ {1: ["a", "c"], 2: ["b", "e"], 3: ["d"]}</div>
+    <div class="skills">
+      <span class="skill">defaultdict(list)</span><span class="skill">.items()</span><span class="skill">dict inversion</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q07')">Show Solution</button>
+    <div class="answer" id="q07-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">invert</span>(d: dict) -> dict:
+    <span class="cmt"># Group original keys by their value</span>
+    inv = <span class="fn">defaultdict</span>(<span class="fn">list</span>)
+    <span class="kw">for</span> k, v <span class="kw">in</span> d.items():
+        inv[v].append(k)
+    <span class="kw">return</span> <span class="fn">dict</span>(inv)   <span class="cmt"># convert back to plain dict for clean output</span></pre>
+      <div class="explanation">
+        <strong>Pattern:</strong> Iterate <code>.items()</code>, swap key/value, append to the new list.
+        Without <code>defaultdict</code>, you'd write <code>if v not in inv: inv[v] = []</code> every time.
+        Converting back with <code>dict(inv)</code> is good practice — callers get a plain dict, not a defaultdict.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q08 — Coding -->
+  <div class="problem" id="q08">
+    <div class="p-header">
+      <span class="p-num">Q 08</span>
+      <span class="badge-cp">Coding Problem</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Word → Line Numbers Index</div>
+    <div class="p-desc">
+      Given a list of text lines, build an index mapping each word to the list of line numbers (0-indexed) it appears on.
+      Case-insensitive. Skip punctuation.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">lines = ["Hello world", "World of Python", "Hello again"]
+build_index(lines)
+→ {"hello": [0, 2], "world": [0, 1], "of": [1], "python": [1], "again": [2]}</div>
+    <div class="skills">
+      <span class="skill">defaultdict(list)</span><span class="skill">enumerate</span><span class="skill">str.split</span><span class="skill">str.lower</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q08')">Show Solution</button>
+    <div class="answer" id="q08-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+<span class="kw">import</span> re
+
+<span class="kw">def</span> <span class="fn">build_index</span>(lines):
+    index = <span class="fn">defaultdict</span>(<span class="fn">list</span>)
+    <span class="kw">for</span> line_num, line <span class="kw">in</span> <span class="fn">enumerate</span>(lines):
+        <span class="cmt"># Extract only word characters, lowercase</span>
+        words = re.<span class="fn">findall</span>(<span class="str">r'\b[a-z]+\b'</span>, line.<span class="fn">lower</span>())
+        <span class="kw">for</span> word <span class="kw">in</span> words:
+            index[word].append(line_num)
+    <span class="kw">return</span> <span class="fn">dict</span>(index)</pre>
+      <div class="explanation">
+        This is the classic <strong>inverted index</strong> pattern — the foundation of search engines.
+        <code>defaultdict(list)</code> lets you append line numbers without checking if the word was seen before.
+        <code>re.findall(r'\b[a-z]+\b', ...)</code> cleanly strips punctuation.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 3: defaultdict(set) & other factories                -->
+  <!-- ============================================================ -->
+  <div class="section-divider">Section 3 — defaultdict(set) · Unique Grouping</div>
+
+  <!-- Q09 -->
+  <div class="problem" id="q09">
+    <div class="p-header">
+      <span class="p-num">Q 09</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-easy">Easy</span>
+    </div>
+    <div class="p-title">Unique values per key</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+d = <span class="fn">defaultdict</span>(<span class="fn">set</span>)
+pairs = [(<span class="str">"a"</span>, <span class="num">1</span>), (<span class="str">"b"</span>, <span class="num">2</span>), (<span class="str">"a"</span>, <span class="num">1</span>), (<span class="str">"a"</span>, <span class="num">3</span>), (<span class="str">"b"</span>, <span class="num">2</span>)]
+<span class="kw">for</span> k, v <span class="kw">in</span> pairs:
+    d[k].add(v)
+
+<span class="fn">print</span>(<span class="fn">sorted</span>(d[<span class="str">"a"</span>]))
+<span class="fn">print</span>(<span class="fn">sorted</span>(d[<span class="str">"b"</span>]))
+<span class="fn">print</span>(d[<span class="str">"c"</span>])</pre>
+    <button class="reveal-btn" onclick="reveal('q09')">Show Answer</button>
+    <div class="answer" id="q09-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">[1, 3]
+[2]
+set()</div>
+      <div class="explanation">
+        <strong>Why defaultdict(set)?</strong> When you need to group values per key but want <em>uniqueness</em>.
+        <code>list</code> collects duplicates; <code>set</code> deduplicates automatically.
+        The pair <code>("a", 1)</code> appears twice but <code>d["a"]</code> holds <code>{1, 3}</code> — only unique values.
+        <code>d["c"]</code> creates an empty <code>set()</code>, shown as <code>set()</code> (not <code>{}</code> — that's an empty dict!).
+      </div>
+    </div>
+  </div>
+
+  <!-- Q10 — Coding -->
+  <div class="problem" id="q10">
+    <div class="p-header">
+      <span class="p-num">Q 10</span>
+      <span class="badge-cp">Coding Problem</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Graph as Adjacency List</div>
+    <div class="p-desc">
+      Given a list of undirected edges <code>(u, v)</code>, build an adjacency list using <code>defaultdict(set)</code>.
+      Then return all neighbours of a given node, sorted.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">edges = [(1,2),(1,3),(2,3),(3,4)]
+graph = build_graph(edges)
+neighbours(graph, 3) → [1, 2, 4]</div>
+    <div class="skills">
+      <span class="skill">defaultdict(set)</span><span class="skill">undirected graph</span><span class="skill">adjacency list</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q10')">Show Solution</button>
+    <div class="answer" id="q10-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">build_graph</span>(edges):
+    graph = <span class="fn">defaultdict</span>(<span class="fn">set</span>)
+    <span class="kw">for</span> u, v <span class="kw">in</span> edges:
+        graph[u].add(v)   <span class="cmt"># undirected — add both directions</span>
+        graph[v].add(u)
+    <span class="kw">return</span> graph
+
+<span class="kw">def</span> <span class="fn">neighbours</span>(graph, node):
+    <span class="kw">return</span> <span class="fn">sorted</span>(graph[node])  <span class="cmt"># sorted for deterministic output</span></pre>
+      <div class="explanation">
+        <strong>Why set instead of list?</strong> Sets prevent duplicate edges. If the same edge <code>(1,2)</code>
+        appears twice in input, the graph is still correct — no duplicate neighbours.
+        This is the standard way to build graphs in Python interview problems.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 4: lambda factories — Custom Defaults                 -->
+  <!-- ============================================================ -->
+  <div class="section-divider">Section 4 — lambda factories · Custom Defaults</div>
+
+  <!-- Q11 -->
+  <div class="problem" id="q11">
+    <div class="p-header">
+      <span class="p-num">Q 11</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">lambda: constant value</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+d = <span class="fn">defaultdict</span>(<span class="kw">lambda</span>: <span class="str">"unknown"</span>)
+d[<span class="str">"name"</span>] = <span class="str">"Alice"</span>
+
+<span class="fn">print</span>(d[<span class="str">"name"</span>])
+<span class="fn">print</span>(d[<span class="str">"age"</span>])
+<span class="fn">print</span>(d[<span class="str">"city"</span>])</pre>
+    <button class="reveal-btn" onclick="reveal('q11')">Show Answer</button>
+    <div class="answer" id="q11-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">Alice
+unknown
+unknown</div>
+      <div class="explanation">
+        <strong>lambda: "unknown"</strong> is a zero-argument callable that always returns <code>"unknown"</code>.
+        Any missing key gets this default. Explicit keys override it normally.
+        This replaces <code>dict.get(key, "unknown")</code> — useful when you're accessing many keys
+        and want a consistent fallback without repeating the default everywhere.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q12 -->
+  <div class="problem" id="q12">
+    <div class="p-header">
+      <span class="p-num">Q 12</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">lambda: mutable default — gotcha!</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="cmt"># lambda: [] creates a NEW list for each missing key</span>
+d = <span class="fn">defaultdict</span>(<span class="kw">lambda</span>: [])
+d[<span class="str">"a"</span>].append(<span class="num">1</span>)
+d[<span class="str">"b"</span>].append(<span class="num">2</span>)
+
+<span class="fn">print</span>(d[<span class="str">"a"</span>])
+<span class="fn">print</span>(d[<span class="str">"b"</span>])
+<span class="fn">print</span>(d[<span class="str">"a"</span>] <span class="kw">is</span> d[<span class="str">"b"</span>])</pre>
+    <button class="reveal-btn" onclick="reveal('q12')">Show Answer</button>
+    <div class="answer" id="q12-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">[1]
+[2]
+False</div>
+      <div class="explanation">
+        <strong>Each key gets its own fresh list.</strong> The lambda is called every time a new key is accessed.
+        So <code>d["a"]</code> and <code>d["b"]</code> are two <em>different</em> list objects — <code>is</code> returns <code>False</code>.
+        <br><br>
+        Compare this to a common Python gotcha with mutable defaults in function signatures:
+        <code>def f(x=[]):</code> — there, the <em>same</em> list is shared. With <code>defaultdict(lambda: [])</code>, each call creates a new list. Safe.
+        <br><br>
+        <strong>Note:</strong> <code>defaultdict(lambda: [])</code> is equivalent to <code>defaultdict(list)</code>. Prefer <code>list</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q13 -->
+  <div class="problem" id="q13">
+    <div class="p-header">
+      <span class="p-num">Q 13</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">lambda: arbitrary starting value</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="cmt"># Count down from 10 for each new key</span>
+d = <span class="fn">defaultdict</span>(<span class="kw">lambda</span>: <span class="num">10</span>)
+d[<span class="str">"x"</span>] -= <span class="num">3</span>
+d[<span class="str">"y"</span>] -= <span class="num">7</span>
+d[<span class="str">"x"</span>] -= <span class="num">2</span>
+
+<span class="fn">print</span>(d[<span class="str">"x"</span>])
+<span class="fn">print</span>(d[<span class="str">"y"</span>])
+<span class="fn">print</span>(d[<span class="str">"z"</span>])</pre>
+    <button class="reveal-btn" onclick="reveal('q13')">Show Answer</button>
+    <div class="answer" id="q13-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">5
+3
+10</div>
+      <div class="explanation">
+        <strong>Why?</strong> <code>d["x"]</code> starts at 10 (lambda), then <code>-= 3</code> makes it 7, then <code>-= 2</code> makes it 5.
+        <code>d["y"]</code> starts at 10, <code>-= 7</code> → 3.
+        <code>d["z"]</code> is accessed for the first time → lambda returns 10. Nothing else changes it.
+        <br><br>
+        This pattern — <code>lambda: N</code> — is useful for problems where new counters start at a non-zero baseline.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q14 — Coding -->
+  <div class="problem" id="q14">
+    <div class="p-header">
+      <span class="p-num">Q 14</span>
+      <span class="badge-cp">Coding Problem</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Score Tracker with Custom Default</div>
+    <div class="p-desc">
+      Players start with 100 points. Build a score tracker using <code>defaultdict(lambda: 100)</code>.
+      Apply a list of <code>(player, delta)</code> events. Return final scores for all players seen.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">events = [("alice", -10), ("bob", +20), ("alice", -5), ("carol", -30)]
+track_scores(events)
+→ {"alice": 85, "bob": 120, "carol": 70}</div>
+    <div class="skills">
+      <span class="skill">defaultdict(lambda)</span><span class="skill">+=</span><span class="skill">dict()</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q14')">Show Solution</button>
+    <div class="answer" id="q14-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">track_scores</span>(events):
+    <span class="cmt"># Each new player starts at 100 automatically</span>
+    scores = <span class="fn">defaultdict</span>(<span class="kw">lambda</span>: <span class="num">100</span>)
+    <span class="kw">for</span> player, delta <span class="kw">in</span> events:
+        scores[player] += delta
+    <span class="kw">return</span> <span class="fn">dict</span>(scores)</pre>
+      <div class="explanation">
+        Without <code>defaultdict</code>, you'd write: <code>if player not in scores: scores[player] = 100</code>
+        before every update. The lambda removes that boilerplate entirely.
+        <code>scores[player] += delta</code> reads the current value (100 if new), adds delta, stores back.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 5: Nested defaultdict                                 -->
+  <!-- ============================================================ -->
+  <div class="section-divider">Section 5 — Nested defaultdict · Two-Level Grouping</div>
+
+  <!-- Q15 -->
+  <div class="problem" id="q15">
+    <div class="p-header">
+      <span class="p-num">Q 15</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">defaultdict of defaultdict(int)</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="cmt"># Two-level: outer key → inner key → count</span>
+d = <span class="fn">defaultdict</span>(<span class="kw">lambda</span>: <span class="fn">defaultdict</span>(<span class="fn">int</span>))
+
+d[<span class="str">"alice"</span>][<span class="str">"python"</span>] += <span class="num">3</span>
+d[<span class="str">"alice"</span>][<span class="str">"java"</span>]   += <span class="num">1</span>
+d[<span class="str">"bob"</span>][<span class="str">"python"</span>]   += <span class="num">5</span>
+
+<span class="fn">print</span>(d[<span class="str">"alice"</span>][<span class="str">"python"</span>])
+<span class="fn">print</span>(d[<span class="str">"alice"</span>][<span class="str">"go"</span>])    <span class="cmt"># not set yet</span>
+<span class="fn">print</span>(d[<span class="str">"bob"</span>][<span class="str">"python"</span>])
+<span class="fn">print</span>(<span class="fn">list</span>(d.keys()))</pre>
+    <button class="reveal-btn" onclick="reveal('q15')">Show Answer</button>
+    <div class="answer" id="q15-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">3
+0
+5
+['alice', 'bob']</div>
+      <div class="explanation">
+        <strong>Two-level nesting:</strong> The outer <code>defaultdict</code> uses <code>lambda: defaultdict(int)</code>
+        so each new outer key gets a fresh inner <code>defaultdict(int)</code>.
+        <code>d["alice"]["go"]</code> accesses a missing inner key → inner defaultdict returns 0.
+        <br><br>
+        <strong>Why not <code>defaultdict(defaultdict(int))</code>?</strong>
+        That would call <code>defaultdict(int)</code> <em>once</em> and share the same inner dict for all outer keys — a shared-state bug!
+        Always use <code>lambda: defaultdict(int)</code> for nesting, so each key gets its own fresh inner dict.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q16 gotcha -->
+  <div class="problem" id="q16">
+    <div class="p-header">
+      <span class="p-num">Q 16</span>
+      <span class="badge-mc">Multiple Choice</span>
+      <span class="diff-hard">Hard</span>
+    </div>
+    <div class="p-title">The shared-inner-dict bug</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="cmt"># BUG: defaultdict(int) is evaluated ONCE here</span>
+inner = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+d = <span class="fn">defaultdict</span>(inner)   <span class="cmt"># passing an instance, not a factory!</span>
+
+d[<span class="str">"alice"</span>][<span class="str">"python"</span>] += <span class="num">3</span>
+d[<span class="str">"bob"</span>][<span class="str">"python"</span>]   += <span class="num">5</span>
+
+<span class="fn">print</span>(d[<span class="str">"alice"</span>][<span class="str">"python"</span>])</pre>
+    <p class="p-desc">What does this print — and why is the code wrong?</p>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q16',false)">a) 3 — works correctly</button>
+      <button class="option-btn" onclick="checkMC(this,'q16',true)">b) 8 — both keys share the same inner dict</button>
+      <button class="option-btn" onclick="checkMC(this,'q16',false)">c) TypeError — inner is not callable</button>
+      <button class="option-btn" onclick="checkMC(this,'q16',false)">d) 5 — bob's value overwrites</button>
+    </div>
+    <div class="answer" id="q16-answer">
+      <div class="explanation">
+        <strong>Answer: b.</strong> <code>defaultdict(inner)</code> passes the <em>same</em> <code>defaultdict(int)</code> instance as the factory.
+        When Python calls <code>inner()</code> it <em>calls</em> the defaultdict as a function.
+        A defaultdict is callable and calling it with no args returns 0 (calls its own factory). This means d["alice"] and d["bob"] both get the
+        <em>same</em> inner dict object!
+        So <code>d["alice"]["python"] += 3</code> and <code>d["bob"]["python"] += 5</code> both write to the same key, totaling 8.
+        <br><br>
+        <strong>Fix:</strong> Always use <code>lambda: defaultdict(int)</code> — the lambda is called fresh each time, creating a new inner dict.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q17 — Coding: 2D frequency map -->
+  <div class="problem" id="q17">
+    <div class="p-header">
+      <span class="p-num">Q 17</span>
+      <span class="badge-cp">Coding Problem</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">User → Action → Count</div>
+    <div class="p-desc">
+      Given a list of <code>(user, action)</code> events, count how many times each user performed each action.
+      Use a nested <code>defaultdict</code>. Return the count for a specific <code>(user, action)</code> pair.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">events = [
+  ("alice", "login"), ("bob", "login"), ("alice", "click"),
+  ("alice", "login"), ("bob", "logout"), ("alice", "click")
+]
+count_actions(events, "alice", "click") → 2
+count_actions(events, "bob",   "click") → 0</div>
+    <div class="skills">
+      <span class="skill">nested defaultdict</span><span class="skill">lambda: defaultdict(int)</span><span class="skill">two-level grouping</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q17')">Show Solution</button>
+    <div class="answer" id="q17-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">build_action_map</span>(events):
+    <span class="cmt"># outer: user → inner: action → count</span>
+    action_map = <span class="fn">defaultdict</span>(<span class="kw">lambda</span>: <span class="fn">defaultdict</span>(<span class="fn">int</span>))
+    <span class="kw">for</span> user, action <span class="kw">in</span> events:
+        action_map[user][action] += <span class="num">1</span>
+    <span class="kw">return</span> action_map
+
+<span class="kw">def</span> <span class="fn">count_actions</span>(events, user, action):
+    action_map = <span class="fn">build_action_map</span>(events)
+    <span class="cmt"># .get() avoids creating the key if user/action not seen</span>
+    <span class="kw">return</span> action_map.get(user, {}).get(action, <span class="num">0</span>)</pre>
+      <div class="explanation">
+        <strong>Pattern:</strong> <code>action_map[user][action] += 1</code> — two bracket accesses, both safe.
+        For querying, use <code>.get()</code> chains to avoid creating keys just from reading.
+        This two-level structure (user → action → count) appears constantly in analytics and log processing problems.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 6: Gotchas                                           -->
+  <!-- ============================================================ -->
+  <div class="section-divider">Section 6 — Gotchas · Common Mistakes</div>
+
+  <!-- Q18 -->
+  <div class="problem" id="q18">
+    <div class="p-header">
+      <span class="p-num">Q 18</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Iterating creates keys!</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+d = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+keys_to_check = [<span class="str">"a"</span>, <span class="str">"b"</span>, <span class="str">"c"</span>]
+
+<span class="kw">for</span> k <span class="kw">in</span> keys_to_check:
+    <span class="kw">if</span> d[k] == <span class="num">0</span>:           <span class="cmt"># accessing d[k] creates the key!</span>
+        <span class="kw">pass</span>
+
+<span class="fn">print</span>(<span class="fn">list</span>(d.keys()))</pre>
+    <button class="reveal-btn" onclick="reveal('q18')">Show Answer</button>
+    <div class="answer" id="q18-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">['a', 'b', 'c']</div>
+      <div class="explanation">
+        <strong>Gotcha:</strong> Even though you never wrote to these keys, just <em>reading</em> them with <code>d[k]</code>
+        triggered <code>__missing__</code> and created them with value <code>0</code>.
+        <br><br>
+        <strong>Fix:</strong> Use <code>d.get(k, 0) == 0</code> to check without creating the key.
+        Or use <code>k in d</code> to check existence. Only use <code>d[k]</code> when you <em>intend</em> to create the key.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q19 -->
+  <div class="problem" id="q19">
+    <div class="p-header">
+      <span class="p-num">Q 19</span>
+      <span class="badge-mc">Multiple Choice</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">defaultdict(None) — what happens?</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+d = <span class="fn">defaultdict</span>(<span class="kw">None</span>)
+d[<span class="str">"a"</span>] = <span class="num">1</span>
+<span class="fn">print</span>(d[<span class="str">"b"</span>])</pre>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q19',false)">a) None</button>
+      <button class="option-btn" onclick="checkMC(this,'q19',false)">b) 0</button>
+      <button class="option-btn" onclick="checkMC(this,'q19',true)">c) KeyError</button>
+      <button class="option-btn" onclick="checkMC(this,'q19',false)">d) TypeError</button>
+    </div>
+    <div class="answer" id="q19-answer">
+      <div class="explanation">
+        <strong>Answer: c) KeyError.</strong> When <code>default_factory</code> is <code>None</code>,
+        <code>defaultdict</code> behaves exactly like a regular dict — it raises <code>KeyError</code> for missing keys.
+        Setting it to <code>None</code> disables the auto-creation behaviour.
+        <br><br>
+        This is actually useful when you want a dict that you <em>might</em> later change to have a factory,
+        or when you want to disable the default temporarily.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q20 -->
+  <div class="problem" id="q20">
+    <div class="p-header">
+      <span class="p-num">Q 20</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Converting to plain dict</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+d = <span class="fn">defaultdict</span>(<span class="fn">list</span>)
+d[<span class="str">"a"</span>].append(<span class="num">1</span>)
+d[<span class="str">"b"</span>].append(<span class="num">2</span>)
+
+plain = <span class="fn">dict</span>(d)
+plain[<span class="str">"c"</span>]   <span class="cmt"># access missing key on plain dict</span></pre>
+    <button class="reveal-btn" onclick="reveal('q20')">Show Answer</button>
+    <div class="answer" id="q20-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">KeyError: 'c'</div>
+      <div class="explanation">
+        <strong>Converting with <code>dict(dd)</code></strong> creates a plain dict. All keys and values are copied.
+        But the auto-creation behaviour is gone — <code>plain["c"]</code> raises <code>KeyError</code>.
+        <br><br>
+        <strong>Best practice:</strong> Return <code>dict(dd)</code> from functions so callers get predictable plain dicts.
+        Keep the <code>defaultdict</code> internal. This prevents callers from accidentally creating keys via reads.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q21 -->
+  <div class="problem" id="q21">
+    <div class="p-header">
+      <span class="p-num">Q 21</span>
+      <span class="badge-mc">Multiple Choice</span>
+      <span class="diff-hard">Hard</span>
+    </div>
+    <div class="p-title">Factory is called how?</div>
+    <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">my_factory</span>(key=<span class="str">"default"</span>):
+    <span class="kw">return</span> key.<span class="fn">upper</span>()
+
+d = <span class="fn">defaultdict</span>(my_factory)
+<span class="fn">print</span>(d[<span class="str">"x"</span>])</pre>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q21',false)">a) "X" — key is passed to factory</button>
+      <button class="option-btn" onclick="checkMC(this,'q21',true)">b) "DEFAULT" — factory called with no args</button>
+      <button class="option-btn" onclick="checkMC(this,'q21',false)">c) KeyError</button>
+      <button class="option-btn" onclick="checkMC(this,'q21',false)">d) TypeError</button>
+    </div>
+    <div class="answer" id="q21-answer">
+      <div class="explanation">
+        <strong>Answer: b) "DEFAULT".</strong> The factory is <em>always called with zero arguments</em>.
+        The missing key is NOT passed to it. <code>my_factory()</code> uses its default arg <code>key="default"</code>,
+        so it returns <code>"default".upper()</code> = <code>"DEFAULT"</code>.
+        <br><br>
+        If you need the key inside the factory, you can't use <code>defaultdict</code> directly.
+        You'd need to subclass <code>dict</code> and override <code>__missing__(self, key)</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q22 — __missing__ -->
+  <div class="problem" id="q22">
+    <div class="p-header">
+      <span class="p-num">Q 22</span>
+      <span class="badge-po">Predict Output</span>
+      <span class="diff-hard">Hard</span>
+    </div>
+    <div class="p-title">Custom __missing__ — key-aware factory</div>
+    <pre class="code-block"><span class="kw">class</span> <span class="cls">SmartDict</span>(<span class="fn">dict</span>):
+    <span class="kw">def</span> <span class="fn">__missing__</span>(<span class="kw">self</span>, key):
+        <span class="cmt"># Called automatically when key not found</span>
+        value = key.<span class="fn">upper</span>()
+        <span class="kw">self</span>[key] = value   <span class="cmt"># store so it's not recomputed</span>
+        <span class="kw">return</span> value
+
+d = <span class="cls">SmartDict</span>()
+<span class="fn">print</span>(d[<span class="str">"hello"</span>])
+<span class="fn">print</span>(d[<span class="str">"world"</span>])
+<span class="fn">print</span>(<span class="fn">list</span>(d.keys()))</pre>
+    <button class="reveal-btn" onclick="reveal('q22')">Show Answer</button>
+    <div class="answer" id="q22-answer">
+      <span class="output-label">Output</span>
+      <div class="output-code">HELLO
+WORLD
+['hello', 'world']</div>
+      <div class="explanation">
+        <strong>__missing__</strong> is the hook that <code>defaultdict</code> uses internally.
+        By subclassing <code>dict</code> and overriding it, you can create factories that <em>know the missing key</em>.
+        This is the answer to Q21's limitation — when you need the key to compute the default.
+        <br><br>
+        <code>defaultdict</code> is just a <code>dict</code> subclass that implements <code>__missing__</code> to call <code>default_factory()</code>.
+        That's the whole magic — nothing more.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 7: LeetCode problems                                 -->
+  <!-- ============================================================ -->
+  <div class="section-divider">Section 7 — LeetCode Problems using defaultdict</div>
+
+  <!-- Q23 — Group Anagrams (LC 49) -->
+  <div class="problem" id="q23">
+    <div class="p-header">
+      <span class="p-num">Q 23</span>
+      <span class="badge-lc">LeetCode 49</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Group Anagrams</div>
+    <div class="p-desc">
+      Given an array of strings, group the anagrams together. Return a list of groups.
+      Two strings are anagrams if they have the same characters (regardless of order).
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">strs = ["eat","tea","tan","ate","nat","bat"]
+groupAnagrams(strs)
+→ [["eat","tea","ate"], ["tan","nat"], ["bat"]]</div>
+    <div class="skills">
+      <span class="skill">defaultdict(list)</span><span class="skill">sorted() as key</span><span class="skill">tuple as dict key</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q23')">Show Solution</button>
+    <div class="answer" id="q23-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">groupAnagrams</span>(strs):
+    <span class="cmt"># Key insight: anagrams share the same sorted character tuple</span>
+    groups = <span class="fn">defaultdict</span>(<span class="fn">list</span>)
+    <span class="kw">for</span> s <span class="kw">in</span> strs:
+        key = <span class="fn">tuple</span>(<span class="fn">sorted</span>(s))   <span class="cmt"># "eat" → ('a','e','t')</span>
+        groups[key].append(s)
+    <span class="kw">return</span> <span class="fn">list</span>(groups.values())</pre>
+      <div class="explanation">
+        <strong>Key insight:</strong> Anagrams produce the same sorted tuple. Use that as the dict key.
+        <code>defaultdict(list)</code> auto-creates the group when a new anagram signature is seen.
+        Without it, you'd need: <code>if key not in groups: groups[key] = []</code>.
+        <br><br>
+        <strong>Time:</strong> O(n · k log k) where k is max string length. <strong>Space:</strong> O(n · k).
+      </div>
+    </div>
+  </div>
+
+  <!-- Q24 — Top K Frequent Elements (LC 347) -->
+  <div class="problem" id="q24">
+    <div class="p-header">
+      <span class="p-num">Q 24</span>
+      <span class="badge-lc">LeetCode 347</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Top K Frequent Elements</div>
+    <div class="p-desc">
+      Given an integer array and an integer k, return the k most frequent elements.
+      Use <code>defaultdict(int)</code> to count, then bucket sort by frequency.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">nums = [1,1,1,2,2,3], k = 2
+topKFrequent(nums, 2) → [1, 2]</div>
+    <div class="skills">
+      <span class="skill">defaultdict(int)</span><span class="skill">defaultdict(list)</span><span class="skill">bucket sort</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q24')">Show Solution</button>
+    <div class="answer" id="q24-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">topKFrequent</span>(nums, k):
+    <span class="cmt"># Step 1: count frequencies</span>
+    freq = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+    <span class="kw">for</span> n <span class="kw">in</span> nums:
+        freq[n] += <span class="num">1</span>
+
+    <span class="cmt"># Step 2: bucket sort — index = frequency, value = list of nums</span>
+    buckets = <span class="fn">defaultdict</span>(<span class="fn">list</span>)
+    <span class="kw">for</span> num, count <span class="kw">in</span> freq.items():
+        buckets[count].append(num)
+
+    <span class="cmt"># Step 3: collect top-k from highest freq bucket down</span>
+    result = []
+    <span class="kw">for</span> count <span class="kw">in</span> <span class="fn">range</span>(<span class="fn">len</span>(nums), <span class="num">0</span>, -<span class="num">1</span>):
+        result.extend(buckets[count])
+        <span class="kw">if</span> <span class="fn">len</span>(result) >= k:
+            <span class="kw">break</span>
+    <span class="kw">return</span> result[:k]</pre>
+      <div class="explanation">
+        <strong>Two defaultdicts in one solution:</strong> <code>defaultdict(int)</code> for counting,
+        <code>defaultdict(list)</code> for bucketing by frequency.
+        Bucket sort gives O(n) time — better than heap-based O(n log k) approaches.
+        <br><br>
+        Note: <code>buckets[count]</code> safely returns <code>[]</code> for any count with no numbers — no need to check if count exists.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q25 — Subarray Sum Equals K (LC 560) -->
+  <div class="problem" id="q25">
+    <div class="p-header">
+      <span class="p-num">Q 25</span>
+      <span class="badge-lc">LeetCode 560</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Subarray Sum Equals K</div>
+    <div class="p-desc">
+      Given an array of integers and an integer k, return the number of subarrays whose sum equals k.
+      Use prefix sums + <code>defaultdict(int)</code> for O(n) solution.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">nums = [1, 1, 1], k = 2
+subarraySum(nums, 2) → 2   # subarrays [1,1] at positions 0-1 and 1-2</div>
+    <div class="skills">
+      <span class="skill">defaultdict(int)</span><span class="skill">prefix sum</span><span class="skill">complement trick</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q25')">Show Solution</button>
+    <div class="answer" id="q25-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">subarraySum</span>(nums, k):
+    <span class="cmt"># prefix_count[s] = how many times prefix sum s has appeared</span>
+    prefix_count = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+    prefix_count[<span class="num">0</span>] = <span class="num">1</span>   <span class="cmt"># empty prefix has sum 0</span>
+
+    total = <span class="num">0</span>
+    prefix_sum = <span class="num">0</span>
+    <span class="kw">for</span> n <span class="kw">in</span> nums:
+        prefix_sum += n
+        <span class="cmt"># If (prefix_sum - k) was seen before, there's a valid subarray</span>
+        total += prefix_count[prefix_sum - k]
+        prefix_count[prefix_sum] += <span class="num">1</span>
+
+    <span class="kw">return</span> total</pre>
+      <div class="explanation">
+        <strong>Key insight:</strong> A subarray from index i to j sums to k if <code>prefix[j] - prefix[i-1] = k</code>.
+        Rearranged: <code>prefix[i-1] = prefix[j] - k</code>.
+        So for each prefix sum, we check how many earlier prefix sums equal <code>current - k</code>.
+        <br><br>
+        <code>defaultdict(int)</code> makes <code>prefix_count[prefix_sum - k]</code> return 0 safely when that prefix hasn't been seen.
+        Without it, you'd need <code>prefix_count.get(prefix_sum - k, 0)</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Q26 — Top K Frequent Words (LC 692) -->
+  <div class="problem" id="q26">
+    <div class="p-header">
+      <span class="p-num">Q 26</span>
+      <span class="badge-lc">LeetCode 692</span>
+      <span class="diff-medium">Medium</span>
+    </div>
+    <div class="p-title">Top K Frequent Words</div>
+    <div class="p-desc">
+      Given an array of strings and integer k, return the k most frequent words.
+      Ties are broken alphabetically. Return in descending frequency order.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">words = ["i","love","leetcode","i","love","coding"]
+topKFrequent(words, 2) → ["i", "love"]
+
+words = ["the","day","is","sunny","the","the","the","sunny","is","is"]
+topKFrequent(words, 4) → ["the", "is", "sunny", "day"]</div>
+    <div class="skills">
+      <span class="skill">defaultdict(int)</span><span class="skill">two-key sort</span><span class="skill">-freq + lex</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q26')">Show Solution</button>
+    <div class="answer" id="q26-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">topKFrequent</span>(words, k):
+    <span class="cmt"># Count word frequencies</span>
+    freq = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+    <span class="kw">for</span> w <span class="kw">in</span> words:
+        freq[w] += <span class="num">1</span>
+
+    <span class="cmt"># Two-key sort: highest freq first (-freq), ties broken alphabetically (+word)</span>
+    <span class="kw">return</span> <span class="fn">sorted</span>(freq, key=<span class="kw">lambda</span> w: (-freq[w], w))[:k]</pre>
+      <div class="explanation">
+        <strong>This is the same two-key sort pattern from Q04.</strong>
+        <code>(-freq[w], w)</code> sorts by descending frequency, then ascending lexicographic order.
+        <code>sorted(freq, ...)</code> iterates over the dict's keys.
+        <br><br>
+        <strong>Time:</strong> O(n + m log m) where m is unique words. <strong>Space:</strong> O(m).
+      </div>
+    </div>
+  </div>
+
+  <!-- Q27 — Bonus: Accounts Merge pattern -->
+  <div class="problem" id="q27">
+    <div class="p-header">
+      <span class="p-num">Q 27</span>
+      <span class="badge-cp">Coding Problem</span>
+      <span class="diff-hard">Hard</span>
+    </div>
+    <div class="p-title">Frequency of Frequencies</div>
+    <div class="p-desc">
+      Given a list of words, first count word frequencies. Then count how many words have each frequency.
+      Return a dict of <code>{frequency: count_of_words_with_that_freq}</code>.
+      Use two <code>defaultdict(int)</code>s chained together.
+    </div>
+    <div class="example-label">Example</div>
+    <div class="example">words = ["a","b","a","c","b","a","d"]
+freq_of_freq(words)
+→ {3: 1, 2: 1, 1: 2}
+# "a" appears 3 times (1 word with freq 3)
+# "b" appears 2 times (1 word with freq 2)
+# "c","d" appear 1 time each (2 words with freq 1)</div>
+    <div class="skills">
+      <span class="skill">chained defaultdict</span><span class="skill">freq of freq</span><span class="skill">.values()</span>
+    </div>
+    <button class="reveal-btn" onclick="reveal('q27')">Show Solution</button>
+    <div class="answer" id="q27-answer">
+      <div class="solution-label">Solution</div>
+      <pre class="code-block"><span class="kw">from</span> collections <span class="kw">import</span> defaultdict
+
+<span class="kw">def</span> <span class="fn">freq_of_freq</span>(words):
+    <span class="cmt"># Step 1: word → its frequency</span>
+    word_freq = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+    <span class="kw">for</span> w <span class="kw">in</span> words:
+        word_freq[w] += <span class="num">1</span>
+
+    <span class="cmt"># Step 2: frequency → how many words have it</span>
+    fof = <span class="fn">defaultdict</span>(<span class="fn">int</span>)
+    <span class="kw">for</span> count <span class="kw">in</span> word_freq.values():
+        fof[count] += <span class="num">1</span>
+
+    <span class="kw">return</span> <span class="fn">dict</span>(fof)</pre>
+      <div class="explanation">
+        <strong>Chain pattern:</strong> Use the <em>values</em> of the first <code>defaultdict</code> as the <em>keys</em> of the second.
+        This is a very common two-pass pattern: first count something, then count the counts.
+        Appears in problems like "Find the Celebrity", "Find All Anagrams", and database aggregation.
+        <br><br>
+        The elegance of <code>defaultdict(int)</code> is that both passes look identical —
+        just <code>d[key] += 1</code> — regardless of what kind of key you're counting.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- Summary mental map                                           -->
+  <!-- ============================================================ -->
+  <div class="callout" style="margin-top: 40px;">
+    <strong>Quick Reference — Pick your factory:</strong>
+    <br><br>
+    <code>defaultdict(int)</code> → counters, frequencies, prefix sums<br>
+    <code>defaultdict(list)</code> → grouping, indexing, adjacency lists<br>
+    <code>defaultdict(set)</code> → unique grouping, deduplication, graph edges<br>
+    <code>defaultdict(lambda: X)</code> → any custom constant default<br>
+    <code>defaultdict(lambda: defaultdict(int))</code> → two-level grouping<br>
+    <br>
+    <strong>3 rules to remember:</strong><br>
+    1. Reading a missing key <em>creates</em> it — use <code>.get()</code> to peek without side effects<br>
+    2. For nesting, always use <code>lambda: defaultdict(...)</code> — never pass an instance directly<br>
+    3. Return <code>dict(dd)</code> from functions — callers get clean, predictable plain dicts
+  </div>
+
+  <div class="ch-nav">
+    <a href="../i-leetcode-75/">← Category I: LeetCode 75</a>
+    <a href="../k-live-company-questions/">Category K: Live Company Questions →</a>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// REVEAL — show/hide answer block
+// ============================================================
+function reveal(id) {
+  const ans = document.getElementById(id + '-answer');
+  const btn = ans.previousElementSibling;
+  if (ans.classList.contains('open')) {
+    ans.classList.remove('open');
+    btn.textContent = 'Show Answer';
+  } else {
+    ans.classList.add('open');
+    btn.textContent = 'Hide Answer';
+  }
+}
+
+// ============================================================
+// MULTIPLE CHOICE — mark correct / wrong, show answer
+// ============================================================
+function checkMC(btn, qid, isCorrect) {
+  // Disable all options in this question
+  const opts = btn.closest('.problem').querySelectorAll('.option-btn');
+  opts.forEach(o => o.disabled = true);
+
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  if (!isCorrect) {
+    // Highlight the correct one
+    opts.forEach(o => {
+      if (o.getAttribute('onclick').includes('true')) {
+        o.classList.add('correct');
+      }
+    });
+  }
+
+  // Show explanation
+  const ans = document.getElementById(qid + '-answer');
+  if (ans) ans.classList.add('open');
+}
+</script>
+<script>
+window.PROBLEM_TESTS = {
+  "q04": [
+    {name: "Tie broken lexicographically", call: "char_freq('mississippi')", expected: "({'m': 1, 'i': 4, 's': 4, 'p': 2}, 'i')"},
+    {name: "Single repeated character", call: "char_freq('aaa')", expected: "({'a': 3}, 'a')"},
+    {name: "Two-way tie", call: "char_freq('bbaa')", expected: "({'b': 2, 'a': 2}, 'a')"}
+  ],
+  "q07": [
+    {name: "Duplicate values become lists", call: "invert({'a': 1, 'b': 2, 'c': 1, 'd': 3, 'e': 2})", expected: "{1: ['a', 'c'], 2: ['b', 'e'], 3: ['d']}"},
+    {name: "Bijection", call: "invert({'x': 10, 'y': 20})", expected: "{10: ['x'], 20: ['y']}"},
+    {name: "Empty dict", call: "invert({})", expected: "{}"}
+  ],
+  "q08": [
+    {name: "Word line index", call: "build_index(['Hello world', 'World of Python', 'Hello again'])", expected: "{'hello': [0, 2], 'world': [0, 1], 'of': [1], 'python': [1], 'again': [2]}"},
+    {name: "Single line", call: "build_index(['one two'])", expected: "{'one': [0], 'two': [0]}"},
+    {name: "Empty line list", call: "build_index([])", expected: "{}"}
+  ],
+  "q10": [
+    {name: "Triangle plus tail", call: "neighbours(build_graph([(1, 2), (1, 3), (2, 3), (3, 4)]), 3)", expected: "[1, 2, 4]"},
+    {name: "Node not in edges", call: "neighbours(build_graph([(1, 2)]), 99)", expected: "[]"},
+    {name: "Single edge", call: "neighbours(build_graph([(5, 10)]), 5)", expected: "[10]"}
+  ],
+  "q14": [
+    {name: "Example scorecard", call: "track_scores([('alice', -10), ('bob', 20), ('alice', -5), ('carol', -30)])", expected: "{'alice': 85, 'bob': 120, 'carol': 70}"},
+    {name: "No events", call: "track_scores([])", expected: "{}"},
+    {name: "Large positive swing", call: "track_scores([('z', 50), ('z', 50)])", expected: "{'z': 200}"}
+  ],
+  "q17": [
+    {name: "Alice click count", call: "count_actions([('alice', 'login'), ('bob', 'login'), ('alice', 'click'), ('alice', 'login'), ('bob', 'logout'), ('alice', 'click')], 'alice', 'click')", expected: "2"},
+    {name: "Missing action", call: "count_actions([('alice', 'login')], 'bob', 'click')", expected: "0"},
+    {name: "Unknown user", call: "count_actions([('a', 'x')], 'nobody', 'x')", expected: "0"}
+  ],
+  "q23": [
+    {name: "Three groups", setup: "result = sorted([sorted(g) for g in groupAnagrams(['eat', 'tea', 'tan', 'ate', 'nat', 'bat'])])", call: "result", expected: "[['ate', 'eat', 'tea'], ['bat'], ['nat', 'tan']]"},
+    {name: "Each unique", setup: "result = sorted([sorted(g) for g in groupAnagrams(['abc', 'def', 'ghi'])])", call: "result", expected: "[['abc'], ['def'], ['ghi']]"},
+    {name: "Empty input", call: "groupAnagrams([])", expected: "[]"}
+  ],
+  "q24": [
+    {name: "Two most frequent", call: "sorted(topKFrequent([1, 1, 1, 2, 2, 3], 2))", expected: "[1, 2]"},
+    {name: "k equals distinct", call: "sorted(topKFrequent([1, 2, 3], 3))", expected: "[1, 2, 3]"},
+    {name: "Single element", call: "topKFrequent([5], 1)", expected: "[5]"}
+  ],
+  "q25": [
+    {name: "Overlapping subarrays", call: "subarraySum([1, 1, 1], 2)", expected: "2"},
+    {name: "Single element hit", call: "subarraySum([5], 5)", expected: "1"},
+    {name: "Prefix sum equals k", call: "subarraySum([1, 2, 3], 3)", expected: "2"}
+  ],
+  "q26": [
+    {name: "Frequency then alphabet", call: "topKFrequent(['i', 'love', 'leetcode', 'i', 'love', 'coding'], 2)", expected: "['i', 'love']"},
+    {name: "Tie-breaking", call: "topKFrequent(['b', 'a', 'b', 'a'], 2)", expected: "['a', 'b']"},
+    {name: "Full vocabulary", call: "topKFrequent(['z', 'y', 'x'], 3)", expected: "['x', 'y', 'z']"}
+  ],
+  "q27": [
+    {name: "Example freq-of-freq", call: "freq_of_freq(['a', 'b', 'a', 'c', 'b', 'a', 'd'])", expected: "{3: 1, 2: 1, 1: 2}"},
+    {name: "All equally rare", call: "freq_of_freq(['a', 'b', 'c'])", expected: "{1: 3}"},
+    {name: "One word repeated", call: "freq_of_freq(['x', 'x', 'x'])", expected: "{3: 1}"}
+  ]
+};
+</script>
+<script src="../codemirror-bundle.js"></script>
+<script src="../pyrunner.js"></script>
+<script src="../pyscript-editor.js"></script>
+</body>
+</html>

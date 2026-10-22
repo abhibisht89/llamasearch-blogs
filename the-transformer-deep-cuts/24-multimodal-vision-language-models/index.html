@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building a Multimodal Vision-Language Model — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #5eead4;
+  --accent2: #818cf8;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); margin-bottom: 20px; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+.nav-wrap {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav-wrap.visible { transform: translateY(0); }
+.nav-inner {
+  max-width: 920px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.nav-back { font-weight: 700; color: var(--accent2); white-space: nowrap; font-size: 0.85rem; }
+.nav-toggle {
+  margin-left: auto; display: none;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.75rem; cursor: pointer; font-family: inherit;
+}
+.nav-toggle:hover { border-color: var(--accent); }
+.nav-links {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  font-size: 0.78rem;
+}
+.nav-links a { color: var(--text-dim); }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: block; }
+  .nav-links {
+    display: none; width: 100%; flex-direction: column; align-items: flex-start;
+    padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px;
+  }
+  .nav-wrap.open .nav-links { display: flex; }
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 88px 24px 64px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(94,234,212,0.12) 0%, transparent 68%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 14px; position: relative; z-index: 1; }
+.subtitle {
+  font-size: 1.12rem; color: var(--text-dim);
+  max-width: 720px; margin: 0 auto 28px; position: relative; z-index: 1;
+}
+
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 18px 0;
+}
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; margin: 18px 0;
+  font-family: var(--mono); font-size: 0.88rem; color: var(--accent3);
+  text-align: center; overflow-x: auto;
+}
+
+.callout {
+  background: rgba(129,140,248,0.07); border-left: 3px solid var(--accent2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 20px; margin: 20px 0;
+}
+.callout p:last-child { margin-bottom: 0; }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.06); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin: 22px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+.qa-box p:last-child { margin-bottom: 0; }
+
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 22px 0;
+  align-items: stretch;
+}
+.comparison .card { margin: 0; }
+.comparison .card h3 { color: var(--accent2); font-size: 1rem; margin-bottom: 10px; }
+@media (max-width: 800px) { .comparison { grid-template-columns: 1fr; } }
+
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 22px 0;
+}
+.interactive-panel h4 {
+  font-size: 0.95rem; color: var(--text); margin-bottom: 14px; font-weight: 600;
+}
+
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.88rem; cursor: pointer; margin: 4px 6px 4px 0;
+  font-family: inherit;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: rgba(94,234,212,0.15); border-color: var(--accent); color: var(--accent); }
+
+label.lbl { font-size: 0.8rem; color: var(--text-dim); display: block; margin-top: 8px; }
+input[type="range"] { width: 100%; max-width: 360px; }
+
+ul.clean { margin: 12px 0 12px 1.2em; color: var(--text-dim); }
+ul.clean li { margin-bottom: 0.5em; }
+
+.fade-in { opacity: 0; transform: translateY(28px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent4); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.patch-demo-wrap {
+  display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+}
+.patch-canvas-wrap {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #0d1117;
+}
+#patchCanvas { display: block; max-width: 100%; height: auto; }
+
+.clip-grid {
+  display: grid; gap: 4px;
+  font-family: var(--mono); font-size: 0.7rem;
+  margin: 12px 0;
+}
+.clip-cell {
+  min-width: 44px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; border: 1px solid var(--border);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.clip-cell.diag { box-shadow: inset 0 0 0 2px var(--accent); background: rgba(94,234,212,0.12); }
+.clip-cell.neg { color: var(--text-dim); }
+
+.flow-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 12px 0; font-size: 0.82rem; font-family: var(--mono);
+}
+.flow-box {
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+}
+.flow-box.vision { border-color: var(--accent3); color: var(--accent3); }
+.flow-box.text { border-color: var(--accent2); color: var(--accent2); }
+.flow-arrow { color: var(--text-dim); }
+
+.fusion-svg { width: 100%; max-width: 640px; height: auto; display: block; margin: 16px auto; }
+
+.kv-step {
+  font-family: var(--mono); font-size: 0.78rem;
+  padding: 10px 14px; margin: 6px 0;
+  border-left: 3px solid var(--accent5);
+  background: var(--bg-card-alt);
+  border-radius: 0 8px 8px 0;
+}
+
+.play-canvas {
+  min-height: 200px; border: 1px dashed var(--border);
+  border-radius: var(--radius); padding: 16px; margin-top: 12px;
+  font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim);
+}
+
+.comparison-mini {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;
+}
+@media (max-width: 640px) { .comparison-mini { grid-template-columns: 1fr; } }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Multimodal Vision-Language Models</span></nav>
+
+
+<nav class="nav-wrap" id="nav" aria-label="Section navigation">
+  <div class="nav-inner">
+    <a class="nav-back" href="../">Advanced NLP V2</a>
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false">Menu</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#s00">00</a>
+      <a href="#s01">01</a>
+      <a href="#s02">02</a>
+      <a href="#s03">03</a>
+      <a href="#s04">04</a>
+      <a href="#s05">05</a>
+      <a href="#s06">06</a>
+      <a href="#s07">07</a>
+      <a href="#s08">Playground</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>Building a Multimodal Vision-Language Model</h1>
+    <p class="subtitle">
+      From contrastive vision encoders and the Vision Transformer to token fusion, rotary position embeddings, and key–value caching for efficient multimodal decoding—this chapter traces a PaliGemma-style architecture end to end.
+    </p>
+  </div>
+</header>
+
+<main class="container">
+
+<section id="s00" class="section fade-in">
+  <span class="section-num">00 — Overview</span>
+  <h2>What you are assembling</h2>
+  <p>A vision-language model (VLM) answers questions <em>about pixels</em> by conditioning a text decoder on visual features. The pipeline in this family of models typically includes:</p>
+  <ul class="clean">
+    <li><strong>Contrastive vision encoder</strong> (often a SigLIP-trained ViT): maps an image to a <em>sequence</em> of patch tokens aligned with text in embedding space.</li>
+    <li><strong>Multimodal projector</strong>: a linear map from vision hidden size to language hidden size so tensors can be concatenated.</li>
+    <li><strong>Causal language model</strong> (decoder-only): Gemma-style stack with RMSNorm, grouped-query attention, and rotary positional embeddings (RoPE).</li>
+    <li><strong>Fusion</strong>: placeholder token IDs in the text sequence are replaced by projected vision features; attention masks treat image tokens as bidirectional context and text tokens as causal for generation.</li>
+  </ul>
+  <div class="callout">
+    <p><strong>Conditional generation.</strong> The image and the user prefix are not “contrasted” at inference the way training pairs are; they act as <strong>context</strong> the decoder attends to while predicting the next token.</p>
+  </div>
+
+  <p>Concretely, a VLM can answer a question such as “where is the photographer resting?” when given a beach photograph: the model conditions on pixels and produces a short answer (for example, that the person is in a hammock under a tree). That behavior is <strong>not</strong> produced by running contrastive scoring over caption candidates at decode time; the decoder is simply an autoregressive LM whose prefix includes fused visual tokens.</p>
+
+  <p>Contrastive pretraining still matters because it shapes the vision tower: image patches are mapped to vectors that already “live in” a space compatible with text. A practical data source is web-scale image–text pairs (captions, HTML <code class="inline">alt</code> text, encyclopedia descriptions). Noise in those pairs is expected; training at very large scale tends to wash out occasional mismatches and yields representations that align well with language.</p>
+
+  <p>Contrastive pretraining shapes the vision tower: patch embeddings must sit in a space compatible with text when the decoder attends over a fused sequence. A SigLIP-trained ViT is the usual choice—paired image–text supervision at scale, without dense labels per downstream task.</p>
+</section>
+
+<section id="s01" class="section fade-in">
+  <span class="section-num">01 — Contrastive pretraining</span>
+  <h2>Vision tower from CLIP / SigLIP</h2>
+  <p>Using the CLIP framework from <a href="../22-clip-contrastive-vision-language/">Chapter 22</a>, encoders map image–caption pairs into a shared space: matched pairs score high, mismatches low. PaliGemma-style VLMs typically adopt a <strong>SigLIP</strong>-trained ViT—sigmoid pairwise training instead of row softmax—because it scales to larger batches without global row normalization. At inference the VLM does not run contrastive scoring; it reuses the vision encoder’s patch tokens as decoder context.</p>
+
+  <div class="comparison">
+    <div class="card">
+      <h3>CLIP (softmax over a row)</h3>
+      <p>Cross-entropy along rows and columns of an \(N \times N\) similarity matrix. Needs the full row on one device for the softmax partition function.</p>
+    </div>
+    <div class="card">
+      <h3>SigLIP (sigmoid per cell)</h3>
+      <p>Each \((i,j)\) pair is an independent binary target after a sigmoid—cells can be sharded for very large batches.</p>
+    </div>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Interactive: CLIP vs SigLIP on a similarity grid</h4>
+    <p style="margin-bottom:12px;font-size:0.9rem;">Adjust match strength on the diagonal. CLIP normalizes whole rows/columns (softmax). SigLIP scores each cell on its own (sigmoid toward 0/1 targets).</p>
+    <label class="lbl" for="diagStrength">Diagonal similarity (matched pairs)</label>
+    <input type="range" id="diagStrength" min="1" max="8" value="5" step="0.5">
+    <div class="grid-2" style="margin-top:16px;">
+      <div class="card" style="margin:0;">
+        <strong style="color:var(--text);">CLIP view</strong>
+        <p style="font-size:0.82rem;margin:8px 0;">One row after softmax (approximate): probabilities must sum to 1.</p>
+        <div id="clipRow" class="clip-grid" style="grid-template-columns: repeat(4, 1fr);"></div>
+      </div>
+      <div class="card" style="margin:0;">
+        <strong style="color:var(--text);">SigLIP view</strong>
+        <p style="font-size:0.82rem;margin:8px 0;">Each cell: independent \(\sigma(s_{ij})\) vs target 1 or 0.</p>
+        <div id="siglipGrid" class="clip-grid" style="grid-template-columns: repeat(4, 1fr);"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s02" class="section fade-in">
+  <span class="section-num">02 — Vision Transformer (ViT)</span>
+  <h2>Patch embeddings and full self-attention</h2>
+  <p>An image tensor has shape \((B, 3, H, W)\). A <strong>patch embedding</strong> uses a 2D convolution with <code class="inline">kernel_size = patch_size</code>, <code class="inline">stride = patch_size</code>, and <code class="inline">padding = 'valid'</code> so patches do not overlap. Each spatial location becomes one token of dimension <code class="inline">hidden_size</code>.</p>
+  <div class="formula">\(\displaystyle N_{\text{patches}} = \left(\frac{H}{\text{patch\_size}}\right)\left(\frac{W}{\text{patch\_size}}\right)\)</div>
+  <p>For a square \(224 \times 224\) image and \(16 \times 16\) patches, \(N_{\text{patches}} = 14 \times 14 = 196\) spatial tokens; configurations may expose a fixed <code class="inline">num_image_tokens</code> (e.g. 256) depending on variant and pooling.</p>
+
+  <p><strong>Positional information</strong> in ViT is usually a <strong>learned</strong> embedding table (one vector per patch index), added to patch embeddings—unlike sinusoidal encodings common in original NLP Transformers.</p>
+
+  <p><strong>Attention mask.</strong> ViT uses <strong>bidirectional</strong> self-attention over patches—every patch may attend to every other patch.</p>
+
+  <p>The original Vision Transformer treats non-overlapping patches as a token sequence with learned position vectors and encoder blocks—<strong>no causal mask</strong> inside the vision tower, unlike the text decoder in <a href="../04-llama-architecture/">Chapter 04</a>.</p>
+
+  <p>For global contrastive training, some systems pool patch states into one image vector. PaliGemma-style VLMs keep <strong>all</strong> patch tokens, project each to the text hidden size, and splice them into the decoder prefix for fine-grained spatial evidence.</p>
+
+  <div class="callout ok">
+    <p><strong>Patch count vs. <code class="inline">num_image_tokens</code>.</strong> For \(224\times 224\) inputs with \(16\times 16\) patches, the natural grid is \(14\times 14 = 196\) spatial tokens. Many released checkpoints instead fix <code class="inline">num_image_tokens</code> (often 256 for the smallest PaliGemma image size) so the tokenizer and projector agree on placeholder count—consult the model config rather than assuming 196.</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Interactive: patch grid on a faux image</h4>
+    <label class="lbl" for="patchSize">Patch size (px in demo)</label>
+    <input type="range" id="patchSize" min="12" max="48" value="24" step="4">
+    <label class="lbl" for="gridGlow">Highlight patch index</label>
+    <input type="range" id="gridGlow" min="0" max="15" value="5" step="1">
+    <div class="patch-demo-wrap">
+      <div class="patch-canvas-wrap">
+        <canvas id="patchCanvas" width="320" height="320" aria-label="Patch embedding visualization"></canvas>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <p style="font-size:0.88rem;">Convolution with stride equal to kernel size walks the image in a non-overlapping grid. Flattening spatial dimensions yields a <strong>sequence</strong> of patch tokens for the Transformer encoder stack (pre-norm blocks: LayerNorm → attention → residual; LayerNorm → MLP → residual).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Interactive: multi-head split (conceptual)</h4>
+    <p style="font-size:0.88rem;margin-bottom:10px;">Embedding dimension \(d_{\text{model}}\) is partitioned into \(h\) heads, each of size \(d_{\text{head}} = d_{\text{model}} / h\). Heads run scaled dot-product attention in parallel; outputs are concatenated and mixed by \(W_o\).</p>
+    <label class="lbl" for="numHeads">Heads \(h\)</label>
+    <input type="range" id="numHeads" min="2" max="16" value="8" step="1">
+    <p id="headDimOut" style="font-family:var(--mono);color:var(--accent3);margin-top:10px;"></p>
+  </div>
+</section>
+
+<section id="s03" class="section fade-in">
+  <span class="section-num">03 — Normalization</span>
+  <h2>LayerNorm in ViT, RMSNorm in the decoder</h2>
+  <p>ViT encoder blocks use <strong>LayerNorm</strong> per token (pre-norm: normalize before attention and MLP). The text decoder uses <strong>RMSNorm</strong> instead—see <a href="../04-llama-architecture/">Chapter 04</a> for the full treatment. BatchNorm (batch-axis statistics) appears in CNN image pipelines but not in these Transformer stacks.</p>
+</section>
+
+<section id="s04" class="section fade-in">
+  <span class="section-num">04 — PaliGemma-style assembly</span>
+  <h2>Vision tower, projector, and decoder</h2>
+  <p>The end-to-end model is a composition of three trainable pieces plus preprocessing:</p>
+  <ol style="color:var(--text-dim);margin-left:1.2em;">
+    <li><strong>SigLIP / ViT tower:</strong> pixels → sequence of vision hidden states.</li>
+    <li><strong>Multimodal projector:</strong> linear layer \(W \in \mathbb{R}^{d_v \times d_\ell}\) mapping each vision token to \(d_\ell\) (language hidden size).</li>
+    <li><strong>Decoder LM:</strong> decoder-only stack from <a href="../04-llama-architecture/">Chapter 04</a> / <a href="../05-coding-llama-2/">Chapter 05</a> (RMSNorm, RoPE, GQA); final logits tied or untied with input embeddings.</li>
+  </ol>
+
+  <div class="callout">
+    <p><strong>Weight tying.</strong> Sharing parameters between the input embedding matrix and the output projection to vocabulary reduces parameter count when the vocabulary is large.</p>
+  </div>
+
+  <p>In a typical PaliGemma-style bundle, the <strong>text decoder</strong> (Gemma family) uses hidden width \(d_\ell\) on the order of <strong>2048</strong> for a “base”-scale checkpoint, while the <strong>SigLIP ViT</strong> tower often exposes a different width \(d_v\) (commonly <strong>1152</strong> in public configs). The multimodal projector is a single linear map \(\mathbb{R}^{d_v} \to \mathbb{R}^{d_\ell}\) applied <em>per patch token</em>. Matching names with the Hugging Face state dict (e.g. <code class="inline">vision_tower</code>, <code class="inline">multi_modal_projector</code>) avoids brittle weight-import scripts.</p>
+
+  <p>Released variants resize inputs to different squares—<strong>224</strong>, <strong>448</strong>, and <strong>896</strong> pixels appear across the family—with corresponding increases in patch-token count. The processor must resize, rescale pixels from \([0,255]\) toward \([0,1]\), then normalize channels (often with per-channel mean/std close to ImageNet statistics, sometimes simplified to \(0.5\) scalars in code for convenience).</p>
+
+  <div class="callout warn">
+    <p>Implementations sometimes <strong>rescale projected image features</strong> by \(1/\sqrt{d_\ell}\) (same spirit as attention scaling) so doubling embedding width does not automatically explode activation magnitudes. Treat this as a training-time convention carried into inference.</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Interactive: tensor shapes through the stack</h4>
+    <label class="lbl" for="shapeNp">\(N_{\text{patches}}\) (sequence length from vision)</label>
+    <input type="range" id="shapeNp" min="64" max="512" value="256" step="32">
+    <label class="lbl" for="shapeDv">Vision hidden \(d_v\)</label>
+    <input type="range" id="shapeDv" min="512" max="1536" value="1152" step="64">
+    <label class="lbl" for="shapeDl">Language hidden \(d_\ell\)</label>
+    <input type="range" id="shapeDl" min="512" max="2048" value="2048" step="128">
+    <p id="shapeOut" style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);margin-top:14px;"></p>
+  </div>
+</section>
+
+<section id="s05" class="section fade-in">
+  <span class="section-num">05 — Fusing image and text tokens</span>
+  <h2>Placeholders, merge, and attention mask</h2>
+  <p>Tokenizer output is a list of integer IDs. The recipe adds <strong>many copies</strong> of a dedicated <code class="inline">&lt;image&gt;</code> placeholder ID at the start of the sequence, then BOS, then the task prefix string, often with a newline separator tokenized carefully so it does not merge incorrectly with the prefix.</p>
+  <p>Embeddings are looked up for all IDs. Rows corresponding to placeholder positions are <strong>discarded</strong> and replaced by the projected vision features (same count as placeholders). The result is one long sequence of vectors fed to the decoder.</p>
+
+  <p>The published PaliGemma prompt template follows the schematic: <strong>\(k\) image placeholders</strong> (with \(k\) equal to <code class="inline">num_image_tokens</code> from config—often <strong>256</strong> for the smallest image setting), then <strong>BOS</strong>, then the user’s task string (“describe…”, “where is…”), then a <strong>newline</strong> separator. The paper recommends tokenizing the newline separately so byte-pair merges do not glue it to the last word of the instruction.</p>
+
+  <p>A practical merge implementation builds three boolean masks over positions—<strong>image</strong>, <strong>text</strong>, <strong>padding</strong>—broadcasts them across \(d_\ell\), and uses <code class="inline">torch.where</code> / masked scatter: copy ordinary text embeddings where the text mask is true; write scaled projector outputs where the image mask is true; zero or ignore padding. The placeholder rows produced by the embedding table are throwaway; only positions matter.</p>
+
+  <div class="callout ok">
+    <p>Beyond captioning, the same tokenizer family can carry <strong>extra special tokens</strong> for dense tasks (for example, large grids of location tokens for bounding-box style outputs and additional tokens for segmentation masks). Conditional captioning only needs the image placeholders plus text instructions; detection/segmentation tokens stay unused in that mode.</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Interactive: placeholder replacement (schematic)</h4>
+    <button type="button" class="btn primary" id="btnMergeAnim">Run merge step</button>
+    <div class="flow-row" id="mergeFlow" style="margin-top:16px;">
+      <span class="flow-box vision" id="mb1">[img₀…imgₖ₋₁]</span>
+      <span class="flow-arrow">+</span>
+      <span class="flow-box text" id="mb2">[BOS, prefix…]</span>
+    </div>
+    <p id="mergeStatus" style="font-size:0.85rem;margin-top:10px;color:var(--text-dim);">Projector aligns vision dim → language dim; merged sequence length = k + text tokens.</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Interactive: concatenation flow diagram</h4>
+    <svg class="fusion-svg" viewBox="0 0 520 280" xmlns="http://www.w3.org/2000/svg" aria-label="Image and text token flow">
+      <defs>
+        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#34d399"/><stop offset="100%" style="stop-color:#5eead4"/>
+        </linearGradient>
+        <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#818cf8"/><stop offset="100%" style="stop-color:#a78bfa"/>
+        </linearGradient>
+      </defs>
+      <rect x="20" y="30" width="120" height="50" rx="8" fill="url(#g1)" opacity="0.25" stroke="#34d399"/>
+      <text x="80" y="60" text-anchor="middle" fill="#e0e0e8" font-size="11" font-family="system-ui,sans-serif">Pixels</text>
+      <path d="M 140 55 L 198 55" stroke="#8888a0" stroke-width="2"/>
+      <rect x="200" y="30" width="120" height="50" rx="8" fill="#12121a" stroke="#5eead4"/>
+      <text x="260" y="60" text-anchor="middle" fill="#5eead4" font-size="11" font-family="system-ui,sans-serif">ViT patches</text>
+      <path d="M 320 55 L 380 55" stroke="#8888a0" stroke-width="2"/>
+      <rect x="380" y="30" width="120" height="50" rx="8" fill="#12121a" stroke="#34d399"/>
+      <text x="440" y="52" text-anchor="middle" fill="#34d399" font-size="10" font-family="system-ui,sans-serif">Projector</text>
+      <text x="440" y="68" text-anchor="middle" fill="#8888a0" font-size="9" font-family="system-ui,sans-serif">d_v → d_ℓ</text>
+
+      <rect x="20" y="130" width="120" height="50" rx="8" fill="url(#g2)" opacity="0.2" stroke="#818cf8"/>
+      <text x="80" y="160" text-anchor="middle" fill="#e0e0e8" font-size="11" font-family="system-ui,sans-serif">Tokenizer</text>
+      <path d="M 140 155 L 260 155" stroke="#8888a0" stroke-width="2"/>
+      <rect x="260" y="130" width="160" height="50" rx="8" fill="#12121a" stroke="#818cf8"/>
+      <text x="340" y="152" text-anchor="middle" fill="#818cf8" font-size="10" font-family="system-ui,sans-serif">IDs + &lt;image&gt;×k</text>
+      <text x="340" y="168" text-anchor="middle" fill="#8888a0" font-size="9" font-family="system-ui,sans-serif">embed lookup</text>
+
+      <path d="M 440 80 L 440 115 L 280 115 L 280 130" fill="none" stroke="#f472b6" stroke-width="2" stroke-dasharray="4 3"/>
+      <path d="M 340 180 L 340 210 L 200 210" fill="none" stroke="#f472b6" stroke-width="2" stroke-dasharray="4 3"/>
+      <rect x="80" y="200" width="360" height="56" rx="10" fill="#181825" stroke="#f472b6"/>
+      <text x="260" y="228" text-anchor="middle" fill="#f472b6" font-size="12" font-family="system-ui,sans-serif">Decoder: replace k placeholders → single sequence</text>
+      <text x="260" y="246" text-anchor="middle" fill="#8888a0" font-size="10" font-family="system-ui,sans-serif">Causal mask on text positions; full bidirectional context within prefix as configured</text>
+    </svg>
+    <p style="font-size:0.85rem;">The diagram summarizes the data path: image branch produces \(k\) tokens at width \(d_\ell\); text branch produces embeddings for BOS + task prefix; the model splices them into one tensor for self-attention.</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Interactive: prefix attention pattern (schematic)</h4>
+    <p style="font-size:0.88rem;margin-bottom:10px;">Image tokens (left block) attend to each other bidirectionally. Text tokens (right) use causal masking for autoregressive LM training; image tokens can attend to all image positions and are visible from text positions per the model’s mask recipe.</p>
+    <label class="lbl" for="maskImg">Image tokens \(k\)</label>
+    <input type="range" id="maskImg" min="3" max="10" value="6" step="1">
+    <label class="lbl" for="maskTxt">Text tokens</label>
+    <input type="range" id="maskTxt" min="3" max="10" value="5" step="1">
+    <div id="maskGrid" style="display:grid;gap:2px;margin-top:14px;max-width:420px;"></div>
+    <p id="maskLegend" style="font-size:0.75rem;color:var(--text-dim);margin-top:10px;"></p>
+  </div>
+
+  <p>PaliGemma allows <strong>full bidirectional attention within the prefix</strong> (image tokens + task text) because that block is always supplied, not sampled. Only the <strong>generated answer</strong> is causal. See the prefix-attention demo below.</p>
+
+  <p>With a KV cache during decode, you only form <strong>one new query row</strong> per step; keys and values for the whole prefix already sit in cache.</p>
+</section>
+
+<section id="s06" class="section fade-in">
+  <span class="section-num">06 — RoPE &amp; KV cache</span>
+  <h2>Positions and efficient autoregressive decoding</h2>
+  <p>The text decoder follows the stack from <a href="../04-llama-architecture/">Chapter 04</a> and <a href="../05-coding-llama-2/">Chapter 05</a>: RoPE on queries and keys, grouped-query attention, and a KV cache for autoregressive generation. With hundreds of image tokens in the prefix, cache size and memory bandwidth dominate latency—GQA shrinks the KV footprint compared to full multi-head attention.</p>
+
+  <p><strong>Prefill vs. decode.</strong> First forward: run the entire prefix (all image + instruction tokens) to populate per-layer KV caches in one parallel pass. Each subsequent step appends <strong>one</strong> token: compute \(q,k,v\) for that token, concatenate new \(k,v\) along the sequence axis, and attend over the growing cache.</p>
+
+  <div class="callout ok">
+    <p><strong>Position IDs through prefill.</strong> If the prefix contains 256 image tokens plus three text tokens, RoPE consumes positions \(0,1,\ldots,255,256,257,258\) in order. The first decode step uses position \(259\) for the newly sampled token, then \(260\), and so on.</p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Interactive: multimodal KV cache timeline</h4>
+    <p style="font-size:0.88rem;margin-bottom:10px;">Prefill: compute K,V for the entire prefix (image + text so far) once. Decode: append one new token per step; cache past K,V so only the new position’s projections and attention over the growing cache are needed.</p>
+    <div id="kvSteps"></div>
+    <label class="lbl" for="decodeStep">Simulated decode step</label>
+    <input type="range" id="decodeStep" min="0" max="12" value="0" step="1">
+    <p id="kvCaption" style="font-family:var(--mono);font-size:0.8rem;color:var(--accent5);margin-top:10px;"></p>
+  </div>
+</section>
+
+<section id="s07" class="section fade-in">
+  <span class="section-num">07 — Full forward pass</span>
+  <h2>End-to-end inference checklist</h2>
+  <ol style="color:var(--text-dim);margin-left:1.2em;">
+    <li>Resize and normalize the image (channel-first tensor; mean/std scaling as in the checkpoint).</li>
+    <li>Run the vision tower forward → <code class="inline">(B, N_p, d_v)</code>.</li>
+    <li>Apply multimodal projector → <code class="inline">(B, N_p, d_\ell)</code>.</li>
+    <li>Build token IDs: <code class="inline">k</code> image placeholders + BOS + prefix (+ separator as specified).</li>
+    <li>Embed tokens; overwrite the first <code class="inline">k</code> rows with projected patch features.</li>
+    <li>Run decoder with appropriate attention mask; optionally fill KV cache during prefill.</li>
+    <li>Sample or greedy-decode from logits at the last position until EOS.</li>
+  </ol>
+  <div class="callout warn">
+    <p><strong>Padding.</strong> Batched inference requires padding masks aligned with the fused sequence; single-sequence tutorials often omit this for clarity.</p>
+  </div>
+
+  <p><strong>Sampling mechanics.</strong> Greedy decoding takes \(\arg\max\) over the vocabulary on the final position’s logits. <strong>Temperature</strong> divides logits by \(T>1\) before softmax to flatten the distribution (more diversity); \(T<1\) sharpens it. <strong>Top-p</strong> (nucleus) sampling sorts probabilities, keeps the smallest set whose cumulative mass exceeds \(p\) (say \(p=0.7\)), renormalizes, and draws from that truncated distribution—e.g. if sorted masses are \(0.5, 0.2, 0.1,\ldots\), only the first two might survive for \(p=0.7\), yielding a two-way lottery after renormalization (illustratively \(\approx 0.71 / 0.29\)).</p>
+
+  <p>Weights load from stacked <code class="inline">safetensors</code> shards plus <code class="inline">config.json</code>; keeping module names aligned with the reference implementation lets you <code class="inline">load_state_dict</code> without a rename map. After load, call the tie-weights hook so the input embedding matrix and LM head share storage—often on the order of ~10% of total parameters for large vocabularies.</p>
+
+  <div class="comparison">
+    <div class="card">
+      <h3>ViT MLP (SiGLIP)</h3>
+      <p>Two linear layers with an inner GELU: expand to an intermediate multiple of the hidden size (often ~4× in ViT literature), then project back. Operates per token independently after attention mixes information.</p>
+    </div>
+    <div class="card">
+      <h3>Gemma FFN</h3>
+      <p>Gated SwiGLU-style expansion—details in <a href="../04-llama-architecture/">Chapter 04</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section id="s08" class="section fade-in">
+  <span class="section-num">08 — Playground</span>
+  <h2>Try the formulas</h2>
+  <p>Explore sigmoid targets on a single similarity value (SigLIP-style per-pair scoring).</p>
+  <div class="interactive-panel">
+    <label class="lbl" for="rawLogit">Raw logit / similarity \(z\)</label>
+    <input type="range" id="rawLogit" min="-4" max="4" value="1" step="0.1">
+    <p id="playSoftmax" class="play-canvas" style="margin-top:8px;"></p>
+    <p id="playSigmoid" class="play-canvas"></p>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  var nav = document.getElementById('nav');
+  var navToggle = document.getElementById('navToggle');
+  var navLinks = document.getElementById('navLinks');
+  var sections = document.querySelectorAll('.section.fade-in');
+
+  window.addEventListener('scroll', function () {
+    nav.classList.toggle('visible', window.scrollY > 120);
+  });
+
+  navToggle.addEventListener('click', function () {
+    var open = nav.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!nav.contains(e.target)) {
+      nav.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) en.target.classList.add('visible');
+    });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+  sections.forEach(function (s) { obs.observe(s); });
+
+  function softmaxRow(arr) {
+    var m = Math.max.apply(null, arr);
+    var ex = arr.map(function (x) { return Math.exp(x - m); });
+    var s = ex.reduce(function (a, b) { return a + b; }, 0);
+    return ex.map(function (x) { return x / s; });
+  }
+
+  function renderClipSiglip() {
+    var d = parseFloat(document.getElementById('diagStrength').value);
+    var off = 0.5;
+    var row = [d, off, off, off];
+    var sm = softmaxRow(row);
+    var clipRow = document.getElementById('clipRow');
+    clipRow.innerHTML = '';
+    sm.forEach(function (p, i) {
+      var el = document.createElement('div');
+      el.className = 'clip-cell' + (i === 0 ? ' diag' : '');
+      el.textContent = p.toFixed(3);
+      el.title = 'softmax prob col ' + i;
+      clipRow.appendChild(el);
+    });
+
+    var sig = document.getElementById('siglipGrid');
+    sig.innerHTML = '';
+    for (var i = 0; i < 4; i++) {
+      for (var j = 0; j < 4; j++) {
+        var c = document.createElement('div');
+        var sij = i === j ? d : off;
+        var sigv = 1 / (1 + Math.exp(-sij));
+        c.className = 'clip-cell' + (i === j ? ' diag' : ' neg');
+        c.textContent = sigv.toFixed(2);
+        c.title = 'σ(s_' + i + ',' + j + '), target ' + (i === j ? '1' : '0');
+        sig.appendChild(c);
+      }
+    }
+  }
+  document.getElementById('diagStrength').addEventListener('input', renderClipSiglip);
+  renderClipSiglip();
+
+  var patchCanvas = document.getElementById('patchCanvas');
+  var pctx = patchCanvas.getContext('2d');
+  function drawPatches() {
+    var psz = parseInt(document.getElementById('patchSize').value, 10);
+    var hi = parseInt(document.getElementById('gridGlow').value, 10);
+    var w = patchCanvas.width;
+    var h = patchCanvas.height;
+    pctx.fillStyle = '#161b22';
+    pctx.fillRect(0, 0, w, h);
+    for (var y = 0; y < h; y += psz) {
+      for (var x = 0; x < w; x += psz) {
+        var g = (x / psz + y / psz * (w / psz)) | 0;
+        var hue = (g * 37) % 360;
+        pctx.fillStyle = 'hsla(' + hue + ',45%,35%,0.85)';
+        pctx.fillRect(x, y, psz - 1, psz - 1);
+      }
+    }
+    pctx.strokeStyle = 'rgba(94,234,212,0.4)';
+    pctx.lineWidth = 1;
+    for (var y2 = 0; y2 <= h; y2 += psz) {
+      pctx.beginPath(); pctx.moveTo(0, y2); pctx.lineTo(w, y2); pctx.stroke();
+    }
+    for (var x2 = 0; x2 <= w; x2 += psz) {
+      pctx.beginPath(); pctx.moveTo(x2, 0); pctx.lineTo(x2, h); pctx.stroke();
+    }
+    var cols = (w / psz) | 0;
+    var px = (hi % cols) * psz;
+    var py = ((hi / cols) | 0) * psz;
+    pctx.strokeStyle = '#f472b6';
+    pctx.lineWidth = 3;
+    pctx.strokeRect(px + 2, py + 2, psz - 5, psz - 5);
+  }
+  ['patchSize', 'gridGlow'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', drawPatches);
+  });
+  drawPatches();
+
+  function updateHeadDim() {
+    var h = parseInt(document.getElementById('numHeads').value, 10);
+    var d = 1024;
+    document.getElementById('headDimOut').textContent =
+      'd_model=' + d + ', h=' + h + ' → d_head=' + (d / h) + ' (must divide evenly in real models).';
+  }
+  document.getElementById('numHeads').addEventListener('input', updateHeadDim);
+  updateHeadDim();
+
+  function updateShapes() {
+    var Np = parseInt(document.getElementById('shapeNp').value, 10);
+    var dv = parseInt(document.getElementById('shapeDv').value, 10);
+    var dl = parseInt(document.getElementById('shapeDl').value, 10);
+    var B = 1;
+    document.getElementById('shapeOut').innerHTML =
+      'Vision out: (' + B + ', ' + Np + ', ' + dv + ') &nbsp;→&nbsp; projector &nbsp;→&nbsp; (' + B + ', ' + Np + ', ' + dl + ')<br>' +
+      'Matches k=' + Np + ' placeholder rows after embed lookup at width ' + dl + '.';
+  }
+  ['shapeNp', 'shapeDv', 'shapeDl'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', updateShapes);
+  });
+  updateShapes();
+
+  var mergeState = 0;
+  function renderMask() {
+    var k = parseInt(document.getElementById('maskImg').value, 10);
+    var t = parseInt(document.getElementById('maskTxt').value, 10);
+    var n = k + t;
+    var g = document.getElementById('maskGrid');
+    g.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
+    g.innerHTML = '';
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        var cell = document.createElement('div');
+        var ai = i < k;
+        var aj = j < k;
+        var allowed;
+        if (ai && aj) allowed = true;
+        else if (!ai && !aj) allowed = j <= i;
+        else if (!ai && aj) allowed = true;
+        else allowed = false;
+        cell.style.aspectRatio = '1';
+        cell.style.borderRadius = '3px';
+        cell.style.border = '1px solid var(--border)';
+        cell.style.background = allowed ? 'rgba(94,234,212,0.35)' : 'rgba(248,113,113,0.15)';
+        g.appendChild(cell);
+      }
+    }
+    document.getElementById('maskLegend').textContent =
+      'Greenish: attention allowed. Dim red: masked. Rows/cols 0…' + (k - 1) + ' = image; ' + k + '…' + (n - 1) + ' = text (causal block).';
+  }
+  ['maskImg', 'maskTxt'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', renderMask);
+  });
+  renderMask();
+
+  document.getElementById('btnMergeAnim').addEventListener('click', function () {
+    mergeState = (mergeState + 1) % 3;
+    var mb1 = document.getElementById('mb1');
+    var mb2 = document.getElementById('mb2');
+    var st = document.getElementById('mergeStatus');
+    if (mergeState === 0) {
+      mb1.textContent = '[img₀…imgₖ₋₁]';
+      mb2.textContent = '[BOS, prefix…]';
+      st.textContent = 'Projector aligns vision dim → language dim; merged sequence length = k + text tokens.';
+    } else if (mergeState === 1) {
+      mb1.textContent = 'W · h_vision';
+      mb2.textContent = 'Embed(text IDs)';
+      st.textContent = 'Same width d_ℓ; ready to splice.';
+    } else {
+      mb1.textContent = '[merged sequence]';
+      mb2.textContent = '';
+      st.textContent = 'Single tensor (B, k + T_text, d_ℓ) enters decoder self-attention.';
+    }
+  });
+
+  var kvSteps = document.getElementById('kvSteps');
+  var kvHtml = [
+    'Prefill: compute Q,K,V for all image + prompt positions; fill cache.',
+    'Decode t=1: new token only; attend Q_new to all cached K,V.',
+    'Decode t=2: append new K,V; total context grows by one each step.',
+    'RoPE indices continue from prefill length so positions stay consistent.'
+  ];
+  kvHtml.forEach(function (t) {
+    var d = document.createElement('div');
+    d.className = 'kv-step';
+    d.textContent = t;
+    kvSteps.appendChild(d);
+  });
+  function updateKvCap() {
+    var t = parseInt(document.getElementById('decodeStep').value, 10);
+    var pre = 256 + 32;
+    document.getElementById('kvCaption').textContent =
+      'Cache length after step ' + t + ': ' + (pre + t) + ' positions (example prefill ' + pre + ' + ' + t + ' new).';
+  }
+  document.getElementById('decodeStep').addEventListener('input', updateKvCap);
+  updateKvCap();
+
+  function updatePlayground() {
+    var z = parseFloat(document.getElementById('rawLogit').value);
+    var m = Math.max(z, 0);
+    var e1 = Math.exp(z - m);
+    var e0 = Math.exp(0 - m);
+    var sm = e1 / (e1 + e0);
+    var sig = 1 / (1 + Math.exp(-z));
+    document.getElementById('playSoftmax').textContent =
+      'Binary softmax [z, 0] with max-subtraction: P(class1) = ' + sm.toFixed(4) + ' — stable because exp uses (z - max).';
+    document.getElementById('playSigmoid').textContent =
+      'Sigmoid σ(z) = ' + sig.toFixed(4) + ' — independent scalar; no row normalization.';
+  }
+  document.getElementById('rawLogit').addEventListener('input', updatePlayground);
+  updatePlayground();
+})();
+</script>
+</body>
+</html>

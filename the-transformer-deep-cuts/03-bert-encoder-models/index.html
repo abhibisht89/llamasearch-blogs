@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BERT: Encoder Models, Pretraining &amp; Fine-Tuning — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); margin-bottom: 20px; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 20px;
+  font-size: 0.85rem;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav.visible { transform: translateY(0); }
+.nav-back { font-weight: 700; color: var(--accent2); white-space: nowrap; }
+.nav-links { display: flex; gap: 14px; flex-wrap: wrap; }
+.nav-links a { color: var(--text-dim); }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 88px 24px 64px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(108,140,255,0.14) 0%, transparent 68%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 14px; position: relative; z-index: 1; }
+.subtitle {
+  font-size: 1.12rem; color: var(--text-dim);
+  max-width: 640px; margin: 0 auto 28px; position: relative; z-index: 1;
+}
+.stats {
+  display: flex; gap: 28px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 28px; position: relative; z-index: 1;
+}
+.stat { text-align: center; }
+.stat-val {
+  display: block; font-size: 1.85rem; font-weight: 700;
+  color: var(--accent); font-family: var(--mono);
+}
+.stat-label {
+  font-size: 0.72rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 8px;
+}
+
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 18px 0;
+}
+.comparison {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;
+}
+@media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+
+.formula {
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; margin: 18px 0;
+  font-family: var(--mono); font-size: 0.98rem; color: var(--accent3);
+  text-align: center; overflow-x: auto;
+}
+
+.callout {
+  background: rgba(108,140,255,0.07); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 16px 20px; margin: 20px 0;
+}
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.06); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.06); }
+.callout.danger { border-left-color: var(--danger); background: rgba(248,113,113,0.06); }
+.callout p:last-child { margin-bottom: 0; }
+
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin: 20px 0;
+}
+.qa-box .q {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.qa-box p:last-child { margin-bottom: 0; }
+
+.interactive-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin: 22px 0;
+}
+.interactive-panel h4 {
+  font-size: 0.95rem; color: var(--text); margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.token-row {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  font-family: var(--mono); font-size: 0.82rem; margin: 12px 0;
+}
+.token {
+  padding: 6px 10px; border-radius: 6px;
+  background: var(--bg-card-alt); border: 1px solid var(--border);
+  color: var(--text-dim); cursor: default;
+}
+.token.special { border-color: var(--accent2); color: var(--accent2); }
+.token.mask { border-color: var(--accent5); color: var(--accent5); background: rgba(251,191,36,0.08); }
+.token.seg-a { border-left: 3px solid var(--accent); }
+.token.seg-b { border-left: 3px solid var(--accent4); }
+
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.88rem; cursor: pointer; margin: 4px 6px 4px 0;
+  font-family: inherit;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: rgba(108,140,255,0.2); border-color: var(--accent); color: var(--accent); }
+
+.grid-matrix {
+  display: inline-grid; gap: 2px; margin: 12px auto;
+  font-family: var(--mono); font-size: 0.7rem;
+}
+.cell {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border-radius: 4px; background: var(--bg-card-alt); color: var(--text-dim);
+}
+.cell.blocked { background: rgba(248,113,113,0.15); color: var(--danger); }
+.cell.open { background: rgba(52,211,153,0.12); color: var(--accent3); }
+
+.bar-mixer { display: flex; align-items: flex-end; gap: 4px; height: 120px; margin: 16px 0; }
+.bar-mixer .b {
+  flex: 1; min-width: 8px; border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  transition: height 0.4s ease;
+}
+
+.flow-steps {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0;
+}
+.flow-box {
+  padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-card-alt); font-family: var(--mono); font-size: 0.8rem;
+  opacity: 0.35; transition: opacity 0.35s ease, border-color 0.35s;
+}
+.flow-box.active { opacity: 1; border-color: var(--accent3); }
+
+input[type="range"] { width: 100%; max-width: 320px; }
+label.lbl { font-size: 0.8rem; color: var(--text-dim); display: block; margin-top: 8px; }
+
+ul.clean { margin: 12px 0 12px 1.2em; color: var(--text-dim); }
+ul.clean li { margin-bottom: 0.5em; }
+
+.fade-in { opacity: 0; transform: translateY(28px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent4); }
+
+.pred-list { margin-top: 12px; }
+.pred-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; margin: 4px 0; border-radius: 6px;
+  background: var(--bg-card-alt); font-family: var(--mono); font-size: 0.85rem;
+}
+.pred-bar {
+  height: 6px; border-radius: 3px; background: var(--accent);
+  margin-top: 4px; max-width: 100%;
+}
+
+kbd {
+  font-family: var(--mono); font-size: 0.8em;
+  padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">BERT: Encoder Models &amp; Fine-Tuning</span></nav>
+
+
+<nav class="nav" id="nav">
+  <a class="nav-back" href="../">Advanced NLP V2</a>
+  <div class="nav-links">
+    <a href="#s00">00 LM basics</a>
+    <a href="#s01">01 Train LM</a>
+    <a href="#s05">05 BERT</a>
+    <a href="#s08">08 MLM</a>
+    <a href="#s09">09 NSP</a>
+    <a href="#s11">11 Fine-tune</a>
+    <a href="#play">Playground</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>BERT: Encoder Models, Pretraining &amp; Fine-Tuning</h1>
+    <p class="subtitle">
+      From autoregressive language modeling to bidirectional encoders: how masked language modeling,
+      next-sentence prediction, and the <code class="inline">[CLS]</code> token define a different path
+      than decoder-only models—and how you adapt BERT with task-specific heads.
+    </p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">768</span><span class="stat-label">Hidden (BERT-Base)</span></div>
+      <div class="stat"><span class="stat-val">12</span><span class="stat-label">Encoder layers</span></div>
+      <div class="stat"><span class="stat-val">~30k</span><span class="stat-label">WordPiece vocab</span></div>
+      <div class="stat"><span class="stat-val">512</span><span class="stat-label">Max positions</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00</span>
+  <h2>Language models: probabilities over text</h2>
+  <p>
+    A <strong>language model</strong> is a <strong>probabilistic model</strong>: it assigns probabilities to sequences of tokens.
+    In practice it lets you score how plausible a continuation is—for example, the probability of the word
+    <em>China</em> following the fragment <em>“Shanghai is a city in …”</em>. That conditional probability is exactly
+    the quantity a neural language model is trained to approximate from very large text corpora.
+  </p>
+  <p>
+    When the training corpus is very large, people often call them <strong>large language models (LLMs)</strong>.
+    The label reflects <strong>data scale</strong> and usually <strong>model scale</strong> as well—the same probabilistic
+    idea applies to a tiny corpus or a huge one, but the LLM name is reserved for networks trained on very large text with
+    many parameters. Models pretrained on broad data—think <strong>entire Wikipedia</strong>, or <strong>billions of web pages</strong>,
+    plus books and similar sources—are also called <strong>foundation models</strong>:
+    downstream use can rely on <em>prompting</em> or on <em>fine-tuning</em>, depending on architecture and tooling.
+  </p>
+  <div class="callout">
+    <p><strong>Conditional next-token view.</strong> Many systems emphasize
+    <span style="font-family:var(--mono);color:var(--accent3);">P(w<sub>t+1</sub> | w<sub>1</sub>, …, w<sub>t</sub>)</span>:
+    the probability of the next token given everything to its left.
+    BERT is not trained primarily in this autoregressive way; it uses bidirectional context instead (see sections 06–08).</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01</span>
+  <h2>Training an autoregressive LM on a corpus</h2>
+  <p>
+    Take a line of text and turn it into a token sequence. For illustration, assume one token per word
+    (real systems use subword tokenizers). Prepend a <strong>start-of-sequence</strong> symbol so the network
+    always sees an explicit beginning. The model is sequence-to-sequence in shape: length in equals length out.
+  </p>
+  <p>
+    The <strong>target</strong> is the same text with an <strong>end-of-sequence</strong> symbol appended at the end
+    instead of a start symbol at the front—the total length matches the input length. For each prefix of the input,
+    the last position of the model output is trained to predict the next token of the target sequence.
+  </p>
+  <div class="card">
+    <h3>Why boundary tokens matter</h3>
+    <p style="margin-bottom:0">
+      If you feed only the first token, the network produces one output vector; that vector should align with the
+      first target token. If you feed the first two tokens, the second output position should match the second target
+      token, and so on. The final output position carries the prediction for the <em>next</em> token in the original
+      sentence.       Optimization uses <strong>cross-entropy</strong> between predicted and true next tokens, then backpropagation.
+    </p>
+  </div>
+  <p>
+    On a <strong>concrete line of text</strong>, take a famous line from Li Bai
+    (often romanized as Li Po): <em>“Before my bed lies a pool of moon bright.”</em> Suppose you are training on
+    that single line as your entire corpus for the sake of a toy example. Build the <strong>input</strong> sequence by
+    prepending a <strong>start-of-sequence</strong> token, so the network always sees an explicit left boundary.
+    For a deliberately simple tokenizer, pretend <strong>one word = one token</strong> (real systems use subwords;
+    BERT uses WordPiece—section 05).
+  </p>
+  <p>
+    Feed that input into a stack that behaves like the <strong>encoder</strong> side of a Transformer, followed by a
+    <strong>linear</strong> layer and <strong>softmax</strong> over the vocabulary—this is the same high-level pattern
+    many decoder-style LMs use for next-token modeling (for example LLaMA-style models), even though the internal
+    block diagram differs in details from “encoder-only” BERT.
+  </p>
+  <p>
+    Because the network is <strong>sequence-to-sequence in width</strong>—<em>n</em> tokens in produce <em>n</em> token
+    positions out—you can read off training cases by sliding the prefix:
+  </p>
+  <ul class="clean">
+    <li>Input prefix <code class="inline">[SOS]</code> only → the output position aligned with that prefix should
+      target the first real word: <strong>before</strong>.</li>
+    <li>Input <code class="inline">[SOS] before</code> → the last output position should predict <strong>my</strong>
+      (the next token after <em>before</em>).</li>
+    <li>Input <code class="inline">[SOS] before my</code> → predict <strong>bed</strong>.</li>
+    <li>Continue until the model learns to emit the full line, with an <strong>end-of-sequence</strong> token learned
+      at the final position of the parallel target sequence (target = same words, EOS at the end instead of SOS at the front).</li>
+  </ul>
+  <div class="callout ok">
+    <p>
+      <strong>Training target shape.</strong> The <strong>target</strong> is the same sentence without the leading SOS,
+      but with <strong>EOS</strong> appended at the end, so total length still matches the input length. Every time you
+      grow the input by one token on the left, the <strong>last</strong> output slot is the one trained to predict the
+      next token in that target stream.
+    </p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02</span>
+  <h2>Inference: greedy (or sampled) continuation</h2>
+  <p>
+    At inference time you supply a <strong>prompt</strong>—a prefix of tokens (with the start symbol as needed).
+    Run the model, read the predicted next token from the appropriate position, append it to the input, and repeat
+    until you emit an end symbol or hit a length limit. Decoder-only models such as many GPT-style and LLaMA-style
+    stacks are built around this loop for open-ended generation.
+  </p>
+  <p>
+    Prepend <code class="inline">[SOS]</code>, supply a short prefix such as <code class="inline">before my</code>, run the
+    network, and read the predicted next token from the last output position. Append that token, run again, and repeat until
+    the model emits <strong>EOS</strong> or you hit a length limit. Each step conditions only on tokens already generated—that
+    prompt → predict → append loop is autoregressive inference. BERT is generally <em>not</em> used this way for long-form
+    generation (section 06).
+  </p>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03</span>
+  <h2>Encoder building blocks (Transformer)</h2>
+  <p>
+    The <strong>vanilla Transformer</strong>—the architecture introduced in the paper
+    <strong>“Attention Is All You Need”</strong>—has both an encoder stack and a decoder stack. Most language-model
+    systems you meet in the wild use <em>either</em> the encoder side <em>or</em> the decoder side (plus output projections),
+    depending on the task. BERT uses the <strong>encoder</strong> side: token embeddings,
+    position information, self-attention, residual connections, layer normalization, and feed-forward sublayers, then
+    a task head (which changes at fine-tuning time). The full treatment of
+    <strong>scaled dot-product self-attention</strong>, <strong>multi-head attention</strong>,
+    <strong>layer normalization</strong>, and feed-forward sublayers is in
+    <a href="../01-transformer-architecture-and-math/">Chapter 01: Transformer Architecture &amp; Math</a>.
+    Here we highlight what differs for BERT—especially <strong>bidirectional</strong> self-attention with
+    <strong>no causal mask</strong>—and skip re-deriving the attention formula.
+  </p>
+  <h3>Token IDs → embeddings</h3>
+  <p>
+    Text is split into <strong>tokens</strong>. Each token maps to an index in a vocabulary, then to a dense vector
+    (e.g. <strong>512</strong> dimensions in the original “Attention Is All You Need” configuration; BERT-Base uses
+    <strong>768</strong>—section 05). Those vectors encode semantic similarity:
+    related words tend to point in similar directions in space; unrelated words diverge. Similarity is often measured
+    with <strong>cosine similarity</strong>, which builds on the <strong>dot product</strong>—the same operation that
+    appears inside attention scores.
+  </p>
+  <p>
+    In two dimensions, <strong>digital</strong> and <strong>information</strong> might point in similar directions (small
+    angle), while <strong>cherry</strong> and <strong>digital</strong> diverge (large angle). <strong>Cosine similarity</strong>
+    formalizes that geometry from the dot product—the same operation that drives attention scores between positions.
+  </p>
+  <h3>Positional information (sinusoidal, original encoder)</h3>
+  <p>
+    Embeddings alone are permutation-invariant. Texts refer to these additions as <strong>positional encodings</strong>
+    or <strong>positional embeddings</strong>; in the original Transformer they are deterministic functions, while in BERT
+    they are learned vectors (section 05). Either way, the model must know each token’s index in the sequence. In the
+    vanilla Transformer, fixed sinusoidal features are used: for each position
+    <code class="inline">pos</code> and dimension index <code class="inline">i</code>,
+  </p>
+  <div class="formula">
+    PE<sub>(pos, 2i)</sub> = sin(pos / 10000<sup>2i/d</sup>)<br>
+    PE<sub>(pos, 2i+1)</sub> = cos(pos / 10000<sup>2i/d</sup>)
+  </div>
+  <p>
+    The same position vectors are reused for every sentence: slot 0 always gets the same positional vector, regardless
+    of which word sits there. If another sentence also has three tokens—say <em>“I love you”</em>—it reuses the
+    <strong>same</strong> position-0, position-1, and position-2 vectors as any other length-three sentence. The vector
+    is tied to the <strong>index in the sentence</strong>, not to the identity of the word occupying that slot.
+  </p>
+  <h3>Self-attention (Chapter 01)</h3>
+  <p>
+    BERT encoder layers apply the same <strong>scaled dot-product self-attention</strong> as the vanilla Transformer:
+    linear projections to <strong>Q</strong>, <strong>K</strong>, and <strong>V</strong>, a softmax over keys, then a
+    weighted sum of values. Matrix shapes, multi-head wiring, and the full formula are in
+    <a href="../01-transformer-architecture-and-math/">Chapter 01</a>. For BERT the critical difference is what is
+    <em>absent</em>: there is <strong>no causal mask</strong>, so every position may attend to every other position in
+    the packed input—exactly what masked language modeling needs (sections 04 and 08).
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Demo: sinusoidal vs learned positions</h4>
+    <p style="font-size:0.9rem;margin-bottom:12px;color:var(--text-dim);">
+      BERT replaces fixed sinusoids with <strong>learned position embeddings</strong> (section 05). Toggle the labels below.
+    </p>
+    <button type="button" class="btn primary" id="posToggle">Show: BERT (learned, trainable)</button>
+    <p id="posExplain" style="margin-top:12px;font-size:0.9rem;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04</span>
+  <h2>Causal (triangular) masking for autoregressive models</h2>
+  <p>
+    For <strong>next-token prediction</strong>, a token must not attend to future tokens—only to
+    <strong>left context</strong>. Without a mask, the “start” position could attend to words that have not been
+    predicted yet, leaking information. A <strong>causal mask</strong> sets forbidden attention logits to
+    <code class="inline">−∞</code> before softmax; those entries become zero after softmax, removing rightward influence.
+  </p>
+  <p>
+    After masking, the first token only attends to itself; each later token attends to itself and all previous tokens.
+    The final token’s row can attend to the full prefix. Multiplying the attention matrix by <code class="inline">V</code>
+    mixes value vectors according to these allowed weights, producing updated representations that respect causality.
+  </p>
+  <p>
+    Why does <code class="inline">−∞</code> before softmax implement a hard ban? Write softmax for a row with logits
+    <code class="inline">z<sub>i</sub></code>:
+  </p>
+  <div class="formula">
+    softmax(z<sub>i</sub>) = e<sup>z<sub>i</sub></sup> / Σ<sub>j</sub> e<sup>z<sub>j</sub></sup>
+  </div>
+  <p>
+    Any position forced to <code class="inline">−∞</code> has <strong>e<sup>−∞</sup> = 0</strong>, so it contributes
+    <strong>nothing</strong> to the denominator or numerator. After the mask, forbidden future positions carry zero mass;
+    the model never receives gradient pressure to “peek” rightward. Geometrically, everything <strong>above the main
+    diagonal</strong> of the score matrix (future keys seen from an earlier query) is wiped before normalization.
+  </p>
+  <p>
+    Shape check: with sequence length 10 and model width 512, the softmax output is still <strong>10 × 10</strong>, while
+    <code class="inline">V</code> remains <strong>10 × 512</strong>. The product yields a <strong>10 × 512</strong> updated
+    representation. Focus on the <strong>first row’s first dimension</strong>: it is a weighted sum of the first
+    coordinate of every value row, using only the non-zero weights the mask left alive—so the first token’s new vector
+    depends <strong>only on itself</strong>. The <strong>second row</strong> mixes value rows 1–2 only; by induction, row
+    <em>t</em> depends on tokens <strong>1…t</strong>. That is the matrix view of “each step sees only left context.”
+    Only the <strong>final</strong> token’s row can attend with non-zero mass to every earlier token; every other row has
+    at least one structural zero on the right half of the matrix. Language modeling needs
+    <code class="inline" style="color:var(--accent3);">P(next&nbsp;|&nbsp;left context only)</code>; without a causal mask,
+    a position trained to predict the next token could attend to future evidence and cheat the autoregressive contract.
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Demo: causal vs bidirectional attention pattern</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:10px;">
+      Rows = query positions, columns = key positions. Green = allowed mass; red = blocked (causal upper triangle).
+    </p>
+    <button type="button" class="btn" id="attnModeCausal">Decoder-style (causal mask)</button>
+    <button type="button" class="btn primary" id="attnModeBi">Encoder-style (BERT: no causal mask)</button>
+    <div id="attnGridWrap" style="text-align:center;margin-top:16px;"></div>
+    <p id="attnCaption" style="text-align:center;font-size:0.85rem;color:var(--text-dim);margin-top:10px;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05</span>
+  <h2>BERT’s encoder stack</h2>
+  <p>
+    BERT’s architecture is a stack of Transformer encoder layers: embeddings + self-attention + normalization +
+    feed-forward + residual pathways, then a linear <strong>task head</strong> chosen for pretraining or fine-tuning.
+    Two public sizes ship with the original release: <strong>BERT-Base</strong> stacks <strong>12</strong> identical
+    encoder layers (the gray block repeated twelve times), uses <strong>12</strong> attention heads inside multi-head
+    self-attention, and sets the hidden width to <strong>768</strong>. <strong>BERT-Large</strong> doubles depth to
+    <strong>24</strong> layers, widens hidden states to <strong>1024</strong>, and uses <strong>16</strong> heads.
+  </p>
+  <p>
+    The position-wise feed-forward sublayer is two linear layers with a nonlinearity between them. In BERT-Base the
+    <strong>inner</strong> feed-forward width is <strong>four times</strong> the hidden size:
+    <strong>4 × 768 = 3072</strong> intermediate units, then back to 768—this is the standard configuration documented
+    with the architecture. Positional embeddings
+    are <strong>learned</strong>, not sinusoidal, and BERT supports up to <strong>512</strong> positions—longer sequences
+    need truncation or another architecture. Vocabulary size is on the order of <strong>30,000</strong> subword units
+    via <strong>WordPiece</strong> tokenization (words often split into multiple tokens).
+  </p>
+  <div class="comparison">
+    <div class="card">
+      <h3>Vanilla Transformer (encoder LM sketch)</h3>
+      <p style="margin:0;color:var(--text-dim);">
+        Often discussed with <strong>d<sub>model</sub> = 512</strong> in the original diagrams; sinusoidal
+        <strong>PE(pos)</strong> added to token embeddings; simple tokenization in toy examples (one word ↔ one token);
+        task head depends on the job (LM softmax over vocabulary at each position, etc.).
+      </p>
+    </div>
+    <div class="card">
+      <h3>BERT-Base / BERT-Large</h3>
+      <p style="margin:0;color:var(--text-dim);">
+        Wider vectors—<strong>768</strong> (Base) or <strong>1024</strong> (Large)—with learned
+        <strong>position embeddings</strong> summed alongside token embeddings; hard cap of
+        <strong>512</strong> learned position slots; <strong>WordPiece</strong> vocabulary ≈30k; the final
+        <strong>linear head</strong> swaps with the objective (MLM, NSP, classification, spans…).
+      </p>
+    </div>
+  </div>
+  <div class="callout warn">
+    <p>
+      <strong>Tokenizer contrast.</strong> Decoder-only stacks—what many people simply call
+      <strong>“language models”</strong> in casual speech, GPT-style or LLaMA-style—
+      frequently rely on <strong>BPE</strong> or SentencePiece merges. BERT’s original recipe uses
+      <strong>WordPiece</strong>, which is why a surface word may fracture into several subword pieces—always check the
+      tokenizer, not the whitespace, when counting tokens.
+    </p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: WordPiece-style splitting (illustrative)</h4>
+    <p style="font-size:0.88rem;color:var(--text-dim);">
+      Type a word. The toy splitter uses heuristic prefixes—real WordPiece uses a data-derived vocabulary and merge rules.
+    </p>
+    <input type="text" id="wpInput" placeholder="e.g. unhappiness" style="width:100%;max-width:360px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card-alt);color:var(--text);margin-top:8px;">
+    <div id="wpOut" class="token-row" style="margin-top:12px;"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06</span>
+  <h2>BERT vs GPT-style / LLaMA-style decoders</h2>
+  <div class="comparison">
+    <div class="card">
+      <h3>Decoder-only LLMs (typical)</h3>
+      <ul class="clean">
+        <li>Trained with <strong>next-token prediction</strong> and causal attention.</li>
+        <li>Strong at <strong>open-ended generation</strong> from a prompt.</li>
+        <li>Often use <strong>BPE</strong> or SentencePiece-style tokenization.</li>
+        <li>Many tasks can be handled with <strong>in-context prompts</strong> (zero- or few-shot).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>BERT (encoder-only)</h3>
+      <ul class="clean">
+        <li>Pretrained with <strong>MLM</strong> and (in original BERT) <strong>NSP</strong>, not pure next-token LM loss.</li>
+        <li>Uses <strong>left and right context</strong> simultaneously—bidirectional self-attention.</li>
+        <li>Not aimed at long autoregressive generation; excels at <strong>understanding</strong> and span tasks.</li>
+        <li>Specialization usually via <strong>fine-tuning</strong> with a small task head—not prompt-only chat.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">
+    <p>
+      <strong>Question answering contrast.</strong> A decoder-only model can be steered with a carefully written prompt
+      (instructions plus examples) so it continues with an answer. BERT-style QA instead adds a <strong>span head</strong>
+      over context tokens after fine-tuning on labeled (question, context, answer-span) data (section 11).
+    </p>
+  </div>
+  <p>
+    In <strong>extractive question answering</strong>, GPT-style or LLaMA-style decoders are often steered with a
+    <strong>few-shot prompt</strong>: instructions, optional worked examples, then the live passage and question. The model
+    continues with tokens that quote or paraphrase the support span—everything is mediated by natural language in the prompt.
+    <strong>BERT does not specialize that way.</strong> You typically <strong>fine-tune</strong> the encoder on supervised
+    (question, passage, answer-span) tuples so a small head can emit start/end logits directly (section 11). Original BERT
+    checkpoints are <strong>not</strong> trained for multi-turn chat or chain-of-thought prompting; you add a task head and
+    continue gradient updates on labeled data instead.
+  </p>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07</span>
+  <h2>Left context, right context, and why both matter</h2>
+  <p>
+    <strong>Left context</strong> is what you have heard or read so far—natural for dialogue turns where each reply
+    conditions on the prior stream. <strong>Right context</strong> is what comes later; humans sometimes choose an early
+    phrase to set up a later clause (planning how a sentence will end). Statistical models that only condition on the
+    left (autoregressive LMs) differ from encoders that can use the full sentence at once.
+  </p>
+  <p>
+    BERT’s lack of causal masking during pretraining is exactly what allows a masked position to gather evidence from
+    both sides of the blank—ideal for fill-in-the-blank objectives.
+  </p>
+  <h3>Left context: the telephone operator pattern</h3>
+  <p>
+    <strong>Left context</strong> is the prefix already spoken or written. In a support call, each operator reply conditions
+    on everything the customer said so far—each turn is a draw from
+    <code class="inline" style="color:var(--accent3);">P(next turn | everything to the left)</code>. Autoregressive
+    language models enforce the same contract at the token level.
+  </p>
+  <h3>Right context: planning the ending in advance</h3>
+  <p>
+    <strong>Right context</strong> is trickier: reading flows left-to-right, yet speakers often choose an early clause to
+    set up a later payoff. A child confessing a broken necklace might open with a long preamble before landing on
+    <em>“your favorite necklace has broken”</em>—the opener is chosen <strong>because the ending is already known</strong>.
+    That is one informal way to see why <strong>rightward context</strong> matters for understanding even when generation
+    unfolds sequentially.
+  </p>
+  <p>
+    Statistical models differ in how they treat those dependencies. A classic left-to-right LM scores the next token using
+    only earlier tokens. BERT’s encoder, during MLM pretraining, lets a masked slot peek at <strong>both</strong> flanks
+    inside the same sentence—closer to “reading the whole line before filling the blank” than to “guessing forward
+    without looking back.”
+  </p>
+</section>
+
+<section class="section fade-in" id="s08">
+  <span class="section-num">08</span>
+  <h2>Masked Language Modeling (MLM)</h2>
+  <p>
+    <strong>MLM</strong> is the same genre of exercise as a <strong>cloze</strong> test: someone removes a word and you
+    fill the gap, familiar from language exams where a sentence arrives with a blank and you supply the missing lemma.
+    <strong>Masked language modeling</strong> is the neural scale version of that worksheet. During BERT pretraining,
+    roughly <strong>15%</strong> of input tokens are chosen. Of those:
+  </p>
+  <ul class="clean">
+    <li><strong>80%</strong> of the time the token is replaced by <code class="inline">[MASK]</code>.</li>
+    <li><strong>10%</strong> of the time it is replaced by a <strong>random</strong> vocabulary token.</li>
+    <li><strong>10%</strong> of the time the token is <strong>left unchanged</strong>.</li>
+  </ul>
+  <p>
+    In all three cases, the training label is still the <em>original</em> token. The random and unchanged cases reduce
+    a mismatch between pretraining (heavy use of literal mask symbols) and fine-tuning (where masks are absent).
+  </p>
+  <p>
+    The encoder outputs one vector per input position. Loss is computed only on the <strong>masked positions</strong>:
+    compare the head’s prediction at those indices to the true token IDs, then average for the batch.
+  </p>
+  <p>
+    Take the sentence <em>“Rome is the capital of Italy, which is why it hosts many government buildings.”</em> Suppose
+    pretraining selects the word <strong>capital</strong> among the 15% of tokens slated for corruption. With probability <strong>0.8</strong> it becomes the literal <code class="inline">[MASK]</code> token;
+    with probability <strong>0.1</strong> it is swapped for a <strong>random</strong> vocabulary draw (picture a
+    decoy such as <strong>zebra</strong>—any unrelated token will do); with probability <strong>0.1</strong> it stays
+    <strong>capital</strong> even though the model is still asked to reconstruct the original. In <em>all three</em>
+    variants the label remains <strong>capital</strong>, which forces the network to rely on context instead of blindly
+    emitting the surface form it saw.
+  </p>
+  <p>
+    Because BERT is a Transformer encoder, <strong>length in equals length out</strong>: if the masked sentence packs
+    <strong>14</strong> WordPiece tokens (including punctuation splits), the stack returns <strong>14</strong> hidden
+    vectors. Training does not average loss over every slot—only the positions that were chosen for corruption. For
+    instance, if <em>capital</em> occupied slot <em>k</em>, compare the MLM head’s logits at index <em>k</em> against
+    the true ID for <strong>capital</strong>, accumulate cross-entropy, and backpropagate.
+  </p>
+  <p>
+    None of this works with a causal mask. Recall the attention construction
+    <span style="font-family:var(--mono);color:var(--accent3);">softmax(QK<sup>T</sup> / √d<sub>k</sub>) V</span> with
+    <strong>no triangular mask</strong>: every token attends to neighbors on the <strong>left and right</strong>, so the
+    hidden state at the mask can fuse evidence from <em>Italy</em>, from <em>which is why…</em>, and from <em>Rome is…</em>
+    simultaneously. That bidirectional reach is exactly what a cloze-style objective rewards.
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Demo: toy MLM predictor</h4>
+    <p style="font-size:0.88rem;color:var(--text-dim);">
+      Click a word to mask it. Predictions are <em>simulated</em> from keyword heuristics—not a real model.
+    </p>
+    <div class="token-row" id="mlmTokens"></div>
+    <button type="button" class="btn" id="mlmReset">Reset sentence</button>
+    <div id="mlmPreds" class="pred-list"></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s09">
+  <span class="section-num">09</span>
+  <h2>Next Sentence Prediction (NSP)</h2>
+  <p>
+    Original BERT also uses <strong>next sentence prediction</strong>. Sample a sentence A. With probability 0.5,
+    sentence B is the actual next sentence in the corpus; otherwise B is a random sentence from elsewhere.
+    The model must classify whether B truly follows A.
+  </p>
+  <p>
+    Two sentences are packed into <strong>one</strong> input: special token <code class="inline">[CLS]</code>, then tokens
+    of A, then <code class="inline">[SEP]</code>, then tokens of B, then <code class="inline">[SEP]</code>.
+    Token and position embeddings are summed with <strong>segment embeddings</strong>: one learned vector for “sentence A”
+    tokens and another for “sentence B” tokens, so the model can tell which segment each token belongs to.
+  </p>
+  <p>
+    The final hidden state at the <code class="inline">[CLS]</code> position is passed through a small classifier
+    (e.g. linear layer to two logits: <em>IsNext</em> / <em>NotNext</em>), softmax, and cross-entropy against the label.
+  </p>
+  <p>
+    Two engineering questions arise immediately. First, <strong>how do you serialize two sentences into one tensor</strong>
+    without ambiguity? Second, <strong>how does the model know whether sentence B truly follows A</strong> in the
+    original corpus? The training recipe answers both. Concatenate <code class="inline">[CLS]</code>, every token of A,
+    <code class="inline">[SEP]</code>, every token of B, and a closing <code class="inline">[SEP]</code>. Without extra
+    structure, the encoder would not know whether <em>my</em> belongs to the first sentence or <em>likes</em> to the
+    second, so BERT adds <strong>segment embeddings</strong>—a learned vector for “sentence A” and another for “sentence B”—
+    summed together with the usual token and position embeddings.
+  </p>
+  <div class="formula">
+    input_to_encoder = TokenEmbed(token) + PositionEmbed(index) + SegmentEmbed(A or B)
+  </div>
+  <p>
+    Example: let sentence A be <em>“The moon shines over the quiet lake.”</em> With probability 0.5, B is the
+    <strong>next sentence</strong> in the corpus; otherwise B is a <strong>random</strong> sentence from elsewhere. Feed
+    the packed input through BERT. If B truly follows A, the label is <strong>IsNext</strong>; if B is a decoy,
+    <strong>NotNext</strong>. Only the <code class="inline">[CLS]</code> output participates in this auxiliary loss, but
+    gradients still flow through the shared encoder, teaching it to represent discourse continuity.
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Demo: segment IDs on a packed input</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);">Blue border = segment A; pink = segment B.</p>
+    <div class="token-row" id="segDemo"></div>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: NSP label checker (toy logic)</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);">
+      Pair A with either the true continuation or a random line. The demo applies simple keyword continuity as a stand-in for corpus adjacency.
+    </p>
+    <p id="nspPair" style="font-family:var(--mono);font-size:0.88rem;color:var(--text);margin:10px 0;"></p>
+    <button type="button" class="btn" id="nspReal">Pair: real continuation</button>
+    <button type="button" class="btn" id="nspRand">Pair: unrelated second line</button>
+    <p id="nspVerdict" style="margin-top:12px;font-weight:600;"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <span class="section-num">10</span>
+  <h2>The <code class="inline">[CLS]</code> token as a pooled representation</h2>
+  <p>
+    The letters <strong>CLS</strong> abbreviate <strong>classifier</strong>: historically this slot is the one sequence-level
+    summary vector that downstream linear heads read when you need a single embedding for an entire sentence or pair.
+    With full self-attention, <code class="inline">[CLS]</code> can attend to every token in the sequence. Its output
+    vector is trained—especially under NSP—to aggregate information useful for a sentence-pair decision. For
+    single-sentence classification fine-tuning, the same position is commonly used as the input to a linear classifier.
+  </p>
+  <div class="callout">
+    <p>
+      <strong>Analogy.</strong> Think of <code class="inline">[CLS]</code> as a single slot whose representation is
+      encouraged to summarize the whole input, similar to routing all reports through one coordinator who talks to every
+      team member before a yes/no decision.
+    </p>
+  </div>
+  <p>
+    With hidden size <strong>768</strong> in BERT-Base and <strong>no causal mask</strong>, the <code class="inline">[CLS]</code>
+    row of the attention matrix can assign non-zero mass to <em>every</em> token. After softmax, each weight is learned rather
+    than structurally forbidden; the representation at <code class="inline">[CLS]</code> becomes a learned mixture of the
+    entire sequence, which is why sentence-pair heads and single-vector classifiers attach there. (The attention formula and
+    matrix walkthrough are in <a href="../01-transformer-architecture-and-math/">Chapter 01</a>.)
+  </p>
+  <div class="callout ok">
+    <p>
+      <strong>Boardroom analogy (full version).</strong> Treat <code class="inline">[CLS]</code> as the
+      <strong>CEO</strong> and yourself as a <strong>shareholder</strong> who wants a single executive summary. You do
+      not interview every engineer separately; you expect the CEO to walk the floor, talk with each team, synthesize
+      competing facts, and return with a decision. The CEO embedding is not “the first word” of the document—it is a slot
+      whose whole training pressure pushes it to compress what every other token contributed. That is why classifier
+      heads read out <code class="inline">[CLS]</code>: the architecture has been encouraged to make that position a
+      sentence-level or pair-level summary vector.
+    </p>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Demo: <code class="inline">[CLS]</code> mixing weights (animated toy)</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);">
+      Bar heights mimic attention mass from <code class="inline">[CLS]</code> into each token (random walk for effect).
+    </p>
+    <div class="bar-mixer" id="clsBars"></div>
+    <button type="button" class="btn primary" id="clsAnimate">Re-run mix animation</button>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <span class="section-num">11</span>
+  <h2>Fine-tuning: classification and extractive QA</h2>
+  <h3>Text classification</h3>
+  <p>
+    Map each example to <code class="inline">[CLS]</code> + tokenized text. Run BERT; take the hidden state at
+    <code class="inline">[CLS]</code>, apply a linear map to <code class="inline">C</code> classes, softmax, and
+    cross-entropy against the gold label. Example domains: routing ISP support tickets into
+    <strong>hardware</strong>, <strong>software</strong>, or <strong>building</strong> (facilities) issues—whatever your
+    label set is. If there are three classes, the linear head has <strong>three</strong> output logits; softmax converts
+    them to probabilities; the cross-entropy target is the one-hot (or soft) label supplied by your annotators.
+  </p>
+  <p>
+    A ticket describing a faulty cable modem should route to <strong>hardware</strong>; one about a buggy mobile app to
+    <strong>software</strong>; elevator outages to <strong>building</strong> maintenance. During fine-tuning every example
+    follows the same recipe:
+    <code class="inline">[CLS]</code> + tokenized complaint → transformer layers → vector at <code class="inline">[CLS]</code>
+    → <strong>Linear(768 → C)</strong> → softmax → compare against the supervised class ID → backpropagate through the
+    entire stack (or through the head only if you freeze lower layers).
+  </p>
+  <h3>Extractive question answering</h3>
+  <p>
+    Concatenate <strong>question</strong> (segment A) and <strong>passage</strong> (segment B) with separators, using
+    segment embeddings to mark which tokens belong to which part. For each token in the passage (sometimes restricted),
+    a head produces two scores: probability that this token is the <strong>start</strong> of the answer span and
+    probability that it is the <strong>end</strong>. Training matches predicted start/end to the labeled span.
+  </p>
+  <p>
+    Pack the string as <code class="inline">[CLS]</code> + tokenized question + <code class="inline">[SEP]</code> + tokenized
+    passage + <code class="inline">[SEP]</code>, exactly as in NSP formatting, but now segment IDs tell BERT which side is
+    the interrogative clause versus the evidence paragraph. After the encoder runs, attach a <strong>span head</strong>:
+    a linear map with <strong>two</strong> logits per token—one signaling “start of answer,” one signaling “end of answer.”
+    Softmax is applied <em>across positions</em> separately for starts and ends (implementation details vary slightly by
+    codebase, but the conceptual object is a distribution over token indices for each role).
+  </p>
+  <div class="card">
+    <p style="margin:0">
+      <strong>Example.</strong> Context: “Shanghai is a city in China. It is also a financial center, its fashion capital,
+      and industrial city.” Question: “What is the fashion capital of China?” A valid span highlights
+      <em>Shanghai</em>. In a toy numbering where the token <strong>Shanghai</strong> lands at index <strong>10</strong>
+      inside the packed sequence, both the start label and the end label point to <strong>10</strong>—a degenerate span of
+      length one. The training loss encourages the start logit at index 10 (and the end logit at the same index) to
+      dominate all other positions.
+    </p>
+  </div>
+  <p>
+    If the packed question+passage uses, say, <strong>27</strong> WordPiece tokens, BERT emits <strong>27</strong> hidden
+    vectors; the span head scores each position twice (start/end). Cross-entropy (or a smooth variant) compares those
+    distributions to the human-annotated span, gradients flow backward, and the encoder learns to align factual cues in
+    the passage with linguistic triggers in the question.
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Demo: fine-tuning flow (classification head)</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);">Animated steps: packed input → last-layer <code class="inline">[CLS]</code> → linear → softmax.</p>
+    <div class="flow-steps" id="finetuneFlow"></div>
+    <button type="button" class="btn primary" id="finetuneReplay">Replay animation</button>
+  </div>
+</section>
+
+<section class="section fade-in" id="play">
+  <span class="section-num">12 · Playground</span>
+  <h2>Playground</h2>
+  <p>
+    Use the controls together: compare causal and bidirectional masks, watch the <code class="inline">[CLS]</code> mixer,
+    mask words in the MLM panel, and replay the fine-tuning flow. For production work, swap these toys with logits from
+    a real checkpoint (Hugging Face <code class="inline">BertForMaskedLM</code>, <code class="inline">BertForSequenceClassification</code>, etc.).
+  </p>
+
+  <div class="interactive-panel">
+    <h4>Encoder vs decoder — one-glance summary</h4>
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem;color:var(--text-dim);">
+      <thead>
+        <tr style="color:var(--text);text-align:left;">
+          <th style="padding:8px;border-bottom:1px solid var(--border);">Aspect</th>
+          <th style="padding:8px;border-bottom:1px solid var(--border);">BERT (encoder)</th>
+          <th style="padding:8px;border-bottom:1px solid var(--border);">GPT / LLaMA (decoder)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:8px;border-bottom:1px solid var(--border);">Pretraining signal</td><td style="padding:8px;border-bottom:1px solid var(--border);">MLM (+ NSP in original)</td><td style="padding:8px;border-bottom:1px solid var(--border);">Next-token LM</td></tr>
+        <tr><td style="padding:8px;border-bottom:1px solid var(--border);">Attention</td><td style="padding:8px;border-bottom:1px solid var(--border);">Bidirectional</td><td style="padding:8px;border-bottom:1px solid var(--border);">Causal (left only)</td></tr>
+        <tr><td style="padding:8px;border-bottom:1px solid var(--border);">Typical adaptation</td><td style="padding:8px;border-bottom:1px solid var(--border);">Fine-tune task heads</td><td style="padding:8px;border-bottom:1px solid var(--border);">Prompting / SFT / RLHF stacks</td></tr>
+        <tr><td style="padding:8px;">Generation</td><td style="padding:8px;">Not the primary design goal</td><td style="padding:8px;">Core capability</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="interactive-panel">
+    <h4>Scaled dot-product: temperature slider (math intuition)</h4>
+    <p style="font-size:0.85rem;color:var(--text-dim);">
+      Dividing by √d<sub>k</sub> keeps dot products from growing too large as dimension increases—stabilizing softmax.
+      Below, larger “effective scale” = sharper distribution (toy 3-way softmax from fake logits).
+    </p>
+    <label class="lbl">Sharpness factor: <span id="sharpLab">1.0</span></label>
+    <input type="range" id="sharpSlider" min="0.3" max="3" step="0.1" value="1">
+    <div id="softmaxBars" style="margin-top:14px;display:flex;gap:12px;align-items:flex-end;min-height:100px;"></div>
+  </div>
+</section>
+
+</main>
+
+<footer class="container" style="padding:48px 24px 80px;text-align:center;color:var(--text-dim);font-size:0.85rem;">
+  Advanced NLP V2 · Chapter 03 · Encoder-only pretraining and adaptation · BERT (original release) debuted in
+  <strong style="color:var(--text);">2018</strong>—older than today’s decoder-only chat models, yet still a workhorse for
+  classification, retrieval, and span labeling pipelines.
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // --- Positional encoding demo ---
+  const posExplain = document.getElementById('posExplain');
+  const posToggle = document.getElementById('posToggle');
+  let showingLearned = true;
+  function renderPos() {
+    if (showingLearned) {
+      posToggle.textContent = 'Switch to: sinusoidal (vanilla Transformer)';
+      posExplain.innerHTML = '<strong>Learned (BERT):</strong> Each position index (0…511) has a trainable vector of size <em>d</em>. The model learns position patterns from data; max length is bounded by the embedding table.';
+    } else {
+      posToggle.textContent = 'Switch to: learned (BERT)';
+      posExplain.innerHTML = '<strong>Sinusoidal (original):</strong> Position vectors are deterministic functions of index and dimension—no extra learned position table. Same vector for “position 0” in every sentence.';
+    }
+  }
+  posToggle.addEventListener('click', function () {
+    showingLearned = !showingLearned;
+    renderPos();
+  });
+  renderPos();
+
+  // --- Attention grid ---
+  const nTok = 6;
+  function buildAttnGrid(causal) {
+    const wrap = document.getElementById('attnGridWrap');
+    wrap.innerHTML = '';
+    const g = document.createElement('div');
+    g.className = 'grid-matrix';
+    g.style.gridTemplateColumns = `repeat(${nTok}, 28px)`;
+    for (let i = 0; i < nTok; i++) {
+      for (let j = 0; j < nTok; j++) {
+        const c = document.createElement('div');
+        c.className = 'cell' + (causal && j > i ? ' blocked' : ' open');
+        c.textContent = causal && j > i ? '×' : '·';
+        g.appendChild(c);
+      }
+    }
+    wrap.appendChild(g);
+    document.getElementById('attnCaption').textContent = causal
+      ? 'Causal: token at row i cannot attend to column j when j > i (future).'
+      : 'Bidirectional: every token may attend to every token (BERT MLM path).';
+  }
+  document.getElementById('attnModeCausal').addEventListener('click', () => buildAttnGrid(true));
+  document.getElementById('attnModeBi').addEventListener('click', () => buildAttnGrid(false));
+  buildAttnGrid(false);
+
+  // --- WordPiece toy ---
+  function toyWordPiece(w) {
+    w = (w || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (!w) return ['∅'];
+    const common = ['ing', 'ed', 's', 'ly', 'tion', 'ness', 'un', 're'];
+    const out = [];
+    let rest = w;
+    while (rest.length > 4) {
+      let hit = null;
+      for (const s of common) {
+        if (rest.endsWith(s) && rest.length > s.length) { hit = s; break; }
+      }
+      if (hit) {
+        out.unshift(rest.slice(-hit.length));
+        rest = rest.slice(0, -hit.length);
+      } else {
+        const take = Math.min(4, rest.length - 2);
+        out.unshift(rest.slice(-take));
+        rest = rest.slice(0, -take);
+      }
+    }
+    if (rest) out.unshift(rest);
+    return out.map((t, i) => (i === 0 ? t : '##' + t));
+  }
+  const wpInput = document.getElementById('wpInput');
+  const wpOut = document.getElementById('wpOut');
+  function drawWP() {
+    const parts = toyWordPiece(wpInput.value);
+    wpOut.innerHTML = parts.map(p => `<span class="token">${p}</span>`).join('');
+  }
+  wpInput.addEventListener('input', drawWP);
+  wpInput.value = 'unhappiness';
+  drawWP();
+
+  // --- MLM ---
+  const mlmSentence = ['Rome', 'is', 'the', 'capital', 'of', 'Italy', ',', 'which', 'hosts', 'many', 'government', 'buildings', '.'];
+  const mlmEl = document.getElementById('mlmTokens');
+  const mlmPreds = document.getElementById('mlmPreds');
+  let mlmState = mlmSentence.slice();
+  let mlmMaskIdx = -1;
+
+  function mlmPredict(maskedWord, idx) {
+    const bank = {
+      capital: [['capital', 0.62], ['capitol', 0.12], ['largest', 0.08], ['heart', 0.07], ['name', 0.06]],
+      Rome: [['Rome', 0.55], ['Paris', 0.1], ['London', 0.09], ['Athens', 0.08]],
+      Italy: [['Italy', 0.58], ['Europe', 0.15], ['Sicily', 0.08]],
+      default: [['[vocab]', 0.2], ['token', 0.18], ['word', 0.16], ['lemma', 0.14]]
+    };
+    const key = maskedWord in bank ? maskedWord : 'default';
+    return bank[key];
+  }
+
+  function renderMLM() {
+    mlmEl.innerHTML = '';
+    mlmState.forEach((tok, i) => {
+      const span = document.createElement('span');
+      span.className = 'token' + (tok === '[MASK]' ? ' mask' : '');
+      span.textContent = tok;
+      span.dataset.i = i;
+      if (tok !== '[MASK]') {
+        span.style.cursor = 'pointer';
+        span.addEventListener('click', () => {
+          if (mlmMaskIdx >= 0 && mlmState[mlmMaskIdx] === '[MASK]') {
+            mlmState[mlmMaskIdx] = mlmSentence[mlmMaskIdx];
+          }
+          mlmMaskIdx = i;
+          const orig = mlmSentence[i];
+          mlmState[i] = '[MASK]';
+          renderMLM();
+          const preds = mlmPredict(orig, i);
+          mlmPreds.innerHTML = '<strong style="color:var(--text);font-size:0.9rem;">Toy predictions for original <code class=inline>' + orig + '</code></strong>' +
+            preds.map(([w, p]) => `<div class="pred-row"><span>${w}</span><span>${(p * 100).toFixed(1)}%</span></div><div class="pred-bar" style="width:${p * 100}%"></div>`).join('');
+        });
+      }
+      mlmEl.appendChild(span);
+    });
+  }
+  document.getElementById('mlmReset').addEventListener('click', () => {
+    mlmState = mlmSentence.slice();
+    mlmMaskIdx = -1;
+    mlmPreds.innerHTML = '';
+    renderMLM();
+  });
+  renderMLM();
+
+  // --- Segment demo ---
+  const segDemo = document.getElementById('segDemo');
+  const segA = ['[CLS]', 'my', 'dog', 'is', 'cute', '[SEP]'];
+  const segB = ['he', 'likes', 'playing', '[SEP]'];
+  segDemo.innerHTML = [
+    ...segA.map(t => `<span class="token special seg-a">${t}</span>`),
+    ...segB.map(t => `<span class="token special seg-b">${t}</span>`)
+  ].join('');
+
+  // --- NSP toy ---
+  const line1 = 'Before my bed lies a pool of moon bright.';
+  const line2 = 'I raise my head — the mountain moon is cold.';
+  const lineRand = 'The stock market closed higher on Tuesday.';
+  const nspPair = document.getElementById('nspPair');
+  const nspVerdict = document.getElementById('nspVerdict');
+  function setNSP(real) {
+    const b = real ? line2 : lineRand;
+    nspPair.innerHTML = `<span style="color:var(--accent);">A:</span> ${line1}<br><span style="color:var(--accent4);">B:</span> ${b}`;
+    nspVerdict.style.color = real ? 'var(--accent3)' : 'var(--accent5)';
+    nspVerdict.textContent = real
+      ? 'Label: IsNext — (toy rule: both lines share “moon” imagery / poetic continuation).'
+      : 'Label: NotNext — (toy rule: unrelated topic from finance vs poetry).';
+  }
+  document.getElementById('nspReal').addEventListener('click', () => setNSP(true));
+  document.getElementById('nspRand').addEventListener('click', () => setNSP(false));
+  setNSP(true);
+
+  // --- CLS bars ---
+  const clsBars = document.getElementById('clsBars');
+  const clsLabels = ['[CLS]', 'before', 'my', 'bed', 'lies', 'a', 'pool', 'of', 'moon', 'bright'];
+  let clsIntervalId = null;
+  function buildClsBars() {
+    clsBars.innerHTML = '';
+    clsLabels.forEach(() => {
+      const d = document.createElement('div');
+      d.className = 'b';
+      d.style.height = '4px';
+      clsBars.appendChild(d);
+    });
+  }
+  function animateCls() {
+    if (clsIntervalId) clearInterval(clsIntervalId);
+    buildClsBars();
+    const bars = clsBars.querySelectorAll('.b');
+    let t = 0;
+    clsIntervalId = setInterval(() => {
+      t += 0.08;
+      bars.forEach((b, i) => {
+        const w = Math.max(0.05, Math.sin(t + i * 0.7) * 0.35 + 0.35 + (i === 0 ? 0 : Math.random() * 0.08));
+        b.style.height = (w * 110) + 'px';
+      });
+      if (t > 6) { clearInterval(clsIntervalId); clsIntervalId = null; }
+    }, 50);
+  }
+  document.getElementById('clsAnimate').addEventListener('click', animateCls);
+  animateCls();
+
+  // --- Fine-tune flow ---
+  const flow = document.getElementById('finetuneFlow');
+  const steps = [
+    'Tokenize + [CLS]',
+    'BERT encoder (×L)',
+    'Hidden at [CLS]',
+    'Linear → C logits',
+    'Softmax + CE loss'
+  ];
+  function buildFlow() {
+    flow.innerHTML = steps.map((s, i) => `<div class="flow-box" data-step="${i}">${s}</div>`).join('<span style="color:var(--text-dim);">→</span>');
+  }
+  let ftTimer = null;
+  function replayFinetune() {
+    if (ftTimer) clearInterval(ftTimer);
+    buildFlow();
+    const boxes = flow.querySelectorAll('.flow-box');
+    let i = 0;
+    boxes.forEach(b => b.classList.remove('active'));
+    ftTimer = setInterval(() => {
+      boxes.forEach(b => b.classList.remove('active'));
+      if (i < boxes.length) boxes[i].classList.add('active');
+      i++;
+      if (i > boxes.length) { clearInterval(ftTimer); ftTimer = null; }
+    }, 650);
+  }
+  document.getElementById('finetuneReplay').addEventListener('click', replayFinetune);
+  replayFinetune();
+
+  // --- Playground softmax ---
+  const logits0 = [2.0, 1.0, 0.2];
+  function softmax(arr, scale) {
+    const x = arr.map(v => v * scale);
+    const m = Math.max(...x);
+    const e = x.map(v => Math.exp(v - m));
+    const s = e.reduce((a, b) => a + b, 0);
+    return e.map(v => v / s);
+  }
+  const sharpSlider = document.getElementById('sharpSlider');
+  const sharpLab = document.getElementById('sharpLab');
+  const softmaxBars = document.getElementById('softmaxBars');
+  function drawSoft() {
+    const sc = parseFloat(sharpSlider.value);
+    sharpLab.textContent = sc.toFixed(1);
+    const p = softmax(logits0, sc);
+    const labs = ['key dim large → divide by √dₖ', 'moderate', 'small'];
+    softmaxBars.innerHTML = p.map((pi, i) =>
+      `<div style="flex:1;text-align:center;">
+        <div style="height:${pi * 120}px;background:linear-gradient(180deg,var(--accent2),var(--accent));border-radius:6px 6px 0 0;margin:0 auto;max-width:48px;"></div>
+        <div style="font-size:0.75rem;color:var(--text-dim);margin-top:6px;">${labs[i]}</div>
+        <div style="font-family:var(--mono);font-size:0.8rem;color:var(--accent3);">${(pi * 100).toFixed(1)}%</div>
+      </div>`
+    ).join('');
+  }
+  sharpSlider.addEventListener('input', drawSoft);
+  drawSoft();
+
+  // --- Nav + fade-in ---
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', function () {
+    const y = window.scrollY;
+    nav.classList.toggle('visible', y > 280);
+    document.querySelectorAll('.fade-in:not(.visible)').forEach(el => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 50) el.classList.add('visible');
+    });
+  }, { passive: true });
+  window.dispatchEvent(new Event('scroll'));
+})();
+</script>
+</body>
+</html>

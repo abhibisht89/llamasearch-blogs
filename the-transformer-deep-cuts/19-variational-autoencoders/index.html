@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Variational Autoencoders: ELBO &amp; Latent Space — Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #8b9fff;
+  --accent3: #5eead4;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.45rem, 3vw, 2.1rem); margin-bottom: 20px; }
+h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 10px; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+.nav-wrap {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.93);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+.nav-wrap.visible { transform: translateY(0); }
+.nav-inner {
+  max-width: 920px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.nav-back { font-weight: 700; color: var(--accent2); white-space: nowrap; font-size: 0.85rem; }
+.nav-toggle {
+  margin-left: auto; display: none;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card-alt);
+  color: var(--text); font-size: 0.75rem; cursor: pointer; font-family: inherit;
+}
+.nav-toggle:hover { border-color: var(--accent); }
+.nav-links {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  font-size: 0.78rem;
+}
+.nav-links a { color: var(--text-dim); }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 900px) {
+  .nav-toggle { display: block; }
+  .nav-links {
+    display: none; width: 100%; flex-direction: column; align-items: flex-start;
+    padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px;
+  }
+  .nav-wrap.open .nav-links { display: flex; }
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 88px 24px 64px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+  width: 560px; height: 560px;
+  background: radial-gradient(circle, rgba(108,140,255,0.14) 0%, transparent 68%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 14px; position: relative; z-index: 1; }
+.subtitle {
+  font-size: 1.12rem; color: var(--text-dim);
+  max-width: 680px; margin: 0 auto 28px; position: relative; z-index: 1;
+}
+.stats {
+  display: flex; gap: 28px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 28px; position: relative; z-index: 1;
+}
+.stat { text-align: center; }
+.stat-val {
+  display: block; font-size: 1.85rem; font-weight: 700;
+  color: var(--accent); font-family: var(--mono);
+}
+.stat-label {
+  font-size: 0.72rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); }
+.section-num {
+  font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+  display: block; margin-bottom: 8px; letter-spacing: 0.06em;
+}
+
+.fade-in { opacity: 0; transform: translateY(28px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+.callout {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  margin: 22px 0;
+}
+.callout p:last-child { margin-bottom: 0; }
+.callout.accent { border-left: 4px solid var(--accent); }
+.callout.warn { border-left: 4px solid var(--accent5); }
+.callout.ok { border-left: 4px solid var(--accent3); }
+
+.formula {
+  font-family: var(--mono);
+  font-size: 0.98rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent2);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 20px 0;
+  color: var(--text);
+  overflow-x: auto;
+  line-height: 1.55;
+}
+
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  margin: 22px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.qa-box p:last-child { margin-bottom: 0; }
+
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 22px 0;
+}
+@media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.comparison .card h3 { margin-top: 0; font-size: 1rem; color: var(--accent3); margin-bottom: 10px; }
+.comparison .card p { margin-bottom: 0; font-size: 0.92rem; }
+
+.math {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 18px 0;
+  color: var(--text);
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+.demo-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  margin: 24px 0;
+}
+.demo-wrap h3 { margin-top: 0; color: var(--accent3); font-size: 1rem; }
+.demo-caption { font-size: 0.85rem; color: var(--text-dim); margin-top: 12px; margin-bottom: 0; }
+
+canvas.democv {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  background: #08080c;
+  border: 1px solid var(--border);
+}
+
+.controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 14px 0; }
+.controls label { font-size: 0.85rem; color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
+input[type="range"] { width: 160px; accent-color: var(--accent); }
+
+.bar-row { display: flex; align-items: flex-end; gap: 10px; height: 140px; margin: 16px 0; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.bar-fill {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  min-height: 4px;
+  transition: height 0.35s ease;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; font-family: var(--mono); }
+
+.ae-vae-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 20px 0;
+}
+@media (max-width: 640px) { .ae-vae-grid { grid-template-columns: 1fr; } }
+.mini-card {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  font-size: 0.9rem;
+}
+.mini-card strong { color: var(--accent3); }
+
+ul.tight { margin: 0 0 1em 1.2em; color: var(--text-dim); }
+ul.tight li { margin-bottom: 0.45em; }
+
+.readout {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--accent5);
+  margin-top: 10px;
+}
+
+.reparam-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  margin: 16px 0;
+  color: var(--text-dim);
+}
+.reparam-flow span.box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--text);
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Variational Autoencoders</span></nav>
+
+
+<div class="nav-wrap" id="navWrap">
+  <div class="nav-inner">
+    <a class="nav-back" href="../">← Advanced NLP V2</a>
+    <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#s00">00 Intro</a>
+      <a href="#s01">01 Autoencoders</a>
+      <a href="#s02">02 Latent space</a>
+      <a href="#s03">03 Inference</a>
+      <a href="#s04">04 ELBO</a>
+      <a href="#s05">05 Loss terms</a>
+      <a href="#s06">06 Reparam</a>
+      <a href="#s07">07 Diffusion</a>
+      <a href="#play">Playground</a>
+    </div>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="container">
+    <h1>Variational Autoencoders: ELBO, Latent Space &amp; Math</h1>
+    <p class="subtitle">
+      From deterministic bottlenecks to <strong>learned distributions</strong>: why the marginal likelihood is hard,
+      how the <strong>evidence lower bound (ELBO)</strong> makes training tractable, and how
+      <strong>reparameterization</strong> lets gradients flow through stochastic latents—ideas that carry directly into
+      <strong>latent diffusion</strong> systems.
+    </p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">ELBO</span><span class="stat-label">Trainable bound</span></div>
+      <div class="stat"><span class="stat-val">z = μ + σ⊙ε</span><span class="stat-label">Reparam</span></div>
+      <div class="stat"><span class="stat-val">KL</span><span class="stat-label">To prior</span></div>
+      <div class="stat"><span class="stat-val">p(x|z)</span><span class="stat-label">Decoder</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+<section class="section fade-in" id="s00">
+  <span class="section-num">00</span>
+  <h2>Why variational autoencoders matter</h2>
+  <p>
+    A variational autoencoder (VAE) is a standard building block for models that <strong>compress high-dimensional
+    observations into a latent space</strong> and <strong>generate new samples</strong> by decoding random draws from
+    that space. The same probabilistic picture—approximate posterior, reconstruction likelihood, KL to a simple
+    prior—shows up wherever you train a deep generative model with an explicit latent variable.
+  </p>
+  <p>
+    In <strong>latent diffusion</strong> (Stable Diffusion–style pipelines), a VAE maps pixels to a lower-dimensional
+    tensor and a diffusion model denoises in that space. ELBO, the decoder <code>p(x|z)</code>, and the approximate
+    posterior <code>q(z|x)</code> are the same machinery that shapes those latents before diffusion runs.
+  </p>
+</section>
+
+<section class="section fade-in" id="s01">
+  <span class="section-num">01</span>
+  <h2>Autoencoders: bottleneck compression</h2>
+  <p>
+    A plain autoencoder is two networks: an <strong>encoder</strong> maps input <code>x</code> to a low-dimensional
+    code <code>z</code>; a <strong>decoder</strong> maps <code>z</code> back to a reconstruction
+    <code>x̂</code>. The goal is to keep the code small while making <code>x̂</code> close to <code>x</code>.
+  </p>
+  <p>
+    Concretely, imagine a file named <code>zebra.jpg</code>. If you compress it into <code>zebra.zip</code> and then
+    decompress, you expect to recover the same image: classical compression is built to be (near) lossless or
+    controlled-loss. An autoencoder is <strong>not</strong> guaranteed to recover every bit. It is a neural network:
+    it learns a mapping whose bottleneck is small, and it is trained so the reconstruction matches the input
+    <strong>as well as the loss allows</strong>—pixel-wise MSE, a Bernoulli likelihood on pixels, or another choice—but
+    not necessarily exactly.
+  </p>
+  <p>
+    What makes a <strong>good</strong> autoencoder, in the classical sense? First, the code should be as
+    <strong>small</strong> as possible: the bottleneck should squeeze out redundancy. Second, the reconstruction should
+    be as <strong>close</strong> to the original input as that small code allows. Those two desires pull against each
+    other; training finds a compromise.
+  </p>
+  <p>
+    The deeper problem is <strong>semantics</strong>. The encoder may learn an arbitrary hash of the dataset: the code
+    for a photograph of a <strong>tomato</strong> might sit next to the code for a <strong>zebra</strong>, and the code
+    for a <strong>cat</strong> might resemble the code for a <strong>pizza</strong>. Nothing in the plain autoencoder
+    objective forces neighborhoods in <code>z</code> to respect categories or attributes. The model memorizes a mapping
+    from inputs to codes; it does not, by itself, organize <code>z</code> so that “food,” “animals,” “cars,” or
+    “buildings” form coherent regions you can navigate or sample from.
+  </p>
+  <div class="comparison">
+    <div class="card">
+      <h3>Plain autoencoder</h3>
+      <p>
+        Encoder outputs a single vector <code>z = f<sub>φ</sub>(x)</code>. Training pushes reconstructions toward
+        <code>x</code> while keeping the bottleneck small. Sampling or interpolating in <code>z</code> is not part of the
+        contract—so the geometry of <code>z</code> can be irregular or meaningless for generation.
+      </p>
+    </div>
+    <div class="card">
+      <h3>Variational autoencoder</h3>
+      <p>
+        Encoder outputs a <strong>distribution</strong> <code>q<sub>φ</sub>(z|x)</code> (often Gaussian parameters).
+        Training maximizes a lower bound on <code>log p(x)</code> that includes a <strong>KL penalty</strong> to a prior
+        <code>p(z)</code>. The latent space is shaped for <strong>sampling</strong> and for smooth semantic structure
+        when the model and data cooperate.
+      </p>
+    </div>
+  </div>
+  <div class="ae-vae-grid">
+    <div class="mini-card">
+      <strong>Deterministic AE</strong>
+      <p style="margin:8px 0 0; font-size:0.88rem;">
+        Encoder outputs a single vector <code>z = f<sub>φ</sub>(x)</code>. No distribution—just a point in latent space.
+        Interpolation between codes can produce meaningless decodings because the space is not organized as a smooth
+        generative manifold.
+      </p>
+    </div>
+    <div class="mini-card">
+      <strong>VAE</strong>
+      <p style="margin:8px 0 0; font-size:0.88rem;">
+        Encoder outputs parameters of a distribution <code>q<sub>φ</sub>(z|x)</code> (typically Gaussian mean and
+        variance). You <em>sample</em> <code>z</code>, decode, and regularize so the aggregate posterior stays close
+        to a chosen prior <code>p(z)</code>—enabling meaningful sampling and interpolation.
+      </p>
+    </div>
+  </div>
+
+  <div class="demo-wrap">
+    <h3>Demo: deterministic code vs. stochastic latents</h3>
+    <p class="demo-caption" style="margin-top:0">
+      Toggle: a single point code (AE) spreads no uncertainty; the VAE draws a cloud around the mean for the same
+      conceptual “example,” reflecting <code>q(z|x)</code>.
+    </p>
+    <div class="controls">
+      <label><input type="checkbox" id="demoAeVaeToggle"> Show VAE (Gaussian cloud around μ)</label>
+    </div>
+    <canvas class="democv" id="cvAeVae" width="640" height="280"></canvas>
+    <p class="readout" id="aeVaeReadout"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s02">
+  <span class="section-num">02</span>
+  <h2>Latent space, semantics, and sampling</h2>
+  <p>
+    A weakness of standard autoencoders is that the learned code can be an arbitrary hash: unrelated inputs may land
+    near each other in <code>z</code>, and there is no guarantee that Euclidean geometry in the bottleneck reflects
+    semantic similarity (e.g. unrelated object categories with adjacent codes).
+  </p>
+  <p>
+    A VAE instead learns a <strong>latent distribution</strong> over data—conceptually, a multivariate distribution
+    over the data, not a single code vector per example. The hope is that this distribution captures
+    <strong>semantic</strong> structure: all <strong>food</strong> images occupy a region related to other food images,
+    all <strong>animals</strong> relate to other animals, and similarly for <strong>cars</strong>,
+    <strong>buildings</strong>, or a <strong>stadium</strong> versus other structures. The organizing principle is
+    statistical proximity in <code>z</code>, not hand-labeled taxonomies.
+  </p>
+  <p>
+    <strong>Sampling</strong> the latent space means: draw a random vector <code>z</code> from a distribution (often the
+    prior), run the decoder, and read off a synthetic <code>x</code>. That is the same idea as using Python to draw an
+    integer uniformly from 1 to 100: each draw is a sample from the <strong>uniform</strong> distribution because every
+    outcome in the range has the same probability. Here, the distribution is typically Gaussian (or another choice), but
+    the sampling metaphor is identical—<code>z</code> is random, the decoder is deterministic given <code>z</code>.
+  </p>
+  <p>
+    Suppose a VAE was trained on food photographs. If you sample a point in latent space that lies <strong>between</strong>
+    three training images—say, <strong>egg</strong>, <strong>flour</strong>, and <strong>basil leaves</strong>—you hope
+    the decoder produces something semantically in the same family, such as <strong>pasta with basil</strong>. That would
+    indicate the model has learned relations in the training distribution rather than isolated memorized codes.
+  </p>
+  <div class="callout">
+    <p>
+      <strong>Why “latent”?</strong> We observe <code>x</code> but posit a hidden variable <code>z</code> such that
+      <code>x</code> is generated conditioned on <code>z</code>. Latent means <em>not directly observed</em>. A common
+      modeling choice is <code>p(z) = 𝒩(0, I)</code> and <code>q<sub>φ</sub>(z|x) = 𝒩(μ<sub>φ</sub>(x),
+      diag(σ<sub>φ</sub>²(x)))</code>.
+    </p>
+  </div>
+  <p>
+    <strong>Plato’s allegory of the cave</strong> is a compact metaphor: prisoners see only shadows on a wall, not the
+    objects casting them. Observed data <code>x</code> plays the role of those shadows; the generative model posits a
+    hidden cause <code>z</code> we never measure directly, and the VAE learns approximate inference for <code>z</code>
+    given <code>x</code>.
+  </p>
+
+  <div class="demo-wrap">
+    <h3>Demo: toy 2D latent space (clusters + prior)</h3>
+    <p class="demo-caption" style="margin-top:0">
+      Two “families” of points (e.g. categories) with ellipses showing axis-aligned Gaussian approximations
+      <code>q(z|x)</code>; the dashed circle suggests the standard Gaussian prior. Drag the slider to resample noise.
+    </p>
+    <div class="controls">
+      <label>Resample cloud <input type="range" id="latentSeed" min="0" max="100" value="42"></label>
+    </div>
+    <canvas class="democv" id="cvLatent" width="640" height="360"></canvas>
+    <p class="demo-caption">Ellipses are schematic: σ scaled for visibility. Real VAEs use much higher dimension.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s03">
+  <span class="section-num">03</span>
+  <h2>Variational inference and the intractable marginal</h2>
+  <h3>Tools you will use repeatedly</h3>
+  <p>
+    Three ideas show up in almost every derivation of the ELBO: the <strong>expectation</strong> of a function of a
+    random variable (an integral or sum against a density), the <strong>chain rule</strong> of probability
+    (factorizations such as <code>p(x, z) = p(x|z)p(z)</code>), and <strong>Bayes’ rule</strong> (relating
+    <code>p(z|x)</code> to <code>p(x|z)</code> and <code>p(x)</code>). They are standard undergraduate probability;
+    what follows applies them in a specific pattern.
+  </p>
+  <p>
+    A fourth object is <strong>Kullback–Leibler (KL) divergence</strong>. Given two distributions <code>P</code> and
+    <code>Q</code> (discrete or continuous on a common support), KL measures how much information is lost if you
+    approximate <code>P</code> with <code>Q</code>. It is <strong>not</strong> a distance in the metric sense: in
+    general <strong>KL(P ‖ Q) ≠ KL(Q ‖ P)</strong>. Physical distance from A to B matches B to A; KL does not obey
+    that symmetry. Nonetheless, KL(P ‖ Q) ≥ 0, and KL(P ‖ Q) = 0 if and only if the two distributions are the same
+    (on the support where the definition is finite).
+  </p>
+  <div class="formula">
+    KL(P ‖ Q) = 𝔼<sub>x∼P</sub>[ log P(x) − log Q(x) ] &nbsp; (continuous case: ∫ p(x) log(p(x)/q(x)) dx when defined)
+  </div>
+  <p>
+    We posit a generative story: sample <code>z ∼ p(z)</code>, then sample <code>x ∼ p<sub>θ</sub>(x|z)</code>. The
+    marginal density of observations is
+  </p>
+  <div class="math">
+    p<sub>θ</sub>(x) = ∫ p<sub>θ</sub>(x|z) p(z) dz .
+  </div>
+  <p>
+    For flexible neural <code>p<sub>θ</sub>(x|z)</code>, this integral is generally <strong>intractable</strong>:
+    you could define it on paper, but computing it by brute force over the latent space is prohibitively expensive.
+    “Intractable” here means: in principle the quantity exists, but exhaustive computation is so slow or so memory-heavy
+    that it is not a viable algorithm. A vivid analogy is guessing a neighbor’s Wi‑Fi password: in theory you could
+    enumerate every possible string and try each one; in practice the search space makes that approach useless on human
+    timescales.
+  </p>
+  <p>
+    The true posterior <code>p<sub>θ</sub>(z|x) = p<sub>θ</sub>(x|z)p(z) / p<sub>θ</sub>(x)</code> is also hard
+    because it divides by <code>p<sub>θ</sub>(x)</code>. You want <code>p<sub>θ</sub>(x)</code> (learning) and
+    <code>p<sub>θ</sub>(z|x)</code> (inference), but each seems to require the other—a chicken-and-egg loop.
+  </p>
+  <p>
+    The way out is <strong>variational inference</strong>: introduce a tractable approximate posterior
+    <code>q<sub>φ</sub>(z|x)</code> with its own parameters <code>φ</code>, and fit <code>(θ, φ)</code> so that
+    <code>q<sub>φ</sub></code> is close to the true posterior while improving the generative model.
+  </p>
+  <p>
+    You can also write the marginal using the joint and marginalize over <code>z</code>, but the same obstacle appears:
+    integrating over <strong>all</strong> latent <code>z</code> with a rich decoder is what blocks closed-form
+    likelihood evaluation. Meanwhile, the quantity <code>p<sub>θ</sub>(z|x)</code> depends on
+    <code>p<sub>θ</sub>(x)</code>, which is what you are trying to compute—so treating learning and exact inference as
+    naïvely separable leads straight back to the chicken-and-egg loop.
+  </p>
+  <div class="callout ok">
+    <p>
+      When you cannot compute exactly what you want, the standard move is to introduce a <strong>surrogate</strong> you
+      <em>can</em> optimize. The ELBO is that surrogate: a lower bound on <code>log p<sub>θ</sub>(x)</code> built from
+      expectations under <code>q<sub>φ</sub>(z|x)</code>.
+    </p>
+  </div>
+
+  <div class="demo-wrap">
+    <h3>Demo: Kullback–Leibler divergence is asymmetric</h3>
+    <p class="demo-caption" style="margin-top:0">
+      <strong>KL(p ‖ q)</strong> measures how much information is lost when <code>q</code> is used to approximate
+      <code>p</code>. It is not a metric: <strong>KL(p ‖ q) ≠ KL(q ‖ p)</strong> in general. It is always ≥ 0, and
+      equals 0 only when the distributions match (on the support). Adjust means of two 1D Gaussians with fixed variance.
+    </p>
+    <div class="controls">
+      <label>μ₁ <input type="range" id="klM1" min="-3" max="3" step="0.05" value="0"></label>
+      <label>μ₂ <input type="range" id="klM2" min="-3" max="3" step="0.05" value="1"></label>
+    </div>
+    <canvas class="democv" id="cvKl" width="640" height="220"></canvas>
+    <p class="readout" id="klReadout"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <span class="section-num">04</span>
+  <h2>From log-likelihood to the ELBO</h2>
+  <p>
+    Training seeks parameters <code>θ</code> that assign high density to observed data: we care about
+    <code>log p<sub>θ</sub>(x)</code> for each example <code>x</code> (or sums over a dataset). The obstacle is that
+    <code>p<sub>θ</sub>(x)</code> is the marginal obtained from <code>p<sub>θ</sub>(x|z)</code> and <code>p(z)</code>,
+    and that marginal is hard to evaluate. The ELBO is derived by <strong>exact algebra</strong> starting from
+    <code>log p<sub>θ</sub>(x)</code>—no approximation in the identities—until a non-negative KL term appears and can be
+    dropped from the bound.
+  </p>
+
+  <p>
+    For fixed <code>x</code>, introduce any tractable density <code>q<sub>φ</sub>(z|x)</code>. Since
+    <code>∫ q<sub>φ</sub>(z|x) dz = 1</code> and <code>log p<sub>θ</sub>(x)</code> does not depend on <code>z</code>,
+  </p>
+  <div class="formula">log p<sub>θ</sub>(x) = ∫ q<sub>φ</sub>(z|x) log p<sub>θ</sub>(x) dz = 𝔼<sub>q<sub>φ</sub>(z|x)</sub>[ log p<sub>θ</sub>(x) ] .</div>
+  <p>
+    For every <code>z</code> with <code>p<sub>θ</sub>(z|x) &gt; 0</code>, Bayes’ rule gives
+    <code>log p<sub>θ</sub>(x) = log p<sub>θ</sub>(x, z) − log p<sub>θ</sub>(z|x)</code>. Averaging under
+    <code>z ∼ q<sub>φ</sub>(z|x)</code>:
+  </p>
+  <div class="formula">
+    log p<sub>θ</sub>(x) = 𝔼<sub>q<sub>φ</sub>(z|x)</sub>[ log p<sub>θ</sub>(x, z) − log p<sub>θ</sub>(z|x) ] .
+  </div>
+  <p>
+    Factor the joint with the generative model, <code>p<sub>θ</sub>(x, z) = p<sub>θ</sub>(x|z) p(z)</code>:
+  </p>
+  <div class="formula">
+    log p<sub>θ</sub>(x) = 𝔼<sub>q<sub>φ</sub></sub>[ log p<sub>θ</sub>(x|z) + log p(z) − log p<sub>θ</sub>(z|x) ] .
+  </div>
+  <p>
+    Now add and subtract <code>log q<sub>φ</sub>(z|x)</code> inside the expectation—again, adding zero pointwise:
+  </p>
+  <div class="formula">
+    log p<sub>θ</sub>(x)
+    = 𝔼<sub>q<sub>φ</sub></sub>[ log p<sub>θ</sub>(x|z) + log p(z) − log q<sub>φ</sub>(z|x) ]
+    + 𝔼<sub>q<sub>φ</sub></sub>[ log q<sub>φ</sub>(z|x) − log p<sub>θ</sub>(z|x) ] .
+  </div>
+  <p>
+    Identify the two KL divergences. By definition,
+    <code>KL(q<sub>φ</sub>(z|x) ‖ p(z)) = 𝔼<sub>q<sub>φ</sub></sub>[log q<sub>φ</sub>(z|x) − log p(z)]</code>, so
+    <code>𝔼<sub>q<sub>φ</sub></sub>[log p(z) − log q<sub>φ</sub>(z|x)] = −KL(q<sub>φ</sub> ‖ p(z))</code>.
+    The second expectation is
+    <code>KL(q<sub>φ</sub>(z|x) ‖ p<sub>θ</sub>(z|x)) = 𝔼<sub>q<sub>φ</sub></sub>[log q<sub>φ</sub>(z|x) − log p<sub>θ</sub>(z|x)] ≥ 0</code>.
+  </p>
+  <div class="formula">
+    KL( q<sub>φ</sub>(z|x) ‖ p<sub>θ</sub>(z|x) ) = 𝔼<sub>q<sub>φ</sub></sub>[ log q<sub>φ</sub>(z|x) − log p<sub>θ</sub>(z|x) ] ≥ 0 .
+  </div>
+
+  <p>
+    Collecting terms:
+  </p>
+  <div class="formula">
+    log p<sub>θ</sub>(x)
+    = 𝔼<sub>q<sub>φ</sub>(z|x)</sub>[ log p<sub>θ</sub>(x|z) ]
+    − KL( q<sub>φ</sub>(z|x) ‖ p(z) )
+    + KL( q<sub>φ</sub>(z|x) ‖ p<sub>θ</sub>(z|x) ) .
+  </div>
+  <p>
+    The final KL is <strong>non-negative</strong>, so <code>log p<sub>θ</sub>(x) ≥ ELBO(x)</code>. Define the <strong>evidence lower bound (ELBO)</strong>:
+  </p>
+  <div class="formula">
+    ELBO(x) = 𝔼<sub>q<sub>φ</sub>(z|x)</sub>[ log p<sub>θ</sub>(x|z) ] − KL( q<sub>φ</sub>(z|x) ‖ p(z) ) .
+  </div>
+  <div class="formula">
+    log p<sub>θ</sub>(x) = ELBO(x) + KL( q<sub>φ</sub>(z|x) ‖ p<sub>θ</sub>(z|x) ) &nbsp;≥&nbsp; ELBO(x) .
+  </div>
+
+  <h3>Equivalent form and “reverse” KL bookkeeping</h3>
+  <p>
+    By regrouping the same expectations, the ELBO is often written to display reconstruction minus KL to the
+    <strong>prior</strong> explicitly (the form used in implementations). Starting again from
+    <code>log p<sub>θ</sub>(x) = 𝔼<sub>q</sub>[log p<sub>θ</sub>(x|z) + log p(z) − log q<sub>φ</sub>(z|x)] + KL(q‖p<sub>θ</sub>(z|x))</code>,
+    the part before the trailing KL is exactly
+    <code>𝔼<sub>q</sub>[log p<sub>θ</sub>(x|z)] − KL(q<sub>φ</sub>‖p(z))</code>. Some textbook steps instead exhibit a
+    <strong>minus</strong> sign in front of a KL because they expand a <em>different</em> KL orientation (reverse KL)
+    relative to the first display; the key invariant is always: <strong>log p = ELBO + (a non-negative gap)</strong>.
+  </p>
+
+  <div class="callout warn">
+    <p>
+      Do not confuse <code>KL(q<sub>φ</sub> ‖ p(z))</code> with <code>KL(q<sub>φ</sub> ‖ p<sub>θ</sub>(z|x))</code>.
+      The former compares the approximate posterior to the <strong>prior</strong>—that is the KL you regularize with in
+      the standard Gaussian VAE. The latter compares <code>q</code> to the <strong>true</strong> posterior; it is the gap
+      between bound and evidence. They are different objects, and KL is not symmetric, so swapping arguments changes the
+      measure entirely.
+    </p>
+  </div>
+
+  <div class="demo-wrap">
+    <h3>Demo: ELBO decomposition (schematic)</h3>
+    <p class="demo-caption" style="margin-top:0">
+      Drag the gap: <code>log p(x) = ELBO + KL(q‖p(z|x))</code>. The ELBO bar is the trainable objective; the gap is
+      unknown at training time—you indirectly shrink it by making <code>q</code> expressive and optimizing ELBO.
+    </p>
+    <div class="controls">
+      <label>Posterior gap (arbitrary units) <input type="range" id="elboGap" min="0" max="80" value="25"></label>
+    </div>
+    <div class="bar-row" id="elboBars" style="height:160px;">
+      <div class="bar-col">
+        <div class="bar-fill" id="barElbo" style="background:linear-gradient(180deg,var(--accent3),#2dd4bf);width:100%;"></div>
+        <span class="bar-label">ELBO</span>
+      </div>
+      <div class="bar-col">
+        <div class="bar-fill" id="barGap" style="background:linear-gradient(180deg,var(--accent4),#db2777);width:100%;"></div>
+        <span class="bar-label">KL(q‖p(z|x))</span>
+      </div>
+      <div class="bar-col">
+        <div class="bar-fill" id="barTotal" style="background:linear-gradient(180deg,var(--accent),#4f6fff);width:100%;"></div>
+        <span class="bar-label">log p(x)</span>
+      </div>
+    </div>
+    <p class="readout" id="elboReadout"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s05">
+  <span class="section-num">05</span>
+  <h2>What maximizing ELBO does</h2>
+  <p>
+    Equivalently, ELBO is often written as <strong>reconstruction expectation minus KL to the prior</strong>. Maximizing
+    ELBO therefore:
+  </p>
+  <ul class="tight">
+    <li><strong>Increases</strong> 𝔼<sub>q<sub>φ</sub></sub>[log p<sub>θ</sub>(x|z)]—the decoder explains the data well
+    when latents are drawn from the encoder’s distribution.</li>
+    <li><strong>Decreases</strong> KL(q<sub>φ</sub>(z|x) ‖ p(z))—latents stay close to the prior (typically standard
+    Gaussian), which makes the latent space smooth enough to sample from at generation time.</li>
+  </ul>
+  <p>
+    Maximizing ELBO therefore increases expected reconstruction quality and shrinks KL to the prior, keeping the latent space smooth enough to sample from at generation time.
+  </p>
+
+  <div class="demo-wrap">
+    <h3>Demo: reconstruction vs. KL tradeoff (β-style)</h3>
+    <p class="demo-caption" style="margin-top:0">
+      Many implementations minimize <code>−ELBO</code>, i.e. reconstruction loss plus KL. A <strong>β-VAE</strong>
+      scales the KL by <code>β</code> to emphasize disentangling or richer reconstructions. This slider shows a
+      fictional scalar loss = Recon + β·KL (relative units).
+    </p>
+    <div class="controls">
+      <label>β (KL weight) <input type="range" id="betaKl" min="0" max="200" value="100"></label>
+    </div>
+    <canvas class="democv" id="cvTradeoff" width="640" height="200"></canvas>
+    <p class="readout" id="tradeReadout"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <span class="section-num">06</span>
+  <h2>Gradients through stochastic latents: reparameterization</h2>
+  <h3>Why “gradient descent” in code is usually stochastic</h3>
+  <p>
+    When you <strong>minimize</strong> a smooth loss, the prototype is gradient descent: move parameters opposite the
+    gradient. Picture a <strong>convex</strong> bowl: your current weights sit somewhere on the surface; the gradient
+    points uphill along steepest ascent, so stepping <em>against</em> it reduces the loss. When you <strong>maximize</strong>
+    an objective, you step <em>with</em> the gradient instead. Deep models reuse the same calculus, even when the loss
+    landscape is far from convex.
+  </p>
+  <p>
+    In real training loops you almost never evaluate the gradient on the <strong>entire</strong> dataset before each
+    update. True gradient descent would require a pass over all examples to get the exact gradient of the full loss.
+    <strong>Stochastic</strong> gradient descent uses a <strong>minibatch</strong>: you estimate the gradient from a
+    subset. That estimate is a <strong>random variable</strong>—different batches yield slightly different directions.
+    Over one full epoch (enough batches to cover the data once), those estimates average toward the true gradient under
+    standard assumptions; that is why the method is called <em>stochastic</em>. The estimator has a mean (what you want)
+    and a <strong>variance</strong> (noise). For many supervised losses the variance is small enough that SGD works
+    reliably.
+  </p>
+  <p>
+    The expectation 𝔼<sub>q<sub>φ</sub></sub>[·] involves sampling <code>z</code>. A naive Monte Carlo estimator built
+    directly on samples from <code>q<sub>φ</sub>(z|x)</code> can have <strong>high variance</strong>: imagine descending
+    a valley where most stochastic gradient draws point the right way, but occasionally a draw points almost sideways or
+    backward. If you are <strong>lucky</strong>, the estimated gradient aligns with the true descent direction; if you
+    are <strong>unlucky</strong>, a high-variance estimate can send you <strong>away</strong> from the minimum. An
+    estimator can be <strong>unbiased</strong>—averaging over infinitely many draws would center on the correct
+    quantity—and still be unusable in practice because the variance is too large for stable optimization.
+  </p>
+  <p>
+    <strong>Kingma and Welling</strong> analyze an ELBO gradient estimator of the naive kind and show it suffers from
+    this pathology. There is a second, separate problem: <strong>backpropagation through a raw “sample” node</strong>.
+    Frameworks like PyTorch build derivatives through deterministic ops; drawing <code>z ∼ q<sub>φ</sub></code> is not a
+    smooth function of <code>φ</code> in the naive representation, so you cannot ask autograd for
+    ∂(sample)/∂<code>φ</code> the way you would for a matrix multiply. You need a <strong>different estimator</strong>
+    that both exposes parameters to gradients and keeps variance under control.
+  </p>
+  <p>
+    The <strong>reparameterization trick</strong> moves randomness to an independent noise variable <code>ε</code> that
+    sits <strong>outside</strong> the learnable map from parameters to <code>z</code>. Instead of treating
+    <code>z</code> itself as the stochastic node whose derivative you cannot define, you sample
+    <code>ε</code>—typically from a standard Gaussian—and <strong>combine</strong> it with the encoder outputs. If
+    <code>q<sub>φ</sub>(z|x)</code> is Gaussian with mean <code>μ<sub>φ</sub>(x)</code> and (diagonal) scale
+    <code>σ<sub>φ</sub>(x)</code> (standard deviation, elementwise),
+  </p>
+  <div class="formula">
+    ε ∼ 𝒩(0, I),&nbsp;&nbsp; z = μ<sub>φ</sub>(x) + σ<sub>φ</sub>(x) ⊙ ε .
+  </div>
+  <p>
+    Here <code>⊙</code> is <strong>elementwise</strong> multiplication, not a full matrix product. Conditional on
+    <code>ε</code>, the map <code>(μ, σ) ↦ z</code> is smooth; autograd can differentiate through <code>μ<sub>φ</sub></code>
+    and <code>σ<sub>φ</sub></code>. The backward pass will also compute contributions along the sampling branch for
+    <code>ε</code>, but those are <strong>discarded</strong> in the conceptual picture: <code>ε</code> is drawn, then
+    held fixed for the backward through the deterministic path—your randomness source is external, like drawing from
+    <code>torch.randn</code> for a zero-mean, unit-variance Gaussian (or the multivariate analogue).
+  </p>
+  <p>
+    The reparameterized objective is a <strong>Monte Carlo</strong> estimator: you approximate expectations by a finite
+    number of <code>ε</code> draws. One can show this reparameterized estimator remains <strong>unbiased</strong>—averaging
+    over enough samples tracks the true gradient in expectation—and empirically it exhibits <strong>much lower
+    variance</strong> than the score-function (likelihood-ratio / REINFORCE-style) gradient for this model class, which
+    is what makes VAE training practical.
+  </p>
+  <p>
+    Symbolically, if <code>L</code> denotes an ELBO built from samples, one argues along the lines:
+    <code>∇<sub>φ,θ</sub> 𝔼<sub>ε</sub>[L(ε)] = 𝔼<sub>ε</sub>[∇<sub>φ,θ</sub> L(ε)]</code> under regularity conditions—the
+    gradient passes through the expectation because the distribution you differentiate <em>against</em> no longer depends
+    on those parameters in the awkward way it did before the reparameterization. That interchange is the calculus mirror
+    of the engineering fix “sample noise outside, then mix with <code>μ</code> and <code>σ</code>.”
+  </p>
+  <p>
+    In practice, networks often predict <strong>log σ²</strong> rather than <code>σ²</code> directly. Variance must be
+    positive; forcing positivity by hand on raw network outputs is awkward. If the network emits
+    <code>log σ²</code>, you recover a nonnegative variance as <code>σ² = exp(log σ²)</code>. The forward pass is stable,
+    and the reparameterization still uses <code>σ</code> (the square root of that positive quantity) when forming
+    <code>z = μ + σ ⊙ ε</code>.
+  </p>
+
+  <p>
+    You cannot backprop through a generic <code>torch.sample</code> draw the way you do through matrix multiplication.
+    Gaussian location-scale families are special: simulate them as a deterministic transform of independent noise—that
+    is what reparameterization exploits.
+  </p>
+
+  <div class="demo-wrap">
+    <h3>Demo: reparameterization path</h3>
+    <p class="demo-caption" style="margin-top:0">
+      Fixed noise <code>ε</code> (drawn once); adjust learned <code>μ</code> and <code>σ</code> to see how
+      <code>z = μ + σε</code> moves along a line in 1D. Backprop updates μ and σ; ε is treated as a constant for the
+      backward pass through this draw.
+    </p>
+    <div class="controls">
+      <label>μ <input type="range" id="rpMu" min="-2" max="2" step="0.02" value="0.3"></label>
+      <label>σ <input type="range" id="rpSig" min="0.05" max="1.5" step="0.01" value="0.4"></label>
+      <button type="button" id="rpNewEps" style="padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card-alt);color:var(--text);cursor:pointer;font-family:inherit;">New ε</button>
+    </div>
+    <div class="reparam-flow">
+      <span class="box">ε ~ 𝒩(0,1)</span>
+      <span>→</span>
+      <span class="box">μ, σ from encoder</span>
+      <span>→</span>
+      <span class="box">z = μ + σε</span>
+      <span>→</span>
+      <span class="box">decoder</span>
+    </div>
+    <canvas class="democv" id="cvReparam" width="640" height="200"></canvas>
+    <p class="readout" id="rpReadout"></p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <span class="section-num">07</span>
+  <h2>Practical loss and connection to latent diffusion</h2>
+  <h3>End-to-end training pass (conceptual)</h3>
+  <p>
+    Combine the pieces in the order a computation graph actually runs. Take an observed input <code>x</code> (for
+    example an image tensor). Run it through the <strong>encoder</strong>; the encoder returns parameters of the
+    approximate posterior—mean <code>μ<sub>φ</sub>(x)</code> and (typically) a parameterization of variance or log-variance.
+    Draw <strong>noise outside</strong> the encoder’s stochastic node: sample <code>ε</code> from a standard Gaussian
+    (in PyTorch, <code>torch.randn</code> with the right shape implements draws from <code>𝒩(0, I)</code>). Form
+    <code>z = μ + σ ⊙ ε</code> with <strong>elementwise</strong> multiplication. Feed <code>z</code> to the
+    <strong>decoder</strong>, which outputs parameters of <code>p<sub>θ</sub>(x|z)</code>—for continuous pixels with
+    Gaussian observation noise, maximizing log-likelihood corresponds to penalizing squared error, so practitioners often
+    use <strong>mean squared error (MSE)</strong> pixel by pixel between the reconstruction and the original image.
+    Add the KL term between <code>q<sub>φ</sub>(z|x)</code> and the prior <code>p(z)</code>. Minimize the sum of what
+    amounts to <strong>negative ELBO</strong> (possibly with a <code>β</code> weight on KL in a β-VAE).
+  </p>
+  <p>
+    Putting it together for a Gaussian prior and diagonal Gaussian encoder, the objective used in training is the
+    <strong>negative ELBO</strong> (plus optional β scaling). One term is <strong>reconstruction</strong>—often MSE for
+    continuous pixels or Bernoulli cross-entropy for bounded inputs—matching <code>−𝔼[log p<sub>θ</sub>(x|z)]</code> under
+    the chosen observation model. The other is <strong>closed-form KL</strong> between two Gaussians when both are
+    diagonal, comparing <code>q<sub>φ</sub>(z|x)</code> to <code>𝒩(0,I)</code>.
+  </p>
+  <p>
+    At generation time: sample <code>z ∼ 𝒩(0,I)</code>, run the decoder—no encoder needed. At training time: encode
+    to get <code>μ, σ</code>, sample <code>z</code> via ε, decode, compute loss, backpropagate.
+  </p>
+
+  <h3>Diagonal Gaussian KL to the standard normal — step by step</h3>
+  <p>
+    Why the implementation formulas look the way they do is pure calculus on Gaussians. Let <code>q</code> be
+    <code>𝒩(μ, σ²)</code> in one dimension and <code>p</code> be <code>𝒩(0, 1)</code>. By definition,
+  </p>
+  <div class="formula">
+    KL(q ‖ p) = 𝔼<sub>x∼q</sub>[ log q(x) − log p(x) ] .
+  </div>
+  <p>
+    Write the log-densities explicitly (constants included so nothing is hidden):
+  </p>
+  <div class="formula">
+    log q(x) = −½ log(2π) − ½ log σ² − (x − μ)² / (2σ²),<br>
+    log p(x) = −½ log(2π) − x² / 2 .
+  </div>
+  <p>
+    Subtract and simplify the integrand <code>log q(x) − log p(x)</code>:
+  </p>
+  <div class="formula">
+    log q(x) − log p(x) = −½ log σ² − (x − μ)² / (2σ²) + x² / 2 .
+  </div>
+  <p>
+    Take expectations under <code>x ∼ 𝒩(μ, σ²)</code>. Use
+    <code>𝔼[(x − μ)²] = σ²</code> and <code>𝔼[x²] = σ² + μ²</code>:
+  </p>
+  <div class="formula">
+    𝔼[log q(x) − log p(x)]
+    = −½ log σ² − σ² / (2σ²) + (σ² + μ²) / 2
+    = −½ log σ² − ½ + ½σ² + ½μ² .
+  </div>
+  <p>
+    Collect terms into the form you see in code:
+  </p>
+  <div class="formula">
+    KL(𝒩(μ, σ²) ‖ 𝒩(0, 1)) = ½ ( σ² + μ² − 1 − log σ² ) .
+  </div>
+  <p>
+    If the encoder outputs <strong>log-variance</strong> <code>v = log σ²</code>, substitute <code>σ² = exp(v)</code>
+    and <code>log σ² = v</code> so the expression stays numerically stable and automatically enforces
+    <code>σ² &gt; 0</code>. For a <strong>diagonal</strong> multivariate encoder and spherical unit prior, sum the same
+    scalar KL across dimensions:
+  </p>
+  <div class="formula">
+    KL( 𝒩(μ, diag(σ²)) ‖ 𝒩(0, I) ) = ½ Σ<sub>i</sub> ( σ<sub>i</sub>² + μ<sub>i</sub>² − 1 − log σ<sub>i</sub>² ) .
+  </div>
+  <div class="callout ok">
+    <p>
+      The closed-form KL is the standard term in VAE implementations. If you want every algebraic maneuver in one place,
+      a detailed walkthrough is easy to find on <strong>Stack Exchange</strong> and similar references; the calculation is
+      lengthy but elementary—products of Gaussians, completing squares, and collecting coefficients.
+    </p>
+  </div>
+  <p>
+    <strong>Kingma and Welling</strong> print the full variational objective—including this KL and the reconstruction
+    term—in their original VAE paper; that display is the blueprint most codebases follow, modulo sign conventions
+    (maximizing ELBO versus minimizing negative ELBO).
+  </p>
+  <div class="callout">
+    <p>
+      <strong>Latent diffusion.</strong> A convolutional VAE compresses an image to a smaller latent tensor with a
+      learned encoder/decoder pair. A separate diffusion model is trained to model the distribution of those latents.
+      Denoising in pixel space would be far more expensive; working in VAE latents is the architectural compromise that
+      makes high-resolution synthesis tractable. The ELBO-trained VAE therefore defines the geometry and noise level of
+      the space in which the diffusion objective operates.
+    </p>
+  </div>
+</section>
+
+<section class="section fade-in" id="play">
+  <span class="section-num">08</span>
+  <h2>Playground</h2>
+  <p>
+    Combined view: adjust posterior spread and prior match, and watch a schematic training loss shaped like
+    <code>reconstruction + KL</code>. Numbers are illustrative, not calibrated to a real dataset.
+  </p>
+  <div class="demo-wrap">
+    <h3>Unified knobs</h3>
+    <div class="controls">
+      <label>Encoder variance (avg σ) <input type="range" id="pSig" min="5" max="100" value="35"></label>
+      <label>Decoder quality (inverse recon loss) <input type="range" id="pDec" min="20" max="100" value="70"></label>
+      <label>Prior strictness <input type="range" id="pPrior" min="10" max="100" value="50"></label>
+    </div>
+    <canvas class="democv" id="cvPlay" width="640" height="320"></canvas>
+    <p class="readout" id="playReadout"></p>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  function gaussianPdf(x, mu, sig) {
+    return Math.exp(-0.5 * Math.pow((x - mu) / sig, 2)) / (sig * Math.sqrt(2 * Math.PI));
+  }
+
+  // --- Demo: AE vs VAE ---
+  const cvAeVae = document.getElementById('cvAeVae');
+  const aeVaeReadout = document.getElementById('aeVaeReadout');
+  const aeVaeToggle = document.getElementById('demoAeVaeToggle');
+  function drawAeVae() {
+    const ctx = cvAeVae.getContext('2d');
+    const W = cvAeVae.width, H = cvAeVae.height;
+    ctx.fillStyle = '#08080c';
+    ctx.fillRect(0, 0, W, H);
+    const cx = W * 0.5, cy = H * 0.5;
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, cy); ctx.lineTo(W, cy);
+    ctx.moveTo(cx, 0); ctx.lineTo(cx, H);
+    ctx.stroke();
+    const muX = cx + 80, muY = cy - 20;
+    ctx.fillStyle = '#6c8cff';
+    ctx.beginPath();
+    ctx.arc(muX, muY, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText('μ = encoder(x)', muX + 14, muY + 4);
+    if (aeVaeToggle.checked) {
+      ctx.strokeStyle = 'rgba(108,140,255,0.35)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 48; i++) {
+        const ang = (i / 48) * Math.PI * 2;
+        const r1 = 55, r2 = 28;
+        const px = muX + Math.cos(ang) * r1 * 0.6 + (Math.random() - 0.5) * 15;
+        const py = muY + Math.sin(ang) * r2 * 0.6 + (Math.random() - 0.5) * 15;
+        ctx.beginPath();
+        ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#5eead4';
+      ctx.fillText('Samples z ~ q(z|x)', 24, 28);
+    } else {
+      ctx.fillStyle = '#f472b6';
+      ctx.fillText('Single code z (no uncertainty)', 24, 28);
+    }
+    aeVaeReadout.textContent = aeVaeToggle.checked
+      ? 'VAE: stochastic bottleneck — decoder sees different z each forward pass (expectation estimated by samples).'
+      : 'AE: one z per x — good for compression, weak generative structure.';
+  }
+  aeVaeToggle.addEventListener('change', drawAeVae);
+  drawAeVae();
+
+  // --- Latent space 2D ---
+  const cvLatent = document.getElementById('cvLatent');
+  const latentSeed = document.getElementById('latentSeed');
+  function rand(s) {
+    let x = Math.sin(s * 12.9898 + 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  }
+  function drawLatent() {
+    const ctx = cvLatent.getContext('2d');
+    const W = cvLatent.width, H = cvLatent.height;
+    const seed = parseInt(latentSeed.value, 10) || 0;
+    ctx.fillStyle = '#08080c';
+    ctx.fillRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2;
+    const sc = 55;
+    function cluster(baseX, baseY, col, label, off) {
+      for (let i = 0; i < 35; i++) {
+        const r1 = rand(seed + i * 3 + off);
+        const r2 = rand(seed + i * 7 + off + 19);
+        const x = baseX + (r1 - 0.5) * 100;
+        const y = baseY + (r2 - 0.5) * 70;
+        ctx.fillStyle = col;
+        ctx.globalAlpha = 0.75;
+        ctx.beginPath();
+        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.ellipse(baseX, baseY, 58, 40, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#e0e0e8';
+      ctx.font = 'bold 13px ' + getComputedStyle(document.body).fontFamily;
+      ctx.fillText(label, baseX - 28, baseY - 52);
+    }
+    cluster(cx - 130, cy + 10, 'rgba(108,140,255,0.9)', 'Family A', 0);
+    cluster(cx + 120, cy - 20, 'rgba(94,234,212,0.9)', 'Family B', 100);
+    ctx.strokeStyle = 'rgba(251,191,36,0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 145, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText('Prior p(z) ~ 𝒩(0,I) (schematic)', cx - 78, cy - 160);
+  }
+  latentSeed.addEventListener('input', drawLatent);
+  drawLatent();
+
+  // --- KL demo ---
+  const cvKl = document.getElementById('cvKl');
+  const klM1 = document.getElementById('klM1');
+  const klM2 = document.getElementById('klM2');
+  const klReadout = document.getElementById('klReadout');
+  function klGauss(m1, m2, s1, s2) {
+    const v1 = s1 * s1, v2 = s2 * s2;
+    return Math.log(s2 / s1) + (v1 + (m1 - m2) * (m1 - m2)) / (2 * v2) - 0.5;
+  }
+  function drawKl() {
+    const ctx = cvKl.getContext('2d');
+    const W = cvKl.width, H = cvKl.height;
+    const m1 = parseFloat(klM1.value), m2 = parseFloat(klM2.value);
+    const s = 0.45;
+    ctx.fillStyle = '#08080c';
+    ctx.fillRect(0, 0, W, H);
+    const pad = 40, plotW = W - 2 * pad, plotH = H - 20;
+    const xmin = -4, xmax = 4;
+    function xpix(x) { return pad + (x - xmin) / (xmax - xmin) * plotW; }
+    function ypix(y) { return 10 + plotH - y * plotH * 0.85; }
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.beginPath();
+    ctx.moveTo(pad, 10 + plotH); ctx.lineTo(W - pad, 10 + plotH);
+    ctx.stroke();
+    function curve(mu, col) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i <= 200; i++) {
+        const x = xmin + (i / 200) * (xmax - xmin);
+        const y = gaussianPdf(x, mu, s) * 4;
+        const px = xpix(x), py = ypix(y);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    curve(m1, '#6c8cff');
+    curve(m2, '#f472b6');
+    const k12 = klGauss(m1, m2, s, s);
+    const k21 = klGauss(m2, m1, s, s);
+    klReadout.textContent = 'KL(p₁‖p₂) = ' + k12.toFixed(4) + '   |   KL(p₂‖p₁) = ' + k21.toFixed(4) +
+      '   (1D Gaussians, σ=' + s + ')';
+  }
+  klM1.addEventListener('input', drawKl);
+  klM2.addEventListener('input', drawKl);
+  drawKl();
+
+  // --- ELBO bars ---
+  const elboGap = document.getElementById('elboGap');
+  const barElbo = document.getElementById('barElbo');
+  const barGap = document.getElementById('barGap');
+  const barTotal = document.getElementById('barTotal');
+  const elboReadout = document.getElementById('elboReadout');
+  function drawElboBars() {
+    const gap = parseInt(elboGap.value, 10);
+    const elbo = 100;
+    const total = elbo + gap;
+    const maxH = 130;
+    barElbo.style.height = (elbo / total * maxH) + 'px';
+    barGap.style.height = (gap / total * maxH) + 'px';
+    barTotal.style.height = maxH + 'px';
+    elboReadout.textContent = 'Relative scale: log p(x) = ' + total + '  =  ELBO ' + elbo + '  +  gap ' + gap +
+      '  (toy units). Maximizing ELBO pushes up the fixed log-likelihood floor.';
+  }
+  elboGap.addEventListener('input', drawElboBars);
+  drawElboBars();
+
+  // --- Tradeoff ---
+  const cvTradeoff = document.getElementById('cvTradeoff');
+  const betaKl = document.getElementById('betaKl');
+  const tradeReadout = document.getElementById('tradeReadout');
+  function drawTradeoff() {
+    const ctx = cvTradeoff.getContext('2d');
+    const W = cvTradeoff.width, H = cvTradeoff.height;
+    const beta = parseInt(betaKl.value, 10) / 100;
+    ctx.fillStyle = '#08080c';
+    ctx.fillRect(0, 0, W, H);
+    const recon = 40 + 50 * Math.exp(-beta * 0.8);
+    const kl = 8 + 55 * (1 - Math.exp(-beta * 1.2));
+    const total = recon + kl;
+    const bw = 70, gap = 40, base = H - 30;
+    function bar(x, h, col, lab) {
+      ctx.fillStyle = col;
+      ctx.fillRect(x, base - h, bw, h);
+      ctx.fillStyle = '#8888a0';
+      ctx.font = '11px monospace';
+      ctx.fillText(lab, x, base + 14);
+      ctx.fillStyle = '#e0e0e8';
+      ctx.fillText(h.toFixed(1), x + 10, base - h - 8);
+    }
+    bar(80, recon * 1.4, '#5eead4', 'Recon');
+    bar(80 + bw + gap, kl * 1.4, '#f472b6', 'KL');
+    bar(80 + 2 * (bw + gap), total * 1.4, '#6c8cff', 'Sum');
+    tradeReadout.textContent = 'β = ' + beta.toFixed(2) +
+      '  →  larger β usually tightens prior match (higher KL penalty); small β can allow richer reconstructions at the cost of a less regularized latent space.';
+  }
+  betaKl.addEventListener('input', drawTradeoff);
+  drawTradeoff();
+
+  // --- Reparam ---
+  const cvReparam = document.getElementById('cvReparam');
+  const rpMu = document.getElementById('rpMu');
+  const rpSig = document.getElementById('rpSig');
+  const rpReadout = document.getElementById('rpReadout');
+  let rpEps = 0.73;
+  document.getElementById('rpNewEps').addEventListener('click', function () {
+    rpEps = (Math.random() + Math.random() + Math.random() - 1.5) * 1.2;
+    drawReparam();
+  });
+  function drawReparam() {
+    const ctx = cvReparam.getContext('2d');
+    const W = cvReparam.width, H = cvReparam.height;
+    const mu = parseFloat(rpMu.value), sig = parseFloat(rpSig.value);
+    const z = mu + sig * rpEps;
+    ctx.fillStyle = '#08080c';
+    ctx.fillRect(0, 0, W, H);
+    const cy = H / 2, sc = 70, cx = W / 2;
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.beginPath();
+    ctx.moveTo(40, cy); ctx.lineTo(W - 40, cy);
+    ctx.stroke();
+    const x0 = cx + mu * sc;
+    const xz = cx + z * sc;
+    ctx.strokeStyle = '#8888a0';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x0 - sig * sc, cy);
+    ctx.lineTo(x0 + sig * sc, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px monospace';
+    ctx.fillText('0', cx - 4, cy + 22);
+    ctx.fillStyle = '#6c8cff';
+    ctx.beginPath();
+    ctx.arc(x0, cy, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#5eead4';
+    ctx.beginPath();
+    ctx.arc(xz, cy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e0e0e8';
+    ctx.fillText('μ', x0 - 3, cy - 14);
+    ctx.fillText('z', xz - 4, cy - 14);
+    rpReadout.textContent = 'ε = ' + rpEps.toFixed(4) + '   |   z = μ + σε = ' + z.toFixed(4) +
+      '   |   ∂z/∂μ = 1,  ∂z/∂σ = ε';
+  }
+  rpMu.addEventListener('input', drawReparam);
+  rpSig.addEventListener('input', drawReparam);
+  drawReparam();
+
+  // --- Playground ---
+  const cvPlay = document.getElementById('cvPlay');
+  const pSig = document.getElementById('pSig');
+  const pDec = document.getElementById('pDec');
+  const pPrior = document.getElementById('pPrior');
+  const playReadout = document.getElementById('playReadout');
+  function drawPlay() {
+    const ctx = cvPlay.getContext('2d');
+    const W = cvPlay.width, H = cvPlay.height;
+    const sigN = parseInt(pSig.value, 10) / 100;
+    const dec = parseInt(pDec.value, 10);
+    const priorN = parseInt(pPrior.value, 10) / 100;
+    const reconLoss = (100 - dec) * 0.8 + sigN * 20;
+    const klLoss = priorN * 40 / (sigN + 0.2);
+    const total = reconLoss + klLoss;
+    ctx.fillStyle = '#08080c';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#e0e0e8';
+    ctx.font = '14px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText('Schematic loss landscape (illustrative)', 24, 28);
+    const base = H - 50, maxBar = H - 90;
+    function bar(x, w, h, col) {
+      ctx.fillStyle = col;
+      ctx.fillRect(x, base - h, w, h);
+    }
+    const mr = Math.max(reconLoss, klLoss, total, 1);
+    bar(60, 80, (reconLoss / mr) * maxBar, '#5eead4');
+    bar(180, 80, (klLoss / mr) * maxBar, '#f472b6');
+    bar(300, 80, (total / mr) * maxBar, '#6c8cff');
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px monospace';
+    ctx.fillText('Recon term', 60, base + 20);
+    ctx.fillText('KL term', 195, base + 20);
+    ctx.fillText('Total', 325, base + 20);
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = '11px monospace';
+    ctx.fillText('σ̄_q (encoder spread) affects both: sharper q can lower KL but hurts sampling diversity.', 24, H - 16);
+    playReadout.textContent = 'recon ≈ ' + reconLoss.toFixed(2) + '  |  KL ≈ ' + klLoss.toFixed(2) +
+      '  |  total ≈ ' + total.toFixed(2);
+  }
+  pSig.addEventListener('input', drawPlay);
+  pDec.addEventListener('input', drawPlay);
+  pPrior.addEventListener('input', drawPlay);
+  drawPlay();
+
+  // --- Nav + fade-in + menu toggle ---
+  const navWrap = document.getElementById('navWrap');
+  const navToggle = document.getElementById('navToggle');
+  const navLinks = document.getElementById('navLinks');
+
+  navToggle.addEventListener('click', function () {
+    const open = navWrap.classList.toggle('open');
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.querySelectorAll('#navLinks a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      navWrap.classList.remove('open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  window.addEventListener('scroll', function () {
+    const y = window.scrollY;
+    navWrap.classList.toggle('visible', y > 220);
+    document.querySelectorAll('.fade-in:not(.visible)').forEach(function (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 50) el.classList.add('visible');
+    });
+  }, { passive: true });
+  window.dispatchEvent(new Event('scroll'));
+})();
+</script>
+</body>
+</html>

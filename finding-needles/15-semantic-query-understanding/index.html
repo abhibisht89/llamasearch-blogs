@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Semantic Query Understanding &amp; Autocomplete | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --query: #38bdf8;
+      --query-dim: rgba(56, 189, 248, 0.25);
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 44px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: var(--accent); text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover { color: var(--accent); }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.12), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 40%, rgba(167, 139, 250, 0.1), transparent),
+        radial-gradient(ellipse 50% 35% at 0% 70%, rgba(56, 189, 248, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.65rem, 4.2vw, 2.75rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .val { font-family: var(--mono); font-size: 1.35rem; color: var(--query); font-weight: 600; }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    .chapter-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent2);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.04em;
+    }
+    section.fade-in {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 72px 24px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    section h2 {
+      font-size: 1.65rem;
+      margin: 0 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    section h3 { font-size: 1.15rem; color: var(--accent); margin: 28px 0 12px; }
+    section p { margin: 0 0 16px; color: var(--text-dim); }
+    section p strong { color: var(--text); }
+    ul.fancy { margin: 0 0 16px; padding-left: 1.25rem; color: var(--text-dim); }
+    ul.fancy li { margin-bottom: 8px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      color: var(--accent5);
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 22px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: var(--text-dim);
+    }
+    .callout.warn { border-left-color: var(--accent5); }
+    .callout.ok { border-left-color: var(--accent3); }
+    .callout.q { border-left-color: var(--query); }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0; }
+    @media (max-width: 720px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      font-size: 0.92rem;
+      color: var(--text-dim);
+    }
+    .comparison > div h4 { margin: 0 0 10px; color: var(--text); font-size: 0.95rem; }
+    .demo {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin: 24px 0;
+    }
+    .demo-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--query);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .demo input[type="text"],
+    .demo textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+    .demo textarea { min-height: 88px; resize: vertical; }
+    .demo button, .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    .demo button:hover, .btn:hover { background: rgba(34, 211, 238, 0.22); }
+    .demo button.secondary {
+      border-color: var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+    }
+    .demo button.secondary:hover { color: var(--text); border-color: var(--text-dim); }
+    .demo-out {
+      margin-top: 14px;
+      padding: 14px 16px;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--accent3);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .demo-out.dim { color: var(--text-dim); }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .tag {
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--query-dim);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: var(--query);
+    }
+    .tag.bad { background: rgba(248, 113, 113, 0.15); border-color: rgba(248, 113, 113, 0.4); color: var(--danger); }
+    .tag.ok { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.4); color: var(--accent3); }
+    .hyde-step {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .hyde-step .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .hyde-step .num {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--query-dim);
+      color: var(--query);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .hyde-step .body { font-size: 0.9rem; color: var(--text-dim); }
+    .hyde-step .body strong { color: var(--text); }
+    .pipeline-track {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0;
+    }
+    .pipe-node {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .pipe-node.active {
+      border-color: var(--accent);
+      background: rgba(34, 211, 238, 0.1);
+      color: var(--accent);
+    }
+    .pipe-node.done {
+      border-color: var(--accent3);
+      color: var(--accent3);
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    .switch {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      border-radius: 999px;
+      background: var(--border);
+      cursor: pointer;
+      border: none;
+      padding: 0;
+    }
+    .switch.on { background: var(--accent3); }
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--text);
+      transition: transform 0.2s;
+    }
+    .switch.on::after { transform: translateX(22px); }
+    .suggest-list { list-style: none; margin: 10px 0 0; padding: 0; }
+    .suggest-list li {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.88rem;
+      color: var(--text-dim);
+    }
+    .suggest-list li:last-child { border-bottom: none; }
+    .sim { font-family: var(--mono); color: var(--accent5); font-size: 0.8rem; }
+    .cache-bar {
+      margin: 14px 0;
+    }
+    .cache-bar input[type="range"] { width: 100%; max-width: 400px; }
+    footer {
+      text-align: center;
+      padding: 48px 24px 80px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a>
+    <span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">Query Understanding</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="mainNav">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="On-page">
+    <a href="#s0">§0 Overview</a>
+    <a href="#s1">§1 Classification</a>
+    <a href="#s2">§2 Parsing</a>
+    <a href="#s3">§3 Disambiguation</a>
+    <a href="#s4">§4 Transformations</a>
+    <a href="#s5">§5 Autocomplete</a>
+    <a href="#s6">§6 Caching</a>
+    <a href="#s7">§7 Pipeline</a>
+    <a href="#s8">§8 Playground</a>
+  </nav>
+
+  <header class="hero" id="top">
+    <span class="chapter-badge">Chapter 15 · Semantic layers</span>
+    <h1>Semantic Query Understanding &amp; Autocomplete</h1>
+    <p class="subtitle">
+      Turn a few noisy keystrokes into structured intent, safer filters, and retrieval that matches what people mean—not only what they typed.
+      Classification, parsing, disambiguation, query transformations, meaning-aware suggestions, and semantic caches each address a different failure mode in short, ambiguous queries.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="val">2–3</div><div class="lbl">Typical query length (words)</div></div>
+      <div class="hero-stat"><div class="val">QU</div><div class="lbl">Upstream of retrieval</div></div>
+      <div class="hero-stat"><div class="val">ANN</div><div class="lbl">Autocomplete &amp; cache lookups</div></div>
+    </div>
+  </header>
+
+  <section class="fade-in" id="s0">
+    <h2>§0 · Overview</h2>
+    <p>
+      <strong>Query understanding</strong> infers intent, constraints, and safe operations from the short, noisy text users type—typically two or three words, often misspelled or overloaded.
+      That fragment drives ranking, filters, index selection, and whether to spend budget on generative steps; misunderstanding it propagates through retrieval, reranking, and answer synthesis.
+    </p>
+    <p>
+      The retriever can only fetch what the query representation asks for, so misclassified or ambiguous queries limit even strong retrievers.
+      Production stacks invest in <code>intent detection</code>, <code>slot filling</code>, <code>sense disambiguation</code>, and <code>query rewriting</code> before dense vectors or sparse postings run.
+    </p>
+    <h3>Why ambiguity dominates</h3>
+    <p>
+      Natural language is sparse relative to the space of possible meanings.
+      The same surface form can denote products, professions, or abstract concepts; geographic names collide; brand tokens double as common words.
+      Search interfaces rarely offer clarifying dialogs, so the engine must carry multiple hypotheses or pick a dominant one using context.
+    </p>
+    <ul class="fancy">
+      <li>Behavioral signals (clicks, reformulations, dwell) provide weak supervision for what “worked.”</li>
+      <li>Catalog structure (categories, facets, knowledge-graph neighborhoods) anchors interpretations to inventory.</li>
+      <li>Learned representations let you compare a query to labeled prototypes without hand-writing every rule.</li>
+    </ul>
+  </section>
+
+  <section class="fade-in" id="s1">
+    <h2>§1 · Query classification</h2>
+    <p>
+      <strong>Query classification</strong> assigns a high-level task label before you execute retrieval.
+      A common three-way split is <code>navigational</code> (the user wants a specific known destination), <code>informational</code> (they want to learn or compare), and <code>transactional</code> (they intend to act—buy, book, download).
+    </p>
+    <p>
+      <strong>Index-based classification</strong> can project the query into the same embedding space as a <strong>semantic knowledge graph</strong> (<code>SKG</code>) of intents or landing pages, then run <code>k</code>-nearest-neighbor retrieval over labeled nodes.
+      This keeps inference cheap and auditable: neighbors are explainable graph entities, not opaque chain-of-thought.
+    </p>
+    <p>
+      <strong>LLM-based classification</strong> instead prompts a model with the raw query (plus locale, vertical, and policy context) and asks for structured JSON: intent, confidence, and optional rationale fields.
+      It shines on tail queries and nuanced language, but you must validate outputs, handle refusals, and watch latency and cost.
+    </p>
+    <h3>Category and slot detection</h3>
+    <p>
+      Beyond coarse intent, commerce and vertical search often extract <code>slots</code>: category, brand, color, size, price bounds, compatibility constraints.
+      For example, <code>red nike shoes</code> decomposes into <code>category=shoes</code>, <code>brand=nike</code>, <code>color=red</code>, with the residual lexical content used for full-text matching.
+    </p>
+    <p>
+      Slots can come from finite-state taggers, sequence models trained on query logs, or constrained generation from an LLM with a strict schema.
+      Once extracted, they drive hard filters in SQL or structured search, while embeddings handle softer semantic matching on the remainder.
+    </p>
+
+    <div class="demo" id="demoClassify">
+      <div class="demo-label">Interactive · Classify a query</div>
+      <input type="text" id="clsInput" placeholder="Try: apple store near me / how to fix leaky faucet / buy usb-c dock" autocomplete="off" />
+      <button type="button" id="clsBtn">Classify</button>
+      <div class="tag-row" id="clsTags"></div>
+      <div class="demo-out dim" id="clsOut">Output appears here. Heuristics below illustrate the shape of real systems.</div>
+    </div>
+
+    <div class="comparison">
+      <div>
+        <h4>SKG + kNN</h4>
+        Deterministic neighbors, easy to log and diff. Needs curated labels and refresh when inventory shifts.
+      </div>
+      <div>
+        <h4>LLM classifier</h4>
+        Flexible wording, strong on rare phrasing. Needs guardrails, caching, and evaluation harnesses.
+      </div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s2">
+    <h2>§2 · Semantic query parsing</h2>
+    <p>
+      <strong>Semantic query parsing</strong> turns free text into a structured object: tokens, phrases, entity spans, negations, comparators, and quantitative constraints.
+      Classic <strong>Named Entity Recognition</strong> (<code>NER</code>) models—whether from <code>spaCy</code>, transformer taggers, or domain-specific fine-tunes—mark product lines, locations, people, and brands inside the query string.
+    </p>
+    <p>
+      The output is not merely labels for display; it becomes a <strong>parse tree</strong> or <code>semantic graph</code> that operators consume.
+      You attach <strong>semantic functions</strong> to nodes: boost signals for promotional intent, apply numeric filters for budgets, expand synonyms for recall, or down-rank incompatible categories.
+    </p>
+    <div class="formula">
+      Example trace: <code>cheap laptop under $500</code><br />
+      → <code>filter(price &lt; 500)</code> ∧ <code>boost(deal_score)</code> ∧ <code>must_match("laptop")</code>
+    </div>
+    <p>
+      Parsing also enables safer execution: a price constraint becomes a parameterized predicate instead of string concatenation into a query language.
+      When retrieval spans both keyword and vector stages, parsed slots can set which field embeddings you compare against (title vs. description vs. specs).
+    </p>
+    <h3>Custom models versus general taggers</h3>
+    <p>
+      Off-the-shelf NER may miss SKUs, chemical names, or automotive fitment codes.
+      Teams often bootstrap spans from search logs (clicked documents as distant supervision), then iterate with human review on error clusters.
+    </p>
+    <p>
+      Log parse JSON alongside the raw query so you can replay ranking experiments when parsers change.
+    </p>
+  </section>
+
+  <section class="fade-in" id="s3">
+    <h2>§3 · Query sense disambiguation</h2>
+    <p>
+      Polysemy breaks naive bag-of-words assumptions.
+      The token <code>server</code> might mean rack hardware, a restaurant role, or a tennis stroke; <code>python</code> might be a language or a snake; <code>java</code> an island or a runtime.
+      <strong>Sense disambiguation</strong> picks—or ranks—interpretations so retrieval targets the right document cluster.
+    </p>
+    <p>
+      As seen with the <code>SKG</code> approach in <a href="../13-wormhole-vectors/index.html" style="color:var(--accent);">Chapter 13</a>, the same surface form can link to different neighborhoods—<code>java</code> toward programming or toward <code>coffee</code>—and foreground context selects which path matters.
+    </p>
+    <p>
+      <strong>Index-based disambiguation</strong> aligns the query with sense nodes in an <code>SKG</code>: compare embeddings or click-propagation scores to see which sense neighborhood dominates given co-occurring tokens (for example, <code>waiter</code> steers <code>server</code> toward hospitality).
+    </p>
+    <p>
+      <strong>LLM-based disambiguation</strong> asks the model for the most likely sense under a described vertical, optionally constrained to a finite sense inventory to keep outputs usable.
+    </p>
+    <p>
+      <strong>Personal context</strong>—recent queries, locale, device, and explicit preferences—acts as a prior.
+      Someone who just searched for <code>kubernetes networking</code> probably means the IT sense of <code>ingress</code>, not apartment rent listings.
+    </p>
+
+    <div class="demo" id="demoDisamb">
+      <div class="demo-label">Interactive · Ambiguous query disambiguator</div>
+      <input type="text" id="disInput" placeholder="Type: server / python / java / mercury / apple" autocomplete="off" />
+      <button type="button" id="disBtn">Suggest senses</button>
+      <div class="demo-out dim" id="disOut"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s4">
+    <h2>§4 · Query transformation techniques</h2>
+    <p>
+      Sometimes the best representation for retrieval is not the user’s literal string.
+      <strong>Query transformations</strong> rewrite, expand, decompose, or reroute the request to match how content is indexed—or to exploit stronger encoders.
+    </p>
+    <h3>HyDE (Hypothetical Document Embeddings)</h3>
+    <p>
+      <code>HyDE</code> asks a generative model to produce a short hypothetical answer document, embeds that text, and uses the embedding as the query vector.
+      The hope is that the fake passage sits closer to true answers in embedding space than the original question phrasing, especially for conversational or abstract queries.
+    </p>
+    <h3>Multi-query generation</h3>
+    <p>
+      Sample <code>N</code> paraphrases or sub-intents, retrieve against each, then merge with reciprocal rank fusion or learned aggregation.
+      This trades compute for recall and robustness to vocabulary mismatch.
+    </p>
+    <h3>Query decomposition</h3>
+    <p>
+      Complex questions become a planner’s list: answer sub-questions, verify consistency, and synthesize.
+      Each sub-query may target a different corpus slice or tool.
+    </p>
+    <h3>Step-back prompting</h3>
+    <p>
+      First retrieve or reason about a more general principle, then specialize to the user’s instance—useful for troubleshooting and scientific queries where background context stabilizes retrieval.
+    </p>
+    <h3>Query routing</h3>
+    <p>
+      Route by language, freshness needs, legal sensitivity, or modality (image vs. text).
+      Routing is a transformation on the execution graph, not only on the string—but the classifier output triggers it.
+    </p>
+
+    <div class="demo" id="demoHyde">
+      <div class="demo-label">Interactive · HyDE-style pipeline (simulated)</div>
+      <input type="text" id="hydeInput" placeholder="e.g. why do transformers use layer norm" autocomplete="off" />
+      <button type="button" id="hydeBtn">Run pipeline</button>
+      <div class="hyde-step" id="hydeSteps"></div>
+      <p style="font-size:0.82rem;color:var(--text-dim);margin-top:12px;">
+        The hypothetical passage below is template-generated for illustration; production systems use your generative model and embedding endpoint, then query an <code>HNSW</code> or other <code>ANN</code> index.
+      </p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s5">
+    <h2>§5 · Semantic autocomplete</h2>
+    <p>
+      Traditional autocomplete completes prefixes against a trie of popular queries: fast, but brittle to typos, reorderings, and synonyms.
+      <strong>Semantic autocomplete</strong> encodes partial queries and candidate suggestions in a shared dense space—often with <code>sentence-transformers</code> (<code>SBERT</code> family)—so that meaning, not only characters, drives ranking.
+    </p>
+    <p>
+      Offline, you embed frequent queries and high-value noun phrases into vectors and store them in an <code>HNSW</code> index (or another graph-based <code>ANN</code> structure).
+      At serving time, embed the current prefix (or last completed phrase), query the index for nearest neighbors, and blend with popularity and personalization signals.
+    </p>
+    <p>
+      Semantic suggestions tolerate mild typos (nearby vectors), synonymy (<code>laptop</code> ↔ <code>notebook computer</code>), and cross-language hints with multilingual encoders—at the cost of index freshness, embedding latency, and policy filtering.
+    </p>
+
+    <div class="demo" id="demoAuto">
+      <div class="demo-label">Interactive · Semantic autocomplete (hash embeddings)</div>
+      <input type="text" id="autoInput" placeholder="Start typing: best noise… / cheap fligh… / install docker on…" autocomplete="off" />
+      <ul class="suggest-list" id="autoList"></ul>
+      <p style="font-size:0.82rem;color:var(--text-dim);margin-top:8px;">
+        Similarity uses a deterministic 64-D hash embedding so the demo runs fully in-browser; swap in real <code>SBERT</code> vectors for production quality.
+      </p>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s6">
+    <h2>§6 · Semantic caching</h2>
+    <p>
+      Generative retrieval stacks repeat expensive steps: embed the query, call an LLM for rewriting, retrieve, rerank, maybe summarize.
+      When different surface forms express the same information need, you can <strong>semantically cache</strong> prior results keyed by query embeddings rather than exact strings.
+    </p>
+    <p>
+      Maintain a vector index over cached queries; at request time, if <code>cosine_similarity(q, q_cached) &gt; τ</code> (often around <code>0.95</code> for high-precision modes), return the stored answer bundle and skip redundant work.
+    </p>
+    <div class="comparison">
+      <div>
+        <h4>Benefits</h4>
+        Cuts tail latency, saves model spend, and smooths traffic spikes when many users ask slight variants of the same question.
+      </div>
+      <div>
+        <h4>Risks</h4>
+        Stale facts after catalog or policy updates; overly aggressive thresholds create false hits; invalidation must be explicit or time-bounded.
+      </div>
+    </div>
+
+    <div class="demo" id="demoCache">
+      <div class="demo-label">Interactive · Cache threshold explorer</div>
+      <p style="color:var(--text-dim);font-size:0.92rem;margin-top:0;">
+        Cached query: <code>how do I reset my password</code>. Compare a new query’s similarity (same simulated embedding as §5).
+      </p>
+      <input type="text" id="cacheInput" placeholder="Try paraphrases of the cached question" autocomplete="off" />
+      <div class="cache-bar">
+        <label for="cacheThresh">Similarity threshold τ</label>
+        <input type="range" id="cacheThresh" min="0.5" max="0.99" step="0.01" value="0.95" />
+        <span id="cacheThreshLbl" style="font-family:var(--mono);color:var(--accent5);">0.95</span>
+      </div>
+      <div class="demo-out dim" id="cacheOut"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s7">
+    <h2>§7 · Putting it together — the query pipeline</h2>
+    <p>
+      Production systems chain the pieces: <strong>classify</strong> intent → <strong>parse</strong> entities and constraints → <strong>disambiguate</strong> senses → <strong>expand or transform</strong> the text → <strong>execute</strong> retrieval (and optionally cache the outcome).
+      Each stage emits structured state consumed by the next; whether a stage uses neural models, graph lookups, or rules is an implementation detail.
+    </p>
+    <p>
+      Unified logging across stages lets you attribute regressions: a sudden CTR drop might trace to a parser change that dropped price filters, not to a new reranker.
+    </p>
+
+    <div class="demo" id="demoPipe">
+      <div class="demo-label">Interactive · End-to-end step-through</div>
+      <input type="text" id="pipeInput" placeholder="Enter any shopping or how-to style query" autocomplete="off" />
+      <button type="button" id="pipeStepBtn">Advance one step</button>
+      <button type="button" class="secondary" id="pipeResetBtn">Reset</button>
+      <div class="pipeline-track" id="pipeTrack"></div>
+      <div class="demo-out dim" id="pipeOut"></div>
+    </div>
+  </section>
+
+  <section class="fade-in" id="s8">
+    <h2>§8 · Playground — query understanding workbench</h2>
+    <p>
+      Toggle between <strong>index-style</strong> heuristics and <strong>LLM-style</strong> narrative output on the same query.
+      The demo is simulated; fields match typical production logs—intent, slots, chosen sense, expansions, transformation notes, and the final execution string.
+    </p>
+
+    <div class="demo" id="demoPlay">
+      <div class="demo-label">Workbench</div>
+      <div class="toggle-row">
+        <span style="color:var(--text-dim);font-size:0.9rem;">Approach</span>
+        <button type="button" class="switch" id="playToggle" aria-pressed="false" title="Toggle LLM-style vs index-style"></button>
+        <span id="playModeLbl" style="font-family:var(--mono);color:var(--accent);">index-style (SKG + rules)</span>
+      </div>
+      <input type="text" id="playInput" placeholder="e.g. durable waterproof hiking boots under 120 dollars" autocomplete="off" />
+      <button type="button" id="playBtn">Analyze query</button>
+      <div class="demo-out dim" id="playOut"></div>
+    </div>
+
+    <p>
+      Evaluate query understanding with offline replay of logged traffic and online guardrails; instrument per-stage precision and coverage so schema mistakes do not silently skew retrieval metrics.
+    </p>
+  </section>
+
+  <footer>
+    Search Zero to Hero · Chapter 15 · Semantic Query Understanding &amp; Autocomplete<br />
+    Single-file reference · Vanilla JS demos · Dark theme
+  </footer>
+
+  <script>
+(function () {
+  'use strict';
+
+  var DIM = 64;
+
+  function embedText(text) {
+    var vec = new Float32Array(DIM);
+    var words = (text.toLowerCase().match(/\w+/g) || []);
+    for (var wi = 0; wi < words.length; wi++) {
+      var w = words[wi];
+      var h = 0;
+      for (var i = 0; i < w.length; i++) {
+        h = ((h << 5) - h) + w.charCodeAt(i);
+        h |= 0;
+      }
+      for (var d = 0; d < DIM; d++) {
+        vec[d] += Math.sin(h + d * 997) * 0.15;
+      }
+    }
+    var norm = 0;
+    for (var j = 0; j < DIM; j++) norm += vec[j] * vec[j];
+    norm = Math.sqrt(norm) || 1;
+    for (var k = 0; k < DIM; k++) vec[k] /= norm;
+    return vec;
+  }
+
+  function cosine(a, b) {
+    var s = 0;
+    for (var i = 0; i < a.length; i++) s += a[i] * b[i];
+    return s;
+  }
+
+  var navToggle = document.getElementById('navToggle');
+  var mainNav = document.getElementById('mainNav');
+  if (navToggle && mainNav) {
+    navToggle.addEventListener('click', function () {
+      var open = mainNav.classList.toggle('visible');
+      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    mainNav.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        mainNav.classList.remove('visible');
+        navToggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
+  var fadeSections = document.querySelectorAll('section.fade-in');
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) en.target.classList.add('visible');
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+  fadeSections.forEach(function (s) { obs.observe(s); });
+
+  function classifyQuery(q) {
+    var ql = q.toLowerCase();
+    var intent = 'informational';
+    if (/\b(buy|order|cheap|deal|price|subscribe|book)\b/.test(ql)) intent = 'transactional';
+    if (/\b(login|sign in|official|www\.|\.com\b|near me|hours|address)\b/.test(ql) && ql.length < 50) intent = 'navigational';
+
+    var slots = [];
+    var colors = ['red', 'blue', 'black', 'white', 'green'];
+    colors.forEach(function (c) {
+      if (new RegExp('\\b' + c + '\\b').test(ql)) slots.push('color=' + c);
+    });
+    if (/\bnike\b/.test(ql)) slots.push('brand=nike');
+    if (/\badidas\b/.test(ql)) slots.push('brand=adidas');
+    if (/\b(shoe|shoes|sneaker|boot)\b/.test(ql)) slots.push('category=footwear');
+    if (/\b(laptop|notebook)\b/.test(ql)) slots.push('category=computers');
+    if (/\$\d+|\b\d+\s*(usd|dollars?)\b/.test(ql)) slots.push('price_constraint=detected');
+
+    var skgNote = 'kNN: nearest intent nodes — navigational hub score ' + (intent === 'navigational' ? '0.82' : '0.31');
+    var llmNote = 'LLM JSON: {"intent":"' + intent + '","confidence":0.86,"slots":[' +
+      slots.map(function (s) { return '"' + s + '"'; }).join(',') + ']}';
+
+    return { intent: intent, slots: slots, skgNote: skgNote, llmNote: llmNote };
+  }
+
+  var clsBtn = document.getElementById('clsBtn');
+  var clsInput = document.getElementById('clsInput');
+  var clsOut = document.getElementById('clsOut');
+  var clsTags = document.getElementById('clsTags');
+  if (clsBtn) {
+    clsBtn.addEventListener('click', function () {
+      var q = (clsInput && clsInput.value) || '';
+      var r = classifyQuery(q);
+      clsTags.innerHTML = '';
+      var t1 = document.createElement('span');
+      t1.className = 'tag ok';
+      t1.textContent = 'intent: ' + r.intent;
+      clsTags.appendChild(t1);
+      r.slots.forEach(function (s) {
+        var sp = document.createElement('span');
+        sp.className = 'tag';
+        sp.textContent = s;
+        clsTags.appendChild(sp);
+      });
+      clsOut.textContent = 'SKG path: ' + r.skgNote + '\n\nLLM path: ' + r.llmNote;
+      clsOut.classList.remove('dim');
+    });
+  }
+
+  var AMB = {
+    server: [
+      { sense: 'IT hardware', cue: 'co-occur: rack, kubernetes, ram, cpu' },
+      { sense: 'Restaurant role', cue: 'co-occur: waiter, tip, menu, table' },
+      { sense: 'Sports (tennis)', cue: 'co-occur: racket, court, serve' }
+    ],
+    python: [
+      { sense: 'Programming language', cue: 'co-occur: pip, django, asyncio' },
+      { sense: 'Animal', cue: 'co-occur: snake, reptile, zoo' }
+    ],
+    java: [
+      { sense: 'JVM / language', cue: 'co-occur: spring, gradle, bytecode' },
+      { sense: 'Geography', cue: 'co-occur: jakarta, island, indonesia' }
+    ],
+    mercury: [
+      { sense: 'Chemical element', cue: 'co-occur: hg, thermometer, toxic' },
+      { sense: 'Planet', cue: 'co-occur: solar, orbit, nasa' }
+    ],
+    apple: [
+      { sense: 'Technology brand', cue: 'co-occur: iphone, macos, icloud' },
+      { sense: 'Fruit / nutrition', cue: 'co-occur: pie, orchard, vitamin' }
+    ]
+  };
+
+  document.getElementById('disBtn').addEventListener('click', function () {
+    var w = ((document.getElementById('disInput').value || '').trim().toLowerCase().split(/\s+/)[0] || '');
+    var out = document.getElementById('disOut');
+    var list = AMB[w];
+    if (!list) {
+      out.textContent = 'No curated ambiguity table for "' + w + '".\n\nIndex approach: climb SKG neighborhoods from co-clicked queries.\nLLM approach: ask for top senses constrained to your vertical taxonomy.';
+      out.classList.remove('dim');
+      return;
+    }
+    var lines = ['Dominant sense selection (illustrative):\n'];
+    list.forEach(function (item, i) {
+      var score = (0.78 - i * 0.12).toFixed(2);
+      lines.push('• ' + item.sense + '  [score=' + score + ']');
+      lines.push('  ' + item.cue);
+    });
+    out.textContent = lines.join('\n');
+    out.classList.remove('dim');
+  });
+
+  function fakeHydeDoc(q) {
+    var ql = q.toLowerCase();
+    if (!ql.trim()) return 'Hypothetical passage: (empty query)';
+    return 'Hypothetical passage: Users asking about "' + q.slice(0, 80) + '" typically need a concise explanation covering definitions, primary mechanisms, and one practical example. Key entities include relevant components and common failure modes. Recommended retrieval should prioritize authoritative references and worked examples.';
+  }
+
+  document.getElementById('hydeBtn').addEventListener('click', function () {
+    var q = document.getElementById('hydeInput').value || '';
+    var steps = document.getElementById('hydeSteps');
+    var hypo = fakeHydeDoc(q);
+    var ev = embedText(q);
+    var eh = embedText(hypo);
+    var align = cosine(ev, eh);
+    steps.innerHTML = '';
+    function addStep(n, html) {
+      var row = document.createElement('div');
+      row.className = 'step';
+      row.innerHTML = '<div class="num">' + n + '</div><div class="body">' + html + '</div>';
+      steps.appendChild(row);
+    }
+    addStep('1', '<strong>Original query</strong> → embed to vector <code>q</code> (dim ' + DIM + ').');
+    addStep('2', '<strong>Generate</strong> hypothetical document (here: template).\n<div style="margin-top:8px;color:var(--text-dim);font-size:0.85rem;">' + hypo.replace(/</g, '&lt;') + '</div>');
+    addStep('3', '<strong>Embed hypothetical doc</strong> → vector <code>h</code>. Cosine(<code>q</code>,<code>h</code>) = ' + align.toFixed(4) + ' (alignment check).');
+    addStep('4', '<strong>ANN search</strong> using <code>h</code> (or blend <code>q</code>+<code>h</code>) against your document index; merge with sparse retrieval as needed.');
+  });
+
+  var VOCAB = [
+    'best noise cancelling headphones under 200',
+    'cheap flights to tokyo next month',
+    'install docker on ubuntu 22.04',
+    'python asyncio tutorial for beginners',
+    'how to sharpen kitchen knives safely',
+    'compact mechanical keyboard wireless',
+    'postgresql vs mysql for analytics',
+    'running shoes for flat feet wide',
+    'learn rust ownership explained simply',
+    'backup iphone photos to nas'
+  ];
+
+  var vocabEmb = VOCAB.map(function (v) { return { t: v, e: embedText(v) }; });
+
+  function refreshAuto() {
+    var partial = (document.getElementById('autoInput').value || '').toLowerCase();
+    var ep = embedText(partial);
+    var scored = vocabEmb.map(function (o) {
+      return { t: o.t, s: cosine(ep, o.e) };
+    });
+    scored.sort(function (a, b) { return b.s - a.s; });
+    var ul = document.getElementById('autoList');
+    ul.innerHTML = '';
+    scored.slice(0, 6).forEach(function (row) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span>' + row.t + '</span><span class="sim">' + row.s.toFixed(3) + '</span>';
+      ul.appendChild(li);
+    });
+  }
+
+  var autoInput = document.getElementById('autoInput');
+  autoInput.addEventListener('input', refreshAuto);
+  refreshAuto();
+
+  var CACHE_Q = 'how do I reset my password';
+  var cacheEmb = embedText(CACHE_Q);
+
+  function refreshCache() {
+    var q = document.getElementById('cacheInput').value || '';
+    var tau = parseFloat(document.getElementById('cacheThresh').value, 10);
+    document.getElementById('cacheThreshLbl').textContent = tau.toFixed(2);
+    var sim = cosine(cacheEmb, embedText(q));
+    var hit = sim >= tau;
+    document.getElementById('cacheOut').textContent =
+      'cosine(new, cached) = ' + sim.toFixed(4) + '\nthreshold τ = ' + tau.toFixed(2) + '\n\n' +
+      (hit ? 'CACHE HIT → return stored answer bundle; skip LLM/RAG.' : 'CACHE MISS → run full pipeline; optionally store result.');
+    document.getElementById('cacheOut').classList.toggle('dim', false);
+  }
+
+  document.getElementById('cacheInput').addEventListener('input', refreshCache);
+  document.getElementById('cacheThresh').addEventListener('input', refreshCache);
+  refreshCache();
+
+  var PIPE_STAGES = [
+    { id: 'classify', label: 'Classify' },
+    { id: 'parse', label: 'Parse' },
+    { id: 'disamb', label: 'Disambiguate' },
+    { id: 'expand', label: 'Expand' },
+    { id: 'transform', label: 'Transform' },
+    { id: 'search', label: 'Search' }
+  ];
+
+  var pipeStep = 0;
+  function renderPipeTrack() {
+    var track = document.getElementById('pipeTrack');
+    track.innerHTML = '';
+    PIPE_STAGES.forEach(function (st, i) {
+      var el = document.createElement('span');
+      el.className = 'pipe-node';
+      el.textContent = st.label;
+      if (i < pipeStep) el.classList.add('done');
+      if (i === pipeStep && pipeStep < PIPE_STAGES.length) el.classList.add('active');
+      track.appendChild(el);
+    });
+  }
+
+  function runPipeStage(q, stageIndex) {
+    var c = classifyQuery(q);
+    var lines = [];
+    if (stageIndex === 0) {
+      lines.push('[Classify] intent=' + c.intent);
+      lines.push('Slots: ' + (c.slots.join(', ') || '(none)'));
+    } else if (stageIndex === 1) {
+      lines.push('[Parse] NER-style spans (illustrative)');
+      lines.push('Tokens tagged for numeric constraints and entity candidates.');
+    } else if (stageIndex === 2) {
+      lines.push('[Disambiguate] pick dominant product sense using SKG context score 0.74');
+    } else if (stageIndex === 3) {
+      lines.push('[Expand] add synonyms: durable→long-lasting; waterproof→water-resistant');
+    } else if (stageIndex === 4) {
+      lines.push('[Transform] optional HyDE + route to vertical index "commerce_main"');
+    } else if (stageIndex === 5) {
+      lines.push('[Search] final bool query: ' + JSON.stringify({
+        must: q.slice(0, 120),
+        filter: c.slots,
+        vector_field: 'title_desc_embedding'
+      }));
+    }
+    return lines.join('\n');
+  }
+
+  document.getElementById('pipeStepBtn').addEventListener('click', function () {
+    var q = document.getElementById('pipeInput').value || '(demo query)';
+    var out = document.getElementById('pipeOut');
+    if (pipeStep < PIPE_STAGES.length) {
+      out.textContent = runPipeStage(q, pipeStep);
+      out.classList.remove('dim');
+      pipeStep++;
+      renderPipeTrack();
+    } else {
+      out.textContent = 'Pipeline complete. Use Reset to run again.';
+    }
+  });
+
+  document.getElementById('pipeResetBtn').addEventListener('click', function () {
+    pipeStep = 0;
+    document.getElementById('pipeOut').textContent = 'Press “Advance one step” to walk the pipeline.';
+    document.getElementById('pipeOut').classList.add('dim');
+    renderPipeTrack();
+  });
+
+  pipeStep = 0;
+  renderPipeTrack();
+  document.getElementById('pipeOut').textContent = 'Press “Advance one step” to walk the pipeline.';
+
+  var playLlm = false;
+  var playToggle = document.getElementById('playToggle');
+  var playModeLbl = document.getElementById('playModeLbl');
+
+  playToggle.addEventListener('click', function () {
+    playLlm = !playLlm;
+    playToggle.classList.toggle('on', playLlm);
+    playToggle.setAttribute('aria-pressed', playLlm ? 'true' : 'false');
+    playModeLbl.textContent = playLlm ? 'LLM-style (structured generation)' : 'index-style (SKG + rules)';
+    playModeLbl.style.color = playLlm ? '#a78bfa' : '#22d3ee';
+  });
+
+  document.getElementById('playBtn').addEventListener('click', function () {
+    var q = document.getElementById('playInput').value || '';
+    var c = classifyQuery(q);
+    var lines = [];
+    lines.push('=== Query understanding workbench ===');
+    lines.push('Raw: ' + q);
+    lines.push('');
+    lines.push('--- Classification ---');
+    lines.push('intent: ' + c.intent);
+    lines.push('slots: ' + (c.slots.join(', ') || '(none)'));
+    lines.push('');
+    lines.push('--- Parsed entities (illustrative) ---');
+    lines.push('MONEY, PRODUCT, ATTRIBUTE spans merged into structured filters.');
+    lines.push('');
+    lines.push('--- Disambiguation ---');
+    lines.push(playLlm
+      ? 'LLM: chosen sense = dominant retail interpretation (confidence 0.81)'
+      : 'SKG: sense score from facet co-clicks = 0.77 for retail hardware');
+    lines.push('');
+    lines.push('--- Expansions ---');
+    lines.push(playLlm
+      ? 'LLM expansions: add "Gore-Tex", "vibram sole" as soft boosts'
+      : 'Index expansions: synonym ring from catalog + query logs');
+    lines.push('');
+    lines.push('--- Transformations ---');
+    var hypo = fakeHydeDoc(q);
+    lines.push('HyDE snippet: ' + hypo.slice(0, 120) + '…');
+    lines.push('');
+    lines.push('--- Final search representation ---');
+    lines.push(playLlm
+      ? '{ "vector_query": "<hypothetical_emb>", "must": "' + q.slice(0, 60) + '...", "filters": ' + JSON.stringify(c.slots) + ' }'
+      : '{ "sparse": "<expanded_keywords>", "filters": ' + JSON.stringify(c.slots) + ', "boosts": ["deal_score"] }');
+    document.getElementById('playOut').textContent = lines.join('\n');
+    document.getElementById('playOut').classList.remove('dim');
+  });
+})();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reinforcement Learning for LLMs: From REINFORCE to PPO — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  background: rgba(248, 113, 113, 0.08);
+  border-left-color: var(--danger);
+}
+.callout.ok {
+  background: rgba(52, 211, 153, 0.08);
+  border-left-color: var(--accent3);
+}
+
+/* ===== Q&A pull quote ===== */
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--accent2);
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Table ===== */
+.alg-table-wrapper { overflow-x: auto; margin: 20px 0; }
+.alg-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  width: 100%;
+}
+.alg-table th, .alg-table td {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.alg-table th {
+  background: var(--bg-card-alt);
+  color: var(--accent);
+  font-weight: 600;
+}
+.alg-table td { background: var(--bg-card); color: var(--text-dim); }
+.alg-table tr:hover td { background: var(--bg-card-alt); }
+
+/* ===== Interview Q hint / reveal ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.hint-btn:hover, .reveal-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(108,140,255,0.08);
+}
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.28);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.hint-box.visible { display: block; }
+.answer {
+  display: none;
+  margin-top: 14px;
+  padding: 16px 18px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.answer.visible { display: block; }
+.solution-label {
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--accent3);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+.explanation { font-size: 0.92rem; color: var(--text-dim); line-height: 1.65; }
+.explanation strong { color: var(--text); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Reinforcement Learning For Llms</span></nav>
+
+
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">Reinforcement Learning for LLMs</a>
+  <div class="nav-links">
+    <a href="#s0">RL Basics</a>
+    <a href="#s1">REINFORCE</a>
+    <a href="#s2">Baseline & Advantage</a>
+    <a href="#s3">Reward Hacking</a>
+    <a href="#s4">PPO</a>
+    <a href="#s5">DPO & GRPO</a>
+    <a href="#s6">Algorithm Comparison</a>
+    <a href="#s7">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Reinforcement Learning for LLMs</h1>
+    <p class="subtitle">
+      From REINFORCE to PPO — how language models learn from reward signals, the policy gradient theorem, baseline subtraction, and the clipping mechanism that stabilizes training.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">12</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">6</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">4</span>
+        <span class="stat-label">Algorithms</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      After supervised fine-tuning, language models can be further improved using reinforcement learning. A reward model scores responses; the policy gradient theorem lets us update the model to favor high-reward outputs. The chapter develops REINFORCE, baseline subtraction, the KL penalty, Proximal Policy Optimization (PPO), and alternatives like DPO and GRPO.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 0: RL BASICS ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Reinforcement Learning Basics</h2>
+
+    <p>
+      In reinforcement learning, an <strong>agent</strong> interacts with an <strong>environment</strong>. At each step, the agent observes a <strong>state</strong>, takes an <strong>action</strong>, and receives a <strong>reward</strong>. The agent's behavior is defined by a <strong>policy</strong> — a mapping from states to distributions over actions. The goal is to maximize expected cumulative reward.
+    </p>
+
+    <h3 style="margin-top:28px;">Language Generation as an RL Problem</h3>
+    <p>
+      Autoregressive language generation fits this framework naturally. The <strong>state</strong> is the prompt <em>x</em> plus the tokens generated so far. The <strong>action</strong> at each step is choosing the next token from the vocabulary. The <strong>reward</strong> is typically computed only at the end of the sequence — after the full response <em>y</em> is produced — by a <strong>reward model</strong> that assigns a scalar score to the pair (x, y).
+    </p>
+
+    <div class="interactive-panel">
+      <h3>RL Framework Mapping</h3>
+      <p>See how LLM generation maps to the standard RL framework. Click each component to highlight its role.</p>
+      <div class="btn-group" id="rlMapBtns">
+        <button class="btn" onclick="highlightRLMap('state')">State</button>
+        <button class="btn" onclick="highlightRLMap('action')">Action</button>
+        <button class="btn" onclick="highlightRLMap('reward')">Reward</button>
+        <button class="btn" onclick="highlightRLMap('policy')">Policy</button>
+      </div>
+      <div class="card card-alt" id="rlMapDisplay" style="margin-top:16px; min-height:120px;">
+        <div class="token-row">
+          <span class="token token-special">Prompt x</span>
+          <span class="token token-word">The</span>
+          <span class="token token-word">capital</span>
+          <span class="token token-word">of</span>
+          <span class="token token-word">France</span>
+          <span class="token token-word">is</span>
+          <span class="token token-new">Paris</span>
+          <span class="token token-word">.</span>
+        </div>
+        <div id="rlMapExplanation" style="margin-top:12px; font-size:0.9rem; color:var(--text-dim);">
+          Click a button above to see how each RL concept maps to language generation.
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">The Objective</h3>
+    <p>
+      We want to maximize the <strong>expected reward</strong> over prompts from our dataset and responses sampled from our current model:
+    </p>
+
+    <div class="formula">
+      J(θ) = E<sub>x~D, y~p<sub>θ</sub>(·|x)</sub> [ R(x, y) ]
+    </div>
+
+    <p>
+      Here <em>p<sub>θ</sub></em> is our policy (language model), <em>R</em> is the reward function (often a frozen reward model), and <em>D</em> is the prompt distribution. We cannot enumerate all possible responses, so we approximate this expectation by sampling one or a few responses per prompt.
+    </p>
+
+    <div class="callout">
+      <p><strong>Reward model:</strong> The reward function is typically a <strong>frozen</strong> model trained on human preferences (see <a href="../09-from-sft-to-rlhf/index.html">Chapter 9</a> for Bradley–Terry training and best-of-N). Given (x, y), it outputs a scalar score. During RL, we do not update the reward model — we use it only to score responses.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> The reward is <strong>not differentiable</strong> with respect to the model parameters. The response <em>y</em> is produced by sampling — a discrete, stochastic process. We cannot backpropagate through it. Instead, we differentiate through the <strong>probability</strong> that the model assigns to the sampled response.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">What reward models are judged on</h3>
+    <p>
+      When people iterate on reward modeling, they care about more than raw agreement with crowd workers on generic chat. Benchmark-style suites probe whether a model assigns higher scores to <strong>factually grounded</strong> answers than to confident hallucinations, whether it respects <strong>precise instruction following</strong> (length constraints, formatting rules, multi-part checklists), whether it ranks <strong>correct mathematics</strong> above wrong reasoning, and whether it reflects <strong>safety</strong> norms (for example, refusing harmful requests). Even strong public checkpoints are imperfect: they may still prefer a worse answer part of the time, and correctness-style tasks remain a weak point relative to human judgment on open-ended prose.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Human labels, model labels, and fragility:</strong> Preference data are noisy—different annotators often disagree, and difficult prompts rarely admit a single objectively correct ranking. Training a reward model treats every label as equally trustworthy, so the network may latch onto shallow cues (verbosity, polish, a single grammar slip) that predict the dataset instead of true quality. Scaling with <strong>LLM-synthesized preferences</strong> is attractive for coverage, but it stacks the teacher model's biases on top of the same risk: the reward signal can become easier to game because it is one more approximation removed from humans.</p>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent); font-size:1rem; margin-bottom:10px;">Open reward checkpoints</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">Published artifacts are often mid-sized language models fine-tuned on large preference datasets. They make the training recipe inspectable and reproducible, which is why leaderboards can compare them directly.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:1rem; margin-bottom:10px;">Proprietary judges and API scores</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">Commercial systems prompted to emit scalar scores may appear next to open models on plots, but the largest, most heavily engineered reward stacks inside major labs typically never enter the same public evaluations. Treat leaderboard numbers as a slice of the ecosystem, not a universal ordering of "true" reward quality.</p>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Verifiable tasks ahead:</strong> When a task has an objectively checkable answer (arithmetic, string equality on a solution), a learned reward model is often unnecessary—a cheap verifier or exact match can provide the scalar signal. The RL machinery (policy gradient, advantage, clipping) still applies; only the source of <em>R(x, y)</em> changes.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 1: REINFORCE ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>REINFORCE and the Policy Gradient Theorem</h2>
+
+    <p>
+      The <strong>REINFORCE</strong> algorithm (Williams, 1992) provides a way to compute the gradient of the expected reward with respect to the policy parameters. It uses a simple mathematical trick — the <strong>log probability trick</strong> — to rewrite the gradient in a form we can estimate from samples.
+    </p>
+
+    <h3 style="margin-top:28px;">The Gradient</h3>
+    <p>
+      For a fixed prompt <em>x</em>, the expected reward is:
+    </p>
+
+    <div class="formula">
+      J(θ) = Σ<sub>y</sub> p<sub>θ</sub>(y|x) · R(x,y)
+    </div>
+
+    <p>
+      The gradient with respect to θ involves differentiating through <em>p<sub>θ</sub>(y|x)</em>. We multiply and divide by <em>p<sub>θ</sub>(y|x)</em> (multiplying by 1) and use the identity:
+    </p>
+
+    <div class="formula">
+      ∇<sub>θ</sub> log p<sub>θ</sub>(y|x) = (1 / p<sub>θ</sub>(y|x)) · ∇<sub>θ</sub> p<sub>θ</sub>(y|x)
+    </div>
+
+    <p>
+      This lets us rewrite the gradient as an expectation:
+    </p>
+
+    <div class="formula">
+      ∇<sub>θ</sub> J(θ) = E<sub>y~p<sub>θ</sub>(·|x)</sub> [ R(x,y) · ∇<sub>θ</sub> log p<sub>θ</sub>(y|x) ]
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Policy Gradient Visualizer</h3>
+      <p>Adjust the reward to see how the gradient pushes probability up or down. Positive reward increases probability; negative reward decreases it.</p>
+      <div class="slider-container">
+        <label>Reward: <span class="slider-value" id="rewardVal">1.0</span></label>
+        <input type="range" id="rewardSlider" min="-2" max="2" step="0.1" value="1">
+      </div>
+      <div class="bar-chart" id="policyGradChart" style="height:180px;"></div>
+      <div id="policyGradExplanation" style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">The REINFORCE Algorithm</h3>
+    <p>
+      Given a prompt <em>x</em>, we (1) sample a response <em>y</em> from our current model, (2) compute the reward <em>R(x,y)</em> using our frozen reward model, and (3) update the model parameters in the direction of <em>R(x,y) · ∇<sub>θ</sub> log p<sub>θ</sub>(y|x)</em>. If the reward is high, we increase the probability of that response. If it is low (or negative), we decrease it.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3); font-size:1rem; margin-bottom:10px;">Supervised fine-tuning</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">The training distribution over targets is effectively <strong>anchored to reference text</strong> from humans or teachers—a nearly one-hot target token at each step. There is always a concrete <em>y</em><sup>*</sup> whose log-likelihood we increase, even if the model would rarely sample that sequence on its own.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent4); font-size:1rem; margin-bottom:10px;">Policy-gradient RL on a reward</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">There is <strong>no fixed reference completion</strong>. We draw <em>y ~ p<sub>θ</sub>(·|x)</em>, learn whether it was good or bad only through <em>R(x, y)</em>, and nudge mass toward or away from that sample. The optimization target is defined by the interaction of sampling and scoring, not by a stored gold sequence.</p>
+      </div>
+    </div>
+
+    <p>
+      REINFORCE itself predates large language models by decades; the same score-function gradient identity has served robotics, games, and control. For LLMs it simply reuses the machinery already built for pre-training and SFT—autoregressive log-probabilities and backprop through softmax logits—with the scalar reward inserted as a multiplier on those familiar gradients.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>REINFORCE Step-by-Step</h3>
+      <div class="btn-group">
+        <button class="btn active" onclick="showReinforceStep(0)">1. Sample Y</button>
+        <button class="btn" onclick="showReinforceStep(1)">2. Compute R</button>
+        <button class="btn" onclick="showReinforceStep(2)">3. Gradient</button>
+        <button class="btn" onclick="showReinforceStep(3)">4. Update</button>
+      </div>
+      <div id="reinforceStepContent" style="margin-top:20px; min-height:100px;"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Sampling and Batch Size</h3>
+    <p>
+      We cannot enumerate all possible responses. In practice, we sample one to perhaps 16 or 32 responses per prompt to compute the update. More samples give a better estimate of the expected reward but increase decoding cost. <strong>Best-of-N sampling</strong> (Chapter 9) is the inference-only extreme — no weight update. RL training aims to make a single sample reliably high-reward.
+    </p>
+
+    <h3 style="margin-top:28px;">Token-Level Decomposition and Credit Assignment</h3>
+    <p>
+      The log probability of a sequence decomposes into a sum of token-level log probabilities via the chain rule:
+    </p>
+
+    <div class="formula">
+      log p<sub>θ</sub>(y|x) = Σ<sub>i</sub> log p<sub>θ</sub>(y<sub>i</sub> | x, y<sub>1</sub>, ..., y<sub>i-1</sub>)
+    </div>
+
+    <p>
+      The reward is received only at the end of the sequence. This creates a <strong>credit assignment</strong> problem: which tokens contributed to the high or low reward? In simple algorithms like REINFORCE and GRPO, we <strong>broadcast</strong> the same sequence-level reward to every token position. Each token's gradient is scaled by that reward. PPO uses a more sophisticated approach: a <strong>value function</strong> predicts token-level expected rewards, giving a different baseline at each position — so tokens earlier in the sequence can receive different advantage estimates than later ones.
+    </p>
+
+    <div class="callout">
+      <p><strong>Why the log trick?</strong> A naive Monte Carlo average of <em>R(x,y) · ∇<sub>θ</sub> p<sub>θ</sub>(y|x)</sub> with <em>y ~ p<sub>θ</sub></em> is biased — it includes an extra factor of <em>p<sub>θ</sub>(y|x)</sub> because we sample from the policy. Dividing by <em>p<sub>θ</sub>(y|x)</sub> corrects this and yields the log trick. Without it, we would not get an unbiased estimate of the true gradient.</p>
+    </div>
+
+    <div class="formula" style="font-size:0.82rem; line-height:1.5;">
+      Write the naive Monte Carlo average of <em>R(x,y) ∇<sub>θ</sub> p<sub>θ</sub>(y|x)</em> with <em>y ~ p<sub>θ</sub></em>. Its expectation expands with an extra weight <em>p<sub>θ</sub>(y|x)</em> inside the sum over outcomes—it is <strong>not</strong> the gradient of <em>J(θ) = E<sub>y~p<sub>θ</sub></sub>[R(x,y)]</em>. Multiplying and dividing by <em>p<sub>θ</sub>(y|x)</em> before differentiating is exactly the correction that turns the estimator into an unbiased policy-gradient sample: reward times <em>∇<sub>θ</sub> log p<sub>θ</sub>(y|x)</em>.
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== SECTION 2: BASELINE & ADVANTAGE ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Baseline Subtraction and Advantage</h2>
+
+    <p>
+      Using the raw reward in the policy gradient leads to high variance. If a sample gets reward 2, we increase its probability — but what if the model usually gets reward 10 for that prompt? A reward of 2 is actually <strong>worse than usual</strong>. We want to compare each sample to a <strong>baseline</strong>.
+    </p>
+
+    <h3 style="margin-top:28px;">The Advantage</h3>
+    <p>
+      The <strong>advantage</strong> is defined as:
+    </p>
+
+    <div class="formula">
+      A(x, y) = R(x, y) − B(x)
+    </div>
+
+    <p>
+      where <em>B(x)</em> is a baseline that may depend on the prompt. If the advantage is positive, the sample is better than usual — we increase its probability. If negative, it is worse than usual — we decrease its probability. Using the advantage instead of the raw reward reduces variance and improves learning.
+    </p>
+
+    <h3 style="margin-top:28px;">Baseline Strategies</h3>
+
+    <div class="card">
+      <ul style="list-style:none; font-size:0.9rem;">
+        <li style="margin-bottom:12px;">
+          <span style="color:var(--danger);">✗</span> <strong>Mean batch reward:</strong> Use the average reward over the entire batch as the baseline. The drawback is that different prompts have different difficulty — comparing across prompts is noisy.
+        </li>
+        <li style="margin-bottom:12px;">
+          <span style="color:var(--accent3);">✓</span> <strong>Group statistics:</strong> For each prompt <em>x</em>, sample multiple responses (e.g., 8, 16, or 32). Compute the mean (and optionally standard deviation) of rewards over those responses. Use that as the baseline for each sample from that prompt. This gives a prompt-specific baseline and is used in <strong>GRPO</strong>.
+        </li>
+        <li>
+          <span style="color:var(--accent3);">✓</span> <strong>Trained value function:</strong> Train a separate model (a <strong>critic</strong>) that takes the prompt and a partial response and predicts the expected final reward. This provides token-level baselines — different at each position — and is used in PPO/RLHF. The value function is trained with L2 loss and updated alongside the policy.
+        </li>
+      </ul>
+    </div>
+
+    <p>
+      The value function is more expressive but requires an extra large model in memory. GRPO avoids this by using group statistics, trading some accuracy for simplicity and compute efficiency.
+    </p>
+
+    <h3 style="margin-top:28px;">Leave-one-out baselines and the "group" in GRPO</h3>
+    <p>
+      Sampling several completions from the <em>same</em> prompt and centering each reward by the group's mean (and often normalizing by the group's standard deviation) predates the recent reasoning wave: the same idea appeared classically under names such as <strong>reinforcement learning with leave-one-out (RLOO)</strong>, where one response's baseline is computed from the others in its set. <strong>GRPO</strong> ("group relative" policy optimization) makes that structure explicit: the <strong>group</strong> is the multiset of <em>y</em>'s drawn for a fixed <em>x</em>, and advantages are measured relative to peers that faced identical conditioning. That answers the flaw of a single batch mean, which mingles easy prompts (where typical rewards are high) with hard ones (where typical rewards are low) and mis-calibrates what "better than usual" should mean.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Compute trade-off:</strong> Prompt-specific baselines need extra rollouts per <em>x</em>. Those generations could instead have been spent covering more diverse prompts. Whether to invest in a thick group for a few prompts or a thin group across many is an empirical allocation question, not a theorem—both sides show up in production systems.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Critic details that matter in implementation</h3>
+    <p>
+      A trained value head is initialized like a reward model—large language-model trunk plus a scalar linear layer on a hidden state—but its target is plain <strong>regression</strong> (squared error) toward the terminal reward observed after a full rollout, not pairwise preference logits. At each prefix the critic asks: if generation continued from here under the current policy, what final score would we expect? That is only partially observable—"Bob is a cow" might still lead to a brilliant unicorn story—but pathological prefixes (toxic repetition, derailment) are often enough for the critic to anticipate collapse. In full algorithms the target is sometimes a <strong>discounted</strong> notion of return so that uncertainty early in the sequence is not treated identically to uncertainty near the end.
+    </p>
+
+    <p>
+      The reward model scores finished (x, y) pairs only. The critic must predict outcomes for <strong>partial</strong> decodings under the current policy, so it is trained alongside the policy — a frozen critic would go stale as <em>p<sub>θ</sub></em> shifts.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: REWARD HACKING & KL PENALTY ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Reward Hacking and the KL Penalty</h2>
+
+    <p>
+      <strong>Reward hacking</strong> occurs when the model finds unintended ways to maximize the reward. The reward model is a proxy for human preferences — it is imperfect. Human preferences can be noisy and subjective. Common behaviors include producing more verbose responses (humans often favor detail), exploiting grammar or formatting biases (a single error may cause humans to rank a response lower regardless of content), or gaming the reward model in other ways. Preference data can be noisy — different humans may disagree, and the reward model treats all preferences equally.
+    </p>
+
+    <h3 style="margin-top:28px;">Training Pipeline</h3>
+    <p>
+      The typical pipeline is: <strong>pre-training</strong> → <strong>supervised fine-tuning (SFT)</strong> → <strong>RL</strong>. We start from an SFT model <em>p<sub>SFT</sub></em> (also called π<sub>ref</sub> or π<sub>SFT</sub> in the literature). Our current policy is <em>p<sub>θ</sub></em>. We want to maximize reward but not deviate too far from the SFT model.
+    </p>
+
+    <h3 style="margin-top:28px;">Solutions to Reward Hacking</h3>
+    <p>
+      Solutions include training a better reward model (more or higher-quality preference data, larger base model) and intervening in the RL process — e.g., penalizing large deviations from the SFT model. <strong>Reward clipping</strong> is another technique: clip the reward to a bounded range so that a single extreme reward does not cause an oversized update.
+    </p>
+
+    <h3 style="margin-top:28px;">KL Divergence Penalty</h3>
+    <p>
+      We add a penalty for deviating from the SFT model using the <strong>KL divergence</strong>:
+    </p>
+
+    <div class="formula">
+      D<sub>KL</sub>(p<sub>θ</sub> ‖ p<sub>SFT</sub>) = E<sub>y~p<sub>θ</sub>(·|x)</sub> [ log p<sub>θ</sub>(y|x) − log p<sub>SFT</sub>(y|x) ]
+    </div>
+
+    <p>
+      If the two distributions are identical, the KL is zero. As the policy places more probability on responses where the SFT model assigns low probability, the KL grows. We subtract this penalty (scaled by a hyperparameter <em>β</em>) from our objective. A large <em>β</em> keeps the policy close to SFT but may limit reward improvement. A small <em>β</em> allows more deviation but increases reward hacking risk.
+    </p>
+
+    <div class="formula">
+      max<sub>θ</sub> &nbsp; E<sub>x,y</sub> [ &nbsp; A<sub>KL</sub>(x,y) &nbsp; ] &nbsp;&nbsp; where &nbsp;&nbsp; A<sub>KL</sub> = (R − baseline) − β · (log p<sub>θ</sub>(y|x) − log p<sub>SFT</sub>(y|x))
+    </div>
+
+    <p>
+      In writing, the KL term is often folded into the advantage alongside reward and baseline so that a single expression drives both "move toward high reward" and "do not wander into regions the SFT distribution would never touch." The coefficient <em>β</em> is a knob you sweep empirically: too large and the policy barely moves; too small and optimization may chase reward spikes that reflect evaluator quirks rather than durable quality.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>What KL cannot promise:</strong> Keeping close to the SFT model in KL is a useful prior, not a certificate of safety or factuality. A policy can remain near the reference and still exploit systematic blind spots in the reward model, and conversely you may need real behavioral change from RL that necessarily shifts the distribution. Expect engineering trade-offs, not guarantees.</p>
+    </div>
+
+    <p>
+      Intuitively, pre-training and SFT assume that the human-written targets are high-quality references worth imitating. In RL, sampled completions may be ungrammatical, unfaithful, or incoherent yet still receive a high score if the reward model mis-generalizes. The KL anchor biases updates toward regions where the supervised model already placed mass, so extreme "reward-only" moves that look good to a flawed critic are harder to reach.
+    </p>
+
+    <h3 style="margin-top:28px;">Forward vs. Reverse KL</h3>
+    <p>
+      The <strong>reverse KL</strong> (used above) encourages the policy to put probability only where the SFT model already has probability — <strong>mode-seeking</strong> behavior. The <strong>forward KL</strong> would encourage the policy to cover all modes of the SFT distribution — <strong>mode-covering</strong>. For RL, we typically want mode-seeking: find high-reward regions that are still plausible under SFT. Some variants of GRPO drop the KL penalty entirely when the data and setup are configured appropriately.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent); font-size:1rem; margin-bottom:10px;">Forward KL flavor</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">Penalties built from <em>E<sub>y~p<sub>SFT</sub></sub>[log p<sub>SFT</sub> − log p<sub>θ</sub>]</em> pressure the student to assign mass wherever the teacher does, even across multiple disjoint modes. That resembles "cover the training distribution" more than "only change where I already know how to speak."</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:1rem; margin-bottom:10px;">Reverse KL (common in RLHF)</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">Sampling (or scoring) under <em>p<sub>θ</sub></em> asks that whatever the policy actually produces stay plausible under <em>p<sub>SFT</sub></em>. A limited model is not forced to resurrect every SFT mode—only to avoid wandering into high-reward corners that the reference would assign negligible density.</p>
+      </div>
+    </div>
+
+    <p>
+      In practice the exact integral is unavailable; both reward and KL are estimated from a handful of samples, and swapping the direction of the KL or the sampling distribution changes curvature and variance. Published recipes disagree: some pipelines report better results with alternate formulations, and a few modern GRPO-style systems omit explicit KL altogether when other stabilizers and data curation carry the load. Treat the choice as empirical, not settled doctrine.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: PPO ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Proximal Policy Optimization (PPO)</h2>
+
+    <p>
+      <strong>PPO</strong> (Schulman et al., 2017) was developed for control tasks (e.g., Atari games) and later adapted for language model RLHF. It adds a <strong>clipping mechanism</strong> to prevent the policy from changing too drastically between updates, stabilizing training.
+    </p>
+
+    <h3 style="margin-top:28px;">The Policy Ratio</h3>
+    <p>
+      For a batch of prompts, we generate responses with the <strong>old</strong> policy (before any updates on this batch). We may then perform multiple optimizer steps on the same rollouts. The <strong>policy ratio</strong> at token position <em>i</em> is:
+    </p>
+
+    <div class="formula">
+      r<sub>i</sub> = p<sub>θ</sub>(y<sub>i</sub> | x, y<sub>1</sub>, ..., y<sub>i-1</sub>) / p<sub>θ_old</sub>(y<sub>i</sub> | x, y<sub>1</sub>, ..., y<sub>i-1</sub>)
+    </div>
+
+    <p>
+      This measures how much more or less likely the token is under the new policy versus the old one. Initially, θ = θ<sub>old</sub>, so r<sub>i</sub> = 1. After updates, r<sub>i</sub> can grow or shrink.
+    </p>
+
+    <p>
+      Here <em>θ<sub>old</sub></em> is <strong>not</strong> the SFT checkpoint from the start of training—it is the policy snapshot taken at the <strong>beginning of the current minibatch</strong> (or outer iteration) before any PPO epochs reuse the same rollouts. All ratios in that phase compare the moving θ against that frozen batch anchor. The SFT model appears separately inside the KL penalty; the two mechanisms answer different questions. KL asks whether we are leaving the long-run supervised prior; the ratio asks whether we are distorting the on-policy data we already collected for this batch.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent); font-size:1rem; margin-bottom:10px;">KL to <em>p<sub>SFT</sub></em></h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">A global anchor tied to human-curated behavior. It penalizes putting mass on completions the reference would never make, even if those completions look attractive to the reward model.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent2); font-size:1rem; margin-bottom:10px;">Clipped ratio vs <em>p<sub>θ_old</sub></em></h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">A local trust region for reusing the same sampled trajectories across multiple inner updates. It stops any single optimization sub-step from rewriting token probabilities far beyond what produced the data on disk.</p>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Small learning rates are not a substitute:</strong> A tiny step size slows movement but does not remove the possibility of steadily crawling toward degenerate regions—places that yield huge reward under a flawed critic yet lie outside anything the SFT model would generate. Explicit KL and ratio clipping encode priors about <em>where</em> in output space updates are allowed to accumulate; learning rate alone only scales how fast you walk.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">The Clipping Mechanism</h3>
+    <p>
+      PPO clips the ratio to a range [1 − ε, 1 + ε], typically with ε = 0.1 or 0.2. The objective at each token is:
+    </p>
+
+    <div class="formula" style="font-size:0.85rem;">
+      min( r<sub>i</sub> · A<sub>i</sub>, clip(r<sub>i</sub>, 1−ε, 1+ε) · A<sub>i</sub> )
+    </div>
+
+    <p>
+      When the advantage <em>A<sub>i</sub></em> is positive (good token), we want to increase its probability. But if the ratio already exceeds 1 + ε, we take the minimum — the clipped term — and <strong>no gradient flows</strong>. We stop updating that token because it is already likely enough. When <em>A<sub>i</sub></em> is negative (bad token), we want to decrease its probability. If the ratio falls below 1 − ε, we again clip and stop. This creates a <strong>trust region</strong>: we only update when the policy has not moved too far.
+    </p>
+
+    <div class="formula" style="font-size:0.8rem; line-height:1.45;">
+      Full objectives aggregate token contributions: &nbsp; max<sub>θ</sub> E<sub>x, y~p<sub>θ_old</sub>(·|x)</sub> [ Σ<sub>i=1</sub><sup>|y|</sup> min( r<sub>i</sub>A<sub>i</sub>, clip(r<sub>i</sub>, 1−ε, 1+ε) A<sub>i</sub> ) ] &nbsp; (possibly minus KL terms folded into <em>A</em>).
+    </div>
+
+    <h3 style="margin-top:28px;">Worked numerics with ε = 0.2 (clip interval [0.8, 1.2])</h3>
+    <p>
+      Take <strong>A<sub>i</sub> = +2</strong> (the token sits inside a response judged better than the value baseline). If <strong>r<sub>i</sub> = 1.3</strong>, the unweighted objective term is 2.6, but clipping pulls the ratio down to 1.2, giving 2.4. The PPO objective uses the <strong>minimum</strong> (2.4), so the surrogate is flat if you try to push <em>r</em> higher—<strong>no gradient</strong> encourages further probability inflation on that token. If instead <strong>r<sub>i</sub> = 1.1</strong>, both branches read 2.2; the minimum is 2.2 and gradients flow normally: the token is still under the ceiling, so we may increase its likelihood.
+    </p>
+    <p>
+      For <strong>A<sub>i</sub> &lt; 0</strong>, the min/clip logic reverses which branch binds. Suppose <strong>A<sub>i</sub> = −3</strong> and <strong>r<sub>i</sub> = 0.6</strong> (already below 0.8). The clipped product (−3)(0.8) = −2.4 is <em>less</em> than the unclipped (−3)(0.6) = −1.8, so the objective selects −2.4 and the gradient through the clipped branch vanishes—the policy has already suppressed that token enough relative to θ<sub>old</sub>. The subtle case is <strong>negative advantage with r<sub>i</sub> &gt; 1 + ε</strong>: the bad token has become <em>more</em> likely under the new policy than under the sampler. You still want to <strong>keep pushing probability down</strong>, because the model is doing the wrong thing with high confidence. On that side of the trust region the surrogate continues to penalize the token until the ratio returns toward unity.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>How to read the piecewise surrogate:</strong> For positive advantages, clipping acts like a ceiling on how much you trust a single optimization step to up-weight a token. For negative advantages, clipping can freeze further down-weighting once the ratio hits the floor—except when the policy has become overconfident in a bad token (large ratio), where the objective keeps applying corrective pressure. Graphing surrogate value against <em>r</em> for fixed <em>A</em> produces the flat "tabs" outside [1−ε, 1+ε] that give PPO its stability.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>PPO Clipping Demo</h3>
+      <p>Adjust epsilon and the policy ratio to see when clipping applies. The shaded region is the trust region.</p>
+      <div class="two-col">
+        <div class="slider-container">
+          <label>ε (epsilon): <span class="slider-value" id="epsilonVal">0.2</span></label>
+          <input type="range" id="epsilonSlider" min="0.05" max="0.5" step="0.05" value="0.2">
+        </div>
+        <div class="slider-container">
+          <label>Policy ratio r: <span class="slider-value" id="ratioVal">1.0</span></label>
+          <input type="range" id="ratioSlider" min="0.5" max="2" step="0.1" value="1">
+        </div>
+      </div>
+      <div class="chart-container" style="margin-top:20px;">
+        <canvas id="ppoClipCanvas" width="840" height="280"></canvas>
+      </div>
+      <div id="ppoClipExplanation" style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">Value Function and GAE</h3>
+    <p>
+      In full RLHF, a <strong>value function</strong> <em>V(x, y<sub>&lt;i</sub>)</em> predicts the expected final reward given the prompt and the partial response so far. Unlike the reward model (which is frozen), the value function is <strong>trained alongside the policy</strong> — as the policy changes, the value function must adapt to predict rewards for the responses the policy actually generates. It is typically a language model with a scalar linear head, trained with L2 (squared) loss to match the final reward of samples. The advantage at each position can be computed using <strong>Generalized Advantage Estimation (GAE)</strong>, which combines multi-step returns. The value function requires significant extra compute and memory.
+    </p>
+
+    <p>
+      The original RLHF / InstructGPT stack cemented the three-model pattern—policy, frozen reward model, and trainable critic—because it empirically worked at scale, not because anything forces that factorization. <strong>GRPO</strong> and related algorithms can be viewed as <strong>deliberately shrinking</strong> the same PPO skeleton: keep the ratio clipping that stabilizes reuse of rollouts, replace the neural critic with closed-form group statistics, and sometimes trim or drop the KL term when other guardrails suffice. The research frontier is largely about which pieces of the classic recipe are load-bearing for a given data regime.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: DPO & GRPO ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>DPO and GRPO: Alternatives to PPO</h2>
+
+    <h3 style="margin-top:28px;">Direct Preference Optimization (DPO)</h3>
+    <p>
+      <strong>DPO</strong> avoids the reward model and PPO entirely. Instead of training a reward model and optimizing it with RL, DPO derives a loss directly from preference pairs (see Chapter 9 for the Bradley–Terry connection). Given a preferred response <em>y<sub>w</sub></em> vs. a rejected response <em>y<sub>l</sub></em>, DPO updates the policy to increase the probability of <em>y<sub>w</sub></em> relative to <em>y<sub>l</sub></em>. No reward model, no value function, no PPO — just a single supervised-style update. It is simpler and often more stable, but it does not use the full machinery of RL.
+    </p>
+
+    <h3 style="margin-top:28px;">Group Relative Policy Optimization (GRPO)</h3>
+    <p>
+      <strong>GRPO</strong> (DeepSeek) keeps the reward model but simplifies the baseline. Instead of a trained value function, it uses <strong>group statistics</strong>: for each prompt, generate multiple responses (a "group"), compute the mean and standard deviation of rewards, and use that as the baseline for each sample. GRPO combines this with policy ratio clipping similar to PPO. The result is a single model to update — no separate value network — which reduces memory and compute. GRPO has been used successfully for reasoning-oriented models.
+    </p>
+
+    <div class="callout">
+      <p><strong>Same skeleton, fewer networks:</strong> Think of GRPO as retaining PPO's trust-region intuition—reuse rollouts, bound per-token ratio movement—while replacing the critic's learned baseline with closed-form statistics over the sampled group. Some implementations also relax or remove the KL-to-SFT term when data filtering and clipping already keep trajectories on-manifold; that is an active design space rather than a settled recipe.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>DPO vs PPO Comparison</h3>
+      <p>Toggle to focus on each approach. See when to choose DPO vs PPO based on your constraints.</p>
+      <div class="btn-group">
+        <button class="btn active" onclick="showDPOPPO('dpo')">Focus: DPO</button>
+        <button class="btn" onclick="showDPOPPO('ppo')">Focus: PPO</button>
+      </div>
+      <div class="comparison" id="dpoPpoComparison">
+        <div class="card" id="dpoCard">
+          <h3 style="color:var(--accent);">DPO</h3>
+          <p><strong>No reward model.</strong> Direct loss from preference pairs (y<sub>w</sub>, y<sub>l</sub>).</p>
+          <p><strong>No value function.</strong> Single policy update.</p>
+          <p><strong>Simpler, more stable.</strong> Fewer hyperparameters.</p>
+          <p><strong>Limitation:</strong> Uses preference pairs only; does not optimize a scalar reward directly.</p>
+          <div id="dpoWhen" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:none;">
+            <strong style="color:var(--accent3);">Choose when:</strong> You have preference data, want simplicity, limited compute.
+          </div>
+        </div>
+        <div class="card" id="ppoCard">
+          <h3 style="color:var(--accent2);">PPO (RLHF)</h3>
+          <p><strong>Reward model</strong> scores full responses.</p>
+          <p><strong>Value function</strong> provides token-level baselines (GAE).</p>
+          <p><strong>Policy ratio clipping</strong> for stability.</p>
+          <p><strong>Limitation:</strong> Three models (policy, reward, value) — compute and memory intensive.</p>
+          <div id="ppoWhen" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:none;">
+            <strong style="color:var(--accent3);">Choose when:</strong> You need fine-grained control, have reward model + compute for value function.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 6: ALGORITHM COMPARISON ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Algorithm Comparison Table</h2>
+
+    <div class="interactive-panel">
+      <h3>REINFORCE, PPO, DPO, GRPO</h3>
+      <p>Click a row to see a summary. Compare key properties across the main algorithms.</p>
+      <div class="alg-table-wrapper">
+        <table class="alg-table" id="algTable">
+          <thead>
+            <tr>
+              <th>Algorithm</th>
+              <th>Reward Model</th>
+              <th>Baseline</th>
+              <th>Value Function</th>
+              <th>Clipping</th>
+              <th>KL Penalty</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-alg="reinforce" onclick="highlightAlgRow(this)">
+              <td><strong>REINFORCE</strong></td>
+              <td>Yes (frozen)</td>
+              <td>Optional (batch/group mean)</td>
+              <td>No</td>
+              <td>No</td>
+              <td>Optional</td>
+            </tr>
+            <tr data-alg="ppo" onclick="highlightAlgRow(this)">
+              <td><strong>PPO</strong></td>
+              <td>Yes (frozen)</td>
+              <td>Value function</td>
+              <td>Yes (trained)</td>
+              <td>Yes (policy ratio)</td>
+              <td>Yes</td>
+            </tr>
+            <tr data-alg="dpo" onclick="highlightAlgRow(this)">
+              <td><strong>DPO</strong></td>
+              <td>No</td>
+              <td>N/A</td>
+              <td>No</td>
+              <td>No</td>
+              <td>Implicit in formulation</td>
+            </tr>
+            <tr data-alg="grpo" onclick="highlightAlgRow(this)">
+              <td><strong>GRPO</strong></td>
+              <td>Yes (frozen)</td>
+              <td>Group mean ± std</td>
+              <td>No</td>
+              <td>Yes (PPO-style)</td>
+              <td>Often reduced or dropped</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="algDetail" class="card card-alt" style="margin-top:16px; min-height:50px; display:none;"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">RL vs SFT</h3>
+    <p>
+      A critical difference: <strong>RL updates are scaled by the probability</strong> of producing the response. RL penalizes low-reward samples that the model actually produces and rewards high-reward samples it produces. It does fine-grained tweaking in the space of responses the model is already likely to generate. <strong>SFT</strong> has no such scaling — it pushes the model toward reference responses (from humans or teachers) that the model may have very low probability of producing. SFT is effectively off-policy; RL is on-policy. RL typically makes smaller parameter changes than SFT.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--accent3); font-size:1rem; margin-bottom:10px;">On-policy RL fine-tuning</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">Gradients arise from trajectories the model currently draws. High mass on a bad completion is directly penalized; high mass on a good completion is reinforced. Exploration is whatever the policy already prefers, modulated by temperature and sampling noise.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent5); font-size:1rem; margin-bottom:10px;">Off-policy-style SFT</h3>
+        <p style="font-size:0.9rem; margin-bottom:0;">Every step nudges logits toward expert tokens even when the model would assign them tiny prior probability—think of teaching a rare idiom or a precise tool-use format. There is no per-example reward multiplier tied to how likely the sample was under θ.</p>
+      </div>
+    </div>
+
+    <p>
+      When a reference completion is already easy for the model (for example, factual trivia it knew from pre-training), SFT-like gradient steps and policy-gradient steps can look similar: both mainly reweight mass that already lived near the data. The divergence shows up on long-tail behaviors the model would almost never sample without exploration pressure—SFT drags the optimizer there; vanilla RL may never visit those strings often enough to learn them from reward alone unless initialization or curriculum supplies the path.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 7: PLAYGROUND ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Playground</h2>
+
+    <p>
+      Experiment with the concepts. Simulate advantage computation, explore the clipping region, and compare algorithm setups.
+    </p>
+
+    <div class="interactive-panel" style="margin-top:32px;">
+      <h3>Advantage Calculator</h3>
+      <p>Enter a reward and baseline to compute the advantage. See how it affects the update direction.</p>
+      <div class="two-col">
+        <div class="slider-container">
+          <label>Reward R: <span class="slider-value" id="advRVal">0.8</span></label>
+          <input type="range" id="advRSlider" min="0" max="1" step="0.05" value="0.8">
+        </div>
+        <div class="slider-container">
+          <label>Baseline B: <span class="slider-value" id="advBVal">0.5</span></label>
+          <input type="range" id="advBSlider" min="0" max="1" step="0.05" value="0.5">
+        </div>
+      </div>
+      <div id="advResult" style="margin-top:16px; font-family:var(--mono); font-size:1rem;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Trust Region Explorer</h3>
+      <p>Adjust epsilon to see how the PPO trust region [1−ε, 1+ε] changes. The policy ratio must stay within this range to receive gradient updates.</p>
+      <div class="slider-container">
+        <label>ε: <span class="slider-value" id="trustEpsVal">0.1</span></label>
+        <input type="range" id="trustEpsSlider" min="0.02" max="0.4" step="0.02" value="0.1">
+      </div>
+      <div class="card card-alt" id="trustRegionDisplay" style="text-align:center; padding:20px;">
+        Trust region: [<span id="trustLow">0.9</span>, <span id="trustHigh">1.1</span>]
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>
+    Reinforcement Learning for LLMs: From REINFORCE to PPO — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+// ============================================================
+// INTERACTIVE 1: RL FRAMEWORK MAPPING
+// ============================================================
+
+function highlightRLMap(which) {
+  const btns = document.querySelectorAll('#rlMapBtns .btn');
+  btns.forEach(b => b.classList.remove('active'));
+  const expl = document.getElementById('rlMapExplanation');
+  const map = {
+    state: 'State = prompt x plus tokens generated so far. At each step, the state is (x, y₁, ..., yᵢ₋₁).',
+    action: 'Action = choosing the next token from the vocabulary. Each token choice is one action.',
+    reward: 'Reward = scalar score from the reward model, computed at the end: R(x, y). Typically one reward per full response.',
+    policy: 'Policy = the language model p_θ(·|x, y₁,...,yᵢ₋₁). It outputs a distribution over the next token.'
+  };
+  expl.textContent = map[which] || '';
+  document.querySelector(`#rlMapBtns button:nth-child(${['state','action','reward','policy'].indexOf(which)+1})`).classList.add('active');
+}
+
+// ============================================================
+// INTERACTIVE 2: POLICY GRADIENT VISUALIZER
+// ============================================================
+
+const rewardSlider = document.getElementById('rewardSlider');
+const rewardVal = document.getElementById('rewardVal');
+const policyGradChart = document.getElementById('policyGradChart');
+const policyGradExplanation = document.getElementById('policyGradExplanation');
+
+function renderPolicyGrad() {
+  const R = parseFloat(rewardSlider.value);
+  rewardVal.textContent = R.toFixed(1);
+
+  const tokens = ['The', 'answer', 'is', 'Paris', '.'];
+  const baseProbs = [0.3, 0.25, 0.2, 0.15, 0.1];
+  const gradScale = Math.max(-1, Math.min(1, R));
+  const adjustedProbs = baseProbs.map((p, i) => {
+    const delta = gradScale * 0.1 * (i + 1);
+    return Math.max(0.05, Math.min(0.5, p + delta));
+  });
+  const sum = adjustedProbs.reduce((a, b) => a + b, 0);
+  const norm = adjustedProbs.map(p => p / sum);
+
+  policyGradChart.innerHTML = '';
+  const maxP = Math.max(...norm);
+  norm.forEach((p, i) => {
+    const w = document.createElement('div');
+    w.className = 'bar-wrapper';
+    const val = document.createElement('div');
+    val.className = 'bar-value';
+    val.textContent = (norm[i] * 100).toFixed(0) + '%';
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (norm[i] / maxP * 100) + '%';
+    bar.style.background = R > 0 ? 'var(--accent3)' : R < 0 ? 'var(--danger)' : 'var(--accent)';
+    const lbl = document.createElement('div');
+    lbl.className = 'bar-label';
+    lbl.textContent = tokens[i];
+    w.appendChild(val);
+    w.appendChild(bar);
+    w.appendChild(lbl);
+    policyGradChart.appendChild(w);
+  });
+
+  if (R > 0) {
+    policyGradExplanation.textContent = 'Positive reward: gradient pushes probability UP on these tokens. The model will increase the likelihood of this response.';
+  } else if (R < 0) {
+    policyGradExplanation.textContent = 'Negative reward: gradient pushes probability DOWN. The model will decrease the likelihood of this response.';
+  } else {
+    policyGradExplanation.textContent = 'Zero reward: no gradient signal. The update has no effect.';
+  }
+}
+
+rewardSlider.addEventListener('input', renderPolicyGrad);
+renderPolicyGrad();
+
+// ============================================================
+// INTERACTIVE 3: REINFORCE STEP-BY-STEP
+// ============================================================
+
+const reinforceSteps = [
+  { title: '1. Sample Y', desc: 'Draw a response y from the current model p_θ(·|x). For example: "The capital of France is Paris."' },
+  { title: '2. Compute R', desc: 'Pass (x, y) to the frozen reward model. Suppose R(x,y) = 0.85. This is a scalar score.' },
+  { title: '3. Gradient', desc: 'Compute ∇_θ log p_θ(y|x). This is the gradient that would increase the probability of y. Scale it by R: R · ∇_θ log p_θ(y|x).' },
+  { title: '4. Update', desc: 'Take a gradient step: θ ← θ + α · R · ∇_θ log p_θ(y|x). Since R > 0, we increase the probability of this response.' }
+];
+
+function showReinforceStep(i) {
+  document.querySelectorAll('#s1 .interactive-panel .btn-group .btn').forEach((b, j) => b.classList.toggle('active', j === i));
+  const content = document.getElementById('reinforceStepContent');
+  content.innerHTML = `<div class="card card-alt"><h3 style="color:var(--accent); margin-bottom:8px;">${reinforceSteps[i].title}</h3><p style="margin-bottom:0;">${reinforceSteps[i].desc}</p></div>`;
+}
+
+showReinforceStep(0);
+
+// ============================================================
+// INTERACTIVE 4: PPO CLIPPING DEMO
+// ============================================================
+
+const epsilonSlider = document.getElementById('epsilonSlider');
+const ratioSlider = document.getElementById('ratioSlider');
+const epsilonVal = document.getElementById('epsilonVal');
+const ratioVal = document.getElementById('ratioVal');
+const ppoCanvas = document.getElementById('ppoClipCanvas');
+const ppoClipExplanation = document.getElementById('ppoClipExplanation');
+
+function drawPPOClip() {
+  const eps = parseFloat(epsilonSlider.value);
+  const r = parseFloat(ratioSlider.value);
+  epsilonVal.textContent = eps.toFixed(2);
+  ratioVal.textContent = r.toFixed(1);
+
+  const W = ppoCanvas.width;
+  const H = ppoCanvas.height;
+  const ctx = ppoCanvas.getContext('2d');
+  const pad = { top: 30, right: 30, bottom: 50, left: 50 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const rMin = 0.5, rMax = 2;
+  const rLow = 1 - eps, rHigh = 1 + eps;
+
+  function xPos(val) { return pad.left + ((val - rMin) / (rMax - rMin)) * plotW; }
+  function yPos(a) { return pad.top + plotH - ((a + 2) / 4) * plotH; }
+
+  ctx.fillStyle = 'rgba(108,140,255,0.1)';
+  ctx.fillRect(xPos(rLow), pad.top, xPos(rHigh) - xPos(rLow), plotH);
+
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(xPos(rLow), pad.top, xPos(rHigh) - xPos(rLow), plotH);
+
+  ctx.strokeStyle = '#6c8cff';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  for (let rr = rMin; rr <= rMax; rr += 0.02) {
+    const aPos = 1;
+    const term1 = rr * aPos;
+    const clipR = Math.max(rLow, Math.min(rHigh, rr));
+    const term2 = clipR * aPos;
+    const val = Math.min(term1, term2);
+    const x = xPos(rr);
+    const y = yPos(val);
+    rr === rMin ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = '#f87171';
+  ctx.beginPath();
+  for (let rr = rMin; rr <= rMax; rr += 0.02) {
+    const aNeg = -1;
+    const term1 = rr * aNeg;
+    const clipR = Math.max(rLow, Math.min(rHigh, rr));
+    const term2 = clipR * aNeg;
+    const val = Math.min(term1, term2);
+    const x = xPos(rr);
+    const y = yPos(val);
+    rr === rMin ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = '11px SF Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Policy ratio r', W / 2, H - 10);
+  ctx.textAlign = 'right';
+  ctx.fillText('J', pad.left - 8, pad.top + 12);
+
+  ctx.fillStyle = '#6c8cff';
+  ctx.fillText('A>0', pad.left - 8, pad.top + 30);
+  ctx.fillStyle = '#f87171';
+  ctx.fillText('A<0', pad.left - 8, pad.top + 45);
+
+  const xR = xPos(r);
+  ctx.strokeStyle = '#34d399';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(xR, pad.top);
+  ctx.lineTo(xR, pad.top + plotH);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const clipped = r < rLow || r > rHigh;
+  ppoClipExplanation.textContent = clipped
+    ? `Ratio r = ${r.toFixed(1)} is outside [${rLow.toFixed(2)}, ${rHigh.toFixed(2)}]. Clipping applies — no gradient flows.`
+    : `Ratio r = ${r.toFixed(1)} is inside the trust region. Normal gradient update.`;
+}
+
+epsilonSlider.addEventListener('input', drawPPOClip);
+ratioSlider.addEventListener('input', drawPPOClip);
+drawPPOClip();
+
+// ============================================================
+// INTERACTIVE 5: DPO VS PPO TOGGLE
+// ============================================================
+
+function showDPOPPO(which) {
+  const allBtns = document.querySelectorAll('#s5 .interactive-panel .btn-group .btn');
+  allBtns[0].classList.toggle('active', which === 'dpo');
+  allBtns[1].classList.toggle('active', which === 'ppo');
+  document.getElementById('dpoWhen').style.display = which === 'dpo' ? 'block' : 'none';
+  document.getElementById('ppoWhen').style.display = which === 'ppo' ? 'block' : 'none';
+  document.getElementById('dpoCard').style.borderColor = which === 'dpo' ? 'var(--accent)' : 'var(--border)';
+  document.getElementById('dpoCard').style.background = which === 'dpo' ? 'rgba(108,140,255,0.08)' : 'var(--bg-card)';
+  document.getElementById('ppoCard').style.borderColor = which === 'ppo' ? 'var(--accent2)' : 'var(--border)';
+  document.getElementById('ppoCard').style.background = which === 'ppo' ? 'rgba(167,139,250,0.08)' : 'var(--bg-card)';
+}
+
+// ============================================================
+// INTERACTIVE 6: ALGORITHM TABLE ROW HIGHLIGHT
+// ============================================================
+
+const algSummaries = {
+  reinforce: 'REINFORCE: The baseline policy gradient. Sample, score, scale gradient by reward. Add optional baseline (batch or group mean) and KL penalty. Simple but high variance.',
+  ppo: 'PPO: Full RLHF stack. Reward model + value function (critic) + policy ratio clipping. Most compute-intensive but fine-grained token-level advantages via GAE.',
+  dpo: 'DPO: No reward model. Derives loss directly from preference pairs. Single supervised-style update. Simpler and often more stable. Good when you have preference data.',
+  grpo: 'GRPO: Reward model + group statistics baseline (no value function). PPO-style clipping. Single model to update. Used by DeepSeek for reasoning. Compute-efficient.'
+};
+
+function highlightAlgRow(row) {
+  document.querySelectorAll('#algTable tbody tr').forEach(r => {
+    r.style.background = 'var(--bg-card)';
+    r.style.borderLeft = 'none';
+  });
+  row.style.background = 'rgba(108,140,255,0.1)';
+  row.style.borderLeft = '3px solid var(--accent)';
+  const alg = row.dataset.alg;
+  const detail = document.getElementById('algDetail');
+  detail.style.display = 'block';
+  detail.innerHTML = '<strong style="color:var(--accent);">' + alg.toUpperCase() + ':</strong> ' + algSummaries[alg];
+}
+
+// ============================================================
+// PLAYGROUND: ADVANTAGE CALCULATOR
+// ============================================================
+
+const advRSlider = document.getElementById('advRSlider');
+const advBSlider = document.getElementById('advBSlider');
+const advRVal = document.getElementById('advRVal');
+const advBVal = document.getElementById('advBVal');
+const advResult = document.getElementById('advResult');
+
+function updateAdv() {
+  const R = parseFloat(advRSlider.value);
+  const B = parseFloat(advBSlider.value);
+  advRVal.textContent = R.toFixed(2);
+  advBVal.textContent = B.toFixed(2);
+  const A = R - B;
+  advResult.innerHTML = `
+    <span style="color:var(--text-dim);">A = R − B = </span>
+    <span style="color:${A > 0 ? 'var(--accent3)' : A < 0 ? 'var(--danger)' : 'var(--text)'}; font-weight:700;">${A.toFixed(2)}</span>
+    <span style="color:var(--text-dim); margin-left:12px;">${A > 0 ? '→ Increase probability' : A < 0 ? '→ Decrease probability' : '→ No update'}</span>
+  `;
+}
+
+advRSlider.addEventListener('input', updateAdv);
+advBSlider.addEventListener('input', updateAdv);
+updateAdv();
+
+// ============================================================
+// PLAYGROUND: TRUST REGION
+// ============================================================
+
+const trustEpsSlider = document.getElementById('trustEpsSlider');
+const trustEpsVal = document.getElementById('trustEpsVal');
+const trustLow = document.getElementById('trustLow');
+const trustHigh = document.getElementById('trustHigh');
+
+trustEpsSlider.addEventListener('input', () => {
+  const eps = parseFloat(trustEpsSlider.value);
+  trustEpsVal.textContent = eps.toFixed(2);
+  trustLow.textContent = (1 - eps).toFixed(2);
+  trustHigh.textContent = (1 + eps).toFixed(2);
+});
+
+// ============================================================
+// INTERVIEW QUESTIONS: hint / reveal
+// ============================================================
+
+function toggleHint(id) {
+  const el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('visible');
+}
+
+function reveal(id) {
+  const el = document.getElementById(id + '-answer');
+  if (el) el.classList.add('visible');
+}
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+</body>
+</html>

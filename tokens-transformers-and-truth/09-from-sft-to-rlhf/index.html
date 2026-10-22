@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>From SFT to RLHF: Reward Models & Alignment — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+.token-error { background: rgba(248,113,113,0.15); color: var(--danger); border: 1px solid rgba(248,113,113,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  background: rgba(248, 113, 113, 0.08);
+  border-left-color: var(--danger);
+}
+.callout.warn p { color: var(--text); }
+.callout.ok {
+  background: rgba(52, 211, 153, 0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text); }
+
+.qa-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--accent2);
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-step.clickable { cursor: pointer; }
+.flow-step.clickable:hover { border-color: var(--accent2); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Response cards for preference demo ===== */
+.response-card {
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-height: 120px;
+}
+.response-card:hover { border-color: var(--accent); background: rgba(108,140,255,0.05); }
+.response-card.selected { border-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.response-card .response-text { font-family: var(--mono); font-size: 0.85rem; color: var(--text); line-height: 1.6; }
+
+/* ===== Architecture diagram ===== */
+.arch-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+}
+.arch-box {
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  text-align: center;
+  transition: all 0.3s;
+}
+.arch-box.highlight { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.arch-box.small { padding: 8px 16px; font-size: 0.9rem; }
+
+/* ===== Interview questions (hint / reveal) ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.hint-btn:hover, .reveal-btn:hover {
+  border-color: var(--accent);
+  background: rgba(108,140,255,0.1);
+}
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(251,191,36,0.06);
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.hint-box.visible { display: block; }
+.answer {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.answer.visible { display: block; }
+.solution-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent3);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.explanation { font-size: 0.95rem; color: var(--text-dim); line-height: 1.65; }
+.explanation strong { color: var(--text); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">From Sft To Rlhf</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">From SFT to RLHF</a>
+  <div class="nav-links">
+    <a href="#s0">Pipeline</a>
+    <a href="#s1">SFT Recap</a>
+    <a href="#s2">SFT Limitations</a>
+    <a href="#s3">Exposure Bias</a>
+    <a href="#s4">Reward Models</a>
+    <a href="#s5">Bradley-Terry</a>
+    <a href="#s6">Architecture</a>
+    <a href="#s7">RLHF Pipeline</a>
+    <a href="#s8">RL Objective</a>
+    <a href="#s9">KL Penalty</a>
+    <a href="#s10">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>From SFT to RLHF</h1>
+    <p class="subtitle">
+      Reward Models & Alignment — Why supervised fine-tuning alone falls short, how human preferences become scalar rewards, and how reinforcement learning aligns language models with what we actually want.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">10</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">6</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1</span>
+        <span class="stat-label">Playground</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Instruction tuning teaches models to follow prompts by imitating expert demonstrations, but imitation has fundamental limits: exposure bias, no learning from mistakes, and no direct alignment with human preferences. This chapter covers reward models, pairwise preference training, and how reinforcement learning from human feedback (RLHF) completes the alignment pipeline.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 0: POST-TRAINING PIPELINE ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Post-Training Pipeline Overview</h2>
+
+    <p>
+      Modern language model development follows a three-stage post-training pipeline — pre-training, instruction tuning (SFT), and RL alignment — as covered in <a href="../08-instruction-tuning-and-peft/">Chapter 08</a>. This chapter focuses on the transition from SFT to RL: why imitation is insufficient, how human preferences become scalar rewards, and how RLHF refines the policy.
+    </p>
+
+    <div class="callout">
+      <p><strong>Why post-training keeps growing:</strong> Frontier budgets increasingly allocate compute to <strong>alignment and RL-style optimization</strong> rather than to marginal pre-training tokens alone. Capabilities such as long-horizon reasoning, tool use, and preference-sensitive tone often sharpen most cost-effectively after a capable base exists — which is why supervised imitation is only the first half of the story.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 1: INSTRUCTION TUNING RECAP ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Instruction Tuning Recap</h2>
+
+    <p>
+      <a href="../08-instruction-tuning-and-peft/">Chapter 08</a> covers supervised fine-tuning in depth: diverse (instruction, input, output) data, the same next-token loss with supervision only on response tokens, generalization to unseen task formats, and human versus synthetic supervision. Here we take that setup as given and ask where imitation learning stops being enough.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 2: LIMITATIONS OF SFT ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Why SFT Alone Is Not Enough</h2>
+
+    <p>
+      Supervised fine-tuning has several fundamental limitations that motivate the move to reinforcement learning.
+    </p>
+
+    <div class="card">
+      <ul style="list-style: none; font-size: 0.95rem;">
+        <li style="margin-bottom: 16px;">
+          <span style="color: var(--danger);">✗</span> <strong>Expensive data creation:</strong> Every (x, y) pair requires a human to produce a high-quality response. Scaling this is costly.
+        </li>
+        <li style="margin-bottom: 16px;">
+          <span style="color: var(--danger);">✗</span> <strong>Only one acceptable response per input:</strong> For open-ended prompts like "write a story about unicorns," there may be millions of valid stories. SFT observes just one and trains the model to put all probability mass on it — which can hurt diversity and generalization.
+        </li>
+        <li style="margin-bottom: 16px;">
+          <span style="color: var(--danger);">✗</span> <strong>No learning from negative examples:</strong> The model only ever sees good outputs. When it generates something terrible at test time, there is no signal to say "never do that again." SFT cannot explicitly penalize bad generations.
+        </li>
+        <li style="margin-bottom: 16px;">
+          <span style="color: var(--danger);">✗</span> <strong>Distribution mismatch (exposure bias):</strong> At training time, the model is fed the <em>ground truth</em> prefix at each step. At test time, it must use its <em>own</em> generated tokens. The model never sees its own errors during training — so it has no chance to learn how to recover from them.
+        </li>
+        <li style="margin-bottom: 16px;">
+          <span style="color: var(--danger);">✗</span> <strong>No direct human preference signal:</strong> SFT optimizes for imitating demonstrations, not for what humans actually prefer. Two model outputs might both be plausible, but humans may strongly prefer one. SFT has no way to incorporate that preference.
+        </li>
+        <li style="margin-bottom: 16px;">
+          <span style="color: var(--danger);">✗</span> <strong>Catastrophic forgetting:</strong> Fine-tuning on a narrow instruction dataset can cause the model to forget capabilities learned during pre-training. The model may overfit to the training tasks at the expense of general knowledge.
+        </li>
+        <li>
+          <span style="color: var(--danger);">✗</span> <strong>Limited generalization:</strong> For small models, instruction tuning can actually hurt performance on unseen tasks — the model uses all its capacity to memorize the training tasks. Generalization to new tasks improves with model size but is never guaranteed.
+        </li>
+      </ul>
+    </div>
+
+    <p>
+      These limitations point toward a different paradigm: instead of imitating expert outputs, we want to <strong>judge the model's own generations</strong> and reward good ones while penalizing bad ones. That is exactly what reinforcement learning enables.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent);">Expert demonstrations (SFT)</h3>
+        <p style="font-size:0.92rem; margin-bottom:0;">Every training example is a high-quality <strong>human-written</strong> completion. The optimizer never sees the model's own mistakes in the prefix. Scaling means paying annotators or contractors—often through specialized data vendors—for more (x, y) pairs.</p>
+      </div>
+      <div class="card card-alt">
+        <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent3);">Preference-driven RL</h3>
+        <p style="font-size:0.92rem; margin-bottom:0;">Learning signals attach to <strong>samples drawn from the policy itself</strong>. Humans (or a reward model trained on human judgments) compare competing outputs for the same prompt. The system can down-weight terrible generations instead of only up-weighting a single gold y.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: EXPOSURE BIAS VISUALIZER (Interactive #1) ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>SFT Limitations Visualizer</h2>
+
+    <p>
+      <strong>Exposure bias</strong> and <strong>distribution mismatch</strong> are easiest to see with a concrete example. Consider a prompt: "Complete this Python function to return a list of even numbers up to n." The ground truth might use a list and a for-loop. During SFT, at every step the model receives the correct prefix from the ground truth. But at test time, if the model samples "dict" instead of "list" in the first line, it has never seen that error during training — and the rest of the generation may cascade into nonsense.
+    </p>
+
+    <p>
+      Under teacher forcing, when the model predicts the token after <code>results = </code>, it always sees the teacher's choice (<code>[</code>) in the context, even if its own distribution would have preferred another opener. Later tokens are learned <em>conditional on a perfect past</em>. At inference, an early structural mistake can make subsequent lines look locally reasonable yet form a globally invalid program. Expert-curated SFT data almost never contains such errorful prefixes, so the model is not trained to recover from them.
+    </p>
+
+    <p>
+      The same mechanism appears in free-form text. Fill-in prompts such as "The capital of Virginia is ___" may assign most probability mass to the correct answer (<strong>Richmond</strong>), yet sampling still draws occasional mistakes. Once a wrong token is committed, every later token is generated <strong>conditioned on that wrong history</strong>; repetition, contradiction, or hallucination can compound. Training optimizes next-token prediction under <em>gold</em> prefixes; deployment uses <em>model-generated</em> prefixes — so errors appear whenever those conditional distributions diverge.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Training vs. Generation: Distribution Mismatch</h3>
+      <p>Toggle between <strong>Training (teacher forcing)</strong> and <strong>Generation (model's own output)</strong> to see the mismatch. In training, the model always gets the correct prefix. In generation, one early error can corrupt the entire response.</p>
+
+      <div class="btn-group">
+        <button class="btn active" id="btnTrain" onclick="setSFTMode('train')">Training (Teacher Forcing)</button>
+        <button class="btn" id="btnGen" onclick="setSFTMode('gen')">Generation (Model's Own)</button>
+      </div>
+
+      <div class="card card-alt" style="margin-top: 20px;">
+        <div style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px;">Prefix fed to model at each step:</div>
+        <div class="token-row" id="sftPrefixTokens"></div>
+        <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 16px;">Model predicts next token given this prefix.</div>
+      </div>
+
+      <div id="sftExplanation" style="margin-top: 16px; font-size: 0.9rem; color: var(--text-dim);"></div>
+    </div>
+
+    <div class="callout">
+      <p><strong>Teacher forcing</strong> (see <a href="../04-attention-and-transformers/">Chapter 04</a>): training always feeds the ground-truth prefix, while generation conditions on the model's own tokens — so errors at inference compound on prefixes the model never saw during SFT.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: PREFERENCE COMPARISON (Interactive #2) ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Preference Comparison Demo</h2>
+
+    <p>
+      The core idea behind reward models is that we collect <strong>pairwise human preferences</strong>: given a prompt and two model-generated responses, a human labeler indicates which one they prefer. We cannot have humans in the loop for every training step, so we collect a large dataset of these preferences offline and train a model to predict them.
+    </p>
+
+    <p>
+      In practice, prompts sit on a spectrum. For <strong>underspecified creative</strong> requests ("write a story about a cat"), two fluent completions can both be valid; labelers may disagree, and the "better" story is partly subjective unless one sample violates constraints (off-topic, garbled grammar). For <strong>tightly constrained</strong> tasks—code that must run, exact formats, factual questions with a unique answer—preferences are often obvious, and bad outputs are easy to rank. High-quality preference corpora therefore mix clear-cut comparisons with noisier judgments; many labs send the same pair to multiple raters and aggregate labels to smooth disagreement.
+    </p>
+
+    <p>
+      The operational picture is: sample several completions <strong>Y₁, Y₂, Y₃, …</strong> from an instruction-tuned policy for the same prompt <strong>x</strong>; obtain a ranking or pairwise choices; then <strong>increase probability on preferred ("winning") samples</strong> and <strong>decrease probability on dispreferred ("losing") samples</strong>. Crucially, both winners and losers are drawn from the model—they are on-support for the current policy. This is a different statistical regime from SFT, where y always comes from a human expert distribution.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Which Response Do You Prefer?</h3>
+      <p>Given the prompt below, click the response you find better. This simulates the human preference data collection process. There is no single "correct" answer — preferences can be subjective.</p>
+
+      <div class="card card-alt" style="margin-bottom: 20px;">
+        <div style="font-size: 0.75rem; color: var(--accent); margin-bottom: 8px;">PROMPT</div>
+        <div id="prefPrompt" style="font-family: var(--mono); font-size: 0.9rem;">Write a short story about a cat who learns to code.</div>
+      </div>
+
+      <div class="comparison">
+        <div class="response-card" id="respA" onclick="selectPreference('A')">
+          <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px;">Response A</div>
+          <div class="response-text" id="textA">Whiskers was a curious tabby. One day she found an old laptop. She pawed the keys until "Hello World" appeared. From then on, she spent her nights debugging. The neighborhood mice were impressed.</div>
+        </div>
+        <div class="response-card" id="respB" onclick="selectPreference('B')">
+          <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 8px;">Response B</div>
+          <div class="response-text" id="textB">A cat learned to code. It was cool. The end.</div>
+        </div>
+      </div>
+
+      <div id="prefResult" style="margin-top: 16px; font-size: 0.9rem; color: var(--accent3);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: BRADLEY-TERRY MODEL ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Bradley-Terry Model for Preference Modeling</h2>
+
+    <p>
+      We need a way to turn pairwise preferences into a trainable objective. The <strong>Bradley-Terry model</strong> does exactly that. Given a prompt <strong>x</strong> and two responses <strong>y_w</strong> (preferred) and <strong>y_l</strong> (dispreferred), we model the probability that humans prefer y_w over y_l as:
+    </p>
+
+    <div class="formula">
+      P(y_w ≻ y_l | x) = exp(r(x, y_w)) / (exp(r(x, y_w)) + exp(r(x, y_l)))
+    </div>
+
+    <p>
+      Here <strong>r(x, y)</strong> is a scalar reward function — the output of our reward model. The preferred response should get a higher reward. This formula is analogous to a two-class softmax: we normalize over the two options.
+    </p>
+
+    <p>
+      The same modeling choice underlies the <strong>RLHF stack popularized by InstructGPT</strong>: collect comparisons from labelers, fit a parametric reward function so that its implied pairwise probabilities match the data, then use that reward to update the policy. The Bradley–Terry layer is the bridge between messy human judgments and a smooth objective you can backprop into (through the reward network, before policy gradients enter the picture).
+    </p>
+
+    <div class="formula">
+      σ(z) = 1 / (1 + e<sup>−z</sup>) = P(y_w ≻ y_l | x) &nbsp; when &nbsp; z = r(x, y_w) − r(x, y_l)
+    </div>
+
+    <p>
+      Viewed another way, the sigmoid is exactly the <strong>softmax over two logits</strong> written in closed form: exponentiate both rewards and normalize, and the probability of preferring y_w collapses to σ(r_w − r_l). That parallel helps if you already think in terms of multi-class softmax at the vocabulary level—here the "vocabulary" is just the two presented completions.
+    </p>
+
+    <p>
+      To train the reward model, we minimize the negative log likelihood of the human-preferred choice:
+    </p>
+
+    <div class="formula">
+      L = −log P(y_w ≻ y_l | x) = −log σ(r(x, y_w) − r(x, y_l))
+    </div>
+
+    <p>
+      where <strong>σ</strong> is the sigmoid function: σ(z) = 1 / (1 + e<sup>−z</sup>). To minimize this loss, we want r(x, y_w) to be higher than r(x, y_l). The larger the gap, the more confident the model is in the preference.
+    </p>
+
+    <p>
+      Pairwise labels do not assert absolute quality — but the scalar reward head is trained so that <em>within each labeled pair</em> the winner scores higher. If every sampled completion is weak, raters still produce relative rankings; ideally <strong>r(x, y)</strong> assigns low absolute scores to all of them while preserving the ordering. Downstream RL then pushes mass toward higher-reward regions.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 5b: BRADLEY-TERRY INTERACTIVE (Interactive #3) ===== -->
+<section class="section fade-in">
+  <div class="container">
+    <div class="interactive-panel">
+      <h3>Bradley-Terry Probability Calculator</h3>
+      <p>Adjust the reward scores for the preferred (y_w) and dispreferred (y_l) responses. See how the probability P(y_w ≻ y_l) changes. When r_w = r_l, the model is uncertain (50%). As the gap grows, confidence increases.</p>
+
+      <div class="two-col">
+        <div class="slider-container">
+          <label>r(x, y_w) — preferred: <span class="slider-value" id="btRwVal">2.0</span></label>
+          <input type="range" id="btRw" min="-5" max="5" step="0.2" value="2">
+        </div>
+        <div class="slider-container">
+          <label>r(x, y_l) — dispreferred: <span class="slider-value" id="btRlVal">-1.0</span></label>
+          <input type="range" id="btRl" min="-5" max="5" step="0.2" value="-1">
+        </div>
+      </div>
+
+      <div class="formula" id="btFormula" style="margin-top: 20px;"></div>
+      <div id="btProb" style="text-align: center; font-size: 1.4rem; margin-top: 12px; color: var(--accent3);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 6: REWARD MODEL ARCHITECTURE ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Reward Model Architecture</h2>
+
+    <p>
+      What does the reward model actually look like? It is an <strong>instruction-tuned language model</strong> with a <strong>linear layer</strong> on top of the final hidden state. The input is the concatenation of the prompt <strong>x</strong> and the response <strong>y</strong>. The model processes this sequence and produces hidden states at each position. We take the <strong>last hidden state</strong> (at the final token) and project it through a linear layer to get a single scalar score.
+    </p>
+
+    <div class="formula">
+      r(x, y) = W · h_last
+    </div>
+
+    <p>
+      where <strong>h_last</strong> is the final-layer hidden state at the last token of the concatenated sequence and <strong>W</strong> is a 1×d parameter matrix (a single row when viewed as a vector). The output is one real number—there is <strong>no vocabulary softmax</strong> at the end. In code, a typical batch stacks forward passes for winning and losing completions, subtracts scores, and applies the logistic loss.
+    </p>
+
+    <p>
+      Training is not limited to the head: in standard setups <strong>all transformer weights are updated</strong> alongside W. Only tuning W would leave almost all capacity frozen; human preference judgments are subtle enough that the backbone usually must adapt. The trade-off is that the resulting network is <strong>no longer a good generic generator</strong>—its parameters have been specialized to emit a judgment scalar, not next-token probabilities for open-ended chat.
+    </p>
+
+    <p>
+      Pairwise Bradley–Terry training is <strong>compute-heavy</strong>: for each preference pair you need one forward pass through the full stack for y_w and another for y_l (batched implementations still perform two distinct sequence evaluations per example before backprop). That cost buys a reward signal that can be evaluated on arbitrary new completions at scale once training finishes.
+    </p>
+
+    <p>
+      Using the final token's hidden state is a <strong>design choice</strong>, not a logical necessity. Alternatives include pooling or averaging the final layer across response tokens, or stacking a small transformer head on top of per-token representations. The usual motivation for staying minimal is that the base LM already contains enormous usable capacity; a single linear readout is often sufficient to convert rich contextual embeddings into a ranking score.
+    </p>
+
+    <p>
+      Why use a language model? Because judging response quality requires understanding language — grammar, coherence, relevance, and task-specific criteria. A pre-trained (and instruction-tuned) LM already has these capabilities; we specialize it for the preference task.
+    </p>
+
+    <p>
+      Public leaderboards such as <strong>RewardBench</strong> rank released reward models; entries are often <strong>tens of billions of parameters</strong>, comparable to chat models. That scale underscores both how much capacity judgment appears to require and how expensive it is to run the reward model during training or best-of-N search. It also highlights a <strong>capability ceiling</strong>: if the backbone cannot understand a task well enough to assess a candidate answer, no amount of preference loss will make its scalar scores trustworthy for that task.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Failure mode:</strong> When the task exceeds the reward model's competence—lengthy proofs, subtle safety trade-offs, specialist code review—the scalar <strong>r(x, y)</strong> may be arbitrary with respect to true quality. Policy optimization against such a proxy drifts toward <strong>reward hacking</strong> (gaming whatever correlates the proxy learned) rather than human-aligned improvement.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== REWARD MODEL ARCHITECTURE DIAGRAM (Interactive #4) ===== -->
+<section class="section fade-in">
+  <div class="container">
+    <div class="interactive-panel">
+      <h3>Reward Model Architecture — Clickable Diagram</h3>
+      <p>Click each component to highlight it and see its role in the architecture.</p>
+
+      <div class="arch-diagram" id="archDiagram">
+        <div class="arch-box" data-part="input" onclick="highlightArch('input')">Input: (x, y) — prompt + response</div>
+        <div style="color: var(--text-dim);">↓</div>
+        <div class="arch-box" data-part="lm" onclick="highlightArch('lm')">Instruction-tuned LM (transformer layers)</div>
+        <div style="color: var(--text-dim);">↓</div>
+        <div class="arch-box" data-part="hidden" onclick="highlightArch('hidden')">Final hidden state h_last (d-dimensional)</div>
+        <div style="color: var(--text-dim);">↓</div>
+        <div class="arch-box small" data-part="linear" onclick="highlightArch('linear')">Linear layer: W · h_last</div>
+        <div style="color: var(--text-dim);">↓</div>
+        <div class="arch-box small" data-part="output" onclick="highlightArch('output')">Output: scalar reward r(x, y)</div>
+      </div>
+
+      <div id="archDesc" style="margin-top: 16px; font-size: 0.9rem; color: var(--text-dim); min-height: 40px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 7: RLHF PIPELINE ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>RLHF Pipeline Overview</h2>
+
+    <p>
+      <strong>Reinforcement Learning from Human Feedback (RLHF)</strong> was pioneered by OpenAI in the InstructGPT paper. The full pipeline is:
+    </p>
+
+    <ol style="margin: 20px 0; padding-left: 24px; color: var(--text-dim);">
+      <li style="margin-bottom: 12px;"><strong style="color: var(--text);">Pre-train</strong> a language model on large text corpora.</li>
+      <li style="margin-bottom: 12px;"><strong style="color: var(--text);">Instruction tune (SFT)</strong> on diverse (instruction, input, output) pairs.</li>
+      <li style="margin-bottom: 12px;"><strong style="color: var(--text);">Sample</strong> multiple responses from the SFT model for many prompts.</li>
+      <li style="margin-bottom: 12px;"><strong style="color: var(--text);">Collect human preferences</strong> — pairwise rankings of which response is better.</li>
+      <li style="margin-bottom: 12px;"><strong style="color: var(--text);">Train a reward model</strong> on the preference data using the Bradley-Terry loss.</li>
+      <li style="margin-bottom: 12px;"><strong style="color: var(--text);">Use the reward model</strong> to update the policy (the language model) via reinforcement learning.</li>
+    </ol>
+
+    <p>
+      The reward model acts as a proxy for human preference. Once trained, we can score arbitrary (prompt, response) pairs without calling human labelers. This allows scaling: we generate many samples, score them with the reward model, and update the policy to maximize expected reward.
+    </p>
+
+    <h3 style="margin-top: 28px;">Strategies for Using the Reward Model</h3>
+    <p>
+      Before diving into full RL, there are simpler ways to use a reward model. <strong>Best-of-N sampling</strong> (also called rejection sampling) generates N responses per prompt and selects the one with the highest reward. This requires no training but is expensive — N decoding passes per prompt. It can perform surprisingly well.
+    </p>
+
+    <p>
+      The hidden cost is not just FLOPs on paper: each completion requires <strong>autoregressive decoding</strong>—repeated forward passes with a growing KV cache, one new token at a time. Asking for 64 candidates means 64 full decodes plus 64 reward evaluations. Best-of-N can beat some training-heavy methods on quality per fixed compute budget in certain regimes, but it does nothing to make a <strong>single</strong> greedy or low-temperature sample reliably good, which is what product deployments often want.
+    </p>
+
+    <p>
+      Another approach is <strong>SFT on high-reward samples</strong> (e.g., RAFT—<em>reward-augmented</em> fine-tuning in the literature): generate many samples, keep those whose reward clears a threshold, and run supervised fine-tune to maximize likelihood of the survivors. Unlike the original instruction-tuning corpus, the <strong>labels now come from the policy itself</strong> (filtered by the proxy reward). After an optimizer step you can resample from the updated weights, score fresh completions, and iterate—something impossible when y must be human-authored for every step.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent);">Instruction-tuning SFT</h3>
+        <p style="font-size:0.92rem; margin-bottom:0;">Targets human demonstrations y*. Can assign probability to sequences the live model would <strong>never</strong> sample by starting from a different generative process (experts). Teaches new behaviors outside the current support.</p>
+      </div>
+      <div class="card card-alt">
+        <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent3);">SFT on high-reward rollouts</h3>
+        <p style="font-size:0.92rem; margin-bottom:0;">Targets model-generated completions that score well. Cannot elevate probability for trajectories with <strong>zero (or near-zero)</strong> sampling mass—you only reinforce what the policy already occasionally produces. Often discards most samples in a batch.</p>
+      </div>
+    </div>
+
+    <p>
+      A subtle interaction: as the policy improves, its output distribution may <strong>shift away from the data the reward model saw</strong> (typically completions from an earlier SFT checkpoint). In the limit, scores become miscalibrated or exploitable unless you refresh preferences, retrain the reward model, or constrain policy updates. KL penalties toward the reference SFT policy are partly motivated by keeping the generator in a region where the proxy reward remains meaningful.
+    </p>
+
+    <p>
+      Full RL differs in two ways. First, it can <strong>lower</strong> the probability of low-reward continuations instead of only up-weighting a cherry-picked winner. Second, it uses reward magnitude to scale updates, improving <strong>sample efficiency</strong> relative to "generate N, keep one" pipelines that throw away almost all compute from each batch. Research systems have also explored <strong>controlled decoding</strong> that scores partial prefixes with a decomposed reward; that family is less standard in production than PPO-style training but illustrates the same principle—steer generation toward high reward.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Universal caveat:</strong> Best-of-N, filtered SFT, and policy-gradient RL <strong>all inherit reward-model blind spots</strong>. If the proxy correlates length with quality, every strategy can over-produce verbosity. Diagnosing hacking usually requires inspecting rollouts, not reading the loss curve.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== RLHF PIPELINE VISUALIZER (Interactive #5) ===== -->
+<section class="section fade-in">
+  <div class="container">
+    <div class="interactive-panel">
+      <h3>RLHF Pipeline — Step Through the Flow</h3>
+      <p>Click "Next" to advance through the pipeline. Each step highlights the current stage.</p>
+
+      <div class="btn-group">
+        <button class="btn" onclick="setPipelineStep(0)">1. Pre-train</button>
+        <button class="btn" onclick="setPipelineStep(1)">2. SFT</button>
+        <button class="btn" onclick="setPipelineStep(2)">3. Sample</button>
+        <button class="btn" onclick="setPipelineStep(3)">4. Human Prefs</button>
+        <button class="btn" onclick="setPipelineStep(4)">5. Reward Model</button>
+        <button class="btn" onclick="setPipelineStep(5)">6. RL Update</button>
+      </div>
+
+      <div class="flow" style="margin-top: 24px;">
+        <div class="flow-step" id="pipe0">Pre-trained LM</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="pipe1">Instruction Tuned LM</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="pipe2">Sample Y₁, Y₂, Y₃, ...</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="pipe3">Human rankings (Y_w ≻ Y_l)</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="pipe4">Train reward model r(x,y)</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-step" id="pipe5">RL: maximize E[r]</div>
+      </div>
+
+      <div id="pipeDesc" style="margin-top: 16px; font-size: 0.9rem; color: var(--text-dim);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 8: RL OBJECTIVE ===== -->
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>The RL Objective</h2>
+
+    <p>
+      The language model we are updating is called the <strong>policy</strong> (or policy model). It is denoted as <strong>p_θ(y|x)</strong> or sometimes <strong>π_θ(y|x)</strong> — the probability of output y given prompt x under parameters θ. The goal of reinforcement learning is to <strong>maximize the expected reward</strong> of the policy's generations:
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent);">p<sub>θ</sub>(y|x)</h3>
+        <p style="font-size:0.92rem; margin-bottom:0;">Common in NLP papers on sequence models. Read it as "the generative distribution parameterized by θ."</p>
+      </div>
+      <div class="card card-alt">
+        <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent2);">π<sub>θ</sub>(y|x)</h3>
+        <p style="font-size:0.92rem; margin-bottom:0;">Classic RL notation for a <strong>policy</strong>. Same object, different typographic tradition—expect both in RLHF literature.</p>
+      </div>
+    </div>
+
+    <div class="formula">
+      J(θ) = E_{y ∼ p_θ(y|x)} [ r(x, y) ]
+    </div>
+
+    <p>
+      For a fixed prompt x, if we could enumerate the countable (yet astronomically large) space of strings y, the expectation would be the explicit sum
+    </p>
+
+    <div class="formula">
+      E<sub>y∼p<sub>θ</sub></sub>[r(x, y)] = Σ<sub>y</sub> p<sub>θ</sub>(y|x) · r(x, y)
+    </div>
+
+    <p>
+      Enumeration is impossible, so RLHF estimators draw <strong>Monte Carlo samples</strong>—often a single completion per prompt per batch—and average empirical rewards across many prompts. With enough independent draws, the sample mean is an unbiased estimate of the true expectation even though each individual y is random.
+    </p>
+
+    <p>
+      This is a probability-weighted average of rewards over all possible responses. In practice, we estimate it by sampling: we draw one or a few responses y from the current policy p_θ, compute r(x, y), and use that to update θ. A key challenge: <strong>generation is non-differentiable</strong>. At each step we sample a token from a distribution — a hard decision. The gradient cannot flow through the sampling process. RL algorithms circumvent this by differentiating through the <em>probability</em> p_θ(y|x) of the sampled sequence, not through the sampling itself.
+    </p>
+
+    <p>
+      Because J is something we want to <strong>maximize</strong> (unlike cross-entropy loss), gradient-based optimizers follow the <strong>positive</strong> direction of ∇<sub>θ</sub>J—equivalently, minimize −J. The familiar "loss minimization" muscle memory from SFT flips sign when the objective is expected reward.
+    </p>
+
+    <p>
+      A critical consideration: if we simply maximize reward, the model might <strong>reward hack</strong> — exploit quirks of the reward model (e.g., preferring longer outputs) rather than actually improving. To prevent this, we add a <strong>KL divergence penalty</strong> that keeps the policy close to a reference policy (typically the SFT model):
+    </p>
+
+    <div class="formula">
+      J(θ) = E[r(x, y)] − β · KL(p_θ || p_ref)
+    </div>
+
+    <p>
+      The β term controls the strength of the penalty. Too small, and we risk reward hacking. Too large, and we barely move from the reference. Algorithms like <strong>PPO (Proximal Policy Optimization)</strong> implement this idea with additional safeguards to keep updates stable.
+    </p>
+
+    <div class="callout">
+      <p><strong>Reward hacking:</strong> The reward model can latch onto superficial cues that correlate with human preference but do not capture true quality. For example, humans often prefer longer, more detailed responses — so the reward model may learn to favor length regardless of content. A policy that maximizes such a reward model might produce verbose, low-quality output. The KL penalty helps by constraining the policy to stay close to the reference, which was trained on diverse, high-quality data.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>Policy optimization:</strong> The policy is the language model p_θ(y|x). We increase the probability of high-reward samples and decrease the probability of low-reward samples. The update magnitude is proportional to the reward — a very good sample gets a stronger positive update than a mildly good one.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 9: KL DIVERGENCE EXPLORER (Interactive #6) ===== -->
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>KL Divergence Explorer</h2>
+
+    <p>
+      The KL penalty prevents the policy from drifting too far from the reference. If the model starts producing outputs that score highly on the reward model but are nonsensical (reward hacking), the KL term grows — because the policy distribution has diverged from the reference. The optimizer is penalized for that, which discourages extreme exploitation.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Reward vs. KL: The Trade-off</h3>
+      <p>Adjust the effective reward and KL divergence. The objective J = Reward − β·KL. When KL is high, the policy has drifted far from the reference — the penalty reduces J even if reward is high.</p>
+
+      <div class="slider-container">
+        <label>β (KL penalty weight): <span class="slider-value" id="klBetaVal">0.1</span></label>
+        <input type="range" id="klBeta" min="0.01" max="1" step="0.01" value="0.1">
+      </div>
+
+      <div class="two-col">
+        <div class="slider-container">
+          <label>Reward (simulated): <span class="slider-value" id="klRewardVal">5.0</span></label>
+          <input type="range" id="klReward" min="0" max="10" step="0.5" value="5">
+        </div>
+        <div class="slider-container">
+          <label>KL(p_θ || p_ref): <span class="slider-value" id="klDivVal">2.0</span></label>
+          <input type="range" id="klDiv" min="0" max="10" step="0.5" value="2">
+        </div>
+      </div>
+
+      <div class="formula" id="klFormula" style="margin-top: 20px;"></div>
+      <div id="klResult" style="text-align: center; font-size: 1.2rem; margin-top: 12px;"></div>
+      <div id="klInterpret" style="text-align: center; font-size: 0.85rem; color: var(--text-dim); margin-top: 8px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 10: PLAYGROUND ===== -->
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Playground</h2>
+
+    <p>
+      Experiment with the concepts from this chapter. Tweak reward scores, explore the Bradley-Terry formula, and see how the KL penalty affects the objective.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Best-of-N Sampling Simulator</h3>
+      <p>Generate N samples and pick the one with the highest reward. This requires no training but is expensive — you need N decoding passes. Click "Sample" to draw 5 random rewards and see which one wins.</p>
+
+      <div class="btn-group">
+        <button class="btn" onclick="runBestOfN()">Sample 5 Responses</button>
+      </div>
+
+      <div class="bar-chart" id="bestOfNChart" style="height: 180px; margin-top: 20px;"></div>
+      <div id="bestOfNResult" style="margin-top: 12px; font-size: 0.9rem;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Sigmoid Explorer</h3>
+      <p>The Bradley-Terry loss uses σ(r_w − r_l). Enter r_w and r_l to see the probability and loss.</p>
+
+      <div class="two-col">
+        <div>
+          <label style="font-size: 0.85rem; color: var(--text-dim);">r_w (preferred)</label>
+          <input type="number" id="sigRw" value="2" step="0.5" style="width:100%; padding:10px; background:var(--bg-card-alt); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--mono); margin-top:6px;">
+        </div>
+        <div>
+          <label style="font-size: 0.85rem; color: var(--text-dim);">r_l (dispreferred)</label>
+          <input type="number" id="sigRl" value="-1" step="0.5" style="width:100%; padding:10px; background:var(--bg-card-alt); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--mono); margin-top:6px;">
+        </div>
+      </div>
+
+      <div id="sigResult" style="margin-top: 16px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p>
+    From SFT to RLHF: Reward Models & Alignment — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+// ============================================================
+// INTERACTIVE #1: SFT LIMITATIONS VISUALIZER
+// ============================================================
+
+const groundTruth = ['results', '=', '[]', 'for', 'i', 'in', 'range(n)', ':', 'if', 'i', '%', '2', '==', '0', ':', 'results.append(i)', 'return', 'results'];
+const errorPrefix = ['results', '=', '{}', 'for', 'i', 'in', 'range(n)', ':', 'if', 'i', '%', '2', '==', '0', ':', 'results.append(i)', 'return', 'results'];
+
+function setSFTMode(mode) {
+  document.getElementById('btnTrain').classList.toggle('active', mode === 'train');
+  document.getElementById('btnGen').classList.toggle('active', mode === 'gen');
+
+  const container = document.getElementById('sftPrefixTokens');
+  const expl = document.getElementById('sftExplanation');
+
+  if (mode === 'train') {
+    container.innerHTML = groundTruth.map((t, i) => {
+      const span = document.createElement('span');
+      span.className = i < groundTruth.length - 1 ? 'token token-word' : 'token token-new';
+      span.textContent = t;
+      return span.outerHTML;
+    }).join('');
+    expl.innerHTML = 'At each step, the model receives the <strong>correct</strong> prefix from the ground truth. It never sees its own mistakes. This is teacher forcing.';
+  } else {
+    container.innerHTML = errorPrefix.map((t, i) => {
+      const span = document.createElement('span');
+      if (i === 2) span.className = 'token token-error';
+      else if (i < errorPrefix.length - 1) span.className = 'token token-word';
+      else span.className = 'token token-new';
+      span.textContent = t;
+      return span.outerHTML;
+    }).join('');
+    expl.innerHTML = 'At step 3, the model sampled <strong>dict</strong> instead of <strong>list</strong>. Now the prefix contains an error. The rest of the code (append, etc.) no longer makes sense — but the model was never trained on this scenario.';
+  }
+}
+
+setSFTMode('train');
+
+// ============================================================
+// INTERACTIVE #2: PREFERENCE COMPARISON
+// ============================================================
+
+function selectPreference(choice) {
+  document.getElementById('respA').classList.remove('selected');
+  document.getElementById('respB').classList.remove('selected');
+  document.getElementById('resp' + choice).classList.add('selected');
+  document.getElementById('prefResult').textContent = 'You preferred Response ' + choice + '. This preference would be recorded as training data for the reward model.';
+}
+
+// ============================================================
+// INTERACTIVE #3: BRADLEY-TERRY CALCULATOR
+// ============================================================
+
+function updateBradleyTerry() {
+  const rw = parseFloat(document.getElementById('btRw').value);
+  const rl = parseFloat(document.getElementById('btRl').value);
+  document.getElementById('btRwVal').textContent = rw.toFixed(1);
+  document.getElementById('btRlVal').textContent = rl.toFixed(1);
+
+  const diff = rw - rl;
+  const prob = 1 / (1 + Math.exp(-diff));
+
+  document.getElementById('btFormula').innerHTML = 'P(y_w ≻ y_l) = σ(r_w − r_l) = σ(' + diff.toFixed(2) + ')';
+  document.getElementById('btProb').textContent = (prob * 100).toFixed(1) + '%';
+}
+
+document.getElementById('btRw').addEventListener('input', updateBradleyTerry);
+document.getElementById('btRl').addEventListener('input', updateBradleyTerry);
+updateBradleyTerry();
+
+// ============================================================
+// INTERACTIVE #4: REWARD MODEL ARCHITECTURE
+// ============================================================
+
+const archDescriptions = {
+  input: 'The prompt x and response y are concatenated and tokenized. This is the input sequence to the model.',
+  lm: 'The instruction-tuned transformer processes the sequence. All parameters are fine-tuned with the Bradley-Terry loss.',
+  hidden: 'We take the hidden state at the final token position. This vector encodes the full (x, y) context.',
+  linear: 'A single linear layer projects h_last to a scalar. W has shape 1×d where d is the hidden dimension.',
+  output: 'The scalar r(x, y) is the reward. Higher for preferred samples, lower for dispreferred.'
+};
+
+function highlightArch(part) {
+  document.querySelectorAll('.arch-box').forEach(b => b.classList.remove('highlight'));
+  document.querySelector(`.arch-box[data-part="${part}"]`).classList.add('highlight');
+  document.getElementById('archDesc').textContent = archDescriptions[part];
+}
+
+// ============================================================
+// INTERACTIVE #5: RLHF PIPELINE
+// ============================================================
+
+const pipelineDescs = [
+  'Pre-training on massive text. The model learns language and facts.',
+  'Instruction tuning on (instruction, input, output) pairs. The model learns to follow instructions.',
+  'Sample multiple responses per prompt. These come from the current policy.',
+  'Human labelers rank the samples. We get pairwise preferences (y_w ≻ y_l).',
+  'Train the reward model on preferences using Bradley-Terry loss. It learns to predict human preference.',
+  'Use RL to maximize expected reward. The policy is updated; we can iterate.'
+];
+
+function setPipelineStep(step) {
+  for (let i = 0; i <= 5; i++) {
+    document.getElementById('pipe' + i).classList.toggle('active', i === step);
+  }
+  document.getElementById('pipeDesc').textContent = pipelineDescs[step];
+}
+
+setPipelineStep(0);
+
+// ============================================================
+// INTERACTIVE #6: KL DIVERGENCE EXPLORER
+// ============================================================
+
+function updateKLExplorer() {
+  const beta = parseFloat(document.getElementById('klBeta').value);
+  const reward = parseFloat(document.getElementById('klReward').value);
+  const kl = parseFloat(document.getElementById('klDiv').value);
+  document.getElementById('klBetaVal').textContent = beta.toFixed(2);
+  document.getElementById('klRewardVal').textContent = reward.toFixed(1);
+  document.getElementById('klDivVal').textContent = kl.toFixed(1);
+
+  const J = reward - beta * kl;
+  document.getElementById('klFormula').innerHTML = 'J = Reward − β·KL = ' + reward.toFixed(1) + ' − ' + beta.toFixed(2) + ' × ' + kl.toFixed(1) + ' = ' + J.toFixed(2);
+  document.getElementById('klResult').innerHTML = 'J = <span style="color:' + (J > 0 ? 'var(--accent3)' : 'var(--danger)') + ';">' + J.toFixed(2) + '</span>';
+
+  let interp = '';
+  if (kl > 5 && beta > 0.2) interp = 'High KL penalty: the policy has drifted far from the reference. The optimizer will pull it back.';
+  else if (J > 0) interp = 'Positive objective: reward outweighs the KL penalty. The update is favorable.';
+  else interp = 'Negative objective: the KL penalty dominates. The policy is too far from the reference.';
+  document.getElementById('klInterpret').textContent = interp;
+}
+
+document.getElementById('klBeta').addEventListener('input', updateKLExplorer);
+document.getElementById('klReward').addEventListener('input', updateKLExplorer);
+document.getElementById('klDiv').addEventListener('input', updateKLExplorer);
+updateKLExplorer();
+
+// ============================================================
+// PLAYGROUND: BEST-OF-N SAMPLING
+// ============================================================
+
+function runBestOfN() {
+  const N = 5;
+  const rewards = [];
+  for (let i = 0; i < N; i++) {
+    rewards.push(+(Math.random() * 8 - 2).toFixed(2));
+  }
+  const maxR = Math.max(...rewards);
+  const winnerIdx = rewards.indexOf(maxR);
+
+  const chart = document.getElementById('bestOfNChart');
+  chart.innerHTML = '';
+  const maxAbs = Math.max(...rewards.map(Math.abs), 1);
+
+  rewards.forEach((r, i) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bar-wrapper';
+    const value = document.createElement('div');
+    value.className = 'bar-value';
+    value.textContent = r;
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const hPct = Math.max(((r + 5) / 10) * 100, 5);
+    bar.style.height = hPct + '%';
+    bar.style.background = i === winnerIdx ? '#34d399' : '#6c8cff';
+    const label = document.createElement('div');
+    label.className = 'bar-label';
+    label.textContent = 'Y' + (i + 1);
+    wrapper.appendChild(value);
+    wrapper.appendChild(bar);
+    wrapper.appendChild(label);
+    chart.appendChild(wrapper);
+  });
+
+  document.getElementById('bestOfNResult').innerHTML = 'Winner: <strong style="color:var(--accent3);">Y' + (winnerIdx + 1) + '</strong> with reward ' + maxR + '. Best-of-N requires ' + N + ' decoding passes — expensive at scale.';
+}
+
+// ============================================================
+// PLAYGROUND: SIGMOID EXPLORER
+// ============================================================
+
+function updateSigExplorer() {
+  const rw = parseFloat(document.getElementById('sigRw').value) || 0;
+  const rl = parseFloat(document.getElementById('sigRl').value) || 0;
+  const diff = rw - rl;
+  const prob = 1 / (1 + Math.exp(-diff));
+  const loss = -Math.log(prob);
+
+  document.getElementById('sigResult').innerHTML = `
+    <div class="card card-alt">
+      <p style="margin-bottom:8px;">P(y_w ≻ y_l) = σ(${rw} − ${rl}) = σ(${diff.toFixed(2)}) = <strong style="color:var(--accent3);">${(prob * 100).toFixed(1)}%</strong></p>
+      <p style="margin-bottom:0;">Loss = −log(σ) = <strong style="color:var(--accent);">${loss.toFixed(4)}</strong></p>
+    </div>
+  `;
+}
+
+document.getElementById('sigRw').addEventListener('input', updateSigExplorer);
+document.getElementById('sigRl').addEventListener('input', updateSigExplorer);
+updateSigExplorer();
+
+// ============================================================
+// INTERVIEW QUESTIONS: hint / reveal
+// ============================================================
+function toggleHint(id) {
+  var el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('visible');
+}
+function reveal(id) {
+  var el = document.getElementById(id + '-answer');
+  if (el) el.classList.add('visible');
+}
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+</body>
+</html>

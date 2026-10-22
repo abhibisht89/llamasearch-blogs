@@ -1,0 +1,2361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Encoding Position — From Integers to Rotary Embeddings</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3, .interactive-panel h4 { margin-bottom: 16px; }
+
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value { font-size: 0.7rem; font-family: var(--mono); color: var(--text); text-align: center; margin-bottom: 4px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-pos { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); font-size: 0.75rem; }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+canvas { border-radius: var(--radius); display: block; }
+
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); display: inline-block; margin-left: 8px; }
+
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { background: rgba(251,191,36,0.08); border-left-color: var(--accent5); }
+.callout.ok { background: rgba(52,211,153,0.08); border-left-color: var(--accent3); }
+
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q { font-weight: 700; color: var(--accent); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+}
+.flow-arrow { font-size: 1.2rem; color: var(--text-dim); padding: 4px 0; }
+
+.nav {
+  position: fixed;
+  top: 44px;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+
+.breadcrumb-nav{position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(10,10,15,.92);backdrop-filter:blur(12px);padding:12px 24px;font-size:.85rem;border-bottom:1px solid #2a2a3a}
+.breadcrumb-nav a{color:#6c8cff;text-decoration:none}.breadcrumb-nav a:hover{text-decoration:underline}
+.breadcrumb-nav .bc-sep{margin:0 8px;color:#555}.breadcrumb-nav .bc-current{color:#8888a0}
+body{padding-top:44px!important}
+
+.heatmap{display:grid;gap:3px;margin:16px 0}
+.heatmap-cell{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.72rem;border-radius:4px;min-height:38px;transition:background .3s}
+.matrix-table{border-collapse:collapse;font-family:var(--mono);font-size:.82rem;margin:16px 0;width:100%}
+.matrix-table td,.matrix-table th{padding:8px 10px;border:1px solid var(--border);text-align:center}
+.matrix-table th{background:var(--bg-card-alt);color:var(--accent)}
+.output-readout{font-family:var(--mono);font-size:.82rem;color:var(--text);margin-top:12px;background:var(--bg-card-alt);padding:14px;border-radius:8px;white-space:pre-wrap;line-height:1.5}
+.ctrl{font-size:.85rem;color:var(--text-dim);display:block;margin:10px 0 4px}
+.demo-canvas{width:100%;max-width:600px;margin:12px auto;display:block;background:var(--bg-card-alt);border-radius:var(--radius)}
+.vec-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-family:var(--mono);font-size:.82rem}
+.vec-label{width:80px;color:var(--accent);text-align:right;flex-shrink:0}
+.vec-bar-wrap{flex:1;height:22px;background:var(--bg-card-alt);border-radius:4px;overflow:hidden}
+.vec-bar{height:100%;border-radius:4px;transition:width .4s}
+.timeline{position:relative;padding-left:28px;margin:24px 0}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--border)}
+.timeline-item{position:relative;margin-bottom:20px}
+.timeline-item::before{content:'';position:absolute;left:-24px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.bit-grid{display:grid;gap:4px;font-family:var(--mono);font-size:.75rem}
+.bit-cell{padding:8px;border-radius:4px;text-align:center;border:1px solid var(--border)}
+.bit-0{background:rgba(136,136,160,0.1);color:var(--text-dim)}
+.bit-1{background:rgba(108,140,255,0.2);color:var(--accent)}
+ol.content-list{color:var(--text-dim);margin:0 0 1em 1.5em;line-height:2}
+ol.content-list li{margin-bottom:0.3em}
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+}
+
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+
+<nav class="breadcrumb-nav">
+<a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span>
+<a href="../../">Learning Blogs</a><span class="bc-sep">›</span>
+<a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span>
+<span class="bc-current">Encoding Position</span>
+</nav>
+
+<nav class="nav" id="nav">
+<a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Encoding Position</a>
+<div class="nav-links">
+<a href="#s0">Why?</a><a href="#s1">Integer</a><a href="#s2">Binary</a><a href="#s3">Sinusoidal</a>
+<a href="#s4">Sin &amp; Cos</a><a href="#s5">RoPE</a><a href="#s6">Intuition</a>
+<a href="#s7">Comparison</a><a href="#s8">Playground</a><a href="#s9">Deep Dive</a>
+</div>
+</nav>
+
+<!-- HERO -->
+<header class="hero" id="top">
+<div class="container">
+<p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 06</p>
+<h1>Encoding Position</h1>
+<p class="subtitle">From Integers to Rotary Embeddings — integer, binary, and sinusoidal encodings through to the rotation mathematics behind RoPE in DeepSeek.</p>
+<div class="stats">
+<div class="stat"><span class="stat-val">4</span><span class="stat-label">Encoding Types</span></div>
+<div class="stat"><span class="stat-val">9</span><span class="stat-label">Interactive Demos</span></div>
+<div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+</div>
+<p style="color:var(--text-dim);font-size:.9rem;max-width:720px;margin:0 auto">
+Transformers have no built-in sense of order. Attention treats every token as an unordered set — which is catastrophic when the same word appears twice in different roles.
+This chapter covers integer encodings, binary encodings, sinusoidal encodings from <em>Attention Is All You Need</em>, and Rotary Positional Embeddings (RoPE) — the encoding DeepSeek couples with Multi-Head Latent Attention.
+</p>
+
+<p style="color:var(--text-dim);font-size:.85rem;max-width:720px;margin:16px auto 0;">
+<strong style="color:var(--text)">Prerequisites:</strong> Chapter 02 (Attention Mechanism) and Chapter 03 (Multi-Head Attention).
+You should understand Q/K/V projections and dot-product attention before starting here.
+<strong style="color:var(--text)">Outcome:</strong> After this chapter you will understand every term in the DeepSeek-V2 section 2.1.3 "Decoupled Rotary Position Embedding" — and why RoPE rotates queries and keys instead of adding to token embeddings.
+</p>
+</div>
+</header>
+<!-- SECTION 0 -->
+<section class="section fade-in" id="s0">
+<div class="container">
+<span class="section-num">00</span>
+<h2>Why Positional Encodings Exist</h2>
+
+<p>
+DeepSeek's <strong>Decoupled Rotary Position Embedding</strong> combines Multi-Head Latent Attention (MLA) with Rotary Positional Encoding (RoPE).
+DeepSeek-V2 section 2.1.3 introduces this design; DeepSeek-V3 and DeepSeek-R1 use MLA with RoPE by default.
+Positional encodings are the prerequisite for understanding that mechanism.
+</p>
+
+<p>
+The reason positional encodings matter is simple and profound: <strong>the position at which a word appears in a sentence is critical to its meaning.</strong>
+As we saw in Chapter 2 with the "dog chased dog" example, word order is crucial for meaning — without positional encoding, identical tokens at different positions receive identical representations, and the model cannot distinguish their roles.
+</p>
+
+<div class="callout">
+<p><strong>Empirical check:</strong> With only token embeddings and no positional information, self-attention produces identical context vectors for the same token regardless of position — unacceptable for language understanding.</p>
+</div>
+
+<div class="flow">
+<div class="flow-step">Input text → Tokenizer → Token Embeddings</div>
+<div class="flow-arrow">↓</div>
+<div class="flow-step" style="border-color:var(--accent5);background:rgba(251,191,36,0.08);">+ Positional Embeddings → Input Embeddings</div>
+<div class="flow-arrow">↓</div>
+<div class="flow-step">Transformer Block(s) → Context Vectors → Next Token</div>
+</div>
+
+<p>
+Positional embeddings are added to token embeddings in the input block before the Transformer sees anything.
+The question is: <strong>how do we construct those positional embedding vectors?</strong>
+This chapter progresses integer → binary → sinusoidal → rotary.
+</p>
+
+<h3>First Principles: How Would You Encode Position?</h3>
+
+<p>
+Consider the design problem: each token has a token embedding vector capturing word meaning.
+You need a positional embedding vector of the same dimension to add to each token embedding.
+How do you encode "this is position 200" vs "this is position 203"?
+</p>
+
+<p>
+The most natural first attempt: use the integer 200 itself. Repeat it across all dimensions.
+This works for distinguishing positions but fails on magnitude.
+The second attempt: binary-encode 200 as [1,1,0,0,1,0,0,0]. Bounded, but discontinuous.
+The third attempt: replace binary oscillation with smooth sine/cosine waves. Continuous, but added to token embeddings.
+The fourth attempt: rotate Q/K vectors using the same frequencies. Magnitude preserved, semantics untouched.
+Each step solves the previous step's problem while preserving its insights.
+</p>
+
+<p>
+Each step explains a design choice in DeepSeek's decoupled RoPE: <em>why</em> rotation over addition, <em>why</em> Q/K rather than token embeddings, and <em>why</em> the 10000<sup>2i/d</sup> frequency structure.
+</p>
+
+<div class="timeline">
+<div class="timeline-item"><span class="tag tag-blue">Step 1</span> Integer positional encoding — simple but magnitude problems</div>
+<div class="timeline-item"><span class="tag tag-purple">Step 2</span> Binary positional encoding — bounded but discontinuous</div>
+<div class="timeline-item"><span class="tag tag-green">Step 3</span> Sinusoidal encoding — smooth, differentiable, rotation-ready</div>
+<div class="timeline-item"><span class="tag tag-pink">Step 4</span> Rotary (RoPE) — rotate Q/K, preserve magnitude, no token pollution</div>
+</div>
+
+<div class="qa-box">
+<div class="q">A common question is: are positional encoding and positional embedding the same thing?</div>
+<p>Yes — the terms are used interchangeably in the literature and in the DeepSeek papers. Both refer to the mechanism for injecting position information into the model. "Encoding" emphasizes the functional transformation; "embedding" emphasizes the vector representation. This chapter uses both terms as equivalent.</p>
+</div>
+</div>
+</section>
+<!-- SECTION 1 -->
+<section class="section fade-in" id="s1">
+<div class="container">
+<span class="section-num">01</span>
+<h2>Integer Positional Encoding</h2>
+
+<p>
+The simplest idea is the most natural: encode position by using the position number itself.
+If "dog" appears at position 200 in the context, create a positional encoding vector where every dimension equals 200.
+If the embedding dimension is 8, the positional vector is:
+</p>
+
+<div class="formula">PE<sub>dog₁</sub> = [200, 200, 200, 200, 200, 200, 200, 200]</div>
+
+<p>
+For the sentence "the dog chased another dog" starting at position 200 in a long context:
+</p>
+
+<div class="card">
+<table class="matrix-table">
+<tr><th>Token</th><th>Position</th><th>Positional Encoding Vector (d=8)</th></tr>
+<tr><td>the</td><td>199</td><td>[199, 199, 199, 199, 199, 199, 199, 199]</td></tr>
+<tr><td>dog (1st)</td><td>200</td><td>[200, 200, 200, 200, 200, 200, 200, 200]</td></tr>
+<tr><td>chased</td><td>201</td><td>[201, 201, 201, 201, 201, 201, 201, 201]</td></tr>
+<tr><td>another</td><td>202</td><td>[202, 202, 202, 202, 202, 202, 202, 202]</td></tr>
+<tr><td>dog (2nd)</td><td>203</td><td>[203, 203, 203, 203, 203, 203, 203, 203]</td></tr>
+</table>
+</div>
+
+<p>
+This achieves the primary goal: the first dog gets [200,…,200] and the second dog gets [203,…,203].
+Their input embeddings (token + position) are now different.
+The Transformer can tell them apart — but magnitude problems remain.
+</p>
+
+<h3>The Magnitude Problem</h3>
+
+<p>
+Token embedding values in large language models are initialized to be <strong>clustered around zero</strong> — typically small values like 0.1, −0.05, 0.08.
+They encode semantic meaning: similar words (kitten, cat) lie close together in vector space; dissimilar words (kitten, airplane) lie far apart.
+When we add positional encodings, we must not destroy this carefully learned structure.
+</p>
+
+<p>
+But integer positional values can be enormous.
+With a context length of 1024, positional values reach 1024.
+When you add a token embedding value of 0.12 to a positional value of 200, the sum is 200.12.
+The positional component contributes over <strong>99.9%</strong> of the input embedding.
+The semantic information from the token embedding is almost completely drowned out.
+</p>
+
+<p>
+Consider a numerical example across the full input embedding vector.
+Suppose the token embedding for "dog" is [0.12, −0.08, 0.15, 0.03, −0.11, 0.09, 0.07, −0.05].
+The integer positional encoding at position 200 is [200, 200, 200, 200, 200, 200, 200, 200].
+The input embedding (sum) is [200.12, 199.92, 200.15, 200.03, 199.89, 200.09, 200.07, 199.95].
+If you compute cosine similarity between the input embeddings of "dog" at position 200 and "cat" at position 200, the token embedding difference (0.12 vs whatever cat's values are) is invisible compared to the shared 200 offset.
+All words at the same position look nearly identical in input embedding space — the position number swamps the word identity.
+</p>
+
+<div class="callout warn">
+<p><strong>The pollution problem:</strong> Adding very large positional values to very small token embedding values causes the positional information to dominate and dilute the semantic information captured by token embeddings.
+Token embeddings encode semantics — we want that information retained when entering the Transformer block.
+Integer encoding fails this requirement catastrophically at scale.</p>
+</div>
+
+<p>
+Ideally, positional encoding values should be <strong>constrained</strong> — hopefully between 0 and 1, or at least comparable in magnitude to token embeddings.
+That constraint leads us to the next idea: represent positions in binary.
+</p>
+
+<div class="interactive-panel">
+<h4>Interactive · Integer Encoding Magnitude Pollution</h4>
+<p style="color:var(--text-dim);font-size:0.9rem;margin-bottom:16px;">Slide the position value. Watch how positional encoding overwhelms the tiny token embedding.</p>
+<label class="ctrl">Position value: <span id="intPosVal" class="slider-value">200</span></label>
+<input type="range" id="intPosSlider" min="1" max="1024" value="200">
+<canvas class="demo-canvas" id="intCanvas" width="560" height="260"></canvas>
+<div class="output-readout" id="intReadout"></div>
+</div>
+
+<div class="qa-box">
+<div class="q">A common question is: why not just divide the integer by the context length to normalize it?</div>
+<p>Normalization helps with magnitude but does not solve the deeper problems that binary, sinusoidal, and rotary encodings address: structured oscillation across dimensions, differentiability, and relative position relationships.
+Integer encoding — even normalized — treats every dimension identically, wasting the representational capacity of a high-dimensional vector.</p>
+</div>
+</div>
+</section>
+
+<!-- SECTION 2: BINARY -->
+<section class="section fade-in" id="s2">
+<div class="container">
+<span class="section-num">02</span>
+<h2>Binary Positional Encoding</h2>
+
+<p>
+Integers are unbounded — they can take arbitrarily large values.
+If we want positional encoding values constrained between 0 and 1, why not represent every position as a <strong>binary number</strong>?
+Each bit is either 0 or 1, naturally bounded.
+If the embedding dimension is 8, we use an 8-bit binary representation.
+</p>
+
+<p>
+Position 200 in binary (8 bits) is <code>11001000</code>.
+Position 201 is <code>11001001</code>.
+Position 203 (the second "dog") is <code>11001011</code>.
+The positional encoding vectors are now:
+</p>
+
+<div class="formula">PE(200) = [1, 1, 0, 0, 1, 0, 0, 0] &nbsp;&nbsp; PE(203) = [1, 1, 0, 0, 1, 0, 1, 1]</div>
+
+<p>
+Every value is 0 or 1 — the same order of magnitude as token embedding values.
+Different positions produce different vectors.
+The magnitude problem from integer encoding is solved.
+</p>
+
+<h3>Two Variables: Position and Index</h3>
+
+<p>
+Binary encoding introduces a crucial conceptual framework with <strong>two variables</strong>:
+</p>
+
+<ol class="content-list">
+<li><strong style="color:var(--text)">Position</strong> — where the token sits in the sequence (x-axis: 64, 65, 66, …)</li>
+<li><strong style="color:var(--text)">Index</strong> — which dimension of the encoding vector (y-axis: 1 through 8)</li>
+</ol>
+
+<p>
+Within each position, we have index numbers 1 through 8.
+Index 1 is the <strong>Least Significant Bit (LSB)</strong> — it changes fastest.
+Index 8 is the <strong>Most Significant Bit (MSB)</strong> — it changes slowest.
+This same position/index framework appears in sinusoidal and rotary encodings.
+</p>
+
+<h3>Oscillation Frequency Across Indexes</h3>
+
+<p>
+Consider positions 64 through 75. Watch how each index behaves:
+</p>
+
+<div class="card">
+<table class="matrix-table">
+<tr><th>Index</th><th>Oscillation Period</th><th>Behavior (positions 64–75)</th></tr>
+<tr><td>1 (LSB)</td><td>Every 1 position</td><td>Flips 0→1→0 with every new position</td></tr>
+<tr><td>2</td><td>Every 2 positions</td><td>Same for 2 positions, then flips</td></tr>
+<tr><td>3</td><td>Every 4 positions</td><td>Same for 4 positions, then flips</td></tr>
+<tr><td>4</td><td>Every 8 positions</td><td>Same for 8 positions, then flips</td></tr>
+<tr><td>5</td><td>Every 16 positions</td><td>No change visible in 64–75 range</td></tr>
+<tr><td>6</td><td>Every 32 positions</td><td>No change visible in 64–75 range</td></tr>
+<tr><td>7</td><td>Every 64 positions</td><td>No change visible in 64–75 range</td></tr>
+<tr><td>8 (MSB)</td><td>Every 128 positions</td><td>Constant across 64–75</td></tr>
+</table>
+</div>
+
+<p>
+The pattern is geometric: index <em>k</em> oscillates every 2<sup><em>k</em>−1</sup> positions.
+If you plot oscillation frequency versus index, lower indexes have the highest frequency; higher indexes have progressively lower frequency.
+</p>
+
+<div class="callout ok">
+<p><strong>Key insight — fine vs. coarse encoding:</strong>
+<strong>Lower indexes</strong> change more frequently → <em>fine-grained encoding</em> — they capture fast changes among nearby positions.
+<strong>Higher indexes</strong> change less frequently → <em>coarse encoding</em> — they capture broad-level positional structure, not minute shifts.</p>
+</div>
+
+<p>
+When two identical words appear close together (spaced 3–4 positions apart), their positional difference is mostly captured by lower indexes because those indexes oscillate fast enough to distinguish nearby positions.
+Higher indexes remain unchanged for small position shifts.
+</p>
+
+<h3>The Discontinuity Problem</h3>
+
+<p>
+Binary encoding solved the magnitude problem but introduced a new one: <strong>discontinuities</strong>.
+Values jump abruptly between 0 and 1 — there is nothing in between.
+During pre-training, the optimizer must deal with these sharp jumps via backpropagation.
+Discontinuous functions make gradient-based optimization harder.
+</p>
+
+<div class="callout warn">
+<p><strong>What we want instead:</strong> the same oscillation structure as binary encoding — lower indexes changing fast, higher indexes changing slow — but with smooth, continuous values. That structure maps directly to sine and cosine functions.</p>
+</div>
+
+<h3>Reading the Position-Index Graph</h3>
+
+<p>
+The position-index graph maps position (x-axis) against encoding dimension (y-axis).
+</p>
+
+<p>
+<strong>Index 1 (bottom row):</strong> Checkerboard — 0, 1, 0, 1, alternating every column. Fastest oscillation.
+<strong>Index 2:</strong> Pairs: 0, 0, 1, 1, 0, 0, 1, 1. Period = 2.
+<strong>Index 3:</strong> Groups of 4. Period = 4.
+<strong>Index 4:</strong> Groups of 8. Period = 8.
+<strong>Indexes 5–8:</strong> Solid bands within the 64–75 window because periods (16, 32, 64, 128) exceed 12 positions shown.
+</p>
+
+<p>
+When you see the sinusoidal heatmap for GPT-2 (1024 positions × 768 indexes), the pattern is identical — smooth sine waves instead of sharp 0/1 bands.
+Row 1 oscillates rapidly; row 768 is nearly flat.
+Lower indexes oscillate fast (fine-grained); higher indexes oscillate slow (coarse-grained).
+Sinusoidal encoding makes this graph smooth; RoPE makes each cell value a rotation angle applied to Q/K pairs.
+</p>
+
+<div class="interactive-panel">
+<h4>Interactive · Binary Encoding Bit Patterns</h4>
+<p style="color:var(--text-dim);font-size:0.9rem;">Slide the starting position. Observe how LSB flips every position while MSB stays constant.</p>
+<label class="ctrl">Start position: <span id="binStartVal" class="slider-value">64</span></label>
+<input type="range" id="binStartSlider" min="0" max="200" value="64">
+<div class="bit-grid" id="binGrid"></div>
+<div class="output-readout" id="binReadout"></div>
+</div>
+
+<div class="interactive-panel">
+<h4>Interactive · Oscillation Frequency by Index</h4>
+<canvas class="demo-canvas" id="binFreqCanvas" width="560" height="300"></canvas>
+<p style="color:var(--text-dim);font-size:0.85rem;margin-top:12px;">Each bar width represents oscillation period. Index 1 (LSB) has the shortest period; index 8 (MSB) the longest.</p>
+</div>
+
+<div class="qa-box">
+<div class="q">A common question is: why does the oscillation period double at each index?</div>
+<p>Because binary counting works exactly this way. The least significant bit toggles every increment (period 1). The next bit toggles every 2 increments (period 2), then 4, 8, 16, and so on — each bit represents a power of 2. Sinusoidal encoding preserves this geometric frequency structure but replaces hard 0/1 jumps with smooth waves.</p>
+</div>
+
+<div class="qa-box">
+<div class="q">A common question is: can I use different embedding dimensions for binary encoding?</div>
+<p>Yes — the number of bits equals the embedding dimension d. With d=8 you represent positions 0–255. With d=16 you represent 0–65535. The oscillation period of index k is always 2<sup>k−1</sup> regardless of d. More dimensions give you more frequency bands — finer control over the multi-scale positional structure.</p>
+</div>
+
+<div class="qa-box">
+<div class="q">A common question is: what happens to binary encoding for positions larger than 2<sup>d</sup>−1?</div>
+<p>With d=8 bits, you can uniquely encode positions 0 through 255. Beyond 255, the binary representation wraps or requires more bits. This is another limitation of binary encoding — context length is bounded by embedding dimension. Sinusoidal encoding has no such hard bound; it cycles smoothly via sin/cos periodicity.</p>
+</div>
+</div>
+</section>
+
+<!-- SECTION 3: SINUSOIDAL -->
+<section class="section fade-in" id="s3">
+<div class="container">
+<span class="section-num">03</span>
+<h2>Sinusoidal Positional Encoding</h2>
+
+<p>
+Sinusoidal positional encodings solve the discontinuity problem of binary encoding.
+Instead of values that are either 0 or 1, every dimension takes a <strong>continuous real value between −1 and 1</strong>.
+The encoding is smooth, differentiable, and friendly to backpropagation.
+</p>
+
+<p>
+These encodings were introduced in the landmark paper <strong>"Attention Is All You Need"</strong> (Vaswani et al., 2017) — the paper that proposed the Transformer architecture and freed attention from recurrent neural networks.
+</p>
+
+<div class="formula">
+PE<sub>(pos, 2i)</sub> = sin(pos / 10000<sup>2i/d<sub>model</sub></sup>)<br><br>
+PE<sub>(pos, 2i+1)</sub> = cos(pos / 10000<sup>2i/d<sub>model</sub></sup>)
+</div>
+
+<p>
+Two variables govern every value:
+</p>
+
+<ul style="color:var(--text-dim);margin:0 0 1em 1.5em;line-height:2;">
+<li><strong style="color:var(--text)">pos</strong> — the position of the token (depends on context size)</li>
+<li><strong style="color:var(--text)">i</strong> — the pair index, from 0 to (d<sub>model</sub>/2 − 1)</li>
+</ul>
+
+<p>
+Even indices (0, 2, 4, …) use the <strong>sine</strong> formula.
+Odd indices (1, 3, 5, …) use the <strong>cosine</strong> formula.
+For a given position, you fill an entire d<sub>model</sub>-dimensional vector by applying these formulas at every index.
+</p>
+
+<h3>Concrete Walkthrough: GPT-2, Position 2</h3>
+
+<p>
+GPT-2 has d<sub>model</sub> = 768 and context size = 1024.
+Positions range from 0 to 1023 (or 1 to 1024 depending on convention).
+Index i ranges from 0 to 383 (since we have 768 dimensions in pairs).
+</p>
+
+<p>
+For <strong>position 2</strong>, we build a 768-dimensional vector.
+At <strong>i = 0</strong> (indices 0 and 1 of the vector):
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.88rem;color:var(--text);margin:0;">
+PE(2, 0) = sin(2 / 10000<sup>0/768</sup>) = sin(2 / 1) = sin(2) ≈ <strong>0.9093</strong><br>
+PE(2, 1) = cos(2 / 10000<sup>0/768</sup>) = cos(2 / 1) = cos(2) ≈ <strong>−0.4161</strong>
+</p>
+</div>
+
+<p>
+At <strong>i = 1</strong> (indices 2 and 3):
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.88rem;color:var(--text);margin:0;">
+PE(2, 2) = sin(2 / 10000<sup>2/768</sup>) = sin(2 / 10000<sup>0.00260</sup>) ≈ sin(2 / 1.061) ≈ <strong>0.9324</strong><br>
+PE(2, 3) = cos(2 / 10000<sup>2/768</sup>) ≈ cos(1.885) ≈ <strong>−0.3614</strong>
+</p>
+</div>
+
+<p>
+At <strong>i = 2</strong> (indices 4 and 5):
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.88rem;color:var(--text);margin:0;">
+10000<sup>4/768</sup> = 10000<sup>0.00521</sup> ≈ 1.127<br>
+PE(2, 4) = sin(2/1.127) = sin(1.775) ≈ <strong>0.9797</strong><br>
+PE(2, 5) = cos(1.775) ≈ <strong>−0.2004</strong>
+</p>
+</div>
+
+<p>
+At <strong>i = 10</strong> (indices 20 and 21) — mid-range index:
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.88rem;color:var(--text);margin:0;">
+10000<sup>20/768</sup> ≈ 10000<sup>0.026</sup> ≈ 1.82<br>
+PE(2, 20) = sin(2/1.82) = sin(1.099) ≈ <strong>0.8906</strong><br>
+PE(2, 21) = cos(1.099) ≈ <strong>0.4546</strong>
+</p>
+</div>
+
+<p>
+At <strong>i = 100</strong> (indices 200 and 201) — high index, slow oscillation:
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.88rem;color:var(--text);margin:0;">
+10000<sup>200/768</sup> ≈ 10000<sup>0.260</sup> ≈ 28.5<br>
+PE(2, 200) = sin(2/28.5) = sin(0.070) ≈ <strong>0.0700</strong><br>
+PE(2, 201) = cos(0.070) ≈ <strong>0.9975</strong>
+</p>
+</div>
+
+<p>
+Continue this for i = 2, 3, … up to i = 383 to fill all 768 values.
+The denominator 10000<sup>2i/d</sup> grows with i, so higher-index pairs oscillate more slowly across positions — exactly mirroring binary encoding's bit behavior.
+</p>
+
+<h3>Wavelength Calculations</h3>
+
+<p>
+The <strong>wavelength</strong> λ of index pair i is the number of positions before the sine wave completes one full cycle:
+</p>
+
+<div class="formula">λ<sub>i</sub> = 2π · 10000<sup>2i/d<sub>model</sub></sup> = 2π / ω<sub>i</sub></div>
+
+<p>
+For GPT-2 (d=768):
+</p>
+
+<div class="card">
+<table class="matrix-table">
+<tr><th>Index i</th><th>ω<sub>i</sub></th><th>Wavelength λ (positions)</th><th>Meaning</th></tr>
+<tr><td>0</td><td>1.0</td><td>≈ 6.28</td><td>Full cycle every ~6 positions</td></tr>
+<tr><td>1</td><td>0.0316</td><td>≈ 198.7</td><td>Full cycle every ~199 positions</td></tr>
+<tr><td>10</td><td>3.2×10<sup>−6</sup></td><td>≈ 1.96×10<sup>6</sup></td><td>Nearly constant across any context</td></tr>
+<tr><td>50</td><td>≈ 10<sup>−13</sup></td><td>≈ astronomical</td><td>Completely flat for i=50 at positions 1–1024</td></tr>
+</table>
+</div>
+
+<p>
+This confirms the binary encoding intuition numerically: i=0 captures changes every few positions; i=50 barely changes across the entire 1024-token context window.
+</p>
+
+<h3>Reading the Formula — Step by Step</h3>
+
+<p>
+To compute PE(pos, idx) for any model:
+</p>
+
+<ol class="content-list">
+<li>Fix the position <em>pos</em> (e.g., 2).</li>
+<li>You need a vector of length d<sub>model</sub> (e.g., 768).</li>
+<li>For each index idx from 0 to d<sub>model</sub>−1:</li>
+<li>&nbsp;&nbsp;If idx is even: compute pair index i = idx/2, apply sin(pos / 10000<sup>2i/d</sup>).</li>
+<li>&nbsp;&nbsp;If idx is odd: compute pair index i = (idx−1)/2, apply cos(pos / 10000<sup>2i/d</sup>).</li>
+<li>Fill all 768 (or d) values. Add vector to token embedding.</li>
+</ol>
+
+<p>
+The even/odd split is not arbitrary — even dimensions carry sine (y-coordinate), odd dimensions carry cosine (x-coordinate), forming rotation-ready pairs.
+</p>
+
+<h3>Why 10,000?</h3>
+
+<p>
+The base 10,000 is an <strong>experimental choice</strong>.
+Model dimensions are typically around 1,000 (768 for GPT-2, 4096 for LLaMA).
+The value 10,000 ensures that:
+</p>
+
+<ul style="color:var(--text-dim);margin:0 0 1em 1.5em;line-height:2;">
+<li>At i = 0, frequencies are very high (rapid oscillation)</li>
+<li>At i = 150, 200, 300, frequencies gradually die down</li>
+<li>At high i, waves become nearly flat across the context window</li>
+</ul>
+
+<p>
+Change 10,000 to a smaller number and high-index waves die too fast.
+Change it to a larger number and low-index waves oscillate too wildly.
+10,000 provides an empirically good balance.
+</p>
+
+<h3>Reframing as Frequency</h3>
+
+<p>
+The formula can be rewritten as:
+</p>
+
+<div class="formula">PE(pos, 2i) = sin(ω<sub>i</sub> · pos) &nbsp;&nbsp; where &nbsp;&nbsp; ω<sub>i</sub> = 1 / 10000<sup>2i/d<sub>model</sub></sup></div>
+
+<p>
+ω<sub>i</sub> is the <strong>frequency of oscillation</strong> for pair index i.
+Because i appears in the denominator of the exponent, lower i → higher ω → faster oscillation.
+Higher i → lower ω → slower oscillation.
+This is precisely why i must be in the denominator — not the numerator.
+If i were in the numerator (10000<sup>i</sup>), lower indexes would oscillate slower and higher indexes faster — the opposite of what we want and the opposite of binary encoding behavior.
+</p>
+
+<p>
+<strong>Why not put i in the numerator?</strong> Consider what would happen with PE(pos, 2i) = sin(pos × 10000<sup>2i/d</sup>).
+At i=0: frequency = 1 (same as correct formula).
+At i=1: frequency = 10000<sup>2/768</sup> ≈ 1.06 — barely different from i=0.
+At i=10: frequency = 10000<sup>20/768</sup> ≈ 28 — still moderate.
+All indexes would oscillate at roughly similar rates — losing the multi-scale structure.
+The denominator placement creates the geometric frequency spread that mirrors binary bit periods (1, 2, 4, 8, 16, …).
+</p>
+
+<h3>From the Attention Is All You Need Paper</h3>
+
+<p>
+The original paper describes the motivation tersely in three paragraphs.
+The core requirement: <em>"Since our model contains no recurrence and no convolution, in order for the model to make use of the order of the sequence, we must inject some information about the relative or absolute position of the tokens in the sequence."</em>
+</p>
+
+<p>
+They note that learned positional embeddings were also tested and performed nearly identically to sinusoidal encodings.
+They chose sinusoidal because it <em>"may allow the model to extrapolate to sequence lengths longer than the ones encountered during training."</em>
+This extrapolation property — encoding positions beyond the training context via a fixed formula — remains valuable today, though RoPE has largely superseded direct sinusoidal addition in production LLMs.
+</p>
+
+<h3>Verification: Same Intuition as Binary</h3>
+
+<p>
+Plot PE values for index 1, 50, and 150 across all 1024 positions.
+Index 1 oscillates extremely rapidly — flipping nearly every position.
+Index 50 oscillates moderately.
+Index 150 is nearly flat across the entire context.
+This matches binary encoding's LSB/MSB behavior exactly, but with smooth curves instead of discrete jumps.
+</p>
+
+<p>
+To verify numerically, compare PE(64, idx=1) vs PE(65, idx=1) for GPT-2:
+PE(64, 1) = cos(64) ≈ 0.1768, PE(65, 1) = cos(65) ≈ −0.3460 — a large flip.
+Compare PE(64, idx=150) vs PE(65, idx=150):
+The denominator 10000<sup>300/768</sup> ≈ 10000<sup>0.391</sup> ≈ 39.2, so angles are 64/39.2 ≈ 1.633 and 65/39.2 ≈ 1.658 — nearly identical.
+This is exactly the binary behavior: index 1 flips every position, index corresponding to i=75 would not flip between 64 and 65.
+</p>
+
+<h3>Advantages Over Binary Encoding</h3>
+
+<p>
+Sinusoidal encoding preserves everything good about binary encoding while fixing its fatal flaw:
+</p>
+
+<div class="comparison">
+<div class="card">
+<h3>Binary</h3>
+<p>Lower indexes oscillate fast ✓</p>
+<p>Higher indexes oscillate slow ✓</p>
+<p>Values bounded [0,1] ✓</p>
+<p>Continuous / differentiable ✗</p>
+<p>Backprop-friendly ✗</p>
+</div>
+<div class="card">
+<h3>Sinusoidal</h3>
+<p>Lower indexes oscillate fast ✓</p>
+<p>Higher indexes oscillate slow ✓</p>
+<p>Values bounded [−1,1] ✓</p>
+<p>Continuous / differentiable ✓</p>
+<p>Backprop-friendly ✓</p>
+</div>
+</div>
+
+<p>
+When the original Transformer paper was released, sinusoidal encoding became the standard for years.
+BERT (2018) switched to learned positional embeddings.
+GPT-2 (2019) used learned embeddings.
+But the mathematical insight from sinusoidal encoding — multi-frequency structure, rotation relationships — directly enabled RoPE, which LLaMA (2023) and DeepSeek (2024) adopted.
+</p>
+
+<div class="interactive-panel">
+<h4>Interactive · Sinusoidal Wave Explorer</h4>
+<label class="ctrl">Fixed index (1–768): <span id="sinIdxVal" class="slider-value">1</span></label>
+<input type="range" id="sinIdxSlider" min="1" max="768" value="1">
+<label class="ctrl">Highlight position: <span id="sinPosHighlight" class="slider-value">2</span></label>
+<input type="range" id="sinPosSlider" min="1" max="1024" value="2">
+<canvas class="demo-canvas" id="sinCanvas" width="560" height="200"></canvas>
+<div class="output-readout" id="sinReadout"></div>
+</div>
+
+<div class="interactive-panel">
+<h4>Interactive · Multi-Index Comparison (GPT-2 d=768)</h4>
+<canvas class="demo-canvas" id="multiIdxCanvas" width="560" height="220"></canvas>
+<p style="color:var(--text-dim);font-size:0.85rem;margin-top:8px;">Pink = index 1 (fastest), green = index 50, yellow = index 150 (slowest) — first 200 positions shown.</p>
+</div>
+
+</div>
+</section>
+
+<!-- SECTION 4: SIN AND COS -->
+<section class="section fade-in" id="s4">
+<div class="container">
+<span class="section-num">04</span>
+<h2>Why Sine and Cosine? The Rotation Property</h2>
+
+<p>
+One property unlocks the sin/cos formula's purpose: <strong>relative positional encodings are rotations of each other.</strong>
+Understanding this property is the bridge to Rotary Positional Embeddings (RoPE).
+</p>
+
+<h3>The Desired Property: Linear Relation Between Positions</h3>
+
+<p>
+When constructing positional encodings, we want a <strong>linear mathematical relationship</strong> between encoded positions.
+If we know the encoding at position p, it should be straightforward to compute the encoding at position p + k.
+Why? Because the Transformer learns positional patterns more easily when positions are mathematically related.
+</p>
+
+<h3>Visual Proof with i = 0</h3>
+
+<p>
+Fix pair index i = 0 and position p.
+Define θ = p / 10000<sup>2×0/d</sup> = p / 10000<sup>0</sup> = p.
+At this pair:
+</p>
+
+<div class="formula">
+y₁ = PE(p, index 2) = sin(θ) &nbsp;&nbsp;|&nbsp;&nbsp; x₁ = PE(p, index 3) = cos(θ)
+</div>
+
+<p>
+Geometrically, (x₁, y₁) is a point on the unit circle at angle θ.
+The vector v₁ = (x₁, y₁) represents the positional encoding for position p at this index pair.
+</p>
+
+<p>
+<strong>Concrete example at p = 5, d = 512:</strong>
+θ = 5 / 10000<sup>0/512</sup> = 5 radians.
+x₁ = cos(5) ≈ 0.2837, y₁ = sin(5) ≈ −0.9589.
+The point (0.2837, −0.9589) lies on the unit circle at angle 5 rad ≈ 286.5°.
+</p>
+
+<p>
+Now we want encodings at position <strong>p + k</strong>.
+Define θ₁ = ω × k where ω = 1/10000<sup>2i/d</sup>.
+For i = 0: ω = 1, so θ₁ = k.
+By the angle addition formulas:
+</p>
+
+<div class="formula">
+sin(θ + θ₁) = sin(θ)cos(θ₁) + cos(θ)sin(θ₁)<br>
+cos(θ + θ₁) = cos(θ)cos(θ₁) − sin(θ)sin(θ₁)
+</div>
+
+<p>
+The new values are:
+</p>
+
+<div class="formula">
+y₂ = sin(θ + θ₁) = PE(p+k, index 2) &nbsp;&nbsp;|&nbsp;&nbsp; x₂ = cos(θ + θ₁) = PE(p+k, index 3)
+</div>
+
+<p>
+Geometrically, v₂ is just <strong>v₁ rotated by angle θ₁ = ω·k</strong>.
+To find positional encodings at position p + k, rotate the vector at position p by ω·k radians.
+No re-computation from scratch — just rotation.
+</p>
+
+<p>
+<strong>Numerical verification:</strong> p = 5, k = 3, so p+k = 8.
+θ = 5, θ₁ = 3, θ + θ₁ = 8.
+y₂ = sin(8) ≈ −0.9894, x₂ = cos(8) ≈ −0.1455.
+Direct computation: sin(8) ≈ −0.9894 ✓, cos(8) ≈ −0.1455 ✓.
+Rotation and direct evaluation match exactly.
+</p>
+
+<p>
+<strong>Matrix form:</strong> The rotation is equivalent to:
+</p>
+
+<div class="formula">
+[x₂]   [cos(θ₁)  −sin(θ₁)] [x₁]<br>
+[y₂] = [sin(θ₁)   cos(θ₁)] [y₁]
+</div>
+
+<p>
+Substituting x₁ = cos(5), y₁ = sin(5), θ₁ = 3:
+x₂ = cos(5)cos(3) − sin(5)sin(3) = cos(5+3) = cos(8) ✓
+y₂ = sin(5)cos(3) + cos(5)sin(3) = sin(5+3) = sin(8) ✓
+This is the standard rotation matrix — the same matrix RoPE applies to Q/K pairs.
+</p>
+
+<div class="callout ok">
+<p><strong>This is why we need BOTH sin and cos:</strong> Rotation in 2D requires both coordinates.
+Sin alone cannot rotate a vector — you need cos for the x-component and sin for the y-component.
+Alternate even/odd indices as sin/cos precisely because relative positional encodings must be rotations of each other.</p>
+</div>
+
+<h3>Relative Position Through Rotation</h3>
+
+<p>
+v₁ and v₂ are rotations of each other.
+Given encoding at one position, find encoding at another by rotation.
+Relative position k maps to a <strong>fixed angular difference</strong> ω·k — predictable and learnable by attention patterns.
+Rotations ensure relative shifts translate into fixed angular differences, which the Transformer can learn during training.
+</p>
+
+<div class="interactive-panel">
+<h4>Interactive · Rotation for Relative Position</h4>
+<label class="ctrl">Base position p: <span id="rotPVal" class="slider-value">10</span></label>
+<input type="range" id="rotPSlider" min="1" max="100" value="10">
+<label class="ctrl">Shift k (relative distance): <span id="rotKVal" class="slider-value">5</span></label>
+<input type="range" id="rotKSlider" min="1" max="50" value="5">
+<canvas class="demo-canvas" id="rotCanvas" width="560" height="280"></canvas>
+<div class="output-readout" id="rotReadout"></div>
+</div>
+
+<h3>Limitations of Sinusoidal Encoding</h3>
+
+<p>
+Despite its elegance, sinusoidal encoding has a critical flaw: <strong>positional embeddings are added directly to token embeddings</strong> in the input block.
+Even though sinusoidal values lie in [−1, 1], addition still modifies the token embedding vector.
+Semantic information carried by token embeddings gets polluted before the Transformer block.
+</p>
+
+<h3>Where Each Encoding Is Applied in the Architecture</h3>
+
+<p>
+Understanding <em>where</em> positional information enters the model is as important as understanding <em>how</em> it is encoded:
+</p>
+
+<div class="flow">
+<div class="flow-step" style="border-color:var(--accent5);">Input Block: Token Embedding + Positional Encoding → Input Embedding</div>
+<div class="flow-arrow">↓ (integer, binary, sinusoidal all apply here)</div>
+<div class="flow-step">Layer Norm → Multi-Head Attention (Q, K, V projections)</div>
+<div class="flow-arrow">↓ (RoPE applies here — rotates Q and K after projection)</div>
+<div class="flow-step">Attention Scores = softmax(Q·K<sup>T</sup>/√d) → Context Vectors</div>
+</div>
+
+<p>
+<strong>Sinusoidal path:</strong> Token emb. + PE → input emb. → Q/K/V all derived from position-contaminated input.
+Every downstream computation inherits the pollution.
+<strong>RoPE path:</strong> Token emb. → input emb. (clean) → Q/K projections (clean) → RoPE rotation on Q/K → attention.
+Token semantics preserved. Position injected only where it matters for attention scoring.
+</p>
+
+<p>
+The attention mechanism is where positional information matters most — queries and keys determine which tokens attend to which.
+So two questions arise:
+</p>
+
+<ol class="content-list">
+<li>Why add positional information to token embeddings? Why not augment <strong>Q and K vectors</strong> inside attention instead?</li>
+<li>Why <strong>add</strong> a positional vector (changing magnitude)? Why not <strong>rotate</strong> the vector (preserving magnitude)?</li>
+</ol>
+
+<p>
+These two insights — apply encoding in Q/K, use rotation not addition — lead directly to RoPE.
+</p>
+
+<div class="comparison">
+<div class="card">
+<h3>Sinusoidal (2017)</h3>
+<p>Add PE to token embeddings in input block. Semantic pollution. Magnitude changes. Used in original Transformer.</p>
+</div>
+<div class="card">
+<h3>RoPE (2021+)</h3>
+<p>Rotate Q and K in attention block. Token embeddings untouched. Magnitude preserved. Used in LLaMA, DeepSeek, Mistral.</p>
+</div>
+</div>
+
+<p>
+The transition from sinusoidal addition to RoPE rotation is the last major innovation in positional encoding before DeepSeek's decoupled variant.
+</p>
+</div>
+</section>
+
+<!-- SECTION 5: ROPE -->
+<section class="section fade-in" id="s5">
+<div class="container">
+<span class="section-num">05</span>
+<h2>Rotary Positional Encoding (RoPE)</h2>
+
+<p>
+Rotary Positional Encoding (RoPE), introduced in the RoFormer paper (2021) and widely adopted by LLaMA, DeepSeek, and modern LLMs, applies the sinusoidal frequency formula — but instead of adding to token embeddings, it <strong>rotates query and key vectors</strong> inside the attention mechanism.
+</p>
+
+<h3>The Two Core Ideas</h3>
+
+<div class="flow">
+<div class="flow-step" style="border-color:var(--accent);">Apply positional encoding in Q and K — not in token embeddings</div>
+<div class="flow-arrow">↓</div>
+<div class="flow-step" style="border-color:var(--accent3);">Rotate vectors instead of adding — preserve magnitude</div>
+</div>
+
+<p>
+Consider the sentence "the dog chased another dog" with 5 tokens.
+Each token has a 4-dimensional query vector (for demonstration; real models use hundreds of dimensions).
+For the first token "the" at position 1 with query vector [x₁, x₂, x₃, x₄]:
+</p>
+
+<h3>Step-by-Step: RoPE on a 4-Dimensional Query</h3>
+
+<p><strong>Step 1 — Form pairs.</strong> Split the vector into groups of 2:</p>
+
+<div class="comparison">
+<div class="card">
+<h3>Group 1 (i=0)</h3>
+<p>Vector (x₁, x₂) — first two dimensions</p>
+</div>
+<div class="card">
+<h3>Group 2 (i=1)</h3>
+<p>Vector (x₃, x₄) — next two dimensions</p>
+</div>
+</div>
+
+<p><strong>Step 2 — Compute rotation angle.</strong> For each group i at position p:</p>
+
+<div class="formula">θ<sub>i</sub> = p × ω<sub>i</sub> &nbsp;&nbsp; where &nbsp;&nbsp; ω<sub>i</sub> = 1 / 10000<sup>2i/d</sup></div>
+
+<p>
+For position p = 1, d = 4:
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.88rem;color:var(--text);margin:0;">
+Group 1 (i=0): θ₀ = 1 × (1/10000<sup>0/4</sup>) = 1 × 1 = <strong>1.0 rad</strong> (≈ 57.3°)<br>
+Group 2 (i=1): θ₁ = 1 × (1/10000<sup>2/4</sup>) = 1 × (1/100) = <strong>0.01 rad</strong> (≈ 0.57°)
+</p>
+</div>
+
+<p><strong>Step 3 — Apply rotation matrix.</strong> For group (x₁, x₂) rotated by θ₀:</p>
+
+<div class="formula">
+[x₁']   [cos θ₀  −sin θ₀] [x₁]<br>
+[x₂'] = [sin θ₀   cos θ₀] [x₂]
+</div>
+
+<p>
+Concrete example with x₁ = 0.8, x₂ = 0.5, θ₀ = 1.0 rad:
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.88rem;color:var(--text);margin:0;">
+x₁' = 0.8·cos(1.0) − 0.5·sin(1.0) = 0.8×0.5403 − 0.5×0.8415 = <strong>0.0117</strong><br>
+x₂' = 0.8·sin(1.0) + 0.5·cos(1.0) = 0.8×0.8415 + 0.5×0.5403 = <strong>0.9435</strong><br>
+|original| = √(0.8² + 0.5²) = <strong>0.9434</strong><br>
+|rotated| = √(0.0117² + 0.9435²) = <strong>0.9434</strong> ✓ magnitude preserved
+</p>
+</div>
+
+<p>
+Repeat for group (x₃, x₄) with θ₁ = 0.01 rad.
+The RoPE-encoded query vector is [x₁', x₂', x₃', x₄'].
+The same operation applies to key vectors.
+Token embeddings are never modified.
+</p>
+
+<h3>Full RoPE Walkthrough: All Five Tokens</h3>
+
+<p>
+Apply RoPE to every token in "the dog chased another dog" with d=4.
+Original query vectors (illustrative values):
+</p>
+
+<div class="card">
+<table class="matrix-table">
+<tr><th>Token</th><th>p</th><th>Q original</th><th>θ₀</th><th>θ₁</th><th>Q after RoPE</th></tr>
+<tr><td>the</td><td>1</td><td>[0.50, 0.30, 0.70, 0.20]</td><td>1.000</td><td>0.010</td><td>[0.02, 0.58, 0.70, 0.21]</td></tr>
+<tr><td>dog₁</td><td>2</td><td>[0.60, 0.40, 0.50, 0.30]</td><td>2.000</td><td>0.020</td><td>[−0.49, 0.45, 0.49, 0.31]</td></tr>
+<tr><td>chased</td><td>3</td><td>[0.30, 0.80, 0.40, 0.60]</td><td>3.000</td><td>0.030</td><td>[−0.89, 0.08, 0.38, 0.61]</td></tr>
+<tr><td>another</td><td>4</td><td>[0.40, 0.50, 0.60, 0.40]</td><td>4.000</td><td>0.040</td><td>[−0.49, −0.09, 0.58, 0.42]</td></tr>
+<tr><td>dog₂</td><td>5</td><td>[0.60, 0.40, 0.50, 0.30]</td><td>5.000</td><td>0.050</td><td>[−0.43, −0.47, 0.48, 0.33]</td></tr>
+</table>
+</div>
+
+<p>
+Note that dog₁ (p=2) and dog₂ (p=5) have identical original query vectors [0.60, 0.40, 0.50, 0.30] but <strong>different RoPE-encoded vectors</strong> because their rotation angles differ.
+This is exactly what we need — same word, different position, different attention behavior.
+</p>
+
+<p>
+<strong>Detailed calculation for dog₁ (p=2):</strong> Group 1: (0.60, 0.40), θ₀ = 2.0 rad.
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.85rem;color:var(--text);line-height:1.8;margin:0;">
+x₁' = 0.60·cos(2.0) − 0.40·sin(2.0) = 0.60×(−0.4161) − 0.40×0.9093 = −0.2497 − 0.3637 = −0.6134<br>
+x₂' = 0.60·sin(2.0) + 0.40·cos(2.0) = 0.60×0.9093 + 0.40×(−0.4161) = 0.5456 − 0.1664 = 0.3792<br>
+|before| = √(0.60² + 0.40²) = 0.7211<br>
+|after|  = √(0.6134² + 0.3792²) = 0.7211 ✓
+</p>
+</div>
+
+<p>
+<strong>Detailed calculation for dog₂ (p=5):</strong> Same original vector, but θ₀ = 5.0 rad.
+</p>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.85rem;color:var(--text);line-height:1.8;margin:0;">
+x₁' = 0.60·cos(5.0) − 0.40·sin(5.0) = 0.60×0.2837 − 0.40×(−0.9589) = 0.1702 + 0.3836 = 0.5538<br>
+x₂' = 0.60·sin(5.0) + 0.40·cos(5.0) = 0.60×(−0.9589) + 0.40×0.2837 = −0.5753 + 0.1135 = −0.4618<br>
+|after|  = 0.7211 ✓ (same magnitude, different direction)
+</p>
+</div>
+
+<p>
+The two dogs now have clearly distinct Q vectors after RoPE, enabling the attention mechanism to treat them differently despite identical token embeddings and identical pre-RoPE query projections.
+</p>
+
+<h3>RoPE Rotation Matrix (General Form)</h3>
+
+<div class="formula">
+R<sub>i</sub>(θ<sub>i</sub>) = [ cos θ<sub>i</sub>  −sin θ<sub>i</sub> ]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ sin θ<sub>i</sub>   cos θ<sub>i</sub> ]<br><br>
+[x<sub>2i</sub>']   = R<sub>i</sub>(p · ω<sub>i</sub>) [x<sub>2i</sub>  ]<br>
+[x<sub>2i+1</sub>']                    [x<sub>2i+1</sub>]
+</div>
+
+<p>
+For a d-dimensional vector, apply d/2 independent 2×2 rotation matrices, each with its own frequency ω<sub>i</sub>.
+The full RoPE operation is block-diagonal: rotations do not mix across pairs.
+</p>
+
+<div class="interactive-panel">
+<h4>Interactive · RoPE 2D Rotation</h4>
+<label class="ctrl">Position p: <span id="ropePosVal" class="slider-value">1</span></label>
+<input type="range" id="ropePosSlider" min="1" max="20" value="1">
+<label class="ctrl">Pair index i: <span id="ropePairVal" class="slider-value">0</span></label>
+<input type="range" id="ropePairSlider" min="0" max="1" value="0">
+<canvas class="demo-canvas" id="ropeCanvas" width="560" height="260"></canvas>
+<div class="output-readout" id="ropeReadout"></div>
+</div>
+
+<div class="interactive-panel">
+<h4>Interactive · RoPE Across All Tokens</h4>
+<canvas class="demo-canvas" id="ropeAllCanvas" width="560" height="200"></canvas>
+<p style="color:var(--text-dim);font-size:0.85rem;margin-top:8px;">Higher position → larger rotation angle θ. Same formula as sinusoidal — applied as rotation, not addition.</p>
+</div>
+
+<div class="callout ok">
+<p><strong>RoPE advantages over sinusoidal:</strong> (1) Token embeddings pass unfiltered — no semantic pollution. (2) Vector magnitude unchanged — only direction changes. (3) Applied where position matters — in Q·K attention scores. (4) Same frequency structure as binary/sinusoidal — lower pairs rotate fast, higher pairs rotate slow.</p>
+</div>
+</div>
+</section>
+
+<!-- SECTION 6: ROPE INTUITION -->
+<section class="section fade-in" id="s6">
+<div class="container">
+<span class="section-num">06</span>
+<h2>RoPE Intuition: Frequency, Distance, and Context</h2>
+
+<h3>Effect of Position: Higher Positions → Larger Rotations</h3>
+
+<p>
+θ = ω<sub>i</sub> × p varies <strong>directly</strong> with position.
+Fix any index i and increase position: the rotation angle grows.
+Token at position 1 rotates slightly; token at position 100 rotates much more.
+</p>
+
+<p>
+<strong>Closer tokens have similar positional encodings</strong> because their p values are nearby, giving similar θ.
+<strong>Distant tokens have different encodings</strong> because their p values differ substantially.
+This matches linguistic intuition: nearby words are more likely related; distant words less so.
+</p>
+
+<p>
+The RoFormer paper proves a <strong>long-term decay property</strong>: the inner product ⟨R(q,m), R(k,n)⟩ decays as relative distance |m−n| increases.
+Tokens far apart naturally receive lower attention scores — without explicit distance masking.
+</p>
+
+<div class="interactive-panel">
+<h4>Interactive · Relative Position Dot Product</h4>
+<label class="ctrl">Query position p₁: <span id="dotP1Val" class="slider-value">3</span></label>
+<input type="range" id="dotP1Slider" min="1" max="30" value="3">
+<label class="ctrl">Key position p₂: <span id="dotP2Val" class="slider-value">8</span></label>
+<input type="range" id="dotP2Slider" min="1" max="30" value="8">
+<canvas class="demo-canvas" id="dotCanvas" width="560" height="240"></canvas>
+<div class="output-readout" id="dotReadout"></div>
+</div>
+
+<h3>Effect of Index: Lower Indexes Change Fast, Higher Indexes Change Slow</h3>
+
+<p>
+The same conclusion from binary and sinusoidal encoding applies to RoPE rotation angles:
+</p>
+
+<div class="comparison">
+<div class="card">
+<h3>Lower index (i=0)</h3>
+<p>ω is large → θ changes rapidly with position → <strong>high frequency</strong> → captures small positional shifts</p>
+</div>
+<div class="card">
+<h3>Higher index (i=383)</h3>
+<p>ω is tiny → θ barely changes with position → <strong>low frequency</strong> → captures long-range dependencies</p>
+</div>
+</div>
+
+<h3>Lower Indexes: Capturing Small Shifts in Meaning</h3>
+
+<p>
+Compare two sentences that differ only in word order:
+</p>
+
+<div class="token-row">
+<span class="token token-word">I</span><span class="token token-highlight">just</span><span class="token token-word">told</span><span class="token token-word">her</span><span class="token token-word">the</span><span class="token token-word">truth</span>
+</div>
+<p style="font-size:0.85rem;color:var(--text-dim);">"I <em>just</em> told her the truth" — recently, with respect to time. "just" at position 2.</p>
+
+<div class="token-row">
+<span class="token token-word">I</span><span class="token token-word">told</span><span class="token token-highlight">just</span><span class="token token-word">her</span><span class="token token-word">the</span><span class="token token-word">the</span><span class="token token-word">truth</span>
+</div>
+<p style="font-size:0.85rem;color:var(--text-dim);">"I told <em>just</em> her the truth" — only her, among all people. "just" at position 3.</p>
+
+<p>
+"told" moves from position 3 to position 2 — a shift of one position that completely changes meaning.
+Lower-index fast oscillations capture this: even a 1-position shift produces a noticeably different rotation angle in low-index pairs.
+At i=0, position 2 gives θ = 2.0 rad while position 3 gives θ = 3.0 rad — a difference of 1 full radian, which significantly changes the rotated Q/K vectors.
+</p>
+
+<h3>Higher Indexes: Capturing Long-Range Dependencies</h3>
+
+<p>
+Consider a longer passage:
+</p>
+
+<div class="token-row">
+<span class="token token-word">Einstein</span><span class="token token-word">developed</span><span class="token token-word">the</span><span class="token token-word">theory</span><span class="token token-word">of</span><span class="token token-word">relativity</span><span class="token token-word">.</span><span class="token token-highlight">This</span><span class="token token-word">breakthrough</span><span class="token token-word">reshaped</span><span class="token token-word">physics</span><span class="token token-word">.</span>
+</div>
+
+<p>
+"This breakthrough" at positions 8–9 refers to "the theory of relativity" at positions 3–6.
+At higher index pairs, rotation angles change so slowly that distant positions produce nearly identical high-index values — a signal for long-range coreference.
+Lower indexes would oscillate wildly over the same span, destroying any stable similarity signal.
+</p>
+
+<h3>Position vs Index: The Two-Axis Intuition Grid</h3>
+
+<p>
+Rows are index pairs; columns are positions. Each cell holds θ = p · ω<sub>i</sub>.
+Moving right increases θ — faster in upper rows (low i), slower in lower rows (high i).
+Moving down decreases oscillation rate; diagonal neighbors differ more at low i than high i.
+This is the same position-index heatmap from binary encoding, with rotation angles instead of 0/1 bits.
+</p>
+
+<div class="callout">
+<p><strong>The complete picture:</strong> RoPE bakes in multi-scale positional structure. Lower index pairs = fast rotation = fine-grained local position sensitivity. Higher index pairs = slow rotation = coarse long-range relationship preservation. Higher absolute positions = larger rotation = natural distance encoding. All without touching token embeddings.</p>
+</div>
+
+<div class="qa-box">
+<div class="q">A common question is: why do higher positions lead to larger rotations?</div>
+<p>Because words closer together in a sentence are more likely to be syntactically or semantically related. Similar rotation angles for nearby positions means similar Q/K representations, which means higher attention scores. Distant words get very different rotations, naturally reducing their attention connection — the long-term decay property.</p>
+</div>
+</div>
+</section>
+
+<!-- SECTION 7: COMPARISON -->
+<section class="section fade-in" id="s7">
+<div class="container">
+<span class="section-num">07</span>
+<h2>The Complete Journey: Four Encodings Compared</h2>
+
+<div class="card" style="overflow-x:auto;">
+<table class="matrix-table">
+<tr>
+<th>Encoding</th><th>Values</th><th>Magnitude</th><th>Continuous?</th><th>Where Applied</th><th>Relative Position?</th><th>Used Today?</th>
+</tr>
+<tr>
+<td><strong>Integer</strong></td><td>pos repeated d times</td><td>Unbounded (0–1024+)</td><td>Yes, but wrong scale</td><td>Added to token emb.</td><td>No structure</td><td>No</td>
+</tr>
+<tr>
+<td><strong>Binary</strong></td><td>0 or 1 per bit</td><td>Bounded [0,1]</td><td>No (discontinuous)</td><td>Added to token emb.</td><td>Implicit via bits</td><td>No</td>
+</tr>
+<tr>
+<td><strong>Sinusoidal</strong></td><td>sin/cos in [−1,1]</td><td>Bounded [−1,1]</td><td>Yes (smooth)</td><td>Added to token emb.</td><td>Yes (rotation)</td><td>Rarely (original Transformer)</td>
+</tr>
+<tr>
+<td><strong>RoPE</strong></td><td>Rotation angles</td><td>Preserved exactly</td><td>Yes (smooth)</td><td>Rotates Q and K</td><td>Yes (rotation + dot product)</td><td>Yes (LLaMA, DeepSeek, Mistral)</td>
+</tr>
+</table>
+</div>
+
+<h3 style="margin-top:32px;">The Research Timeline</h3>
+
+<div class="timeline">
+<div class="timeline-item"><span class="tag tag-blue">2017</span> <strong>Attention Is All You Need</strong> — sinusoidal positional encoding, Transformer architecture</div>
+<div class="timeline-item"><span class="tag tag-purple">2021</span> <strong>RoFormer</strong> — Rotary Positional Encoding (RoPE) derived from sinusoidal formula</div>
+<div class="timeline-item"><span class="tag tag-green">2023+</span> <strong>LLaMA, Mistral, DeepSeek</strong> — RoPE becomes standard in modern LLMs</div>
+<div class="timeline-item"><span class="tag tag-pink">2024</span> <strong>DeepSeek-V2</strong> — Decoupled RoPE combined with Multi-Head Latent Attention</div>
+</div>
+
+<h3 style="margin-top:32px;">Why DeepSeek Needs RoPE</h3>
+
+<p>
+DeepSeek's Multi-Head Latent Attention (MLA) compresses the KV cache by projecting keys and values into a lower-dimensional latent space.
+The basic MLA version does not include positional information.
+DeepSeek-V2 section 2.1.3 introduces <strong>Decoupled Rotary Position Embedding</strong> — MLA coupled with RoPE — creating a much more powerful attention mechanism.
+DeepSeek-V3 and DeepSeek-R1 use this by default.
+</p>
+
+<p>
+The DeepSeek-V2 paper describes the motivation clearly: standard MLA without RoPE cannot distinguish tokens at different positions within the compressed latent space.
+Adding RoPE to the query and key projections in the MLA pathway restores positional sensitivity while maintaining the cache compression benefits.
+The "decoupled" aspect refers to separating the RoPE application in the query pathway from the key-value latent compression pathway — covered in the next chapter.
+</p>
+
+<h3 style="margin-top:32px;">Encoding Evolution — Design Decisions at Each Step</h3>
+
+<p>
+Each encoding type solved a specific problem while revealing the next:
+</p>
+
+<div class="card">
+<p style="margin-bottom:12px;"><strong style="color:var(--accent);">Integer → Binary:</strong> bound values to [0,1]; reveals multi-frequency oscillation structure.</p>
+<p style="margin-bottom:12px;"><strong style="color:var(--accent2);">Binary → Sinusoidal:</strong> replace discontinuous 0/1 with sin/cos waves; reveals rotation between positions.</p>
+<p style="margin-bottom:12px;"><strong style="color:var(--accent3);">Sinusoidal → RoPE:</strong> rotate Q/K instead of adding to embeddings; relative position in dot products.</p>
+<p style="margin-bottom:0;"><strong style="color:var(--accent4);">RoPE → DeepSeek Decoupled RoPE:</strong> decouple RoPE across MLA's query and latent KV pathways.</p>
+</div>
+
+<h3 style="margin-top:32px;">Modern LLM Positional Encoding Landscape (2024–2025)</h3>
+
+<div class="card">
+<table class="matrix-table">
+<tr><th>Model</th><th>Positional Encoding</th><th>Notes</th></tr>
+<tr><td>Original Transformer (2017)</td><td>Sinusoidal (fixed)</td><td>Added to input embeddings</td></tr>
+<tr><td>BERT (2018)</td><td>Learned</td><td>Position table, max 512 tokens</td></tr>
+<tr><td>GPT-2/3 (2019–2020)</td><td>Learned</td><td>Position table, max 1024–2048 tokens</td></tr>
+<tr><td>LLaMA (2023)</td><td>RoPE</td><td>Rotation on Q/K, scales to 4096+ tokens</td></tr>
+<tr><td>Mistral (2023)</td><td>RoPE</td><td>With sliding window attention</td></tr>
+<tr><td>DeepSeek-V2 (2024)</td><td>Decoupled RoPE + MLA</td><td>Section 2.1.3</td></tr>
+<tr><td>DeepSeek-V3/R1 (2025)</td><td>Decoupled RoPE + MLA</td><td>Default in production models</td></tr>
+</table>
+</div>
+
+<p>
+The industry converged on RoPE because it solves all four problems simultaneously: bounded values, continuous/differentiable, relative position structure, and no token embedding pollution.
+DeepSeek's innovation was making RoPE work with compressed latent attention — not replacing RoPE, but adapting the architecture around it.
+</p>
+
+<div class="callout ok">
+<p><strong>Next chapter:</strong> how DeepSeek integrates Multi-Head Latent Attention with RoPE, why traditional MLA does not mix cleanly with RoPE, and what architectural changes DeepSeek made to combine them.</p>
+</div>
+</div>
+</section>
+
+<!-- SECTION 8: PLAYGROUND -->
+<section class="section fade-in" id="s8">
+<div class="container">
+<span class="section-num">08</span>
+<h2>Playground — Explore Positional Encodings</h2>
+
+<p>
+Adjust position, index, and model dimension. Switch between sinusoidal values and RoPE rotation mode.
+The bar chart shows the first 16 dimensions of the positional encoding vector at your chosen position.
+</p>
+
+<div class="interactive-panel">
+<label class="ctrl">Mode</label>
+<select id="pgMode" class="text-input" style="max-width:300px;margin-bottom:16px;">
+<option value="sinusoidal">Sinusoidal PE (values)</option>
+<option value="rope">RoPE (rotation on pair)</option>
+</select>
+<label class="ctrl">Position: <span id="pgPosVal" class="slider-value">2</span></label>
+<input type="range" id="pgPosSlider" min="1" max="1024" value="2">
+<label class="ctrl">Index: <span id="pgIdxVal" class="slider-value">1</span></label>
+<input type="range" id="pgIdxSlider" min="1" max="768" value="1">
+<label class="ctrl">d_model: <span id="pgDimVal" class="slider-value">768</span></label>
+<input type="range" id="pgDimSlider" min="8" max="768" step="8" value="768">
+<div id="pgVec"></div>
+<div class="output-readout" id="pgReadout"></div>
+</div>
+</div>
+</section>
+
+<!-- SECTION 9: DEEP DIVE -->
+<section class="section fade-in" id="s9">
+<div class="container">
+<span class="section-num">09</span>
+<h2>Deep Dive — Full Mathematical Reference</h2>
+
+<p>
+This section collects every formula, worked example, and proof from the chapter in one place.
+Use it as a reference when implementing positional encodings or reading the DeepSeek architecture papers.
+</p>
+
+<h3>Integer Encoding — Complete Specification</h3>
+<p>
+Given token at position <em>pos</em> and embedding dimension <em>d</em>:
+</p>
+<div class="formula">PE<sub>integer</sub>(pos) = [pos, pos, pos, …, pos] &nbsp; (d copies)</div>
+<p>
+Input embedding: <strong>e</strong> = token_embedding + PE<sub>integer</sub>(pos).
+<strong>Problem:</strong> |PE| ≈ context_length while |token_embedding| ≈ 0.1, so semantics are drowned out.
+</p>
+
+<h3>Binary Encoding — Complete Specification</h3>
+<p>
+Convert pos to binary with d bits: pos = Σ b<sub>j</sub> · 2<sup>j</sup> where b<sub>j</sub> ∈ {0, 1}.
+</p>
+<div class="formula">PE<sub>binary</sub>(pos)[j] = b<sub>d−1−j</sub> &nbsp; for j = 0, …, d−1</div>
+<p>
+Oscillation period of index j: T(j) = 2<sup>j</sup> positions.
+<strong>Problem:</strong> discontinuous at every bit flip — gradient-unfriendly during pre-training.
+</p>
+
+<h3>Sinusoidal Encoding — Complete Specification</h3>
+<div class="formula">
+PE(pos, 2i) = sin(pos · ω<sub>i</sub>)<br>
+PE(pos, 2i+1) = cos(pos · ω<sub>i</sub>)<br>
+ω<sub>i</sub> = 1 / 10000<sup>2i/d<sub>model</sub></sup>
+</div>
+
+<h3>Worked Example: All Pairs at Position 2, d=8</h3>
+<p>For d=8 we have 4 index pairs (i = 0, 1, 2, 3):</p>
+<div class="card">
+<table class="matrix-table">
+<tr><th>i</th><th>ω<sub>i</sub></th><th>θ at pos=2</th><th>PE(2,2i) = sin</th><th>PE(2,2i+1) = cos</th></tr>
+<tr><td>0</td><td>1.0000</td><td>2.0000</td><td>0.9093</td><td>−0.4161</td></tr>
+<tr><td>1</td><td>0.1000</td><td>0.2000</td><td>0.1987</td><td>0.9801</td></tr>
+<tr><td>2</td><td>0.0100</td><td>0.0200</td><td>0.0200</td><td>0.9998</td></tr>
+<tr><td>3</td><td>0.0010</td><td>0.0020</td><td>0.0020</td><td>1.0000</td></tr>
+</table>
+</div>
+<p>
+At i=0, position 2 produces a substantial angle (2 radians). At i=3, the angle is tiny (0.002 rad) — the encoding barely changes between nearby positions at this index pair.
+</p>
+
+<h3>Worked Example: GPT-2 at Position 2, Selected Indices</h3>
+<p>For d=768, position 2, selected index pairs:</p>
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.85rem;color:var(--text);line-height:1.8;margin:0;">
+i=0:   ω=1.000000,  PE(2,0)=sin(2.000)=0.909297,  PE(2,1)=cos(2.000)=−0.416147<br>
+i=1:   ω=0.031623,  PE(2,2)=sin(0.063)=0.062870,  PE(2,3)=cos(0.063)=0.998022<br>
+i=50:  ω=0.000045,  PE(2,100)=sin(0.000090)≈0.000090, PE(2,101)=cos(0.000090)≈1.000000<br>
+i=191: ω≈10<sup>−12</sup>, essentially flat across entire context window
+</p>
+</div>
+
+<h3>Rotation Matrix — Complete Specification</h3>
+<div class="formula">
+R(θ) = [ cos θ  −sin θ ]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ sin θ   cos θ ]<br><br>
+[x'] = R(θ) [x]<br>
+[y']         [y]
+</div>
+<p>
+RoPE applies R(θ<sub>i</sub>) to each pair (x<sub>2i</sub>, x<sub>2i+1</sub>) where θ<sub>i</sub> = pos · ω<sub>i</sub>.
+</p>
+
+<h3>RoPE Full Walkthrough: 5 Tokens, d=4</h3>
+<p>Sentence: "the dog chased another dog". Query vectors (simplified):</p>
+<div class="card">
+<table class="matrix-table">
+<tr><th>Token</th><th>Position p</th><th>Original Q</th><th>θ₀=p×1.0</th><th>θ₁=p×0.01</th></tr>
+<tr><td>the</td><td>1</td><td>[0.5, 0.3, 0.7, 0.2]</td><td>1.000 rad</td><td>0.010 rad</td></tr>
+<tr><td>dog</td><td>2</td><td>[0.6, 0.4, 0.5, 0.3]</td><td>2.000 rad</td><td>0.020 rad</td></tr>
+<tr><td>chased</td><td>3</td><td>[0.3, 0.8, 0.4, 0.6]</td><td>3.000 rad</td><td>0.030 rad</td></tr>
+<tr><td>another</td><td>4</td><td>[0.4, 0.5, 0.6, 0.4]</td><td>4.000 rad</td><td>0.040 rad</td></tr>
+<tr><td>dog</td><td>5</td><td>[0.6, 0.4, 0.5, 0.3]</td><td>5.000 rad</td><td>0.050 rad</td></tr>
+</table>
+</div>
+
+<p><strong>Detailed rotation for "the" (p=1):</strong> Group 1: (0.5, 0.3), θ₀=1.0 rad.</p>
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.85rem;color:var(--text);line-height:1.8;margin:0;">
+x₁' = 0.5·cos(1.0) − 0.3·sin(1.0) = 0.5×0.5403 − 0.3×0.8415 = 0.2702 − 0.2525 = 0.0177<br>
+x₂' = 0.5·sin(1.0) + 0.3·cos(1.0) = 0.5×0.8415 + 0.3×0.5403 = 0.4208 + 0.1621 = 0.5829<br>
+|before| = √(0.5² + 0.3²) = 0.5831<br>
+|after|  = √(0.0177² + 0.5829²) = 0.5831 ✓
+</p>
+</div>
+
+<p><strong>Group 2 for "the":</strong> (0.7, 0.2), θ₁=0.01 rad.</p>
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.85rem;color:var(--text);line-height:1.8;margin:0;">
+x₃' = 0.7·cos(0.01) − 0.2·sin(0.01) = 0.699930 − 0.002000 = 0.697930<br>
+x₄' = 0.7·sin(0.01) + 0.2·cos(0.01) = 0.007000 + 0.199990 = 0.206990<br>
+|before| = √(0.7² + 0.2²) = 0.7280<br>
+|after|  = 0.7280 ✓
+</p>
+</div>
+
+<h3>Relative Position Property — Full Proof</h3>
+<p>
+<strong>Claim:</strong> ⟨R(q, m), R(k, n)⟩ depends only on (m − n), not on m and n individually.
+</p>
+<p>
+<strong>Proof sketch:</strong> RoPE rotates pair j of query at position m by θ<sub>j</sub><sup>(m)</sup> = m·ω<sub>j</sub> and pair j of key at position n by θ<sub>j</sub><sup>(n)</sup> = n·ω<sub>j</sub>.
+The dot product of rotated pairs involves cos(θ<sub>j</sub><sup>(m)</sup> − θ<sub>j</sub><sup>(n)</sup>) = cos((m−n)·ω<sub>j</sub>).
+Summing across all pairs, the total attention score depends on relative distance (m−n) only.
+This is the <strong>relative position property</strong> that makes RoPE so effective in attention.
+</p>
+
+<div class="callout ok">
+<p><strong>Long-term decay:</strong> As |m−n| increases, cos((m−n)·ω<sub>j</sub>) oscillates but the aggregate dot product tends to decay for well-separated pairs — matching the linguistic prior that distant tokens should have weaker direct connections.</p>
+</div>
+
+<h3>Angle Addition — Connecting Sinusoidal to RoPE</h3>
+<p>
+The bridge between sinusoidal addition and RoPE rotation:
+</p>
+<div class="formula">
+sin(θ + φ) = sin θ cos φ + cos θ sin φ<br>
+cos(θ + φ) = cos θ cos φ − sin θ sin φ
+</div>
+<p>
+These are exactly the entries of the 2×2 rotation matrix R(φ) applied to vector (cos θ, sin θ).
+Sinusoidal encoding stores (cos θ, sin θ) as consecutive dimensions.
+RoPE applies R(φ) directly to (x, y) pairs in Q and K.
+Same mathematics — different application point in the architecture.
+</p>
+
+<h3>Implementation Notes (PyTorch-style)</h3>
+<div class="card card-alt">
+<pre style="font-family:var(--mono);font-size:0.82rem;color:var(--text);overflow-x:auto;line-height:1.6;margin:0;">
+# Sinusoidal positional encoding (Attention Is All You Need)
+def sinusoidal_pe(seq_len, d_model):
+    pe = torch.zeros(seq_len, d_model)
+    position = torch.arange(seq_len).unsqueeze(1).float()
+    div_term = torch.exp(torch.arange(0, d_model, 2).float()
+                       * (-math.log(10000.0) / d_model))
+    pe[:, 0::2] = torch.sin(position * div_term)
+    pe[:, 1::2] = torch.cos(position * div_term)
+    return pe  # add to token embeddings
+
+# RoPE (applied to Q and K, not token embeddings)
+def apply_rope(x, position, d_model):
+    # x: (batch, seq, d_model), position: (seq,)
+    for i in range(0, d_model, 2):
+        pair_idx = i // 2
+        freq = 1.0 / (10000 ** (2 * pair_idx / d_model))
+        theta = position * freq
+        x_i, x_i1 = x[..., i], x[..., i+1]
+        x[..., i]   = x_i * cos(theta) - x_i1 * sin(theta)
+        x[..., i+1] = x_i * sin(theta) + x_i1 * cos(theta)
+    return x
+</pre>
+</div>
+
+<h3>Attention Is All You Need — Paper Context</h3>
+
+<p>
+The 2017 paper by Vaswani et al. introduced two revolutionary ideas simultaneously: the Transformer architecture (encoder-decoder with self-attention, no RNN) and sinusoidal positional encoding.
+Until this paper, attention mechanisms were always coupled with recurrent neural networks.
+The Transformer freed attention from sequential processing — but that freedom came at a cost: attention is permutation-invariant.
+Without positional encoding, shuffling input tokens would not change the output.
+Sinusoidal encoding was the authors' solution — fixed, deterministic, and extrapolatable beyond training context length.
+</p>
+
+<p>
+The paper's exact wording on positional encoding: <em>"We inject some information about the relative or absolute position of the tokens in the sequence."</em>
+They chose sinusoidal over learned embeddings because learned embeddings would be limited to the maximum sequence length encountered during training.
+Sinusoidal encodings, being a deterministic function of position, can theoretically extend to any sequence length — a property that became critical as context windows grew from 512 to 128K tokens.
+</p>
+
+<h3>RoFormer Paper — Long-Term Decay Property</h3>
+
+<p>
+The RoFormer paper (Su et al., 2021) introduced RoPE and proved a key property:
+the inner product ⟨R(q,m), R(k,n)⟩ decays as relative distance |m−n| increases (for most frequency pairs).
+They state: <em>"A pair of tokens with a long relative distance should have less connection."</em>
+This aligns with linguistic intuition — words far apart in a document are less likely to have direct syntactic or semantic dependencies than nearby words.
+RoPE encodes this prior directly into the attention mechanism's geometry.
+</p>
+
+<h3>Frequency Spectrum Summary for d=768</h3>
+
+<div class="card">
+<table class="matrix-table">
+<tr><th>Pair index i</th><th>ω<sub>i</sub></th><th>Wavelength (positions)</th><th>Role</th></tr>
+<tr><td>0</td><td>1.0</td><td>~6.3</td><td>Adjacent token discrimination</td></tr>
+<tr><td>1</td><td>0.032</td><td>~199</td><td>Phrase-level structure</td></tr>
+<tr><td>10</td><td>3.2×10<sup>−6</sup></td><td>~2×10<sup>6</sup></td><td>Paragraph-level (flat in any context)</td></tr>
+<tr><td>50</td><td>~10<sup>−13</sup></td><td>Astronomical</td><td>Document-level constant</td></tr>
+<tr><td>191</td><td>~10<sup>−50</sup></td><td>Effectively ∞</td><td>Global position anchor</td></tr>
+</table>
+</div>
+
+<p>
+Every modern LLM using RoPE — LLaMA, Mistral, DeepSeek — uses this same frequency spectrum.
+The 10000 base and the 2i/d exponent are hyperparameters inherited from the 2017 Transformer paper.
+Changing them would shift the balance between local and global positional sensitivity.
+</p>
+
+<h3>Extended Worked Example: RoPE at Positions 1–5, d=4, i=0</h3>
+
+<p>
+Complete rotation angles and matrix entries for the first pair (i=0) across five token positions:
+</p>
+
+<div class="card">
+<table class="matrix-table">
+<tr><th>Position p</th><th>ω₀</th><th>θ₀ = p·ω₀</th><th>cos(θ₀)</th><th>sin(θ₀)</th><th>Degrees</th></tr>
+<tr><td>1</td><td>1.0</td><td>1.0000</td><td>0.5403</td><td>0.8415</td><td>57.3°</td></tr>
+<tr><td>2</td><td>1.0</td><td>2.0000</td><td>−0.4161</td><td>0.9093</td><td>114.6°</td></tr>
+<tr><td>3</td><td>1.0</td><td>3.0000</td><td>−0.9900</td><td>0.1411</td><td>171.9°</td></tr>
+<tr><td>4</td><td>1.0</td><td>4.0000</td><td>−0.6536</td><td>−0.7568</td><td>229.2°</td></tr>
+<tr><td>5</td><td>1.0</td><td>5.0000</td><td>0.2837</td><td>−0.9589</td><td>286.5°</td></tr>
+</table>
+</div>
+
+<p>
+For pair i=1 (second group), ω₁ = 1/10000<sup>2/4</sup> = 1/100 = 0.01:
+</p>
+
+<div class="card">
+<table class="matrix-table">
+<tr><th>Position p</th><th>θ₁ = p·0.01</th><th>cos(θ₁)</th><th>sin(θ₁)</th><th>Notes</th></tr>
+<tr><td>1</td><td>0.0100</td><td>0.999950</td><td>0.010000</td><td>~1° rotation</td></tr>
+<tr><td>2</td><td>0.0200</td><td>0.999800</td><td>0.020000</td><td>~1.1° rotation</td></tr>
+<tr><td>5</td><td>0.0500</td><td>0.998750</td><td>0.050000</td><td>~2.9° rotation</td></tr>
+<tr><td>10</td><td>0.1000</td><td>0.995004</td><td>0.099833</td><td>~5.7° rotation</td></tr>
+<tr><td>100</td><td>1.0000</td><td>0.540302</td><td>0.841471</td><td>~57.3° rotation</td></tr>
+</table>
+</div>
+
+<p>
+At i=0, every position increment adds ~57.3° of rotation — highly sensitive to local order.
+At i=1, you need 100 position increments to accumulate the same angular change — capturing document-level structure.
+This numerical table is the RoPE equivalent of the binary oscillation period table from Section 02.
+</p>
+
+<h3>Common Questions — Complete Reference</h3>
+
+<div class="qa-box">
+<div class="q">Why not learn positional embeddings instead of using fixed sin/cos?</div>
+<p>Learned embeddings (used in BERT) work well but do not generalize beyond the training context length. Sinusoidal and RoPE encode a mathematical structure that extrapolates to longer sequences. DeepSeek and LLaMA use RoPE precisely because it scales to long contexts without retraining positional parameters.</p>
+</div>
+
+<div class="qa-box">
+<div class="q">Why 10,000 specifically in the denominator?</div>
+<p>It is an empirical constant chosen so that frequencies span a useful range for typical d_model values (~512–4096). With d=768, i=0 gives ω=1 (wavelength ≈ 2π positions), while i=383 gives extremely low frequency (wavelength ≈ thousands of positions). The value 10,000 creates a smooth frequency spectrum across all index pairs.</p>
+</div>
+
+<div class="qa-box">
+<div class="q">Does RoPE apply to value vectors too?</div>
+<p>Standard RoPE applies only to Q and K, not V. Position information is needed to compute attention scores (which tokens attend to which), but the value vectors carry content, not positional matching information. DeepSeek's decoupled RoPE follows this convention with modifications for MLA's compressed KV structure.</p>
+</div>
+
+<div class="qa-box">
+<div class="q">What is "decoupled" RoPE in DeepSeek-V2?</div>
+<p>In standard RoPE, the same rotation is applied to Q and K. DeepSeek's decoupled variant separates how positional information is injected into the latent compressed KV pathway versus the query pathway — allowing MLA's cache compression to coexist with rotary position encoding. The next chapter covers this integration in full detail.</p>
+</div>
+
+<div class="qa-box">
+<div class="q">How does RoPE interact with causal masking?</div>
+<p>RoPE and causal masking are orthogonal. Causal masking prevents attending to future tokens (upper triangle set to −∞ before softmax). RoPE modifies Q and K before the dot product, encoding relative distance. Together: causal mask enforces temporal order; RoPE encodes how far apart allowed tokens are.</p>
+</div>
+
+<h3>Chapter Summary — The Complete Progression</h3>
+<ol class="content-list">
+<li><strong style="color:var(--text)">Problem identified:</strong> Without positional encoding, identical tokens at different positions produce identical attention outputs.</li>
+<li><strong style="color:var(--text)">Integer encoding:</strong> Simple but magnitude pollutes semantics.</li>
+<li><strong style="color:var(--text)">Binary encoding:</strong> Bounded values, multi-frequency structure, but discontinuous.</li>
+<li><strong style="color:var(--text)">Sinusoidal encoding:</strong> Continuous, same frequency structure, rotation relationship between positions — but added to token embeddings.</li>
+<li><strong style="color:var(--text)">RoPE:</strong> Same frequency formula, applied as rotation to Q/K, preserves token semantics and vector magnitude, relative position in dot product.</li>
+<li><strong style="color:var(--text)">DeepSeek:</strong> Decoupled RoPE + MLA = state-of-the-art attention with compressed KV cache.</li>
+</ol>
+
+<div class="callout">
+<p><strong>What comes next:</strong> With integer, binary, sinusoidal, and rotary encodings fully understood, you have the foundation to read DeepSeek-V2 section 2.1.3 and understand exactly why decoupled RoPE was paired with Multi-Head Latent Attention — and what architectural modifications were required to make them work together.</p>
+</div>
+
+<h3>Quick Reference Card</h3>
+
+<div class="card card-alt">
+<p style="font-family:var(--mono);font-size:0.82rem;color:var(--text);line-height:2;margin:0;">
+<strong>Integer PE:</strong>  PE(pos) = [pos, pos, …, pos]  →  magnitude problem<br>
+<strong>Binary PE:</strong>   PE(pos)[j] = bit j of pos       →  discontinuity problem<br>
+<strong>Sinusoidal PE:</strong> PE(pos,2i) = sin(pos/10000^(2i/d)), PE(pos,2i+1) = cos(…)  →  token pollution<br>
+<strong>RoPE:</strong>         Rotate Q,K pairs by θᵢ = pos × (1/10000^(2i/d))  →  ✓ all problems solved<br><br>
+<strong>Key property:</strong>  ⟨R(q,m), R(k,n)⟩ = f(m−n)  (relative position)<br>
+<strong>Key insight:</strong>   Lower i → fast oscillation → local order<br>
+<strong>Key insight:</strong>   Higher i → slow oscillation → long-range context<br>
+<strong>DeepSeek:</strong>      Decoupled RoPE + MLA in section 2.1.3 (V2 paper, June 2024)
+</p>
+</div>
+
+<p>
+You now have every tool needed to read the positional encoding sections of the DeepSeek-V2 and DeepSeek-V3 papers without confusion.
+The formula that once looked intimidating — sin and cos with 10000 raised to fractional powers — is now a natural consequence of four incremental design decisions, each fixing the failure of the previous approach.
+</p>
+
+<h3>Glossary</h3>
+
+<div class="card">
+<p style="line-height:2;margin:0;color:var(--text-dim);">
+<strong style="color:var(--text)">Positional Encoding (PE):</strong> A vector added to or applied onto token representations to encode position information.<br>
+<strong style="color:var(--text)">RoPE (Rotary Positional Encoding):</strong> Applies rotation matrices to Q/K vector pairs using θ = pos × ω<sub>i</sub>.<br>
+<strong style="color:var(--text)">ω<sub>i</sub> (omega):</strong> Frequency for pair index i: 1/10000<sup>2i/d</sup>.<br>
+<strong style="color:var(--text)">LSB / MSB:</strong> Least/Most Significant Bit — lowest/highest index in binary encoding.<br>
+<strong style="color:var(--text)">Decoupled RoPE:</strong> DeepSeek's variant separating RoPE in query vs. latent KV pathways.<br>
+<strong style="color:var(--text)">Relative position property:</strong> ⟨R(q,m), R(k,n)⟩ depends on (m−n) only.<br>
+<strong style="color:var(--text)">Long-term decay:</strong> Attention scores decrease for tokens with large relative distance.<br>
+<strong style="color:var(--text)">Fine-grained encoding:</strong> Lower index pairs — sensitive to small position shifts.<br>
+<strong style="color:var(--text)">Coarse encoding:</strong> Higher index pairs — stable across large position ranges.
+</p>
+</div>
+
+<h3>Self-Check — Can You Answer These?</h3>
+
+<ol class="content-list">
+<li>Why do two "dog" tokens without positional encoding produce identical context vectors?</li>
+<li>What is the magnitude problem with integer positional encoding at context length 1024?</li>
+<li>Why does index 1 (LSB) in binary encoding oscillate faster than index 8 (MSB)?</li>
+<li>Write the sinusoidal PE formula and identify what pos, i, and d_model control.</li>
+<li>Why must i appear in the denominator of 10000<sup>2i/d</sup>, not the numerator?</li>
+<li>Why do we need both sin (even indices) and cos (odd indices)?</li>
+<li>Given PE at position p, how do you compute PE at position p+k using rotation?</li>
+<li>Why does RoPE apply to Q and K but not token embeddings or V?</li>
+<li>What is the long-term decay property and why does it match linguistic intuition?</li>
+<li>What is decoupled RoPE in DeepSeek-V2 and why is it needed for MLA?</li>
+</ol>
+
+<p>
+If you can answer all ten questions from memory, you are ready for the next chapter: integrating RoPE with Multi-Head Latent Attention in the DeepSeek architecture.
+</p>
+
+<div class="callout ok">
+<p><strong>Chapter complete.</strong> You have traced the full arc from naive integer addition to the rotation matrices powering DeepSeek's attention.
+Keep the quick reference card above handy when reading architecture papers — every symbol in the RoPE formula now has a concrete meaning and a historical reason for being there.</p>
+</div>
+
+</div>
+</section>
+
+<footer class="footer">
+<p>Decoding DeepSeek · Chapter 06 · Encoding Position</p>
+<p style="margin-top:8px;"><a href="../">← Back to Index</a> · <a href="https://llamasearch.dev/">The Context Window</a></p>
+</footer>
+
+<script>
+
+// ===== UTILITIES =====
+function heatColor(v, max) {
+  const t = Math.min(Math.max(v / max, 0), 1);
+  const r = Math.round(108 + (52 - 108) * t);
+  const g = Math.round(140 + (211 - 140) * t);
+  const b = Math.round(255 + (153 - 255) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function peSin(pos, i, dModel) {
+  return Math.sin(pos / Math.pow(10000, 2 * i / dModel));
+}
+function peCos(pos, i, dModel) {
+  return Math.cos(pos / Math.pow(10000, 2 * i / dModel));
+}
+function peValue(pos, idx, dModel) {
+  const i = Math.floor(idx / 2);
+  return idx % 2 === 0 ? peSin(pos, i, dModel) : peCos(pos, i, dModel);
+}
+function omega(i, dModel) {
+  return 1 / Math.pow(10000, 2 * i / dModel);
+}
+function theta(pos, i, dModel) {
+  return pos * omega(i, dModel);
+}
+function rotate2D(x, y, angle) {
+  return {
+    x: x * Math.cos(angle) - y * Math.sin(angle),
+    y: x * Math.sin(angle) + y * Math.cos(angle)
+  };
+}
+function dot(a, b) {
+  return a.reduce((s, v, i) => s + v * b[i], 0);
+}
+function ropeVector(vec, pos, dModel) {
+  const out = vec.slice();
+  for (let pair = 0; pair < dModel / 2; pair++) {
+    const i = pair;
+    const ang = theta(pos, i, dModel);
+    const x = vec[2 * pair];
+    const y = vec[2 * pair + 1];
+    const r = rotate2D(x, y, ang);
+    out[2 * pair] = r.x;
+    out[2 * pair + 1] = r.y;
+  }
+  return out;
+}
+
+// ===== FADE IN + NAV =====
+const fadeEls = document.querySelectorAll('.fade-in');
+const nav = document.getElementById('nav');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.08 });
+fadeEls.forEach(el => observer.observe(el));
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('visible', window.scrollY > 400);
+});
+
+// ===== DEMO 1: INTEGER ENCODING MAGNITUDE =====
+(function() {
+  const posSlider = document.getElementById('intPosSlider');
+  const ctx = document.getElementById('intCanvas');
+  if (!ctx) return;
+  const cx = ctx.getContext('2d');
+  function render() {
+    const pos = parseInt(posSlider.value);
+    document.getElementById('intPosVal').textContent = pos;
+    const tokVal = 0.12;
+    const peVal = pos;
+    const sum = tokVal + peVal;
+    cx.clearRect(0, 0, ctx.width, ctx.height);
+    cx.fillStyle = '#8888a0'; cx.font = '13px sans-serif';
+    cx.fillText('Token embedding value ≈ ' + tokVal + '  |  Position encoding = ' + pos, 20, 30);
+    const maxH = 180;
+    const bars = [
+      { label: 'Token', val: tokVal, color: '#6c8cff', x: 60 },
+      { label: 'Position', val: peVal, color: '#fbbf24', x: 200 },
+      { label: 'Sum (input)', val: sum, color: '#f472b6', x: 340 }
+    ];
+    bars.forEach(b => {
+      const h = Math.min(b.val / pos * maxH, maxH);
+      cx.fillStyle = b.color;
+      cx.fillRect(b.x, 220 - h, 80, h);
+      cx.fillStyle = '#e0e0e8'; cx.font = '12px sans-serif';
+      cx.fillText(b.label, b.x + 10, 240);
+      cx.fillText(b.val.toFixed(2), b.x + 10, 220 - h - 8);
+    });
+    const pct = (peVal / sum * 100).toFixed(1);
+    document.getElementById('intReadout').textContent =
+      `Position ${pos}: token embedding contributes ${(tokVal/sum*100).toFixed(2)}% of input.\n` +
+      `Position encoding dominates ${pct}% — semantic meaning is nearly lost.\n` +
+      `At context length 1024, position values reach ~1024 while token values stay near 0.`;
+  }
+  posSlider.addEventListener('input', render);
+  render();
+})();
+
+// ===== DEMO 2: BINARY ENCODING TABLE =====
+(function() {
+  const startSlider = document.getElementById('binStartSlider');
+  const grid = document.getElementById('binGrid');
+  if (!grid) return;
+  function render() {
+    const start = parseInt(startSlider.value);
+    document.getElementById('binStartVal').textContent = start;
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = '80px repeat(8, 1fr)';
+    const hdr = document.createElement('div'); hdr.className = 'bit-cell'; hdr.textContent = 'Pos'; grid.appendChild(hdr);
+    for (let b = 8; b >= 1; b--) {
+      const c = document.createElement('div'); c.className = 'bit-cell';
+      c.textContent = b === 8 ? 'MSB' : b === 1 ? 'LSB' : 'b' + b;
+      c.style.background = 'var(--bg-card-alt)'; c.style.color = 'var(--accent)';
+      grid.appendChild(c);
+    }
+    for (let p = start; p < start + 12; p++) {
+      const pl = document.createElement('div'); pl.className = 'bit-cell'; pl.textContent = p;
+      pl.style.background = 'var(--bg-card-alt)'; pl.style.color = 'var(--accent2)';
+      grid.appendChild(pl);
+      const bits = p.toString(2).padStart(8, '0').split('');
+      bits.forEach(bit => {
+        const c = document.createElement('div');
+        c.className = 'bit-cell bit-' + bit;
+        c.textContent = bit;
+        grid.appendChild(c);
+      });
+    }
+    document.getElementById('binReadout').textContent =
+      `Positions ${start}–${start+11}: LSB (index 1) flips every position.\n` +
+      `Index 2 flips every 2 positions, index 3 every 4, … index 8 every 128.\n` +
+      `Position ${start}: binary ${start.toString(2).padStart(8,'0')}`;
+  }
+  startSlider.addEventListener('input', render);
+  render();
+})();
+
+// ===== DEMO 3: BINARY OSCILLATION FREQUENCY =====
+(function() {
+  const canvas = document.getElementById('binFreqCanvas');
+  if (!canvas) return;
+  const cx = canvas.getContext('2d');
+  function render() {
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+    const freqs = [1, 2, 4, 8, 16, 32, 64, 128];
+    const colors = ['#f472b6','#a78bfa','#fbbf24','#34d399','#6c8cff','#f87171','#8888a0','#e0e0e8'];
+    cx.fillStyle = '#8888a0'; cx.font = '12px sans-serif';
+    cx.fillText('Oscillation period (positions) vs bit index — lower indexes change faster', 20, 20);
+    freqs.forEach((f, i) => {
+      const y = 50 + i * 30;
+      const w = 400 / f * 8;
+      cx.fillStyle = colors[i];
+      cx.fillRect(80, y, Math.min(w, 400), 18);
+      cx.fillStyle = '#e0e0e8'; cx.font = '11px monospace';
+      cx.fillText('Index ' + (i+1) + ': every ' + f + ' pos', 490, y + 14);
+    });
+  }
+  render();
+})();
+
+// ===== DEMO 4: SINUSOIDAL WAVE EXPLORER =====
+(function() {
+  const posS = document.getElementById('sinPosSlider');
+  const idxS = document.getElementById('sinIdxSlider');
+  const canvas = document.getElementById('sinCanvas');
+  if (!canvas) return;
+  const cx = canvas.getContext('2d');
+  const D = 768;
+  function render() {
+    const fixedIdx = parseInt(idxS.value);
+    document.getElementById('sinIdxVal').textContent = fixedIdx;
+    document.getElementById('sinPosHighlight').textContent = posS.value;
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+    const i = Math.floor((fixedIdx - 1) / 2);
+    const isSin = (fixedIdx - 1) % 2 === 0;
+    cx.fillStyle = '#8888a0'; cx.font = '12px sans-serif';
+    cx.fillText(`Index ${fixedIdx} (${isSin?'sin':'cos'}, i=${i}): PE(pos,${fixedIdx}) vs position`, 20, 22);
+    cx.beginPath();
+    for (let p = 1; p <= 1024; p++) {
+      const v = isSin ? peSin(p, i, D) : peCos(p, i, D);
+      const x = 40 + (p / 1024) * 520;
+      const y = 160 - v * 60;
+      if (p === 1) cx.moveTo(x, y); else cx.lineTo(x, y);
+    }
+    cx.strokeStyle = '#6c8cff'; cx.lineWidth = 1.5; cx.stroke();
+    const hp = parseInt(posS.value);
+    const hv = isSin ? peSin(hp, i, D) : peCos(hp, i, D);
+    const hx = 40 + (hp / 1024) * 520;
+    const hy = 160 - hv * 60;
+    cx.beginPath(); cx.arc(hx, hy, 6, 0, Math.PI*2);
+    cx.fillStyle = '#f472b6'; cx.fill();
+    const wl = (2 * Math.PI * Math.pow(10000, 2*i/D)).toFixed(1);
+    document.getElementById('sinReadout').textContent =
+      `PE(${hp}, index=${fixedIdx}) = ${isSin?'sin':'cos'}(${hp} / 10000^(2×${i}/${D}))\n` +
+      `  = ${hv.toFixed(6)}\n` +
+      `Wavelength ≈ ${wl} positions\n` +
+      (fixedIdx <= 10 ? 'Lower index → rapid oscillation (fine-grained encoding)' :
+       fixedIdx >= 200 ? 'Higher index → slow oscillation (coarse encoding)' :
+       'Mid index → moderate oscillation frequency');
+  }
+  posS.addEventListener('input', render);
+  idxS.addEventListener('input', render);
+  render();
+})();
+
+// ===== DEMO 5: MULTI-INDEX COMPARISON =====
+(function() {
+  const canvas = document.getElementById('multiIdxCanvas');
+  if (!canvas) return;
+  const cx = canvas.getContext('2d');
+  const D = 768;
+  const indices = [1, 50, 150];
+  const colors = ['#f472b6', '#34d399', '#fbbf24'];
+  function render() {
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+    cx.fillStyle = '#8888a0'; cx.font = '12px sans-serif';
+    cx.fillText('Same as binary intuition: i=1 oscillates fastest, i=150 slowest (GPT-2 d=768)', 20, 20);
+    indices.forEach((idx, ci) => {
+      const i = Math.floor((idx - 1) / 2);
+      const isSin = (idx - 1) % 2 === 0;
+      cx.beginPath();
+      for (let p = 1; p <= 200; p++) {
+        const v = isSin ? peSin(p, i, D) : peCos(p, i, D);
+        const x = 30 + (p / 200) * 540;
+        const y = 100 + ci * 55 - v * 20;
+        if (p === 1) cx.moveTo(x, y); else cx.lineTo(x, y);
+      }
+      cx.strokeStyle = colors[ci]; cx.lineWidth = 1.5; cx.stroke();
+      cx.fillStyle = colors[ci]; cx.font = '11px monospace';
+      cx.fillText('index=' + idx, 580, 100 + ci * 55);
+    });
+  }
+  render();
+})();
+
+// ===== DEMO 6: ROTATION FOR RELATIVE POSITION =====
+(function() {
+  const kSlider = document.getElementById('rotKSlider');
+  const pSlider = document.getElementById('rotPSlider');
+  const canvas = document.getElementById('rotCanvas');
+  if (!canvas) return;
+  const cx = canvas.getContext('2d');
+  const D = 512;
+  function render() {
+    const p = parseInt(pSlider.value);
+    const k = parseInt(kSlider.value);
+    document.getElementById('rotPVal').textContent = p;
+    document.getElementById('rotKVal').textContent = k;
+    const i = 0;
+    const th = theta(p, i, D);
+    const th1 = omega(i, D) * k;
+    const th2 = theta(p + k, i, D);
+    const y1 = Math.sin(th);
+    const x1 = Math.cos(th);
+    const y2 = Math.sin(th2);
+    const x2 = Math.cos(th2);
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+    const ox = 180, oy = 180, scale = 100;
+    cx.strokeStyle = '#2a2a3a'; cx.lineWidth = 1;
+    cx.beginPath(); cx.moveTo(ox-120,oy); cx.lineTo(ox+120,oy); cx.stroke();
+    cx.beginPath(); cx.moveTo(ox,oy-120); cx.lineTo(ox,oy+120); cx.stroke();
+    cx.beginPath(); cx.moveTo(ox, oy); cx.lineTo(ox + x1*scale, oy - y1*scale);
+    cx.strokeStyle = '#6c8cff'; cx.lineWidth = 2; cx.stroke();
+    cx.beginPath(); cx.arc(ox, oy, scale, -th, -th2, th2 < th);
+    cx.strokeStyle = '#fbbf24'; cx.lineWidth = 1.5; cx.stroke();
+    cx.beginPath(); cx.moveTo(ox, oy); cx.lineTo(ox + x2*scale, oy - y2*scale);
+    cx.strokeStyle = '#34d399'; cx.lineWidth = 2; cx.stroke();
+    cx.fillStyle = '#6c8cff'; cx.font = '12px monospace';
+    cx.fillText('v₁ at pos ' + p + ': (cos θ, sin θ)', 320, 80);
+    cx.fillStyle = '#34d399';
+    cx.fillText('v₂ at pos ' + (p+k) + ': rotate by ω·k = ' + th1.toFixed(4), 320, 100);
+    cx.fillStyle = '#e0e0e8';
+    cx.fillText('θ = ' + th.toFixed(4) + ' rad', 320, 130);
+    cx.fillText('θ₁ = ω·k = ' + th1.toFixed(4) + ' rad', 320, 150);
+    document.getElementById('rotReadout').textContent =
+      `At index pair (2,3), i=0:\n` +
+      `  PE(pos=${p}, idx=2) = sin(θ) = ${y1.toFixed(6)}\n` +
+      `  PE(pos=${p}, idx=3) = cos(θ) = ${x1.toFixed(6)}\n` +
+      `  PE(pos=${p+k}, idx=2) = sin(θ+θ₁) = ${y2.toFixed(6)}\n` +
+      `  PE(pos=${p+k}, idx=3) = cos(θ+θ₁) = ${x2.toFixed(6)}\n\n` +
+      `Relative position encodings are rotations of each other.\n` +
+      `This is WHY we need both sin AND cos — rotation requires both coordinates.`;
+  }
+  kSlider.addEventListener('input', render);
+  pSlider.addEventListener('input', render);
+  render();
+})();
+
+// ===== DEMO 7: RoPE 2D ROTATION =====
+(function() {
+  const posS = document.getElementById('ropePosSlider');
+  const pairS = document.getElementById('ropePairSlider');
+  const canvas = document.getElementById('ropeCanvas');
+  if (!canvas) return;
+  const cx = canvas.getContext('2d');
+  const D = 4;
+  function render() {
+    const pos = parseInt(posS.value);
+    const pair = parseInt(pairS.value);
+    document.getElementById('ropePosVal').textContent = pos;
+    document.getElementById('ropePairVal').textContent = pair;
+    const i = pair;
+    const ang = theta(pos, i, D);
+    const x1 = 0.8, x2 = 0.5;
+    const r = rotate2D(x1, x2, ang);
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+    const ox = 200, oy = 180, sc = 120;
+    const mag1 = Math.sqrt(x1*x1 + x2*x2);
+    const mag2 = Math.sqrt(r.x*r.x + r.y*r.y);
+    cx.strokeStyle = '#2a2a3a';
+    cx.beginPath(); cx.moveTo(ox-130,oy); cx.lineTo(ox+130,oy); cx.stroke();
+    cx.beginPath(); cx.moveTo(ox,oy-130); cx.lineTo(ox,oy+130); cx.stroke();
+    cx.beginPath(); cx.arc(ox, oy, mag1*sc, 0, Math.PI*2);
+    cx.strokeStyle = 'rgba(136,136,160,0.3)'; cx.stroke();
+    cx.beginPath(); cx.moveTo(ox, oy); cx.lineTo(ox + x1*sc, oy - x2*sc);
+    cx.strokeStyle = '#6c8cff'; cx.lineWidth = 2.5; cx.stroke();
+    cx.beginPath(); cx.moveTo(ox, oy); cx.lineTo(ox + r.x*sc, oy - r.y*sc);
+    cx.strokeStyle = '#34d399'; cx.lineWidth = 2.5; cx.stroke();
+    cx.beginPath(); cx.arc(ox, oy, sc, -ang, 0);
+    cx.strokeStyle = '#fbbf24'; cx.lineWidth = 1.5; cx.stroke();
+    cx.fillStyle = '#e0e0e8'; cx.font = '12px monospace';
+    cx.fillText('Original (x₁,x₂)=(' + x1 + ',' + x2 + ')  |mag|=' + mag1.toFixed(4), 20, 30);
+    cx.fillText('Rotated (x₁\',x₂\')=(' + r.x.toFixed(3) + ',' + r.y.toFixed(3) + ')  |mag|=' + mag2.toFixed(4), 20, 50);
+    cx.fillText('θ = pos/d_model_freq = ' + ang.toFixed(4) + ' rad (' + (ang*180/Math.PI).toFixed(1) + '°)', 20, 70);
+    cx.fillText('ωᵢ = 1/10000^(2×' + i + '/' + D + ')', 20, 90);
+    document.getElementById('ropeReadout').textContent =
+      `RoPE on pair (${2*i+1}, ${2*i+2}) at position ${pos}:\n` +
+      `  θ = ${pos} × ${omega(i,D).toExponential(4)} = ${ang.toFixed(6)} rad\n` +
+      `  x₁' = x₁·cos(θ) − x₂·sin(θ) = ${r.x.toFixed(6)}\n` +
+      `  x₂' = x₁·sin(θ) + x₂·cos(θ) = ${r.y.toFixed(6)}\n` +
+      `  |original| = ${mag1.toFixed(6)}, |rotated| = ${mag2.toFixed(6)} (unchanged!)`;
+  }
+  posS.addEventListener('input', render);
+  pairS.addEventListener('input', render);
+  render();
+})();
+
+// ===== DEMO 8: RELATIVE POSITION DOT PRODUCT =====
+(function() {
+  const pos1S = document.getElementById('dotP1Slider');
+  const pos2S = document.getElementById('dotP2Slider');
+  const canvas = document.getElementById('dotCanvas');
+  if (!canvas) return;
+  const cx = canvas.getContext('2d');
+  const D = 8;
+  function render() {
+    const p1 = parseInt(pos1S.value);
+    const p2 = parseInt(pos2S.value);
+    document.getElementById('dotP1Val').textContent = p1;
+    document.getElementById('dotP2Val').textContent = p2;
+    const q = [0.5, 0.3, 0.7, 0.2, 0.4, 0.6, 0.1, 0.8];
+    const k = [0.4, 0.6, 0.2, 0.5, 0.3, 0.7, 0.5, 0.2];
+    const qR = ropeVector(q, p1, D);
+    const kR = ropeVector(k, p2, D);
+    const d = dot(qR, kR);
+    const rel = p2 - p1;
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+    cx.fillStyle = '#8888a0'; cx.font = '13px sans-serif';
+    cx.fillText('RoPE dot product depends on relative position (p₂ − p₁)', 20, 28);
+    cx.fillStyle = '#e0e0e8';
+    cx.fillText('q at pos ' + p1 + ' · k at pos ' + p2 + ' = ' + d.toFixed(4), 20, 55);
+    cx.fillText('Relative distance: ' + rel, 20, 80);
+    const distances = [];
+    for (let dlt = -20; dlt <= 20; dlt++) {
+      const kr = ropeVector(k, p1 + dlt, D);
+      distances.push({ d: dlt, v: dot(qR, kr) });
+    }
+    cx.beginPath();
+    distances.forEach((pt, idx) => {
+      const x = 40 + (idx / 40) * 520;
+      const y = 200 - pt.v * 80;
+      if (idx === 0) cx.moveTo(x, y); else cx.lineTo(x, y);
+    });
+    cx.strokeStyle = '#a78bfa'; cx.lineWidth = 2; cx.stroke();
+    const hi = 20 + (rel + 20);
+    const hx = 40 + (hi / 40) * 520;
+    cx.beginPath(); cx.arc(hx, 200 - d * 80, 6, 0, Math.PI*2);
+    cx.fillStyle = '#f472b6'; cx.fill();
+    document.getElementById('dotReadout').textContent =
+      `q (RoPE at pos ${p1}) · k (RoPE at pos ${p2}) = ${d.toFixed(6)}\n` +
+      `Relative position Δ = ${rel}\n\n` +
+      `Key RoPE property: ⟨R(q,m), R(k,n)⟩ depends on (m−n), not m and n separately.\n` +
+      `Closer positions → higher dot products (more attention).\n` +
+      `Distant positions → decay (long-term decay property from RoFormer paper).`;
+  }
+  pos1S.addEventListener('input', render);
+  pos2S.addEventListener('input', render);
+  render();
+})();
+
+// ===== DEMO 9: RoPE ALL TOKENS =====
+(function() {
+  const canvas = document.getElementById('ropeAllCanvas');
+  if (!canvas) return;
+  const cx = canvas.getContext('2d');
+  const toks = ['the', 'dog', 'chased', 'another', 'dog'];
+  const D = 4;
+  function render() {
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+    cx.fillStyle = '#8888a0'; cx.font = '12px sans-serif';
+    cx.fillText('"the dog chased another dog" — RoPE rotation angle θ per token (pair i=0)', 20, 22);
+    toks.forEach((t, p) => {
+      const ang = theta(p + 1, 0, D);
+      const x = 60 + p * 110;
+      const y = 140;
+      cx.beginPath(); cx.arc(x, y, 40, -ang, 0);
+      cx.strokeStyle = '#6c8cff'; cx.lineWidth = 2; cx.stroke();
+      cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x + 35, y);
+      cx.strokeStyle = '#f472b6'; cx.lineWidth = 2; cx.stroke();
+      cx.fillStyle = '#e0e0e8'; cx.font = '11px sans-serif';
+      cx.fillText(t, x - 15, y + 60);
+      cx.fillStyle = '#fbbf24'; cx.font = '10px monospace';
+      cx.fillText('p=' + (p+1), x - 10, y + 75);
+      cx.fillText('θ=' + ang.toFixed(2), x - 18, y + 90);
+    });
+  }
+  render();
+})();
+
+// ===== PLAYGROUND =====
+(function() {
+  const posS = document.getElementById('pgPosSlider');
+  const idxS = document.getElementById('pgIdxSlider');
+  const dS = document.getElementById('pgDimSlider');
+  const modeSel = document.getElementById('pgMode');
+  function render() {
+    const pos = parseInt(posS.value);
+    const idx = parseInt(idxS.value);
+    const d = parseInt(dS.value);
+    document.getElementById('pgPosVal').textContent = pos;
+    document.getElementById('pgIdxVal').textContent = idx;
+    document.getElementById('pgDimVal').textContent = d;
+    idxS.max = d;
+    const i = Math.floor((idx - 1) / 2);
+    const isSin = (idx - 1) % 2 === 0;
+    const val = isSin ? peSin(pos, i, d) : peCos(pos, i, d);
+    const om = omega(i, d);
+    const th = pos * om;
+    const wl = 2 * Math.PI / om;
+    let out = `Mode: ${modeSel.value}\nPosition: ${pos}, Index: ${idx}, d_model: ${d}\n`;
+    out += `i (pair index): ${i}\nωᵢ = 1/10000^(2×${i}/${d}) = ${om.toExponential(6)}\n`;
+    out += `θ = ${pos} × ωᵢ = ${th.toFixed(6)} rad\n`;
+    out += `Wavelength λ ≈ ${wl.toFixed(2)} positions\n\n`;
+    if (modeSel.value === 'sinusoidal') {
+      out += `PE(${pos}, ${idx}) = ${isSin?'sin':'cos'}(${pos}/10000^(2×${i}/${d}))\n     = ${val.toFixed(8)}`;
+    } else {
+      const x1 = 0.6, x2 = 0.4;
+      const r = rotate2D(x1, x2, th);
+      out += `RoPE rotation on pair (${2*i+1}, ${2*i+2}):\n`;
+      out += `  (${x1}, ${x2}) → (${r.x.toFixed(6)}, ${r.y.toFixed(6)})\n`;
+      out += `  |before| = ${Math.sqrt(x1*x1+x2*x2).toFixed(6)}, |after| = ${Math.sqrt(r.x*r.x+r.y*r.y).toFixed(6)}`;
+    }
+    const vecDiv = document.getElementById('pgVec');
+    vecDiv.innerHTML = '';
+    for (let j = 1; j <= Math.min(d, 16); j++) {
+      const v = peValue(pos, j, d);
+      const row = document.createElement('div');
+      row.className = 'vec-row';
+      row.innerHTML = `<span class="vec-label">idx ${j}</span>
+        <div class="vec-bar-wrap"><div class="vec-bar" style="width:${(v+1)*50}%;background:${j===idx?'#f472b6':'#6c8cff'}"></div></div>
+        <span style="min-width:70px;color:var(--text)">${v.toFixed(4)}</span>`;
+      vecDiv.appendChild(row);
+    }
+    if (d > 16) {
+      const more = document.createElement('p');
+      more.style.color = 'var(--text-dim)'; more.style.fontSize = '0.85rem';
+      more.textContent = `… showing first 16 of ${d} dimensions`;
+      vecDiv.appendChild(more);
+    }
+    document.getElementById('pgReadout').textContent = out;
+  }
+  [posS, idxS, dS, modeSel].forEach(el => el.addEventListener('input', render));
+  render();
+})();
+
+</script>
+
+
+</body>
+</html>

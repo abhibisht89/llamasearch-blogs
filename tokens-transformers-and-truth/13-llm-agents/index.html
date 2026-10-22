@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM Agents: From Tool Use to Autonomous Systems — An Interactive Tutorial</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+/* ===== Typography ===== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ===== Layout ===== */
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+/* ===== Section Number ===== */
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== Cards / Boxes ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+/* ===== Interactive Panels ===== */
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3 { margin-bottom: 16px; }
+
+/* ===== Bar Chart ===== */
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+  position: relative;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+/* ===== Token display ===== */
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); animation: fadeIn 0.4s ease; }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ===== Canvas ===== */
+canvas { border-radius: var(--radius); display: block; }
+
+/* ===== Slider ===== */
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+/* ===== Info callout ===== */
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn {
+  background: rgba(248,113,113,0.08);
+  border-left-color: var(--danger);
+}
+.callout.warn p { color: var(--text); }
+.callout.ok {
+  background: rgba(52,211,153,0.08);
+  border-left-color: var(--accent3);
+}
+.callout.ok p { color: var(--text); }
+
+/* ===== Q&A pullouts ===== */
+.qa-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+  background: var(--bg-card-alt);
+}
+.qa-box .q {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+.qa-box p { margin-bottom: 0; color: var(--text-dim); line-height: 1.65; }
+
+/* ===== Formula ===== */
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* ===== Comparison Layout ===== */
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+/* ===== Flow diagram ===== */
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+  padding: 4px 0;
+}
+
+/* ===== Bigram Table ===== */
+.bigram-table-wrapper { overflow-x: auto; margin: 20px 0; }
+.bigram-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  width: 100%;
+}
+.bigram-table th, .bigram-table td {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  text-align: center;
+  transition: background 0.3s, color 0.3s;
+}
+.bigram-table th {
+  background: var(--bg-card-alt);
+  color: var(--accent);
+  font-weight: 600;
+}
+.bigram-table td {
+  background: var(--bg-card);
+  color: var(--text-dim);
+}
+.bigram-table td.highlight-cell {
+  background: rgba(108,140,255,0.15);
+  color: var(--text);
+  font-weight: 700;
+}
+.bigram-table td.zero-cell {
+  color: rgba(136,136,160,0.3);
+}
+.bigram-table .row-header {
+  background: var(--bg-card-alt);
+  color: var(--accent2);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ===== Chart container ===== */
+.chart-container { position: relative; margin: 20px 0; }
+
+/* ===== Nav ===== */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+
+/* ===== Two column ===== */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ===== Tags ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+/* ===== Fade in ===== */
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+/* ===== Input fields ===== */
+.text-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus { border-color: var(--accent); }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* ===== Agent-specific ===== */
+.trace-line {
+  padding: 10px 14px;
+  margin: 6px 0;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  border-left: 3px solid var(--border);
+}
+.trace-think { border-left-color: var(--accent); background: rgba(108,140,255,0.08); }
+.trace-act { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.trace-obs { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.trace-error { border-left-color: var(--danger); background: rgba(248,113,113,0.08); }
+.agent-node {
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  transition: all 0.3s;
+}
+.agent-node.controller { background: rgba(108,140,255,0.15); border-color: var(--accent); }
+.agent-node.worker { background: rgba(52,211,153,0.1); border-color: var(--accent3); }
+.agent-node.active { box-shadow: 0 0 20px rgba(108,140,255,0.3); }
+
+/* ===== Interview Q&A ===== */
+.hint-btn, .reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-alt);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.hint-btn:hover, .reveal-btn:hover { border-color: var(--accent); color: var(--accent); }
+.hint-box {
+  display: none;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.25);
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.hint-box.visible { display: block; }
+.answer {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.answer.visible { display: block; }
+.solution-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent3);
+  margin-bottom: 8px;
+}
+.answer .explanation { color: var(--text-dim); font-size: 0.92rem; line-height: 1.65; }
+.answer .explanation strong { color: var(--text); }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP</a><span class="bc-sep">›</span><span class="bc-current">Llm Agents</span></nav>
+
+
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <a href="../../" class="nav-title" style="text-decoration:none;color:inherit;">LLM Agents</a>
+  <div class="nav-links">
+    <a href="#s0">What is an Agent?</a>
+    <a href="#s1">RAG vs Tool Use</a>
+    <a href="#s2">Agent Loop</a>
+    <a href="#s3">ReAct</a>
+    <a href="#s4">Tool Use</a>
+    <a href="#s5">Architectures</a>
+    <a href="#s6">Planning</a>
+    <a href="#s7">Memory</a>
+    <a href="#s8">Coding Agents</a>
+    <a href="#s9">Computer Use</a>
+    <a href="#s10">Research Agents</a>
+    <a href="#s11">Multi-Agent</a>
+    <a href="#s12">Benchmarks</a>
+    <a href="#s13">Challenges</a>
+    <a href="#s14">Training</a>
+    <a href="#s15-env">Agent-Env</a>
+    <a href="#s15">Playground</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="top">
+  <div class="container">
+    <h1>LLM Agents: From Tool Use to Autonomous Systems</h1>
+    <p class="subtitle">
+      How large language models break complex tasks into subtasks, use tools, and iterate until goals are met — from coding assistants to research agents and beyond.
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-val">16</span>
+        <span class="stat-label">Core Concepts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">6</span>
+        <span class="stat-label">Interactive Demos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1</span>
+        <span class="stat-label">Playground</span>
+      </div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      An LLM agent is a multi-turn system that observes its environment, reasons about what to do next, takes actions via tool calls or worker models, and repeats until the task is complete. This tutorial covers the agent loop, ReAct, tool use, agent architectures, memory systems, coding and research agents, benchmarks, and how to train agents with reinforcement learning.
+    </p>
+  </div>
+</header>
+
+<!-- ===== SECTION 0: WHAT IS AN LLM AGENT? ===== -->
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>What is an LLM Agent?</h2>
+
+    <p>
+      An <strong>LLM agent</strong> is a system that uses a large language model to accomplish tasks by breaking them into smaller subtasks, executing those subtasks through <strong>tool calls</strong> or calls to other LLMs, and iterating until a goal condition is satisfied.
+    </p>
+
+    <div class="card card-alt" style="text-align:center; font-size:1.05rem;">
+      <p style="margin-bottom:0; color:var(--text);"><strong>An agent is multi-turn, decomposes tasks, executes via tools or workers, and loops until done.</strong></p>
+    </div>
+
+    <h3 style="margin-top:28px;">Key Properties</h3>
+    <p>
+      Agents differ from simple one-shot LLM calls in several ways. They are <strong>multi-turn</strong>: the model engages in many back-and-forth interactions with the environment. They <strong>decompose</strong> the input task into smaller subtasks, each of which may be executed by a tool call (e.g., calculator, search API) or by another LLM worker (e.g., "summarize this document"). The agent runs in a <strong>loop</strong> until some goal condition is hit — for example, "I have all the information to craft the final response" or "all unit tests pass." The loop can also be terminated by a <strong>budget</strong> (e.g., maximum cost or token limit).
+    </p>
+
+    <p>
+      Agents are typically implemented using <strong>reasoning models</strong>. The model receives a prompt, does some internal reasoning (often chain-of-thought style), formulates a plan, and then farms off subtasks to workers or tools. Critically, the plan can be <strong>revised</strong> based on intermediate results — if a search returns nothing useful, the agent might decide to try a different query or approach.
+    </p>
+
+    <div class="callout">
+      <p><strong>Key insight:</strong> The agent-environment interface is central. The agent observes the current state (e.g., search results, file contents, screenshots), decides what action to take, and the environment updates in response. This feedback loop is what makes agents adaptive and powerful.</p>
+    </div>
+
+    <div class="formula">
+      Termination (typical): goal_satisfied ∨ budget_exhausted — the controller judges sufficiency (information gathered, tests passed, deliverable ready) unless a user cap on cost, tokens, or wall-clock time ends the run first.
+    </div>
+
+    <p>
+      The <strong>controller</strong> model typically judges whether the goal is satisfied — using prompt criteria and accumulated evidence (tool outputs, file diffs, test logs, screenshots). An <strong>orchestration layer</strong> enforces hard stops (max steps, disallowed tools, sandbox timeouts). Soft judgment and hard safety rails work together.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 1: RAG VS TOOL USE ===== -->
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>RAG vs. Tool Use: The Foundation</h2>
+
+    <p>
+      <strong>Retrieval Augmented Generation (RAG)</strong> — see <a href="../12-benchmarking-and-rag/index.html">Chapter 12</a> — follows a fixed retrieve-then-generate pipeline with no feedback loop. Agents generalize beyond that pattern.
+    </p>
+
+    <p>
+      <strong>Tool use</strong> lets the model call a <strong>diverse set of tools</strong> — calculator, search API, code executor, or any API — <strong>at any point</strong> during generation, not only at the start. Valid tool calls are detected via <strong>special tokens</strong>, executed immediately, and their outputs are appended to context. The <strong>Tool Former</strong> paper established this pattern; modern agents refine it with richer orchestration.
+    </p>
+
+    <p>
+      Many production systems evolved from static RAG toward <strong>research-style agents</strong> that retrieve dynamically: read a page, notice a gap, issue a new query, branch to a related entity, then synthesize. <em>Deep research</em> products signal <strong>many</strong> retrieval and summarization hops — often tens of minutes of wall-clock time — rather than a single retrieve-then-answer pass.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Design takeaway:</strong> Tool definitions belong in the prompt (system or user): natural-language descriptions of each tool’s purpose, arguments, and return shape. Tool Former additionally <strong>trained</strong> models to emit valid calls; many shipping systems today rely on strong prompting plus inference-time parsing, but the pattern — expose capabilities in text, stream generations, detect a complete call, execute, append results — is the same.</p>
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--text-dim);">RAG</h3>
+        <p>Fixed one-turn: retrieve → generate. No feedback loop. The model cannot decide when to retrieve or try alternative strategies.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3);">Tool Use / Agents</h3>
+        <p>Dynamic multi-turn: the model can call tools at any point, observe results, and iterate. Enables iterative search, summarization, and complex workflows.</p>
+      </div>
+    </div>
+
+    <p>
+      Production agents typically <strong>hide</strong> intermediate tool calls — the user sees only the synthesized answer. Research setups and some UIs (including the Tool Former paper) may show calls and results inline. When the model emits a complete, valid tool invocation, a runtime <strong>supervisor</strong> executes it and <strong>appends</strong> the observation (stdout, JSON, page text) to context; whether the raw call string stays visible is a product choice.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 2: THE AGENT LOOP ===== -->
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>The Agent Loop: Observe → Think → Act</h2>
+
+    <p>
+      The core loop of any agent follows a simple pattern: <strong>observe</strong> the current state, <strong>think</strong> about what to do next, <strong>act</strong> (issue a tool call or delegate to a worker), then <strong>observe</strong> the result and repeat. This continues until the agent decides the goal is satisfied or a budget is exhausted.
+    </p>
+
+    <div class="formula">
+      Observe → Think → Act → Observe → Think → Act → ... → Done
+    </div>
+
+    <p>
+      At each step, the controller LLM receives the full context: the original prompt, any previous tool outputs, and the current environment state. It reasons (often using "thinking" tokens that are hidden from the user), produces an action (e.g., run a terminal command, search the web, call a summarization worker), and the action is executed. The result is fed back into the context, and the loop continues.
+    </p>
+
+    <div class="callout warn">
+      <p><strong>Cost and depth:</strong> When “tools” are themselves full LLM calls (summarize this PDF, extract a schema, draft a patch), each hop is a billed forward pass. Deep trees of controller → workers → sub-workers can consume <strong>millions of tokens</strong> on a single user task (e.g., building or refactoring a whole site). Latency grows with depth because steps are often sequential.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Agent Loop Visualizer</h3>
+      <p>Step through the observe → think → act cycle. Click "Next Step" to advance through a simulated agent solving a task.</p>
+
+      <div class="btn-group">
+        <button class="btn" onclick="agentLoopReset()">Reset</button>
+        <button class="btn active" onclick="agentLoopStep()">Next Step</button>
+      </div>
+
+      <div class="flow" id="agentLoopFlow" style="margin-top:24px;"></div>
+
+      <div id="agentLoopStatus" style="margin-top:16px; font-size:0.9rem; color:var(--text-dim);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 3: REACT ===== -->
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>ReAct: Reasoning + Acting</h2>
+
+    <p>
+      <strong>ReAct</strong> is a framework that interleaves <strong>reasoning</strong> (chain-of-thought) with <strong>acting</strong> (tool use). Instead of reasoning in isolation and then acting, the model alternates between thinking out loud and taking actions. Each action produces an <strong>observation</strong> from the environment, which informs the next thought.
+    </p>
+
+    <p>
+      The trace looks like: <em>Thought</em> → <em>Action</em> → <em>Observation</em> → <em>Thought</em> → <em>Action</em> → <em>Observation</em> → ... → <em>Final Answer</em>. This interleaving helps the model ground its reasoning in real observations and avoid hallucinating facts.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>ReAct Demo</h3>
+      <p>Watch a simulated ReAct trace for the question: "Who is older, Glenn Hughes or Ross Lynch?" Click "Next" to advance through reasoning, action, and observation steps.</p>
+
+      <div class="btn-group">
+        <button class="btn" onclick="reactReset()">Reset</button>
+        <button class="btn" onclick="reactStep()">Next</button>
+      </div>
+
+      <div id="reactTrace" style="margin-top:20px; max-height:320px; overflow-y:auto;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 4: TOOL USE ===== -->
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Tool Use and Tool Definitions</h2>
+
+    <p>
+      The starting point for any agent is defining the <strong>tools</strong> it can use. Tools are typically specified in <strong>natural language</strong> in the prompt: "You are an expert researcher. You have access to these tools: <em>search</em> — pick a search engine, query string, and number of results; <em>summarize</em> — summarize a document; ..." The model learns to produce valid tool calls from these descriptions.
+    </p>
+
+    <p>
+      In the Tool Former paper, the model is further <strong>trained</strong> to use tools — not just prompted. But in many modern agents, tool use is driven primarily by prompting: the model sees tool specifications and generates appropriate calls. Tool calls are executed <strong>as soon as they are produced</strong> (when a valid, fully formed call is detected in the stream), and the output is appended to the generation.
+    </p>
+
+    <h3 style="margin-top:28px;">Complex Tools: LLMs as Tools</h3>
+    <p>
+      Tools can be more than simple APIs. A tool might be a <strong>prompt to another LLM</strong>: "Summarize this document" — one LLM calls another with a document and summarization prompt, waits for the result, and uses it. In practice, many agent tools are implemented via LLMs: a master controller calls worker LLMs for summarization, code generation, or information extraction. Each call burns tokens and adds latency, so agent trajectories can become expensive.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Tool Selection Demo</h3>
+      <p>Given a task, which tools would the agent choose? Select a task and see the recommended tool sequence.</p>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:0.85rem; color:var(--text-dim);">Task</label>
+        <select class="text-input" id="toolTaskSelect" onchange="toolSelectUpdate()">
+          <option value="weather">What's the weather in Tokyo?</option>
+          <option value="math">Compute 17 × 243</option>
+          <option value="research">Write a report on LLM agents</option>
+          <option value="code">Create a Python script to parse CSV</option>
+        </select>
+      </div>
+
+      <div id="toolSelectResult" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 5: AGENT ARCHITECTURES ===== -->
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Agent Architectures: Controller and Workers</h2>
+
+    <p>
+      Most agents follow a <strong>controller-worker</strong> pattern. A <strong>controller LLM</strong> (sometimes called the "agent" or "manager") receives the user's task, makes a plan, and delegates subtasks to <strong>worker LLMs</strong> or tools. Workers execute specific tasks (e.g., "generate this HTML file," "search for this query") and return results. The controller then decides: do I have enough information to finish, or do I need to issue more calls?
+    </p>
+
+    <p>
+      Workers are typically the <strong>same model</strong> called with different prompts — not separate fine-tuned models. Each worker has a prompt like "You are an expert summarizer" or "You are an expert front-end designer." Breaking the task into smaller, focused prompts often performs better than giving one model the full responsibility. In production stacks, those calls are usually routed to a <strong>shared frontier API</strong> (same weights, different system strings) rather than a separate fine-tuned miniature model per subskill: the latter is hard to maintain when the set of tasks is open-ended, though specialized small models remain an active research and product direction.
+    </p>
+
+    <h3 style="margin-top:28px;">Fixed vs. Proactive Planning</h3>
+    <p>
+      Early agents made a plan once and never changed it: decide on three subgoals, execute all three, then synthesize. <strong>Proactive planning</strong> allows the controller to <strong>revise the plan</strong> based on intermediate results. If the first worker's output reveals that a different search is needed, the controller can add a new goal or skip planned ones. Modern agents increasingly use this adaptive approach.
+    </p>
+
+    <p>
+      The open-source <strong>Agent S2</strong> project illustrates this pattern for <strong>computer-use</strong> agents: a prompt library for multimodal models, with diagrams that contrast a manager dispatching subgoals to role-specific workers (front-end, graph search, filesystem navigation) under either a <em>frozen</em> plan or <em>continuous replanning</em> after partial observations.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--text-dim);">Frozen plan</h3>
+        <p>The manager commits to goals G1…G3 upfront, runs them to completion, then synthesizes — even when G1 already made G2–G3 redundant.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3);">Proactive replanning</h3>
+        <p>After worker outputs return, the manager can insert G4, cancel G2, or rewrite queries. This is the dominant design in recent systems because it wastes fewer steps when the environment behaves unexpectedly.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Agent Architecture Comparison</h3>
+      <p>Compare fixed planning (left) vs. proactive planning (right). Click to highlight the flow.</p>
+
+      <div class="two-col" id="archComparison">
+        <div class="card">
+          <h3 style="color:var(--text-dim);">Fixed Planning</h3>
+          <p style="font-size:0.85rem;">Plan once → Goal 1, 2, 3 → Execute all → Synthesize. No revision.</p>
+          <div class="flow" id="archFixed"></div>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--accent3);">Proactive Planning</h3>
+          <p style="font-size:0.85rem;">Plan → Execute some goals → Revise plan based on results → Execute more → Synthesize.</p>
+          <div class="flow" id="archProactive"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 6: MULTI-STEP REASONING AND PLANNING ===== -->
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Multi-Step Reasoning and Planning</h2>
+
+    <p>
+      Agents break complicated tasks into <strong>multiple conversational turns</strong>. Instead of "generate an entire code repository in one shot," the agent might: look up information, write a file, run it, check for errors, fix them, run tests, and so on. This fine-grained decomposition is more reliable than monolithic generation.
+    </p>
+
+    <p>
+      Many coding agents use a <strong>to-do list</strong>: the controller formulates an initial plan (e.g., "create directory structure, write index.html, write CSS, create images, run verification") and presents it to the user. As each task completes, it is crossed off, and the controller moves to the next. The user can intervene at any step to redirect or correct the plan.
+    </p>
+
+    <p>
+      Controllers typically update <strong>asynchronously</strong> as worker results arrive — revising the plan as soon as one call returns enough information (e.g., skipping remaining searches). Parallel worker batches that wait for all results before replanning are less common.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>What you see in a coding-agent UI:</strong> Many products now open with a visible <strong>to-do list</strong> derived from initial reasoning. Between items you often get <strong>thinking</strong> or <strong>reasoning</strong> traces (sometimes grayed out): the controller’s private chain-of-thought or a summary of it. Each substantive step — scaffold directories, write <code>index.html</code>, run a terminal command — is commonly a <strong>separate model call</strong> where the model re-reads the plan, the filesystem state, and prior outputs. For terminal tools, the runtime typically runs the generated command, captures stdout/stderr, and only then advances the plan once success or failure is known. Some runs end by <strong>deleting scratch artifacts</strong> the user never needed to keep, which is convenient until a bad <code>rm -rf</code> slips past safeguards.</p>
+    </div>
+
+    <p>
+      Commercial agents expose <strong>stop</strong> or <strong>interrupt</strong> controls: you freeze the loop before the next worker step, inspect partial edits, and send a corrective message. That pattern is essential because planning errors and destructive commands do occur in the wild.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 7: MEMORY SYSTEMS ===== -->
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Memory Systems</h2>
+
+    <p>
+      Where does the agent's memory live? In most setups, <strong>memory is natural language</strong>. Worker outputs, tool results, and intermediate state are all appended to the context as text. The controller sees this context and decides what to do next. Some agents use <strong>context compression</strong>: instead of passing raw outputs, another LLM call summarizes "the most important things to know" to avoid exceeding context limits.
+    </p>
+
+    <p>
+      Companies typically <strong>cache</strong> conversation history so that recomputation is not needed for previous turns. For workers called with different context, each call may start a fresh "conversation" — the worker does not necessarily receive everything the controller has seen. Design choices vary: raw output vs. summarization, what to include in each worker's prompt, and how to manage long trajectories.
+    </p>
+
+    <div class="callout">
+      <p><strong>Context compression:</strong> When context grows too large, an LLM can be asked to summarize the key information. This is how some coding assistants save tokens during long, multi-file tasks — compress the history, then continue.</p>
+    </div>
+
+    <div class="formula">
+      Compression pass: full_trajectory_text → [LLM: “What must the controller remember?”] → compressed_bullets → append to context; repeat as the session grows.
+    </div>
+
+    <p>
+      Hosted products <strong>cache</strong> prior turns and KV state so the full transcript is not re-forwarded on every new token. Workers spun up in <strong>fresh chats</strong> may deliberately <em>not</em> receive the controller’s full private history — only the slices the orchestrator passes through are visible to that sub-call.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 8: CODING AGENTS ===== -->
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Coding Agents</h2>
+
+    <p>
+      <strong>Coding agents</strong> are among the most impactful agents today. Given a high-level specification (e.g., "make a better version of this website with liquid glass design"), the agent implements the full solution: creates directories, writes HTML/CSS/JS, generates images, runs terminal commands, and verifies the result. Tools include: file read/write, terminal execution, directory search, and sometimes browser use.
+    </p>
+
+    <p>
+      OpenHands is an open-source example. It defines many tools (e.g., <code>grep</code>, <code>glob</code>, terminal, browser) each with its own prompt. Before executing a command, a <strong>security analyzer</strong> may check whether it would delete critical files. The agent loops until the model signals "done" or a budget is hit.
+    </p>
+
+    <p>
+      A common concern is safety: how do we prevent the agent from deleting files it shouldn't? In practice, agents do sometimes make mistakes (e.g., deleting a working directory). Implementations may allow specifying allowed paths or using a security layer to block dangerous commands. Users can also <strong>interrupt</strong> the agent at any time and provide corrective feedback.
+    </p>
+
+    <div class="formula">
+      OpenHands-style loop (simplified):<br>
+      user_instruction → <strong>agent</strong> (plan / next action) → worker generates concrete command or file patch → <strong>security analyzer</strong> (optional: block destructive ops) → <strong>execute</strong> → event stream (success, stderr, new files) → append to context → optional <strong>compression</strong> → repeat until “done”.
+    </div>
+
+    <p>
+      Mature coding stacks also advertise <strong>skills</strong> or <strong>tool packs</strong>: each capability (grep, glob, browser automation, Jupyter, etc.) ships with its own instruction block the controller can cite when emitting calls. Proprietary assistants rarely publish those inner prompts, but open repositories show the pattern clearly: long markdown per tool describing when to use it, argument conventions, and failure handling.
+    </p>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--text-dim);">High-visibility trace</h3>
+        <p>To-do checklists, per-step thinking summaries, and streamed terminal output help users audit behavior and intervene before irreversible edits.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3);">Opaque trace</h3>
+        <p>Some products collapse intermediate tool chatter; you see a final artifact only. That reduces noise but makes forensic debugging harder when something goes wrong.</p>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Destructive commands are real:</strong> Even with analyzers, agents occasionally issue broad deletes or overwrite trees. Treat shell access as <strong>production-risky</strong>: version control, backups, sandboxes, and least-privilege working directories are not optional extras — they are part of the safety story alongside automated checks.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 9: COMPUTER USE AGENTS ===== -->
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Computer Use Agents</h2>
+
+    <p>
+      <strong>Computer use agents</strong> control the computer via screenshots and actions. The model is <strong>multimodal</strong>: it receives images (screenshots of the screen) and text, and outputs actions like "move mouse to (x, y)," "click," "type this string." It can browse the web, fill forms, use Excel, or run terminal commands — all by "seeing" the screen and issuing actions.
+    </p>
+
+    <p>
+      At a high level, multimodal models process images via a <strong>visual vocabulary</strong>: image patches are mapped to tokens, and the model processes them alongside text. The agent takes a screenshot at some frequency, sends it to the controller, gets an action, executes it, and repeats. For fast, continuous tasks (e.g., 3D games), latency is a major challenge — the loop may be too slow for real-time control.
+    </p>
+
+    <p>
+      These agents are expensive: each screenshot and each decision burns tokens. A single complex task (e.g., playing a game, building a website) can consume millions of tokens from start to finish.
+    </p>
+
+    <p>
+      Stress tests from research benchmarks highlight brittle behavior: a task might require loading a <strong>3D browser game</strong>, following non-obvious navigation rules, and counting objects in the world. Agents often <strong>stall on loading screens</strong>, lose focus of the game canvas, or <strong>pivot to web search</strong> for a walkthrough when direct play fails — reasonable human troubleshooting, but it changes the evaluation contract. End-to-end runs for messy GUI missions can stretch to <strong>30–40 minutes</strong> of wall-clock time, with a fresh multimodal forward pass after each screenshot.
+    </p>
+
+    <div class="callout">
+      <p><strong>Pricing reality:</strong> Subscription products (e.g., bundled coding or agent modes) sometimes mask per-step token burns behind a monthly cap, but the underlying cost is still superlinear in screenshots × reasoning depth. Expect continued investment in faster perception encoders, action abstractions beyond raw pixels, and cached UI representations to close the gap for interactive software — including richer mouse paths (drag gestures already appear in vendor updates).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 10: RESEARCH AGENTS ===== -->
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Research Agents (Deep Research)</h2>
+
+    <p>
+      <strong>Research agents</strong> (often called "deep research") perform iterative search and synthesis. Given a topic or question, they search the web, read sources, decide what else to search for based on what they find, and repeat until they have enough information to produce a report. They may also run simple scripts (e.g., Python for data analysis or plotting).
+    </p>
+
+    <p>
+      The flow: user input → plan (possibly with clarification questions) → retrieval and search → summarization → more retrieval if needed → final synthesis. Tools are typically search and retrieval based. A key feature is <strong>attribution</strong>: the report cites sources, so users can verify claims. This addresses the trust problem — we don't trust raw LLM output, but we can trust it more when it points to readable sources.
+    </p>
+
+    <p>
+      Deep research jobs are deliberately <strong>slow</strong>: twenty to thirty minutes is normal when the controller is fanning out dozens of searches, rereading course sites, cross-checking older syllabi, and only then locking a structured answer. Along the way you may see coarse status chips (“scanning emerging trends”) rather than every HTTP URL — some vendors intentionally <strong>hide exact fetches</strong>, which aids UX but frustrates auditability.
+    </p>
+
+    <div class="formula">
+      User query → (clarify?) → plan → [search / browse / summarize / light code]* → citation-backed report — loop until information gain falls below a threshold or a time budget fires.
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Why citations matter:</strong> A strong research agent ends with a <strong>table of claims</strong>, recommended additions, and a bibliography tying sentences to pages you can open yourself. That combination — fluent synthesis plus pointers to human-verifiable evidence — is what makes the artifact useful in classrooms and enterprises, not just rhetorically convincing.</p>
+    </div>
+
+    <div class="callout warn">
+      <p><strong>Ethics horizon:</strong> The same loop is migrating into <strong>autonomous scientific assistants</strong> that ideate, run experiments, draft papers, and even submit to peer review. The failure mode is not only incorrect science but <strong>reviewer load</strong> and spam at scale. Any curriculum on agents should reserve space for institutional norms, disclosure, and human gatekeeping — not only capability demos.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 11: MULTI-AGENT SYSTEMS ===== -->
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Multi-Agent Systems</h2>
+
+    <p>
+      The term <strong>multi-agent</strong> is ill-defined: a controller calling multiple workers already qualifies, yet many tasks need only that single pipeline. Distinct agents that specialize and pass messages to each other remain an active research area — but most production wins still come from one controller with disciplined tools.
+    </p>
+
+    <div class="callout">
+      <p><strong>Naming vs. mechanics:</strong> If “multi-agent” only means one orchestrator and several prompted workers, most shipping systems already qualify — which makes the buzzword easy to inflate. Before adopting a multi-agent diagram, ask what <em>additional</em> autonomy, state, or communication protocol you gain over a well-structured single pipeline. Many production wins still come from one controller with disciplined tools rather than a crowd of loosely coupled personas.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Multi-Agent Communication</h3>
+      <p>Simulate agents passing messages. Click "Next" to advance the conversation.</p>
+
+      <div class="btn-group">
+        <button class="btn" onclick="multiAgentReset()">Reset</button>
+        <button class="btn" onclick="multiAgentStep()">Next Message</button>
+      </div>
+
+      <div id="multiAgentTrace" style="margin-top:20px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 12: BENCHMARKS ===== -->
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Agent Benchmarks and Evaluation</h2>
+
+    <p>
+      Evaluating agents is hard because we care about the <strong>final outcome</strong> — did the agent fulfill the instruction? — not each individual step. <strong>OS World</strong> is a popular benchmark for general-purpose agents: it challenges agents to solve real computer-use tasks (e.g., "Make Bing the default search engine in Chrome") by taking screenshots and issuing actions. Ground truth trajectories show the correct sequence of clicks and key presses.
+    </p>
+
+    <div class="callout ok">
+      <p><strong>Outcome-first mindset:</strong> In many benchmarks, a trajectory that wanders or retries is still acceptable if the terminal state matches the spec — you mainly want reliability on real chores (settings dialogs, spreadsheets, file dialogs), not a unique golden path. Diagnostics that log action quality remain valuable for training and safety even when the headline metric is pass/fail.</p>
+    </div>
+
+    <p>
+      Agents are evaluated on both <strong>task success</strong> (did they achieve the goal?) and <strong>trajectory similarity</strong> (how close were their actions to the ideal path?). Benchmarks like OS World include Chrome tasks, Excel tasks, and other real-world scenarios. The goal is to push agents toward practical usefulness for everyday tasks.
+    </p>
+
+    <p>
+      Primary metrics emphasize <strong>outcome correctness</strong> — if Bing becomes the default search engine, the task counts as solved even if the path meandered. Secondary metrics (click alignment, distance to expert demonstrations) diagnose <strong>efficiency and safety</strong>: an agent that succeeds only after random clicking may still be undesirable for deployment.
+    </p>
+
+    <ul style="color:var(--text-dim); margin:16px 0 0 1.2em; line-height:1.75;">
+      <li><strong>Chrome:</strong> “Make Bing the default search engine” — requires navigating settings, search engine panels, and confirming the change.</li>
+      <li><strong>Excel:</strong> Spreadsheet chores such as filling sequence numbers down a column after selecting the right range.</li>
+      <li><strong>Other desktop apps:</strong> Tasks that mirror small office workflows rather than toy grid worlds.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== SECTION 13: CHALLENGES ===== -->
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Challenges: Hallucination, Error Propagation, Safety</h2>
+
+    <p>
+      Agents face several challenges. <strong>Hallucination</strong>: the model may invent facts or tools. <strong>Error propagation</strong>: one bad step (e.g., a wrong search result, a buggy code edit) can compound — subsequent steps build on the error, and the final output is wrong even if later steps were correct. <strong>Safety</strong>: agents with file system or terminal access can delete files, run malicious code, or exceed intended permissions.
+    </p>
+
+    <div class="interactive-panel">
+      <h3>Error Propagation Demo</h3>
+      <p>See how one incorrect step compounds. Step 2 uses the wrong result from Step 1, and Step 3 builds on that. The final answer is wrong even though Step 3's logic was correct.</p>
+
+      <div class="btn-group">
+        <button class="btn" onclick="errorPropReset()">Reset</button>
+        <button class="btn" onclick="errorPropStep()">Next Step</button>
+      </div>
+
+      <div id="errorPropTrace" style="margin-top:20px;"></div>
+    </div>
+
+    <p style="margin-top:24px;">
+      Training agents to avoid these failures is an active area. Stepwise reward models can judge each action; outcome-level rewards judge only the final result. Using only outcome rewards to train intermediate steps is tricky — you don't want to penalize a correct step that was undermined by an earlier error.
+    </p>
+  </div>
+</section>
+
+<!-- ===== SECTION 14: TRAINING AGENTS ===== -->
+<section class="section fade-in" id="s14">
+  <div class="container">
+    <span class="section-num">14</span>
+    <h2>Training Agents with RL</h2>
+
+    <p>
+      How do you train an agent to improve? Unlike pre-training (where we have massive text corpora), we lack large-scale <strong>ground truth interaction trajectories</strong>. Humans don't routinely screen-record themselves solving every kind of task. So training often relies on <strong>synthetic data</strong>: run the agent on many tasks, collect successful trajectories, and train via imitation learning on those. Failed trajectories can be analyzed to avoid repeating mistakes.
+    </p>
+
+    <p>
+      <strong>Reinforcement learning</strong> is another approach. If you have a <strong>reward model</strong> that scores the quality of each intermediate step (e.g., "searching for Tom Cruise's age when the question is about Glenn Hughes and Ross Lynch is bad"), you can use RL to upweight good actions and downweight bad ones. Outcome-level rewards (e.g., "was the final answer correct?") are harder to use for stepwise training — you risk unfairly penalizing correct intermediate steps when a later error caused failure.
+    </p>
+
+    <p>
+      The Swirl paper (synthetic data generation and multi-step RL) explores these ideas. This is a very new area; most production agents today are still primarily prompt-based, with training playing a growing role in closed-source systems.
+    </p>
+
+    <div class="formula">
+      Stepwise RL sketch: fix all tokens before action<sub>k</sub>, treat the model’s fresh completion at step k as the decision variable, score it with a <strong>process reward model</strong> (e.g., “first search should mention entities from the question”), update policy; repeat for k+1…T.<br><br>
+      Outcome RL: only the final answer (or task bit) receives reward — credit assignment across many tool calls is noisy because an early correct retrieval can be undone by a late bug.
+    </div>
+
+    <div class="comparison">
+      <div class="card">
+        <h3 style="color:var(--text-dim);">Process / stepwise rewards</h3>
+        <p>Can reject nonsense immediately — searching for Tom Cruise’s age when the question names Glenn Hughes and Ross Lynch should score poorly even if the final guess accidentally lands right.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent3);">Outcome-only rewards</h3>
+        <p>Cheaper to collect when you have checkers for final answers, but unfairly punishes good intermediate work whenever a late step fails — the Swirl discussion highlights exactly this tension.</p>
+      </div>
+    </div>
+
+    <div class="callout ok">
+      <p><strong>Synthetic curricula:</strong> Give an agent hundreds of coding or research tasks, let it roll out, log successes versus failures, then <strong>imitate</strong> winning trajectories or pair them with reward models. That sidesteps the scarcity of human screen recordings for every niche task — at the cost of trusting automated verifiers.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 15: AGENT-ENVIRONMENT INTERFACE ===== -->
+<section class="section fade-in" id="s15-env">
+  <div class="container">
+    <span class="section-num">15</span>
+    <h2>The Agent-Environment Interface</h2>
+
+    <p>
+      The agent interacts with an <strong>environment</strong> that exposes tools. You can run your own server with custom APIs (e.g., MCP — Model Context Protocol) to expose proprietary tools. For example, a search engine over a private dataset: you describe the tools ("nearest neighbor search with query, retrieve top-k results") and the agent calls them. The environment executes actions, returns observations, and the agent decides the next action.
+    </p>
+
+    <p>
+      The interface is: <strong>state</strong> (what the agent sees) → <strong>action</strong> (what the agent does) → <strong>observation</strong> (what comes back). This loop is the same whether the environment is a file system, a browser, a search API, or a suite of LLM workers.
+    </p>
+
+    <div class="callout">
+      <p><strong>Private data, public models:</strong> When Google Search is inappropriate, an MCP server can wrap embeddings + vector search, SQL, or ticket systems. The prompt enumerates callable methods (“<code>nearest_neighbor</code> with query string and <code>k</code>”) exactly like any other tool; the LLM never needs raw database credentials in-context if the server enforces auth. The same abstraction lets enterprises swap retrieval backends without retraining the chat model.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SECTION 16: PLAYGROUND ===== -->
+<section class="section fade-in" id="s15">
+  <div class="container">
+    <span class="section-num">16</span>
+    <h2>Playground</h2>
+    <p>
+      Experiment with agent concepts. Design a simple agent loop, choose tools for a task, and explore how planning and error propagation work.
+    </p>
+
+    <div class="interactive-panel" style="margin-top:32px;">
+      <h3>Design Your Agent Loop</h3>
+      <p>Enter a task and see a suggested observe-think-act breakdown. Modify the task to explore different decompositions.</p>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:0.85rem; color:var(--text-dim);">Task</label>
+        <input type="text" class="text-input" id="playgroundTask" value="Find the population of Tokyo and compare it to New York" oninput="playgroundUpdate()">
+      </div>
+
+      <div id="playgroundResult"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h3>Tool Cost Estimator</h3>
+      <p>Rough estimate: how many LLM calls might a typical agent make for different task types? (Illustrative only.)</p>
+
+      <div class="bar-chart" id="costChart" style="height:200px;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p>
+    LLM Agents: From Tool Use to Autonomous Systems — An Interactive Tutorial<br>
+    Built for learning. Explore, experiment, understand.
+  </p>
+</footer>
+
+<script>
+// ============================================================
+// INTERVIEW QUESTIONS: hint / reveal
+// ============================================================
+function toggleHint(id) {
+  const el = document.getElementById(id + '-hint');
+  if (el) el.classList.toggle('visible');
+}
+function reveal(id) {
+  const el = document.getElementById(id + '-answer');
+  if (el) el.classList.add('visible');
+}
+
+// ============================================================
+// SECTION 2: AGENT LOOP VISUALIZER
+// ============================================================
+
+const agentLoopSteps = [
+  { phase: 'observe', label: 'Observe', desc: 'Agent sees: "User wants to know Tokyo population"' },
+  { phase: 'think', label: 'Think', desc: 'I need to search for Tokyo population data' },
+  { phase: 'act', label: 'Act', desc: 'Call search("Tokyo population 2024")' },
+  { phase: 'observe', label: 'Observe', desc: 'Search returns: "Tokyo: ~14 million"' },
+  { phase: 'think', label: 'Think', desc: 'I have the answer. Can respond.' },
+  { phase: 'act', label: 'Act', desc: 'Generate final response to user' },
+  { phase: 'done', label: 'Done', desc: 'Goal satisfied. Loop ends.' }
+];
+
+let agentLoopIdx = 0;
+
+function agentLoopReset() {
+  agentLoopIdx = 0;
+  agentLoopRender();
+}
+
+function agentLoopStep() {
+  if (agentLoopIdx < agentLoopSteps.length - 1) agentLoopIdx++;
+  agentLoopRender();
+}
+
+function agentLoopRender() {
+  const flow = document.getElementById('agentLoopFlow');
+  const status = document.getElementById('agentLoopStatus');
+  flow.innerHTML = '';
+
+  const current = agentLoopSteps[agentLoopIdx];
+  const phases = ['Observe', 'Think', 'Act'];
+  phases.forEach((p, i) => {
+    const step = document.createElement('div');
+    step.className = 'flow-step' + (current.phase === p.toLowerCase() ? ' active' : '');
+    step.textContent = p;
+    flow.appendChild(step);
+    if (i < 2) {
+      const arr = document.createElement('div');
+      arr.className = 'flow-arrow';
+      arr.textContent = '↓';
+      flow.appendChild(arr);
+    }
+  });
+
+  status.innerHTML = `<strong>Step ${agentLoopIdx + 1}/${agentLoopSteps.length}:</strong> ${current.desc}`;
+}
+
+agentLoopRender();
+
+// ============================================================
+// SECTION 3: REACT DEMO
+// ============================================================
+
+const reactTraceData = [
+  { type: 'think', text: 'I need to find the ages of both Glenn Hughes and Ross Lynch to compare them.' },
+  { type: 'act', text: 'search("Glenn Hughes age")' },
+  { type: 'obs', text: 'Glenn Hughes (born 1951) is 73 years old.' },
+  { type: 'think', text: 'Glenn Hughes was born in 1951. Now I need Ross Lynch\'s age.' },
+  { type: 'act', text: 'search("Ross Lynch age")' },
+  { type: 'obs', text: 'Ross Lynch (born 1995) is 29 years old.' },
+  { type: 'think', text: 'Glenn Hughes: 1951. Ross Lynch: 1995. Glenn Hughes is older.' },
+  { type: 'answer', text: 'Glenn Hughes is older (born 1951) than Ross Lynch (born 1995).' }
+];
+
+let reactIdx = 0;
+
+function reactReset() {
+  reactIdx = 0;
+  reactRender();
+}
+
+function reactStep() {
+  if (reactIdx < reactTraceData.length) reactIdx++;
+  reactRender();
+}
+
+function reactRender() {
+  const container = document.getElementById('reactTrace');
+  container.innerHTML = '';
+  reactTraceData.slice(0, reactIdx).forEach(item => {
+    const div = document.createElement('div');
+    let cls = 'trace-line ';
+    if (item.type === 'think') cls += 'trace-think';
+    else if (item.type === 'act') cls += 'trace-act';
+    else if (item.type === 'obs') cls += 'trace-obs';
+    else cls += 'trace-think';
+    div.className = cls;
+    const prefix = item.type === 'think' ? 'Thought: ' : item.type === 'act' ? 'Action: ' : item.type === 'obs' ? 'Observation: ' : 'Answer: ';
+    div.textContent = prefix + item.text;
+    container.appendChild(div);
+  });
+}
+
+reactRender();
+
+// ============================================================
+// SECTION 4: TOOL SELECTION DEMO
+// ============================================================
+
+const toolTasks = {
+  weather: { tools: ['search'], desc: 'Search for current weather in Tokyo' },
+  math: { tools: ['calculator'], desc: 'Use calculator for 17 × 243' },
+  research: { tools: ['search', 'summarize', 'search', 'write_report'], desc: 'Search → Summarize sources → More search → Write report' },
+  code: { tools: ['read_file', 'write_file', 'run_terminal'], desc: 'Read context → Write Python script → Run and verify' }
+};
+
+function toolSelectUpdate() {
+  const sel = document.getElementById('toolTaskSelect').value;
+  const task = toolTasks[sel];
+  const result = document.getElementById('toolSelectResult');
+  result.innerHTML = `
+    <div class="card card-alt">
+      <p style="margin-bottom:12px; color:var(--text);">${task.desc}</p>
+      <div class="token-row">
+        ${task.tools.map((t, i) => `<span class="token token-word">${i + 1}. ${t}</span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+toolSelectUpdate();
+
+// ============================================================
+// SECTION 5: AGENT ARCHITECTURE COMPARISON
+// ============================================================
+
+const archFixedSteps = ['Plan', 'Goal 1', 'Goal 2', 'Goal 3', 'Synthesize'];
+const archProactiveSteps = ['Plan', 'Goal 1', 'Goal 2', 'Revise', 'Goal 4', 'Synthesize'];
+
+function renderArchFlow(id, steps) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  steps.forEach((s, i) => {
+    const step = document.createElement('div');
+    step.className = 'flow-step';
+    step.textContent = s;
+    el.appendChild(step);
+    if (i < steps.length - 1) {
+      const arr = document.createElement('div');
+      arr.className = 'flow-arrow';
+      arr.textContent = '↓';
+      el.appendChild(arr);
+    }
+  });
+}
+
+renderArchFlow('archFixed', archFixedSteps);
+renderArchFlow('archProactive', archProactiveSteps);
+
+// ============================================================
+// SECTION 11: MULTI-AGENT COMMUNICATION
+// ============================================================
+
+const multiAgentMessages = [
+  { from: 'Researcher', to: 'Writer', msg: 'Here are the key findings: Tokyo 14M, NYC 8.3M.' },
+  { from: 'Writer', to: 'Researcher', msg: 'Can you get GDP figures for comparison?' },
+  { from: 'Researcher', to: 'Writer', msg: 'Tokyo GDP ~$1.6T, NYC ~$1.5T.' },
+  { from: 'Writer', to: 'User', msg: 'Report complete. Tokyo is larger by population; GDP is similar.' }
+];
+
+let multiAgentIdx = 0;
+
+function multiAgentReset() {
+  multiAgentIdx = 0;
+  multiAgentRender();
+}
+
+function multiAgentStep() {
+  if (multiAgentIdx < multiAgentMessages.length) multiAgentIdx++;
+  multiAgentRender();
+}
+
+function multiAgentRender() {
+  const container = document.getElementById('multiAgentTrace');
+  container.innerHTML = '';
+  multiAgentMessages.slice(0, multiAgentIdx).forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'trace-line trace-act';
+    div.innerHTML = `<strong>${m.from} → ${m.to}:</strong> ${m.msg}`;
+    container.appendChild(div);
+  });
+}
+
+multiAgentRender();
+
+// ============================================================
+// SECTION 13: ERROR PROPAGATION DEMO
+// ============================================================
+
+const errorPropSteps = [
+  { step: 1, correct: 'Search("Glenn Hughes birth year") → 1951', wrong: 'Search("Glenn Hughes birth year") → 1991 (hallucinated)', used: null },
+  { step: 2, correct: 'Search("Ross Lynch birth year") → 1995', wrong: 'Compare: 1991 vs 1995 → Ross Lynch older', used: 'wrong' },
+  { step: 3, correct: 'Answer: Glenn Hughes is older (1951 < 1995)', wrong: 'Answer: Ross Lynch is older (1991 < 1995)', used: 'wrong' }
+];
+
+let errorPropIdx = 0;
+
+function errorPropReset() {
+  errorPropIdx = 0;
+  errorPropRender();
+}
+
+function errorPropStep() {
+  if (errorPropIdx < errorPropSteps.length) errorPropIdx++;
+  errorPropRender();
+}
+
+function errorPropRender() {
+  const container = document.getElementById('errorPropTrace');
+  container.innerHTML = '';
+  errorPropSteps.slice(0, errorPropIdx).forEach((s, i) => {
+    const div = document.createElement('div');
+    const isError = i === 0 && errorPropIdx >= 1;
+    div.className = 'trace-line ' + (isError ? 'trace-error' : 'trace-think');
+    const used = s.used === 'wrong' ? s.wrong : s.correct;
+    div.innerHTML = `<strong>Step ${s.step}:</strong> ${used} ${i === 0 && errorPropIdx >= 1 ? '<span style="color:var(--danger);">(WRONG — error propagates)</span>' : ''}`;
+    container.appendChild(div);
+  });
+}
+
+errorPropRender();
+
+// ============================================================
+// SECTION 16: PLAYGROUND
+// ============================================================
+
+function playgroundUpdate() {
+  const task = document.getElementById('playgroundTask').value;
+  const result = document.getElementById('playgroundResult');
+  const steps = [
+    'Observe: Read user task',
+    'Think: Need Tokyo population, then NYC, then compare',
+    'Act: search("Tokyo population 2024")',
+    'Observe: Receive Tokyo result',
+    'Act: search("New York City population 2024")',
+    'Observe: Receive NYC result',
+    'Think: Have both. Can compare.',
+    'Act: Generate comparison response'
+  ];
+  result.innerHTML = `
+    <div class="card card-alt">
+      <p style="margin-bottom:12px; color:var(--text-dim);">Suggested agent loop for: "${task}"</p>
+      <div style="font-family:var(--mono); font-size:0.85rem;">
+        ${steps.map((s, i) => `<div class="trace-line trace-think" style="margin:6px 0;">${i + 1}. ${s}</div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+playgroundUpdate();
+
+// Cost chart
+const costData = [
+  { label: 'Simple Q&A', calls: 2 },
+  { label: 'Code task', calls: 15 },
+  { label: 'Website build', calls: 45 },
+  { label: 'Deep research', calls: 80 }
+];
+
+const costChart = document.getElementById('costChart');
+costChart.innerHTML = '';
+const maxCalls = Math.max(...costData.map(d => d.calls));
+costData.forEach(d => {
+  const w = document.createElement('div');
+  w.className = 'bar-wrapper';
+  w.innerHTML = `
+    <div class="bar-value">${d.calls}</div>
+    <div class="bar" style="height:${(d.calls / maxCalls) * 100}%; background:var(--accent);"></div>
+    <div class="bar-label">${d.label}</div>
+  `;
+  costChart.appendChild(w);
+});
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+
+const nav = document.getElementById('nav');
+
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Word Embeddings — From One-Hot to Word2Vec | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
+      --border: #2a2a3a; --text: #e0e0e8; --text-dim: #8888a0;
+      --accent: #6c8cff; --accent2: #a78bfa; --accent3: #34d399;
+      --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(167, 139, 250, 0.16), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(108, 140, 255, 0.1), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.85rem, 5vw, 3rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 780px; color: var(--text-dim); font-size: 1.08rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .num { font-size: 1.75rem; font-weight: 700; color: var(--accent2); font-family: var(--mono); }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
+    .section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--border);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      scroll-margin-top: 96px;
+    }
+    .section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    .section h2 {
+      font-size: 1.55rem;
+      margin: 0 0 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .section-num { font-family: var(--mono); font-size: 0.9rem; color: var(--accent2); font-weight: 600; }
+    .section p { margin: 0 0 1em; color: var(--text); }
+    .section p:last-child { margin-bottom: 0; }
+    .section ul, .section ol { margin: 0 0 1em; padding-left: 1.35em; color: var(--text); }
+    .section li { margin-bottom: 0.45em; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .card h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      color: var(--accent3);
+    }
+    .formula.formula-lg { font-size: 0.95rem; text-align: center; color: var(--accent5); line-height: 1.55; }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 22px 0;
+    }
+    @media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.92rem;
+    }
+    .interactive-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel h3 { margin: 0 0 14px; font-size: 1rem; color: var(--accent2); }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.active { background: rgba(108, 140, 255, 0.15); border-color: var(--accent); color: var(--accent); }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    .slider-row input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+    .slider-row output { font-family: var(--mono); min-width: 52px; color: var(--accent5); }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 16px 0;
+    }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    table.data th { background: var(--bg-card-alt); color: var(--text-dim); font-weight: 600; }
+    table.data td { font-family: var(--mono); font-size: 0.8rem; }
+    table.data .num { text-align: right; }
+    textarea.input-block, input.input-line, select.input-line {
+      width: 100%;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin: 8px 0;
+    }
+    textarea.input-block { min-height: 88px; resize: vertical; }
+    .oh-grid {
+      display: grid;
+      gap: 4px;
+      margin-top: 12px;
+      overflow-x: auto;
+    }
+    .oh-cell {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+    }
+    .oh-cell.on { background: var(--accent); box-shadow: 0 0 8px rgba(108, 140, 255, 0.45); }
+    .oh-labels { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .tok {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      margin: 2px;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      cursor: default;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .tok.center { background: rgba(244, 114, 182, 0.2); border-color: var(--accent4); }
+    .tok.ctx { background: rgba(108, 140, 255, 0.18); border-color: var(--accent); }
+    .tok.dim { opacity: 0.35; }
+    .demo-out {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--accent3);
+      margin-top: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .nn-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+    .nn-row:last-child { border-bottom: none; }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 0.12em 0.45em;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .play-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .play-tabs .btn.active { background: rgba(167, 139, 250, 0.18); border-color: var(--accent2); color: var(--accent2); }
+    .gram-chip {
+      display: inline-block;
+      margin: 4px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--accent5);
+    }
+    .matrix-wrap { overflow-x: auto; margin: 12px 0; }
+    canvas.mini-chart { max-width: 100%; height: auto; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <style class="breadcrumb-styles">
+    .breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 10000; background: #111118; border-bottom: 1px solid #23232f; padding: 10px 24px; font-size: 0.82rem; color: #8888a0; }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+  </style>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a><span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a><span class="bc-sep">›</span>
+    <span class="bc-current">Word Embeddings</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="Chapter sections">
+    <a href="#s0">§0 Vocabulary mismatch</a>
+    <a href="#s1">§1 One-hot</a>
+    <a href="#s2">§2 Distributional semantics</a>
+    <a href="#s3">§3 Word2Vec CBOW</a>
+    <a href="#s4">§4 Skip-gram</a>
+    <a href="#s5">§5 GloVe</a>
+    <a href="#s6">§6 FastText</a>
+    <a href="#s7">§7 Arithmetic</a>
+    <a href="#s8">§8 Playground</a>
+  </nav>
+
+  <header class="hero">
+    <h1>Word Embeddings — From One-Hot to Word2Vec</h1>
+    <p class="subtitle">
+      Sparse bag-of-words and <code>BM25</code> treat every word type as an isolated symbol. That breaks under vocabulary mismatch.
+      <code>One-hot</code> vectors encode the limitation geometrically; <code>distributional semantics</code>, <code>Word2Vec</code>, <code>GloVe</code>, and <code>FastText</code>
+      learn dense vectors that support similarity, analogy, and softer matching between related terms.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">|V|</div><div class="lbl">Vocabulary size drives sparsity</div></div>
+      <div class="hero-stat"><div class="num">dense</div><div class="lbl">Low-dimensional meaning space</div></div>
+      <div class="hero-stat"><div class="num">cos θ</div><div class="lbl">Similarity in vector space</div></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section fade-in" id="s0">
+      <h2><span class="section-num">§0</span> The vocabulary mismatch problem</h2>
+      <p>
+        Lexical matching assumes that relevance is signaled by sharing the same surface forms. In practice, authors and searchers rarely choose identical
+        strings for the same underlying intent—a page about <code>automobile</code> safety may never contain the query term <code>car</code>, yet a human reader would still judge the match as on-topic.
+      </p>
+      <p>
+        Classical sparse retrieval scores such as <code>TF-IDF</code> and <code>BM25</code> compare term statistics at the type level. If the query term does not appear in
+        the document, there is often no direct signal from that token at all. Heuristics such as stemming or query expansion help at the margins, but they do
+        not provide a geometry of meaning: sparse representations allocate one dimension per word type, so two distinct types remain unrelated unless explicitly linked by rules or external knowledge.
+      </p>
+      <p>
+        With <code>one-hot</code> encodings, each word is represented by a vector of length <code>|V|</code> with a single entry equal to one and all others zero. The dot
+        product between any two distinct <code>one-hot</code> vectors is zero, and their cosine similarity is undefined or zero depending on convention. Orthogonality
+        sounds mathematically tidy, but semantically it is catastrophic: every unrelated pair of words is as “dissimilar” as every related pair.
+      </p>
+      <p>
+        <strong>Dense vectors</strong> in a comparatively low-dimensional real space—typically tens to hundreds of dimensions—place distance and angle in correlation with semantic and syntactic relatedness. Learning such vectors from text is the program of modern static word embeddings. They do not replace inverted indexes by themselves, but they underpin semantic search, dense retrieval, reranking, and many downstream models that must generalize beyond exact token overlap.
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s1">
+      <h2><span class="section-num">§1</span> One-hot encoding</h2>
+      <p>
+        Given a finite vocabulary <code>V = {w₁, …, w<sub>|V|</sub>}</code>, the <code>one-hot</code> representation of word <code>wᵢ</code> is the standard basis vector <code>eᵢ ∈ ℝ<sup>|V|</sup></code>.
+        The encoding is exact and injective: no two types collide. It is also extremely sparse: exactly one nonzero entry per vector, regardless of how large
+        the vocabulary grows.
+      </p>
+      <p>
+        Three structural properties follow immediately. First, <strong>sparsity</strong>: storing a full vector for every token in a long document scales linearly with
+        <code>|V|</code> if materialized naïvely. Second, <strong>high dimensionality</strong>: the ambient dimension equals the number of types, which in open-vocabulary settings
+        can reach millions. Third, <strong>orthogonality</strong> of distinct words makes every pair of different types maximally separated under dot-product similarity.
+      </p>
+      <p>
+        These vectors carry almost no transferable signal. A model that sees <code>one-hot</code> inputs must allocate separate parameters for each type, so statistics for one word type do not help predictions for a synonym. Frequency statistics help at the document level for <code>BM25</code>, but the representation of the types themselves does not smooth across related terms.
+      </p>
+      <p>
+        The <strong>curse of dimensionality</strong> also bites when you treat each word as an isolated corner of a hypercube. In very high dimensions, most probability
+        mass in simple generative stories lies far from any training example unless you impose structure. Dense embeddings impose that structure by sharing
+        dimensions across many words, so co-occurring or substitutable words tug on overlapping coordinates during training.
+      </p>
+      <div class="interactive-panel">
+        <h3>Interactive: visualize one-hot vectors</h3>
+        <p style="margin:0 0 10px; font-size:0.9rem; color:var(--text-dim);">Select a word. Each column is a dimension; the single active cell is the hot entry. Compare dot products: different words share no dimensions.</p>
+        <div class="btn-group" id="ohWords"></div>
+        <div class="matrix-wrap"><div class="oh-grid" id="ohGrid" style="grid-template-columns: repeat(8, 22px);"></div></div>
+        <p class="demo-out" id="ohOut"></p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s2">
+      <h2><span class="section-num">§2</span> Distributional semantics</h2>
+      <p>
+        The distributional hypothesis, often summarized by Firth’s dictum that “you shall know a word by the company it keeps,” proposes that meaning is
+        reflected in contextual patterns. Words that appear in interchangeable or overlapping environments should be represented more similarly than words
+        that do not. This is not a claim that context equals full logical meaning, but a practical statistical principle that turns raw corpora into geometry.
+      </p>
+      <p>
+        A classical construction is the <strong>co-occurrence matrix</strong>. Fix a window (for example, ±5 tokens). For each center word <code>i</code> and context word <code>j</code>,
+        count how often <code>j</code> appears in the window around <code>i</code>. Row <code>i</code> then looks like a very long, sparse histogram of neighbors. High counts link words that
+        tend to show up together: <code>doctor</code> and <code>hospital</code>, <code>keyboard</code> and <code>typing</code>, and so on.
+      </p>
+      <p>
+        Raw counts overweight frequent function words. <strong>Pointwise mutual information</strong> (<code>PMI</code>) rescales counts into association scores. Writing empirical
+        probabilities from the corpus, a common definition is
+      </p>
+      <div class="formula">PMI(i, j) = log₂ P(i, j) / (P(i) · P(j))</div>
+      <p>
+        Large positive <code>PMI</code> suggests that <code>i</code> and <code>j</code> co-occur more than chance; negative values suggest avoidance. <code>PMI</code> is noisy for rare pairs, so
+        practice often uses shifted positive <code>PMI</code> (<code>PPMI</code>) or adds smoothing. Either way, raw integers become information-theoretic
+        edge weights that emphasize informative neighbors.
+      </p>
+      <p>
+        The co-occurrence matrix is still wide. <strong>Singular value decomposition</strong> (<code>SVD</code>) and related factorizations approximate it with a low-rank product,
+        yielding dense rows that serve as word vectors. This pipeline—count, reweight, factorize—is the conceptual ancestor of <code>Word2Vec</code> and <code>GloVe</code>: first
+        summarize global pairwise statistics, then embed them into a small number of latent factors that behave like semantic dimensions.
+      </p>
+      <div class="interactive-panel">
+        <h3>Interactive: build a tiny co-occurrence matrix</h3>
+        <p style="margin:0 0 10px; font-size:0.9rem; color:var(--text-dim);">Tokens are lowercased; punctuation stripped. Window size includes both sides of each center token.</p>
+        <textarea class="input-block" id="coText" spellcheck="false">the cat sat on the mat the dog sat on the log</textarea>
+        <div class="slider-row">
+          <label for="coWin">Window</label>
+          <input type="range" id="coWin" min="1" max="3" value="1" />
+          <output id="coWinOut">1</output>
+        </div>
+        <button type="button" class="btn" id="coBtn">Recompute matrix</button>
+        <div id="coTable"></div>
+        <p class="demo-out" id="coPmi"></p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s3">
+      <h2><span class="section-num">§3</span> Word2Vec — continuous bag-of-words (<code>CBOW</code>)</h2>
+      <p>
+        <code>Word2Vec</code> replaces explicit matrix factorization with a shallow neural prediction problem. In the <strong>continuous bag-of-words</strong> variant, the model
+        reads the multiset of context words within a window and tries to predict the center word. The architecture is deliberately minimal: an embedding lookup
+        for each input token, an aggregation step (typically averaging the context vectors), a linear hidden transformation, and an output layer over the
+        vocabulary.
+      </p>
+      <p>
+        Parameter tying is what makes the vectors useful. The same embedding matrix maps token ids to vectors whether a word appears as context or as a prediction
+        target (modulo some implementations that split input and output embeddings). During training, errors backpropagate into those shared vectors, nudging
+        co-occurring words toward arrangements that make good predictions. The hidden layer weights therefore encode distributional structure even though the
+        training objective is pure prediction.
+      </p>
+      <p>
+        If the output uses a full <code>softmax</code> over <code>|V|</code> classes, each step is expensive. <strong>Negative sampling</strong> approximates the gradient by treating the task as
+        binary classification: distinguish the true center word from a handful of randomly drawn noise words. Noise is typically drawn from a smoothed unigram
+        distribution so frequent tokens are sampled more often as distractors, which empirically stabilizes training.
+      </p>
+      <p>
+        The <strong>window size</strong> sets how far context stretches along the sentence. Small windows emphasize syntactic substitution—words that fit the same local
+        slot. Larger windows pull in more topical associates. There is no universal best value; it is a bias knob that trades local structure against broader
+        co-occurrence.
+      </p>
+      <div class="comparison">
+        <div>
+          <strong><code>CBOW</code> objective (informal)</strong><br />
+          Maximize <code>P(center | context₁, …, context<sub>k</sub>)</code> by averaging context embeddings and comparing against the true center token.
+        </div>
+        <div>
+          <strong>Why averaging?</strong><br />
+          Order inside the window is often discarded for simplicity. The bag-of-contexts assumption keeps the model fast and still captures strong distributional
+          signal for many tasks.
+        </div>
+      </div>
+      <div class="interactive-panel">
+        <h3>Interactive: sliding context window (<code>CBOW</code> view)</h3>
+        <p style="margin:0 0 10px; font-size:0.9rem; color:var(--text-dim);">Blue tokens are context; pink is the predicted center. Step through the sentence.</p>
+        <p style="font-family:var(--mono); font-size:0.9rem; margin:0 0 12px;" id="cbowSentence"></p>
+        <div class="slider-row">
+          <label for="cbowWin">Window radius</label>
+          <input type="range" id="cbowWin" min="1" max="3" value="2" />
+          <output id="cbowWinOut">2</output>
+        </div>
+        <div class="btn-group">
+          <button type="button" class="btn" id="cbowPrev">← Previous center</button>
+          <button type="button" class="btn" id="cbowNext">Next center →</button>
+        </div>
+        <p class="demo-out" id="cbowOut"></p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s4">
+      <h2><span class="section-num">§4</span> Word2Vec — skip-gram</h2>
+      <p>
+        The <strong>skip-gram</strong> model flips the prediction direction: given a center word, it asks the network to predict each context word. The objective is to
+        maximize <code>P(context | center)</code> across pairs drawn from windows. This inversion is not mathematically equivalent to <code>CBOW</code>, and in practice skip-gram
+        often performs better for rare words because each rare center token generates multiple training pairs when it appears, whereas <code>CBOW</code> collapses its
+        contexts into a single averaged prediction problem.
+      </p>
+      <p>
+        Architecturally, you still embed the center word, map through a hidden layer, and score candidate context words. The comparison to <code>CBOW</code> is therefore
+        about what is conditioned on what, not about deep hierarchy. Both models are shallow; depth enters later in contextual models such as <code>ELMo</code> and
+        transformers, which produce token vectors that depend on the entire sentence.
+      </p>
+      <p>
+        Frequent tokens like <code>the</code> create noise: they co-occur with almost everything and dominate gradient counts. <strong>Subsampling</strong> stochastically drops
+        high-frequency words during pair generation, preserving training time and reducing the pressure to waste dimensions explaining trivial predictability.
+        The exact rule varies by implementation, but the intent is always to stop common function words from swamping the signal.
+      </p>
+      <div class="comparison">
+        <div>
+          <strong><code>CBOW</code></strong><br />Many context vectors → predict one center. Noise averaging can help for frequent words; rare centers see fewer updates per
+          appearance.
+        </div>
+        <div>
+          <strong>Skip-gram</strong><br />One center → predict many contexts. Rare words enjoy more training signal per occurrence; computation per sentence can be higher.
+        </div>
+      </div>
+      <div class="interactive-panel">
+        <h3>Interactive: skip-gram pairs on a sentence</h3>
+        <p style="margin:0 0 10px; font-size:0.9rem; color:var(--text-dim);">Each step highlights one (center → context) training pair. Window radius is adjustable.</p>
+        <div id="sgTokens"></div>
+        <div class="slider-row">
+          <label for="sgWin">Window radius</label>
+          <input type="range" id="sgWin" min="1" max="3" value="2" />
+          <output id="sgWinOut">2</output>
+        </div>
+        <div class="btn-group">
+          <button type="button" class="btn" id="sgPrev">← Previous pair</button>
+          <button type="button" class="btn" id="sgNext">Next pair →</button>
+        </div>
+        <p class="demo-out" id="sgOut"></p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s5">
+      <h2><span class="section-num">§5</span> GloVe — global vectors</h2>
+      <p>
+        <code>Word2Vec</code> scans corpora locally through sliding windows, which is efficient and streaming-friendly. <code>GloVe</code> (Global Vectors) instead foregrounds
+        the global co-occurrence matrix <code>X</code>, where <code>X<sub>ij</sub></code> stores how often word <code>j</code> appears in the context of word <code>i</code>. Rather than factorizing <code>X</code> with
+        <code>SVD</code> directly, <code>GloVe</code> defines a weighted least-squares objective that approximates log co-occurrence counts with bilinear dot products of learned
+        vectors plus scalar biases.
+      </p>
+      <p>
+        Let <code>wᵢ</code> and <code>w̃ⱼ</code> be word and context vectors (the final representation often uses their sum or just the word vector, depending on usage). The
+        objective encourages
+      </p>
+      <div class="formula formula-lg">J = Σ<sub>i,j</sub> f(X<sub>ij</sub>) ( wᵢ · w̃ⱼ + bᵢ + b̃ⱼ − log X<sub>ij</sub> )²</div>
+      <p>
+        The weighting function <code>f</code> down-weights rare entries so noise does not dominate, and it caps very large counts so frequent pairs do not overwhelm the
+        loss. A typical choice is piecewise: zero below a cutoff, power-law growth in the middle, and a flat maximum for large <code>x</code>. The details matter for
+        optimization, but the conceptual role is always to balance dynamic range in the co-occurrence statistics.
+      </p>
+      <p>
+        <strong><code>GloVe</code> versus <code>Word2Vec</code>:</strong> both learn vector spaces from co-occurrence structure, but <code>GloVe</code> makes the global matrix explicit in the loss,
+        while skip-gram with negative sampling can be interpreted as implicit factorization of shifted <code>PMI</code> matrices. In deployment, quality differences are
+        often smaller than differences in training data, dimensionality, and tokenization. Both share the same backbone—co-occurrence log counts approximated by dot products of low-dimensional vectors—expressed either through global least squares or local softmax classification. If two words share similar rows in the co-occurrence matrix, their dot products with third words must look alike; the least-squares objective compresses those long rows into parallel directions in embedding space.
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s6">
+      <h2><span class="section-num">§6</span> FastText — subword embeddings</h2>
+      <p>
+        Standard <code>Word2Vec</code> assigns an independent vector to every type in the training vocabulary. At deployment time, any out-of-vocabulary (<code>OOV</code>) string—
+        a rare surname, a product code, a typo—has no embedding at all unless you map it to <code>&lt;UNK&gt;</code> or invent a fallback. That limitation is painful for web
+        text, morphologically rich languages with long word forms, and noisy queries.
+      </p>
+      <p>
+        <code>FastText</code> addresses the gap by representing a word as the sum (or average) of vectors for its character <code>n</code>-grams, including boundary symbols to
+        distinguish prefixes and suffixes, plus optionally the whole-word token itself. The model learns embeddings for those subword units during the same
+        skip-gram-style training as before, but scoring breaks a word into many pieces.
+      </p>
+      <p>
+        For example, with suitable bounds and minimum <code>n</code>, the word <code>playing</code> might contribute <code>&lt;pl</code>, <code>pla</code>, <code>lay</code>, <code>ayi</code>, <code>yin</code>, <code>ing</code>, <code>ng&gt;</code>, and longer grams such as
+        <code>play</code> and <code>aying</code>. Rare inflections still overlap heavily in subwords with frequent lemmas, so their composed vectors inherit partial meaning. Typos
+        that preserve many <code>n</code>-grams remain close to the intended word in cosine distance.
+      </p>
+      <p>
+        The trade-off is memory and computation: many more parameters are active per token, and very short words can be dominated by boundary artifacts if
+        hyperparameters are poorly chosen. Still, for open-vocabulary retrieval and classification, subword models remain a pragmatic default alongside byte-pair
+        and sentence-piece tokenizations used in transformers.
+      </p>
+      <div class="interactive-panel">
+        <h3>Interactive: character <code>n</code>-grams</h3>
+        <p style="margin:0 0 10px; font-size:0.9rem; color:var(--text-dim);">Boundary markers <code>&lt;</code> and <code>&gt;</code> wrap the word. Adjust <code>n</code> min/max (FastText-style sketch).</p>
+        <input type="text" class="input-line" id="ftWord" value="playing" spellcheck="false" />
+        <div class="slider-row">
+          <label for="ftNmin">Min n</label>
+          <input type="range" id="ftNmin" min="2" max="5" value="3" />
+          <output id="ftNminOut">3</output>
+        </div>
+        <div class="slider-row">
+          <label for="ftNmax">Max n</label>
+          <input type="range" id="ftNmax" min="3" max="7" value="6" />
+          <output id="ftNmaxOut">6</output>
+        </div>
+        <button type="button" class="btn" id="ftBtn">Decompose</button>
+        <div id="ftOut" style="margin-top:12px;"></div>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s7">
+      <h2><span class="section-num">§7</span> Embedding arithmetic and properties</h2>
+      <p>
+        Well-trained word vectors arrange linear structure that is not obvious from the training objective alone. The famous example <code>king − man + woman ≈ queen</code>
+        is not an identity in any formal sense, but a robust empirical pattern: vector differences aligned with gender in one pair transfer when added to
+        another word whose gendered component points similarly. The relationship holds approximately in cosine neighborhoods, not as exact equality.
+      </p>
+      <p>
+        <strong>Cosine similarity</strong> is the standard similarity measure for embeddings because vector length often encodes frequency or training artifacts more than
+        semantics. Cosine focuses on direction: <code>cos(θ) = (u·v) / (‖u‖‖v‖)</code>. Nearest-neighbor search in embedding space—whether exact or approximate—typically
+        uses cosine or Euclidean distance after normalization.
+      </p>
+      <p>
+        Clustering and visualization (<code>t-SNE</code>, <code>UMAP</code>) reveal topical islands: countries near capitals, verbs near their objects, hypernyms near hyponyms in
+        coarse structure. These views are exploratory only: distances in projected 2D plots distort global geometry, so they should never be read as quantitative
+        ground truth.
+      </p>
+      <p>
+        Static embeddings assign <em>one</em> vector per type. The word <code>bank</code> shares the same representation for river edges and financial institutions until contextual models condition on surrounding tokens. Dense retrieval today often uses sentence or document encoders for exactly this reason.
+      </p>
+      <div class="interactive-panel">
+        <h3>Interactive: analogy explorer (pre-computed vectors)</h3>
+        <p style="margin:0 0 10px; font-size:0.9rem; color:var(--text-dim);">Vectors are small synthetic embeddings chosen so classic offsets appear in cosine space. Pick A, B, C; the panel ranks candidates for D.</p>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:12px;">
+          <label>A <select class="input-line" id="anA"></select></label>
+          <label>B <select class="input-line" id="anB"></select></label>
+          <label>C <select class="input-line" id="anC"></select></label>
+        </div>
+        <button type="button" class="btn" id="anGo">Find D</button>
+        <p class="demo-out" id="anOut"></p>
+        <canvas class="mini-chart" id="anCanvas" width="640" height="220" style="margin-top:14px;"></canvas>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s8">
+      <h2><span class="section-num">§8</span> Playground</h2>
+      <p>
+        The tools below use the same pre-computed embedding table as §7. Cosine similarity returns values in <code>[-1, 1]</code>. Nearest neighbors rank in-vocabulary items
+        by cosine similarity to the query (matching is case-insensitive). The analogy solver maximizes cosine similarity between <code>(B − A + C)</code> and each candidate <code>D</code>, a
+        lightweight variant of the <code>3CosAdd</code> recipe used in the original evaluations. Lexical retrievers need token overlap; embedding models soften that wall. Modern systems often <strong>hybridize</strong>—retrieve candidates with an inverted index, then rescore with dense vectors—or embed queries and passages jointly with a trained bi-encoder.
+      </p>
+      <datalist id="embedVocabList"></datalist>
+      <div class="interactive-panel">
+        <h3>Embedding playground</h3>
+        <div class="play-tabs" id="playTabs">
+          <button type="button" class="btn active" data-tab="sim">Similarity</button>
+          <button type="button" class="btn" data-tab="nn">Nearest neighbors</button>
+          <button type="button" class="btn" data-tab="ana">Analogy</button>
+        </div>
+        <div id="tab-sim">
+          <label>Word 1 <input type="text" class="input-line" id="pW1" list="embedVocabList" placeholder="e.g. car" autocomplete="off" /></label>
+          <label>Word 2 <input type="text" class="input-line" id="pW2" list="embedVocabList" placeholder="e.g. automobile" autocomplete="off" /></label>
+          <button type="button" class="btn" id="pSimBtn">Compute cosine</button>
+          <p class="demo-out" id="pSimOut"></p>
+        </div>
+        <div id="tab-nn" style="display:none;">
+          <label>Word <input type="text" class="input-line" id="pNW" list="embedVocabList" placeholder="e.g. search" autocomplete="off" /></label>
+          <label style="display:block; margin-top:8px;">Top-k <input type="number" class="input-line" id="pK" value="8" min="1" max="25" style="max-width:120px;" /></label>
+          <button type="button" class="btn" id="pNnBtn">Show neighbors</button>
+          <div id="pNnOut" style="margin-top:12px;"></div>
+        </div>
+        <div id="tab-ana" style="display:none;">
+          <p style="font-size:0.9rem; color:var(--text-dim); margin:0 0 10px;">A is to B as C is to <strong>?</strong> — enter three words; candidates for D are ranked.</p>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap:10px;">
+            <label>A <input type="text" class="input-line" id="pAA" list="embedVocabList" placeholder="king" autocomplete="off" /></label>
+            <label>B <input type="text" class="input-line" id="pAB" list="embedVocabList" placeholder="queen" autocomplete="off" /></label>
+            <label>C <input type="text" class="input-line" id="pAC" list="embedVocabList" placeholder="man" autocomplete="off" /></label>
+          </div>
+          <button type="button" class="btn" id="pAnBtn">Solve</button>
+          <p class="demo-out" id="pAnOut"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  /* --- Nav --- */
+  const navToggle = $('navToggle');
+  const mainNav = $('mainNav');
+  navToggle.addEventListener('click', () => {
+    const open = mainNav.classList.toggle('visible');
+    navToggle.setAttribute('aria-expanded', open);
+  });
+
+  /* --- Fade-in sections --- */
+  const sections = document.querySelectorAll('.section.fade-in');
+  const io = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    },
+    { threshold: 0.08 }
+  );
+  sections.forEach((s) => io.observe(s));
+
+  /* --- One-hot demo --- */
+  const vocabOH = ['car', 'automobile', 'laptop', 'notebook', 'doctor', 'physician', 'river', 'bank'];
+  const ohWords = $('ohWords');
+  const ohGrid = $('ohGrid');
+  const ohOut = $('ohOut');
+  ohGrid.style.gridTemplateColumns = `repeat(${vocabOH.length}, 22px)`;
+  let ohSelected = 0;
+  function renderOH() {
+    ohGrid.innerHTML = '';
+    for (let d = 0; d < vocabOH.length; d++) {
+      const cell = document.createElement('div');
+      cell.className = 'oh-cell' + (d === ohSelected ? ' on' : '');
+      cell.title = 'dim ' + d;
+      ohGrid.appendChild(cell);
+    }
+    const a = vocabOH[ohSelected];
+    let lines = 'One-hot for "' + a + '" (|V|=' + vocabOH.length + ')\n';
+    for (let i = 0; i < vocabOH.length; i++) {
+      if (i === ohSelected) lines += 'dot("' + a + '","' + vocabOH[i] + '") = 1\n';
+      else lines += 'dot("' + a + '","' + vocabOH[i] + '") = 0\n';
+    }
+    ohOut.textContent = lines;
+  }
+  vocabOH.forEach((w, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn' + (i === 0 ? ' active' : '');
+    b.textContent = w;
+    b.addEventListener('click', () => {
+      ohSelected = i;
+      ohWords.querySelectorAll('.btn').forEach((x, j) => x.classList.toggle('active', j === i));
+      renderOH();
+    });
+    ohWords.appendChild(b);
+  });
+  renderOH();
+
+  /* --- Co-occurrence --- */
+  function tokenize(s) {
+    return s
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+  function buildCooc(tokens, win) {
+    const types = [...new Set(tokens)].sort();
+    const idx = Object.fromEntries(types.map((t, i) => [t, i]));
+    const n = types.length;
+    const M = Array.from({ length: n }, () => Array(n).fill(0));
+    for (let i = 0; i < tokens.length; i++) {
+      const w = tokens[i];
+      for (let d = -win; d <= win; d++) {
+        if (d === 0) continue;
+        const j = i + d;
+        if (j < 0 || j >= tokens.length) continue;
+        const a = idx[w];
+        const b = idx[tokens[j]];
+        M[a][b] += 1;
+      }
+    }
+    return { types, M };
+  }
+  function pmiTable(types, M) {
+    const n = types.length;
+    let total = 0;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) total += M[i][j];
+    if (total === 0) return 'No co-occurrences for this window.';
+    const rowSum = M.map((r) => r.reduce((a, b) => a + b, 0));
+    const colSum = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) colSum[j] += M[i][j];
+    const eps = 1e-9;
+    const lines = [];
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const c = M[i][j];
+        if (c === 0) continue;
+        const pij = c / total;
+        const pi = rowSum[i] / total;
+        const pj = colSum[j] / total;
+        const pmi = Math.log2(pij / (pi * pj + eps) + eps);
+        lines.push(types[i] + ',' + types[j] + ': count=' + c + '  PMI≈' + pmi.toFixed(3));
+      }
+    }
+    return lines.slice(0, 24).join('\n') + (lines.length > 24 ? '\n…' : '');
+  }
+  function renderCo() {
+    const win = +$('coWin').value;
+    $('coWinOut').textContent = String(win);
+    const tokens = tokenize($('coText').value);
+    const { types, M } = buildCooc(tokens, win);
+    let html = '<table class="data"><thead><tr><th></th>';
+    types.forEach((t) => (html += '<th>' + t + '</th>'));
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < types.length; i++) {
+      html += '<tr><th>' + types[i] + '</th>';
+      for (let j = 0; j < types.length; j++) html += '<td class="num">' + M[i][j] + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    $('coTable').innerHTML = html;
+    $('coPmi').textContent = pmiTable(types, M);
+  }
+  $('coBtn').addEventListener('click', renderCo);
+  $('coWin').addEventListener('input', renderCo);
+  $('coText').addEventListener('change', renderCo);
+  renderCo();
+
+  /* --- CBOW window --- */
+  const cbowTokens = tokenize('dense vectors capture meaning from the company words keep');
+  const cbowWin = $('cbowWin');
+  const cbowWinOut = $('cbowWinOut');
+  let cbowIdx = 3;
+  function renderCbow() {
+    const win = +cbowWin.value;
+    cbowWinOut.textContent = String(win);
+    const el = $('cbowSentence');
+    el.textContent = '';
+    cbowTokens.forEach((t, i) => {
+      const span = document.createElement('span');
+      span.textContent = t + ' ';
+      if (i === cbowIdx) span.style.color = 'var(--accent4)';
+      else if (Math.abs(i - cbowIdx) <= win && i !== cbowIdx) span.style.color = 'var(--accent)';
+      else span.style.color = 'var(--text-dim)';
+      el.appendChild(span);
+    });
+    const ctx = [];
+    for (let i = cbowIdx - win; i <= cbowIdx + win; i++) {
+      if (i >= 0 && i < cbowTokens.length && i !== cbowIdx) ctx.push(cbowTokens[i]);
+    }
+    $('cbowOut').textContent =
+      'Training example: predict center "' +
+      cbowTokens[cbowIdx] +
+      '" from context bag {' +
+      ctx.map((x) => '"' + x + '"').join(', ') +
+      '}.\nCBOW averages context embeddings before scoring the vocabulary.';
+  }
+  $('cbowPrev').addEventListener('click', () => {
+    cbowIdx = (cbowIdx - 1 + cbowTokens.length) % cbowTokens.length;
+    renderCbow();
+  });
+  $('cbowNext').addEventListener('click', () => {
+    cbowIdx = (cbowIdx + 1) % cbowTokens.length;
+    renderCbow();
+  });
+  cbowWin.addEventListener('input', renderCbow);
+  renderCbow();
+
+  /* --- Skip-gram --- */
+  const sgTokensArr = tokenize('the quick brown fox jumps over the lazy dog');
+  let sgPairIdx = 0;
+  let sgPairs = [];
+  function rebuildSgPairs() {
+    const win = +$('sgWin').value;
+    $('sgWinOut').textContent = String(win);
+    sgPairs = [];
+    for (let i = 0; i < sgTokensArr.length; i++) {
+      for (let d = -win; d <= win; d++) {
+        if (d === 0) continue;
+        const j = i + d;
+        if (j < 0 || j >= sgTokensArr.length) continue;
+        sgPairs.push({ c: i, x: j });
+      }
+    }
+    sgPairIdx = Math.min(sgPairIdx, Math.max(0, sgPairs.length - 1));
+  }
+  function renderSg() {
+    rebuildSgPairs();
+    const box = $('sgTokens');
+    box.innerHTML = '';
+    const pair = sgPairs[sgPairIdx] || { c: 0, x: 1 };
+    sgTokensArr.forEach((t, i) => {
+      const span = document.createElement('span');
+      span.className = 'tok';
+      if (i === pair.c) span.classList.add('center');
+      else if (i === pair.x) span.classList.add('ctx');
+      else if (Math.abs(i - pair.c) <= +$('sgWin').value) span.classList.add('dim');
+      span.textContent = t;
+      box.appendChild(span);
+    });
+    const c = sgTokensArr[pair.c];
+    const x = sgTokensArr[pair.x];
+    $('sgOut').textContent =
+      'Pair ' +
+      (sgPairIdx + 1) +
+      ' / ' +
+      sgPairs.length +
+      ': maximize P(context="' +
+      x +
+      '" | center="' +
+      c +
+      '").\nNegative sampling contrasts this true context with random noise words.';
+  }
+  $('sgPrev').addEventListener('click', () => {
+    rebuildSgPairs();
+    sgPairIdx = (sgPairIdx - 1 + sgPairs.length) % sgPairs.length;
+    renderSg();
+  });
+  $('sgNext').addEventListener('click', () => {
+    rebuildSgPairs();
+    sgPairIdx = (sgPairIdx + 1) % sgPairs.length;
+    renderSg();
+  });
+  $('sgWin').addEventListener('input', renderSg);
+  rebuildSgPairs();
+  renderSg();
+
+  /* --- FastText n-grams --- */
+  function ngrams(word, nMin, nMax) {
+    const w = '<' + word + '>';
+    const S = new Set();
+    for (let n = nMin; n <= nMax; n++) {
+      for (let i = 0; i <= w.length - n; i++) S.add(w.slice(i, i + n));
+    }
+    return [...S].sort();
+  }
+  function renderFt() {
+    const nMin = +$('ftNmin').value;
+    let nMax = +$('ftNmax').value;
+    if (nMax < nMin) nMax = nMin;
+    $('ftNminOut').textContent = String(nMin);
+    $('ftNmaxOut').textContent = String(nMax);
+    $('ftNmax').value = String(nMax);
+    const g = ngrams($('ftWord').value.trim() || 'empty', nMin, nMax);
+    $('ftOut').innerHTML = g.length ? g.map((x) => '<span class="gram-chip">' + x + '</span>').join('') : '<span style="color:var(--text-dim)">No grams.</span>';
+  }
+  $('ftBtn').addEventListener('click', renderFt);
+  ['ftNmin', 'ftNmax'].forEach((id) => $(id).addEventListener('input', renderFt));
+  $('ftWord').addEventListener('change', renderFt);
+  renderFt();
+
+  /* --- Embeddings: additive orthonormal basis in R^16 --- */
+  const DIM = 16;
+  const Z = () => new Array(DIM).fill(0);
+  function add(...vs) {
+    const r = Z();
+    for (const v of vs) for (let i = 0; i < DIM; i++) r[i] += v[i];
+    return r;
+  }
+  const e = (i, s = 1) => {
+    const v = Z();
+    v[i] = s;
+    return v;
+  };
+  const male = e(0, 1);
+  const female = e(0, -1);
+  const royal = e(1, 1);
+  const person = e(2, 1);
+  const vehicle = e(3, 1);
+  const road = e(4, 1);
+  const computer = e(5, 1);
+  const portable = e(6, 1);
+  const animal = e(7, 1);
+  const pet = e(8, 1);
+  const food = e(9, 1);
+  const drink = e(10, 1);
+  const placeEU = e(11, 1);
+  const placeUS = e(12, 1);
+  const motion = e(13, 1);
+  const abstractPos = e(14, 1);
+  const ir = e(15, 1);
+
+  function scale(v, s) {
+    return v.map((x) => x * s);
+  }
+
+  const RAW = {
+    king: add(royal, male),
+    queen: add(royal, female),
+    man: add(person, male),
+    woman: add(person, female),
+    prince: add(royal, male, scale(person, 0.5)),
+    princess: add(royal, female, scale(person, 0.5)),
+    boy: add(person, male, scale(royal, 0)),
+    girl: add(person, female, scale(royal, 0)),
+    car: add(vehicle, road),
+    automobile: add(vehicle, road, scale(road, 0.3)),
+    truck: add(vehicle, scale(road, 0.8)),
+    bus: add(vehicle, scale(person, 0.3)),
+    laptop: add(computer, portable),
+    computer: add(computer, scale(portable, 0.2)),
+    notebook: add(computer, portable, scale(road, 0)),
+    keyboard: add(computer, scale(portable, -0.2)),
+    screen: add(computer, scale(abstractPos, 0.1)),
+    cat: add(animal, pet),
+    dog: add(animal, pet, scale(motion, 0.3)),
+    bird: add(animal, scale(motion, 0.6)),
+    fish: add(animal, drink),
+    paris: add(placeEU, scale(abstractPos, 0.2)),
+    france: add(placeEU, scale(person, 0.1)),
+    london: add(placeEU, scale(road, 0.2)),
+    england: add(placeEU, scale(royal, 0.15)),
+    berlin: add(placeEU, scale(vehicle, 0.05)),
+    germany: add(placeEU, scale(computer, 0.05)),
+    washington: add(placeUS, scale(royal, 0.1)),
+    america: add(placeUS, scale(person, 0.15)),
+    walking: add(motion, person),
+    running: add(motion, scale(person, 0.8)),
+    swimming: add(motion, drink),
+    happy: add(abstractPos, person),
+    sad: add(scale(abstractPos, -1), person),
+    angry: add(scale(abstractPos, -0.7), motion),
+    good: add(abstractPos, food),
+    bad: add(scale(abstractPos, -1), food),
+    doctor: add(person, abstractPos),
+    nurse: add(person, female, abstractPos),
+    hospital: add(person, abstractPos, scale(food, -0.2)),
+    water: drink,
+    bread: food,
+    learn: add(abstractPos, person),
+    teach: add(abstractPos, person, scale(motion, 0.2)),
+    school: add(person, abstractPos),
+    book: add(abstractPos, portable),
+    vector: add(computer, abstractPos),
+    matrix: add(computer, scale(abstractPos, 0.9)),
+    algorithm: add(computer, motion),
+    search: add(ir, motion),
+    query: add(ir, person),
+    document: add(ir, book),
+    index: add(ir, computer),
+    relevance: add(ir, abstractPos),
+    embedding: add(computer, ir),
+    synonym: add(abstractPos, person),
+    typo: add(vehicle, scale(road, 0.95)),
+    oov: add(computer, scale(portable, 0.4), scale(motion, 0.1))
+  };
+
+  function norm(v) {
+    const n = Math.sqrt(v.reduce((a, b) => a + b * b, 0)) || 1;
+    return v.map((x) => x / n);
+  }
+  function dot(a, b) {
+    let s = 0;
+    for (let i = 0; i < DIM; i++) s += a[i] * b[i];
+    return s;
+  }
+  const EMB = {};
+  for (const k of Object.keys(RAW)) EMB[k] = norm(RAW[k]);
+
+  const VOCAB = Object.keys(EMB).sort();
+
+  function cosine(u, v) {
+    return dot(norm(u), norm(v));
+  }
+  function nearestToVec(target, k, exclude) {
+    const ex = new Set(exclude || []);
+    return VOCAB.filter((w) => !ex.has(w))
+      .map((w) => ({ w, s: cosine(target, RAW[w]) }))
+      .sort((a, b) => b.s - a.s)
+      .slice(0, k);
+  }
+
+  function fillSelect(sel) {
+    sel.innerHTML = VOCAB.map((w) => '<option value="' + w + '">' + w + '</option>').join('');
+  }
+  ['anA', 'anB', 'anC'].forEach((id) => fillSelect($(id)));
+  $('anA').value = 'king';
+  $('anB').value = 'queen';
+  $('anC').value = 'man';
+
+  const embedList = $('embedVocabList');
+  embedList.innerHTML = VOCAB.map((w) => '<option value="' + w + '"></option>').join('');
+  $('pW1').value = 'car';
+  $('pW2').value = 'automobile';
+  $('pNW').value = 'embedding';
+  $('pAA').value = 'king';
+  $('pAB').value = 'queen';
+  $('pAC').value = 'man';
+
+  function resolveWord(s) {
+    const k = String(s || '')
+      .trim()
+      .toLowerCase();
+    return EMB[k] ? k : null;
+  }
+
+  function drawAnalogyCanvas(offset, highlight) {
+    const canvas = $('anCanvas');
+    if (!canvas.getContext) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#2a2a3a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(40, H / 2);
+    ctx.lineTo(W - 40, H / 2);
+    ctx.stroke();
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '12px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText('Projected axis: royalty (horizontal) vs gender (vertical)', 40, 24);
+    function proj(v) {
+      const x = 40 + (v[1] * 0.6 + v[0] * 0.25 + 1) * ((W - 80) / 2.5);
+      const y = H / 2 - v[0] * 55;
+      return [x, y];
+    }
+    function dotAt(label, v, col) {
+      const [x, y] = proj(v);
+      ctx.beginPath();
+      ctx.fillStyle = col;
+      ctx.arc(x, y, highlight === label ? 9 : 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e0e0e8';
+      ctx.fillText(label, x + 10, y + 4);
+    }
+    dotAt('king', RAW.king, '#f472b6');
+    dotAt('man', RAW.man, '#6c8cff');
+    dotAt('woman', RAW.woman, '#6c8cff');
+    dotAt('queen', RAW.queen, '#34d399');
+    const t = add(RAW.king, scale(RAW.man, -1), RAW.woman);
+    dotAt('k−m+w', t, '#fbbf24');
+  }
+
+  $('anGo').addEventListener('click', () => {
+    const A = $('anA').value;
+    const B = $('anB').value;
+    const C = $('anC').value;
+    const t = add(RAW[A], scale(RAW[B], -1), RAW[C]);
+    const ranked = nearestToVec(t, 8, [A, B, C]);
+    $('anOut').textContent =
+      'Target offset: ' +
+      B +
+      ' − ' +
+      A +
+      ' + ' +
+      C +
+      '\nTop matches by cosine:\n' +
+      ranked.map((r, i) => i + 1 + '. ' + r.w + '  (' + r.s.toFixed(4) + ')').join('\n');
+    drawAnalogyCanvas(null, null);
+  });
+  drawAnalogyCanvas();
+
+  /* Playground tabs */
+  const tabs = $('playTabs').querySelectorAll('.btn');
+  function showTab(name) {
+    tabs.forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    $('tab-sim').style.display = name === 'sim' ? 'block' : 'none';
+    $('tab-nn').style.display = name === 'nn' ? 'block' : 'none';
+    $('tab-ana').style.display = name === 'ana' ? 'block' : 'none';
+  }
+  tabs.forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  $('pSimBtn').addEventListener('click', () => {
+    const a = resolveWord($('pW1').value);
+    const b = resolveWord($('pW2').value);
+    if (!a || !b) {
+      $('pSimOut').textContent =
+        'Unknown word. Use a token from the ~50-term vocabulary (see suggestions in the dropdown when focused).';
+      return;
+    }
+    const s = cosine(RAW[a], RAW[b]);
+    $('pSimOut').textContent = 'cosine("' + a + '", "' + b + '") = ' + s.toFixed(6);
+  });
+  $('pNnBtn').addEventListener('click', () => {
+    const w = resolveWord($('pNW').value);
+    if (!w) {
+      $('pNnOut').innerHTML =
+        '<p style="margin:0;color:var(--danger);font-size:0.9rem;">Unknown word. Pick from the vocabulary list.</p>';
+      return;
+    }
+    const k = Math.max(1, Math.min(25, +$('pK').value || 8));
+    const nn = nearestToVec(RAW[w], k + 1, []).filter((r) => r.w !== w).slice(0, k);
+    $('pNnOut').innerHTML = nn.map((r) => '<div class="nn-row"><span>' + r.w + '</span><span style="color:var(--accent5)">' + r.s.toFixed(4) + '</span></div>').join('');
+  });
+  $('pAnBtn').addEventListener('click', () => {
+    const A = resolveWord($('pAA').value);
+    const B = resolveWord($('pAB').value);
+    const C = resolveWord($('pAC').value);
+    if (!A || !B || !C) {
+      $('pAnOut').textContent = 'A, B, and C must all be known vocabulary tokens.';
+      return;
+    }
+    const t = add(RAW[A], scale(RAW[B], -1), RAW[C]);
+    const ranked = nearestToVec(t, 10, [A, B, C]);
+    $('pAnOut').textContent = ranked.map((r, i) => i + 1 + '. ' + r.w + '  (' + r.s.toFixed(4) + ')').join('\n');
+  });
+})();
+  </script>
+</body>
+</html>

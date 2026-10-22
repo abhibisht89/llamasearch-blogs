@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vector Databases — Architecture, Indexing &amp; Operations | Search Zero to Hero</title>
+<style>
+    :root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-alt: #181825;
+      --border: #2a2a3a;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --accent: #6c8cff;
+      --accent2: #a78bfa;
+      --accent3: #34d399;
+      --accent4: #f472b6;
+      --accent5: #fbbf24;
+      --danger: #f87171;
+      --radius: 12px;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+      --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 1rem;
+      padding-top: 48px;
+    }
+    .breadcrumb-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background: #111118;
+      border-bottom: 1px solid #23232f;
+      padding: 10px 24px;
+      font-size: 0.82rem;
+      color: #8888a0;
+    }
+    .breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+    .breadcrumb-nav a:hover { text-decoration: underline; }
+    .breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+    .breadcrumb-nav .bc-current { color: #8888a0; }
+    .main-nav {
+      position: fixed;
+      top: 44px;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      justify-content: center;
+      transform: translateY(-120%);
+      opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-height: 42vh;
+      overflow-y: auto;
+    }
+    .main-nav.visible { transform: translateY(0); opacity: 1; }
+    .main-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.78rem; white-space: nowrap; }
+    .main-nav a:hover { color: var(--accent); }
+    .nav-toggle {
+      position: fixed;
+      top: 52px;
+      right: 16px;
+      z-index: 10001;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+    .nav-toggle:hover { color: var(--accent); }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(108, 140, 255, 0.14), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 50%, rgba(52, 211, 153, 0.08), transparent),
+        var(--bg);
+    }
+    .hero h1 {
+      font-size: clamp(1.85rem, 5vw, 3rem);
+      font-weight: 700;
+      margin: 0 0 16px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+    .hero .subtitle { max-width: 920px; color: var(--text-dim); font-size: 1.05rem; margin-bottom: 36px; }
+    .hero-stats { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .hero-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 28px;
+      min-width: 140px;
+    }
+    .hero-stat .num { font-size: 1.75rem; font-weight: 700; color: var(--accent3); font-family: var(--mono); }
+    .hero-stat .lbl { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+    main { max-width: 900px; margin: 0 auto; padding: 0 24px 120px; }
+    .section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--border);
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+      scroll-margin-top: 96px;
+    }
+    .section.fade-in.visible { opacity: 1; transform: translateY(0); }
+    .section h2 {
+      font-size: 1.55rem;
+      margin: 0 0 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .section-num { font-family: var(--mono); font-size: 0.9rem; color: var(--accent2); font-weight: 600; }
+    .section p { margin: 0 0 1em; color: var(--text); }
+    .section ul, .section ol { margin: 0 0 1em; padding-left: 1.35em; color: var(--text); }
+    .section li { margin-bottom: 0.45em; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+    .card h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--bg-card-alt);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    .formula {
+      font-family: var(--mono);
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 18px 0;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      color: var(--accent3);
+    }
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 22px 0;
+    }
+    @media (max-width: 640px) { .comparison { grid-template-columns: 1fr; } }
+    .comparison > div {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 0.92rem;
+    }
+    .interactive-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin: 24px 0;
+    }
+    .interactive-panel h3 { margin: 0 0 14px; font-size: 1rem; color: var(--accent2); }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .btn {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card-alt);
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.active { background: rgba(108, 140, 255, 0.15); border-color: var(--accent); color: var(--accent); }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 14px 0;
+    }
+    .slider-row label { min-width: 140px; font-size: 0.88rem; color: var(--text-dim); }
+    .slider-row input[type="range"] { flex: 1; min-width: 160px; accent-color: var(--accent); }
+    .slider-row output { font-family: var(--mono); min-width: 52px; color: var(--accent5); }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 16px 0;
+    }
+    table.data th, table.data td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    table.data th { background: var(--bg-card-alt); color: var(--text-dim); font-weight: 600; }
+    table.data td.mono { font-family: var(--mono); font-size: 0.76rem; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--bg-card-alt);
+      padding: 0.12em 0.45em;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    canvas.demo-canvas {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+    }
+    .demo-out {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--accent3);
+      margin-top: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .quiz-q { margin: 16px 0; padding: 14px; background: var(--bg-card-alt); border-radius: 8px; border: 1px solid var(--border); }
+    .quiz-q p { margin: 0 0 10px; font-weight: 600; }
+    .quiz-opt { display: block; margin: 6px 0; cursor: pointer; font-size: 0.92rem; }
+    .quiz-result { margin-top: 14px; padding: 12px; border-radius: 8px; border: 1px solid var(--accent3); background: rgba(52, 211, 153, 0.08); }
+    .chapter-foot {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 0.88rem;
+      color: var(--text-dim);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    .chapter-foot a { color: var(--accent); text-decoration: none; }
+    .chapter-foot a:hover { text-decoration: underline; }
+    .play-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+    @media (max-width: 720px) { .play-row { grid-template-columns: 1fr; } }
+    .play-box {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.85rem;
+    }
+    .play-box h4 { margin: 0 0 10px; font-size: 0.9rem; color: var(--accent2); }
+    label.chk { display: flex; align-items: center; gap: 8px; margin: 6px 0; cursor: pointer; font-size: 0.88rem; }
+    select.inp, input.inp {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      font-family: var(--sans);
+      margin-bottom: 8px;
+    }
+    .result-list { list-style: none; padding: 0; margin: 8px 0 0; font-family: var(--mono); font-size: 0.78rem; }
+    .result-list li { padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; margin-right: 6px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-dim); }
+    .shard-viz { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    .shard-node {
+      flex: 1;
+      min-width: 100px;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .shard-node.hot { border-color: var(--accent5); }
+  </style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+  <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+    <a href="../../">Learning Blogs</a><span class="bc-sep">›</span>
+    <a href="../">Search Zero to Hero</a><span class="bc-sep">›</span>
+    <span class="bc-current">Vector Databases</span>
+  </nav>
+  <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false">Sections ▾</button>
+  <nav class="main-nav" id="mainNav" aria-label="Page sections">
+    <a href="#s0">§0 FAISS vs DB</a>
+    <a href="#s1">§1 Architecture</a>
+    <a href="#s2">§2 Filtering</a>
+    <a href="#s3">§3 Hybrid</a>
+    <a href="#s4">§4 Scaling</a>
+    <a href="#s5">§5 Landscape</a>
+    <a href="#s6">§6 Choosing</a>
+    <a href="#s7">§7 Playground</a>
+  </nav>
+
+  <header class="hero">
+    <h1>Vector Databases — Architecture, Indexing &amp; Operations</h1>
+    <p class="subtitle">
+      Libraries like <code>FAISS</code> solve <strong>approximate nearest neighbor</strong> (<code>ANN</code>) search in memory—but production retrieval also needs <code>durability</code>, <code>CRUD</code>, <code>metadata filters</code>,
+      <code>replication</code>, and <code>access control</code>. A <strong>vector database</strong> wraps <code>ANN</code> algorithms in storage-engine semantics borrowed from search indexes and OLTP systems: write-ahead logs, segment files,
+      background merges, and query planners that combine vector similarity with structured predicates and sometimes full-text signals. The sections cover architecture, filtering, hybrid ranking, scaling, and vendor trade-offs.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">WAL</div><div class="lbl">Durability &amp; ordering</div></div>
+      <div class="hero-stat"><div class="num">§§</div><div class="lbl">Pre / post / hybrid filter</div></div>
+      <div class="hero-stat"><div class="num">RRF</div><div class="lbl">Fusion pattern</div></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section fade-in" id="s0">
+      <h2><span class="section-num">§0</span> Why not just <code>FAISS</code>?</h2>
+      <p>
+        <code>FAISS</code> (and similar libraries) are <strong>ANN engines</strong>: they expose index structures and batch search kernels optimized for <code>GPU</code> or <code>CPU</code> throughput. What they are not, by themselves, is a database.
+        A database is a long-lived service contract: you insert and delete rows, expect crash recovery, enforce who may read what, and compose queries that mix similarity with business attributes. An in-process <code>FAISS</code> index is typically
+        ephemeral unless you build your own persistence, snapshotting, and multi-tenant isolation around it.
+      </p>
+      <div class="comparison">
+        <div>
+          <strong><code>FAISS</code>-class library</strong>
+          <ul style="margin-bottom:0">
+            <li>Fast <code>k</code>-NN kernels and composite indexes (<code>IVF</code>, <code>HNSW</code>, <code>PQ</code>, …).</li>
+            <li>You manage process lifecycle, memory maps, versioning, and backup.</li>
+            <li>Filtering beyond bitmasks often requires custom integration.</li>
+          </ul>
+        </div>
+        <div>
+          <strong>Vector database product</strong>
+          <ul style="margin-bottom:0">
+            <li><code>WAL</code> + segments for durability; scheduled <code>compaction</code>.</li>
+            <li><code>CRUD</code>, metadata indexes, optional <code>RBAC</code> and quotas.</li>
+            <li>Operational tooling: replication, metrics, multi-region options.</li>
+          </ul>
+        </div>
+      </div>
+      <p>
+        Concretely, teams outgrow “raw <code>FAISS</code> in a sidecar” when they need <strong>persistence</strong> across deploys, <strong>online updates</strong> without rebuilding a monolithic index from scratch, <strong>metadata filtering</strong> that is selective
+        (e.g., “same tenant, last 30 days, in stock”), <strong>high availability</strong> via replicas, and <strong>governance</strong> (encryption, audit trails, network policies). Vector databases implement those cross-cutting concerns and expose a stable
+        API—<code>REST</code>, <code>gRPC</code>, <code>GraphQL</code>, or <code>SQL</code>—while delegating the innermost neighbor search to algorithms you could also call from a library.
+      </p>
+      <p>
+        None of this implies you <em>must</em> adopt a dedicated vector database. If your corpus is modest, your team already runs <code>PostgreSQL</code>, and latency targets are forgiving, <code>pgvector</code> can be the right trade.
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s1">
+      <h2><span class="section-num">§1</span> Vector database architecture</h2>
+      <p>
+        Vector databases use the <code>WAL</code> → memtable → segment → merge pattern from Chapter 1: writes append to a log, accumulate in a mutable memtable, flush to immutable on-disk segments (each with its own <code>ANN</code> structure), and merge in the background to limit read amplification.
+      </p>
+      <div class="formula">
+        Write path (simplified): <code>vector + metadata → WAL append → memtable insert → (flush) → new segment file</code><br />
+        Read path: <code>query → parallel ANN over {memtable ∪ segments} → merge top-k → optional filter / rerank</code>
+      </div>
+      <p>
+        Queries scan the memtable plus relevant segments and merge partial top-<code>k</code> results with a heap—the same multi-segment pattern as text search engines.
+      </p>
+      <div class="card">
+        <h3>Operational levers</h3>
+        <ul style="margin-bottom:0">
+          <li><strong>Flush interval / memtable size</strong> trades write latency variance against how “hot” the mutable path is.</li>
+          <li><strong>Compaction throughput</strong> caps prevent background merges from starving foreground queries on shared disks.</li>
+          <li><strong>Segment-level caches</strong> keep hot posting lists or graph layers in memory—critical when working sets exceed <code>RAM</code>.</li>
+        </ul>
+      </div>
+
+      <div class="interactive-panel">
+        <h3>Interactive: write path vs read path</h3>
+        <p style="margin:0 0 12px; font-size:0.92rem; color:var(--text-dim)">
+          The animation alternates between a simplified <strong>write</strong> sequence (<code>vector → WAL → memtable → segment</code>) and a <strong>read</strong> sequence (<code>query → scan segments + memtable → merged top-k</code>). Pause resets the cycle. This is schematic:
+          real systems overlap flushes, use finer-grained locking, and may pipeline <code>GPU</code> batch scoring.
+        </p>
+        <canvas class="demo-canvas" id="archCanvas" width="720" height="340" aria-label="Write and read path animation"></canvas>
+        <div class="btn-group">
+          <button type="button" class="btn" id="archPause">Pause / resume</button>
+          <button type="button" class="btn" id="archModeWrite">Show write path</button>
+          <button type="button" class="btn" id="archModeRead">Show read path</button>
+        </div>
+        <div class="demo-out" id="archOut">Mode: alternating write ↔ read</div>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s2">
+      <h2><span class="section-num">§2</span> Metadata filtering</h2>
+      <p>
+        Vectors encode semantics, but applications almost always need <strong>structured predicates</strong> too: <code>category = electronics</code>, <code>price &lt; 500</code>, <code>created_at ≥ '2025-01-01'</code>, <code>tenant_id = UUID</code>, or <code>tags CONTAINS 'safety'</code>.
+        Pure <code>k</code>-NN on the full corpus ignores those constraints unless you embed them into the vector (usually a bad idea: brittle, hard to maintain, and wasteful of dimensions). Instead, the engine must intersect similarity search with metadata
+        evaluation— and the <em>order</em> in which you do that changes both latency and recall behavior.
+      </p>
+      <p>
+        <strong>Pre-filtering</strong> applies predicates first, then runs <code>ANN</code> on the eligible subset. Results respect constraints by construction, but if the filter is highly selective, the remaining set may be so small that graph navigation
+        or cluster probing becomes inefficient—or the filtered subset is too sparse for the index structure you built globally. <strong>Post-filtering</strong> runs <code>ANN</code> on the whole index (or a coarse bucket), then discards neighbors that fail the predicate.
+        That keeps index navigation fast but risks returning fewer than <code>k</code> matches: your top-<code>50</code> approximate neighbors might include only three that pass a tight filter. <strong>Hybrid</strong> strategies interleave predicate checks with graph
+        or cluster expansion— for example, oversampling <code>k′ ≫ k</code> during <code>ANN</code> and trimming, or maintaining metadata-aware posting lists alongside vector postings.
+      </p>
+      <div class="formula">
+        Post-filter risk: requested <code>k</code>, delivered <code>k′ &lt; k</code> → caller must detect shortfall, increase <code>ef_search</code> / oversample, or fall back to brute force on the filtered set.
+      </div>
+      <div class="callout">
+        <strong>Structured metadata</strong> is not “nice to have.” It is how you enforce multi-tenancy, time windows, catalog facets, and compliance constraints. When evaluating vendors, ask not only <code>QPS</code> on unfiltered benchmarks but how
+        selective filters interact with their index layout (bitmap indexes, inverted side indexes, zonemaps, etc.).
+      </div>
+
+      <div class="interactive-panel">
+        <h3>Interactive: pre- vs post- vs hybrid filtering</h3>
+        <p style="margin:0 0 12px; font-size:0.92rem; color:var(--text-dim)">
+          Synthetic 2D “embeddings” stand in for high-dimensional vectors. The filter keeps only points tagged <code>electronics</code>. <strong>Pre</strong> searches only eligible points (accurate, can be slower when few match). <strong>Post</strong> takes global nearest
+          then filters (fast navigation, may return fewer than <code>k</code>). <strong>Hybrid</strong> here oversamples nearest neighbors then filters—a common mitigation for post-filter shortfall.
+        </p>
+        <canvas class="demo-canvas" id="filterCanvas" width="720" height="360" aria-label="Filtering strategies demo"></canvas>
+        <div class="btn-group" id="filterModeGroup">
+          <button type="button" class="btn active" data-mode="pre">Pre-filter</button>
+          <button type="button" class="btn" data-mode="post">Post-filter</button>
+          <button type="button" class="btn" data-mode="hybrid">Hybrid (oversample)</button>
+        </div>
+        <div class="slider-row">
+          <label for="filterK">Target <code>k</code></label>
+          <input type="range" id="filterK" min="2" max="8" value="4" />
+          <output id="filterKOut">4</output>
+        </div>
+        <div class="demo-out" id="filterOut"></div>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s3">
+      <h2><span class="section-num">§3</span> Hybrid queries (vector + full-text)</h2>
+      <p>
+        Semantic similarity excels at paraphrase and concept drift, but some intents hinge on <strong>exact lexical identity</strong>: model numbers (<code>iPhone 15 Pro Max</code>), legal citations, SKUs, rare proper nouns, or safety-critical strings where
+        approximate matching is unacceptable. Production systems therefore combine <strong>dense retrieval</strong> (vectors) with <strong>sparse retrieval</strong> (<code>BM25</code>, <code>DFR</code>, or learned sparse models) or with structured keyword indexes inside the same
+        platform.
+      </p>
+      <p>
+        Architecturally, you either maintain <strong>separate indexes</strong> and <strong>fuse</strong> ranked lists at query time, or build a <strong>unified index</strong> that stores multiple signal types with a single query planner. Separate indexes are flexible—each
+        side can evolve independently—but fusion requires careful normalization because scores live on incomparable scales. <strong>RRF fusion</strong> (detailed in Chapter 12) merges rank lists without raw scores; alternatives include weighted linear combinations after score calibration, or <strong>learned fusion</strong> models trained on click or human relevance data.
+      </p>
+      <div class="formula">
+        <code>RRF(d) = Σ<sub>i</sub> 1 / (k<sub>rrf</sub> + rank<sub>i</sub>(d))</code> — see Chapter 12 for derivation and tuning.
+      </div>
+      <p>
+        Products such as <code>Weaviate</code> and <code>Qdrant</code> expose hybrid search primitives in their APIs; teams using <code>Elasticsearch</code> with <code>dense_vector</code> fields implement the same pattern with multi-stage queries and normalized scores.
+        The design question is not “vector <em>or</em> text” but how to allocate latency budget between candidate generation, fusion, and cross-encoder reranking.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: keyword vs semantic weight (linear fusion)</h3>
+        <p style="margin:0 0 12px; font-size:0.92rem; color:var(--text-dim)">
+          Eight dummy documents each have a <strong>keyword score</strong> (how well the title matches a product query) and a <strong>semantic score</strong> (similarity to an ideal embedding). Move the slider to re-rank by <code>α × keyword + (1−α) × semantic</code>.
+          Compare with the <code>RRF</code> column, which merges rank lists without looking at raw magnitudes.
+        </p>
+        <div class="slider-row">
+          <label for="hybridAlpha">Keyword weight <code>α</code></label>
+          <input type="range" id="hybridAlpha" min="0" max="100" value="50" />
+          <output id="hybridAlphaOut">0.50</output>
+        </div>
+        <div class="demo-out" id="hybridOut"></div>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s4">
+      <h2><span class="section-num">§4</span> Scaling patterns</h2>
+      <p>
+        Beyond single-node tuning, growth forces <strong>sharding</strong> and <strong>replication</strong>. Sharding partitions vectors (and their metadata) across machines—commonly by hashing an id, by range on a key, or by embedding-derived partitions.
+        A query router broadcasts <code>k</code>-NN to every shard (for recall) or uses a routing shortcut if metadata narrows tenants, then merges partial top-<code>k</code>. Replication adds read copies for throughput and fault tolerance; consistent routing
+        and stale-read policies matter when segments compact asynchronously.
+      </p>
+      <p>
+        <strong>Quantization at the storage layer</strong> reduces bytes per vector: <code>PQ</code> (product quantization), <code>SQ</code> (scalar quantization to int8/fp16), or <code>binary</code> sketches for maximum compression at the expense of accuracy. These are not
+        mutually exclusive with library-level <code>PQ</code>; the database chooses representations that integrate with filtering and replication. <strong>Tiered storage</strong> places hot segments in memory or local <code>NVMe</code>, warm data on attached <code>SSD</code>,
+        and cold archives in object storage—with background migration policies driven by access frequency and cost curves.
+      </p>
+      <div class="card">
+        <h3>Dynamic updates without full rebuilds</h3>
+        <p style="margin-bottom:0">
+          Immutable segments mean inserts land in the memtable or fresh small segments; deletes often become tombstones until compaction removes them. Some engines maintain a separate <strong>delta</strong> <code>HNSW</code> graph for recent writes while serving reads from
+          frozen graphs—queries merge both views. The exact mechanics vary by product, but the user-facing goal is the same: sustain reasonable <code>p99</code> latency while the corpus churns, without nightly full reindexes except as a safety valve.
+        </p>
+      </div>
+      <div class="interactive-panel">
+        <h3>Interactive: sharding &amp; tiered placement (schematic)</h3>
+        <p style="margin:0 0 12px; font-size:0.92rem; color:var(--text-dim)">
+          Click a node to mark it “hot” (memory-resident). Schematic view of <strong>replica roles</strong> and <strong>storage tiers</strong> alongside query fan-out.
+        </p>
+        <div class="shard-viz" id="shardViz"></div>
+        <p class="demo-out" id="shardOut" style="margin-top:8px">Select a shard to toggle hot (in-memory) highlighting.</p>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s5">
+      <h2><span class="section-num">§5</span> The vector database landscape</h2>
+      <p>
+        The space spans managed SaaS, Kubernetes-friendly open source, and “no new infra” extensions. None win on every axis; the right choice depends on scale, team skills, filtering complexity, and whether you already anchor data in <code>Postgres</code>.
+      </p>
+
+      <div class="card">
+        <h3><code>Pinecone</code></h3>
+        <p style="margin-bottom:0">
+          Fully managed with low-friction onboarding. Strong for getting started quickly; vendor lock-in and pricing at very large scale may matter.
+        </p>
+      </div>
+      <div class="card">
+        <h3><code>Weaviate</code></h3>
+        <p style="margin-bottom:0">
+          Open-source with <code>GraphQL</code> APIs and modular extensions (vectorizers, rerankers, multi-modal paths). Flexible schema; good when multiple retrieval modalities share one service.
+        </p>
+      </div>
+      <div class="card">
+        <h3><code>Qdrant</code></h3>
+        <p style="margin-bottom:0">
+          Open-source <code>Rust</code> engine emphasizing speed and expressive filtering. Strong filtered <code>ANN</code> latency; <code>REST</code>/<code>gRPC</code> APIs.
+        </p>
+      </div>
+      <div class="card">
+        <h3><code>Milvus</code> / <code>Zilliz</code></h3>
+        <p style="margin-bottom:0">
+          Open-source for large-scale cloud-native deployments; <code>Zilliz</code> offers managed hosting. Targets billion-vector footprints with <code>GPU</code> paths in the ecosystem.
+        </p>
+      </div>
+      <div class="card">
+        <h3><code>Chroma</code></h3>
+        <p style="margin-bottom:0">
+          Lightweight embedding store with embedded and client-server modes. Fast prototyping and Python-native ergonomics.
+        </p>
+      </div>
+      <div class="card">
+        <h3><code>pgvector</code></h3>
+        <p style="margin-bottom:0">
+          <code>PostgreSQL</code> extension for vectors in <code>SQL</code>. Transactional unity with relational data; at scale and strict latency targets, purpose-built engines may pull ahead.
+        </p>
+      </div>
+
+      <table class="data" aria-label="Vector database comparison">
+        <thead>
+          <tr>
+            <th>System</th>
+            <th>Deployment</th>
+            <th>Filtering / hybrid</th>
+            <th>Best when</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">Pinecone</td>
+            <td>Managed SaaS</td>
+            <td>Metadata namespaces; hybrid via integrations</td>
+            <td>Zero-ops, fastest path to production <code>RAG</code></td>
+          </tr>
+          <tr>
+            <td class="mono">Weaviate</td>
+            <td>Self-host or cloud</td>
+            <td>Modules for sparse+dense; GraphQL composition</td>
+            <td>Multi-modal graphs, modular pipelines</td>
+          </tr>
+          <tr>
+            <td class="mono">Qdrant</td>
+            <td>Self-host or cloud</td>
+            <td>Rich payload filters; fusion APIs</td>
+            <td>Latency-sensitive filtered <code>ANN</code></td>
+          </tr>
+          <tr>
+            <td class="mono">Milvus / Zilliz</td>
+            <td>Self-host or managed</td>
+            <td>Partition keys; hybrid patterns in ecosystem</td>
+            <td>Very large scale, <code>GPU</code> acceleration</td>
+          </tr>
+          <tr>
+            <td class="mono">Chroma</td>
+            <td>Embedded / server</td>
+            <td>Lightweight; combine upstream</td>
+            <td>Prototypes, local dev, small corpora</td>
+          </tr>
+          <tr>
+            <td class="mono">pgvector</td>
+            <td><code>Postgres</code> extension</td>
+            <td><code>SQL WHERE</code> + vector index</td>
+            <td>Unify vectors with relational truth</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size:0.88rem; color:var(--text-dim)">
+        “Performance” and “pricing” are omitted from the table cells because they shift with hardware, region, and workload—always validate with your embedding dimension, filter selectivity, and replication factor. Treat vendor benchmarks as starting points, not guarantees.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Interactive: recommendation quiz</h3>
+        <p style="margin:0 0 12px; font-size:0.92rem; color:var(--text-dim)">
+          Answer pragmatically; the scorer maps constraints to a short shortlist with rationale. Heuristic guidance—not a substitute for a load test.
+        </p>
+        <div id="quizMount"></div>
+        <div class="btn-group">
+          <button type="button" class="btn" id="quizScore">Score my answers</button>
+          <button type="button" class="btn" id="quizReset">Reset</button>
+        </div>
+        <div id="quizResult" class="quiz-result" hidden></div>
+      </div>
+    </section>
+
+    <section class="section fade-in" id="s6">
+      <h2><span class="section-num">§6</span> Choosing the right vector database</h2>
+      <p>
+        Start from measurable constraints: maximum corpus cardinality, embedding dimension, tail latency budget, update rate, filter selectivity, tenancy model, and whether vectors must live in the same transaction as relational updates. Those inputs
+        narrow the field faster than brand affinity.
+      </p>
+      <div class="card">
+        <h3>Scale bands (rules of thumb)</h3>
+        <ul style="margin-bottom:0">
+          <li><strong>&lt; ~100k vectors</strong>: <code>pgvector</code> or <code>Chroma</code> often suffice if filters map cleanly to <code>SQL</code> or lightweight Python services.</li>
+          <li><strong>100k – 10M</strong>: <code>Qdrant</code> and <code>Weaviate</code> are common self-hosted sweet spots; managed layers compete on ops savings.</li>
+          <li><strong>&gt; 10M</strong> toward billions: <code>Milvus</code>/<code>Zilliz</code> or mature managed offerings (<code>Pinecone</code> tiers, vendor clouds) dominate discussions—sharding and compaction stories matter more.</li>
+        </ul>
+      </div>
+      <p>
+        <strong>Operations preference</strong> splits teams cleanly: if you lack platform engineers, prioritize managed control planes with backup/restore attestations. If you run <code>Kubernetes</code> already and need cost control, open-source images with
+        Helm charts may win. <strong>Integration</strong> pulls toward <code>pgvector</code> when embeddings are secondary attributes of entities you already store transactionally, and toward Python-first stacks for <code>Chroma</code> during research spikes.
+      </p>
+      <div class="callout">
+        <strong>Heavy filtering</strong> (narrow boolean combinations, range stacks on payloads) rewards engines that invest in metadata indexes and query planning—not just raw <code>ANN</code> throughput. Light filtering makes more options viable; the unfair comparison
+        is an unfiltered <code>k</code>-NN benchmark that ignores your real predicates.
+      </div>
+      <p>
+        <strong>Cost</strong> scales with stored vectors, replica count, query volume, and egress—plus embedding generation if you self-host models. Watch compaction overhead on write-heavy workloads: you pay for temporary disk amplification during merges.
+        <strong>Migration</strong> strategies usually dual-write into the new index, backfill historical vectors in batches, verify recall on held-out queries, then cut reads over with feature flags—rolling back if tail latency or filter correctness regresses.
+      </p>
+    </section>
+
+    <section class="section fade-in" id="s7">
+      <h2><span class="section-num">§7</span> Playground: vector DB operation simulator</h2>
+      <p>
+        The panel simulates a tiny collection of two-dimensional vectors with categorical metadata—enough to see how <code>top-k</code>, similarity thresholds, and filter strategies alter the returned set. Real embeddings
+        live in hundreds or thousands of dimensions, but the control flow is analogous.
+      </p>
+
+      <div class="interactive-panel">
+        <h3>Collection controls</h3>
+        <div class="play-row">
+          <div class="play-box">
+            <h4>Add vector</h4>
+            <label class="chk"><input type="checkbox" id="pgMeta" checked /> Tag as <code>electronics</code></label>
+            <button type="button" class="btn" id="pgAdd">Add random point</button>
+            <button type="button" class="btn" id="pgSeed">Seed demo data</button>
+            <button type="button" class="btn" id="pgClear">Clear all</button>
+          </div>
+          <div class="play-box">
+            <h4>Query vector</h4>
+            <div class="slider-row" style="margin:4px 0">
+              <label for="pgQx"><code>qx</code></label>
+              <input type="range" id="pgQx" min="-1" max="1" step="0.05" value="0.3" />
+              <output id="pgQxOut">0.30</output>
+            </div>
+            <div class="slider-row" style="margin:4px 0">
+              <label for="pgQy"><code>qy</code></label>
+              <input type="range" id="pgQy" min="-1" max="1" step="0.05" value="0.2" />
+              <output id="pgQyOut">0.20</output>
+            </div>
+          </div>
+        </div>
+        <div class="play-row">
+          <div class="play-box">
+            <h4>Search parameters</h4>
+            <div class="slider-row" style="margin:4px 0">
+              <label for="pgK"><code>top-k</code></label>
+              <input type="range" id="pgK" min="1" max="10" value="5" />
+              <output id="pgKOut">5</output>
+            </div>
+            <div class="slider-row" style="margin:4px 0">
+              <label for="pgThresh">Sim threshold</label>
+              <input type="range" id="pgThresh" min="0" max="100" value="0" />
+              <output id="pgThreshOut">0.00</output>
+            </div>
+            <label class="chk"><input type="checkbox" id="pgFilterOnly" /> Require <code>electronics</code> only</label>
+            <label for="pgStrat">Filter strategy</label>
+            <select class="inp" id="pgStrat">
+              <option value="pre">Pre-filter (search eligible only)</option>
+              <option value="post">Post-filter (global ANN → trim)</option>
+              <option value="hybrid">Hybrid (oversample ×3 → trim)</option>
+            </select>
+          </div>
+          <div class="play-box">
+            <h4>Canvas</h4>
+            <canvas class="demo-canvas" id="pgCanvas" width="400" height="400" aria-label="Playground 2D vectors"></canvas>
+          </div>
+        </div>
+        <button type="button" class="btn" id="pgRun">Run search</button>
+        <ul class="result-list" id="pgResults"></ul>
+      </div>
+
+      <div class="chapter-foot">
+        <span>Search Zero to Hero · Vector databases &amp; retrieval engineering</span>
+        <span><a href="../08-ann-indexing/">← ANN indexing</a> · <a href="../">Index</a></span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+(function () {
+  'use strict';
+
+  var navToggle = document.getElementById('navToggle');
+  var mainNav = document.getElementById('mainNav');
+  if (navToggle && mainNav) {
+    navToggle.addEventListener('click', function () {
+      var open = mainNav.classList.toggle('visible');
+      navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
+
+  document.querySelectorAll('.main-nav a').forEach(function (a) {
+    a.addEventListener('click', function () {
+      if (window.innerWidth < 900 && mainNav) {
+        mainNav.classList.remove('visible');
+        if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+  });
+
+  var sections = document.querySelectorAll('.section.fade-in');
+  var io = new IntersectionObserver(
+    function (ents) {
+      ents.forEach(function (e) {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    },
+    { root: null, rootMargin: '0px 0px -8% 0px', threshold: 0.05 }
+  );
+  sections.forEach(function (s) { io.observe(s); });
+
+  /* --- Architecture canvas --- */
+  (function archDemo() {
+    var canvas = document.getElementById('archCanvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width;
+    var h = canvas.height;
+    var paused = false;
+    var mode = 'alt';
+    var t0 = performance.now();
+    var phase = 0;
+    var sub = 0;
+
+    function box(x, y, bw, bh, label, sublabel) {
+      ctx.strokeStyle = '#2a2a3a';
+      ctx.fillStyle = '#12121a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(x, y, bw, bh, 8);
+      } else {
+        ctx.rect(x, y, bw, bh);
+      }
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#e0e0e8';
+      ctx.font = '600 13px Inter, sans-serif';
+      ctx.fillText(label, x + 12, y + 24);
+      if (sublabel) {
+        ctx.fillStyle = '#8888a0';
+        ctx.font = '400 11px SF Mono, monospace';
+        ctx.fillText(sublabel, x + 12, y + 42);
+      }
+    }
+
+    function drawArrow(x1, y1, x2, y2, alpha) {
+      ctx.strokeStyle = 'rgba(108, 140, 255,' + alpha + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      var ang = Math.atan2(y2 - y1, x2 - x1);
+      var sz = 8;
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - sz * Math.cos(ang - 0.4), y2 - sz * Math.sin(ang - 0.4));
+      ctx.lineTo(x2 - sz * Math.cos(ang + 0.4), y2 - sz * Math.sin(ang + 0.4));
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(108, 140, 255,' + alpha + ')';
+      ctx.fill();
+    }
+
+    function particle(px, py, alpha) {
+      ctx.beginPath();
+      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(52, 211, 153,' + alpha + ')';
+      ctx.fill();
+    }
+
+    function frame(now) {
+      if (!paused) {
+        var t = (now - t0) / 1000;
+        phase = mode === 'write' ? 0 : mode === 'read' ? 1 : (Math.floor(t / 5) % 2);
+        sub = (t % 5) / 5;
+      }
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, w, h);
+
+      box(20, 20, 100, 56, 'Client', 'write / read');
+      box(160, 20, 100, 56, 'WAL', 'append-only');
+      box(300, 20, 120, 56, 'Memtable', 'mutable');
+      box(460, 20, 110, 56, 'Seg A', 'immutable');
+      box(590, 20, 110, 56, 'Seg B', 'immutable');
+      box(300, 120, 400, 70, 'Compaction / merge policy', 'rewrites old segments → fewer files');
+      box(20, 220, 140, 90, 'Query', 'top-k');
+      box(200, 220, 500, 90, 'Merged results', 'heap over segment hits');
+
+      var cx = 70;
+      var cy = 48;
+      var a = 0.35 + 0.5 * (0.5 + 0.5 * Math.sin(now / 300));
+
+      if (phase === 0) {
+        var u = sub;
+        if (u < 0.2) {
+          particle(cx + (160 - cx) * (u / 0.2), cy, 1);
+        } else if (u < 0.45) {
+          particle(210 + (300 - 210) * ((u - 0.2) / 0.25), cy, 1);
+        } else if (u < 0.75) {
+          particle(360, cy + (100 - cy) * ((u - 0.45) / 0.3), 1);
+        } else {
+          particle(515 + (u - 0.75) * 200, 48, 1);
+        }
+        drawArrow(130, 48, 155, 48, a);
+        drawArrow(265, 48, 295, 48, a);
+        drawArrow(360, 78, 360, 100, a);
+        drawArrow(420, 48, 455, 48, a);
+      } else {
+        var v = sub;
+        particle(90, 260, 1);
+        var targets = [{ x: 515, y: 48 }, { x: 645, y: 48 }, { x: 360, y: 48 }];
+        var ti = Math.floor(v * 3) % 3;
+        var local = (v * 3) % 1;
+        var tx = 90 + (targets[ti].x - 90) * local;
+        var ty = 260 + (targets[ti].y - 260) * local * 0.35;
+        particle(tx, ty, 0.85);
+        drawArrow(165, 265, 195, 265, a);
+        drawArrow(320, 265, 480, 265, a);
+      }
+
+      var out = document.getElementById('archOut');
+      if (out) {
+        var label = mode === 'alt' ? 'alternating write ↔ read' : mode === 'write' ? 'write path only' : 'read path only';
+        out.textContent = 'Mode: ' + label + ' · phase ' + (phase === 0 ? 'WRITE' : 'READ');
+      }
+      requestAnimationFrame(frame);
+    }
+
+    document.getElementById('archPause').addEventListener('click', function () {
+      paused = !paused;
+    });
+    document.getElementById('archModeWrite').addEventListener('click', function () {
+      mode = 'write';
+      t0 = performance.now();
+    });
+    document.getElementById('archModeRead').addEventListener('click', function () {
+      mode = 'read';
+      t0 = performance.now();
+    });
+    requestAnimationFrame(frame);
+  })();
+
+  /* --- Filtering demo --- */
+  (function filterDemo() {
+    var canvas = document.getElementById('filterCanvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var points = [];
+    var i;
+    var rng = function (s) {
+      var x = Math.sin(s * 9999) * 10000;
+      return x - Math.floor(x);
+    };
+    for (i = 0; i < 42; i++) {
+      points.push({
+        x: rng(i) * (canvas.width - 60) + 30,
+        y: rng(i + 1) * (canvas.height - 60) + 30,
+        elec: rng(i + 2) > 0.45
+      });
+    }
+    var qx = 360;
+    var qy = 180;
+    var mode = 'pre';
+    var k = 4;
+
+    function dist2(p) {
+      var dx = p.x - qx;
+      var dy = p.y - qy;
+      return dx * dx + dy * dy;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      points.forEach(function (p) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = p.elec ? 'rgba(108,140,255,0.55)' : 'rgba(136,136,160,0.25)';
+        ctx.fill();
+      });
+      ctx.beginPath();
+      ctx.arc(qx, qy, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#f472b6';
+      ctx.fill();
+      ctx.fillStyle = '#e0e0e8';
+      ctx.font = '11px monospace';
+      ctx.fillText('query', qx + 12, qy + 4);
+
+      var eligible = points.filter(function (p) { return p.elec; });
+      var sortedAll = points.slice().sort(function (a, b) { return dist2(a) - dist2(b); });
+      var sortedElig = eligible.slice().sort(function (a, b) { return dist2(a) - dist2(b); });
+
+      var pickPre = sortedElig.slice(0, k);
+      var pickPost = sortedAll.filter(function (p) { return p.elec; }).slice(0, k);
+      var oversample = Math.min(sortedAll.length, k * 3);
+      var pickHybrid = sortedAll.slice(0, oversample).filter(function (p) { return p.elec; }).slice(0, k);
+
+      var pick = mode === 'pre' ? pickPre : mode === 'post' ? pickPost : pickHybrid;
+
+      pick.forEach(function (p) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+
+      var out = document.getElementById('filterOut');
+      if (out) {
+        out.textContent =
+          'mode=' + mode +
+          ' · eligible=' + eligible.length +
+          ' · returned=' + pick.length +
+          ' (requested k=' + k + ')' +
+          (mode === 'post' && pick.length < k ? ' · SHORTFALL: post-filter removed neighbors' : '') +
+          (mode === 'hybrid' && pick.length < k ? ' · hybrid still short if sparse' : '');
+      }
+    }
+
+    canvas.addEventListener('mousemove', function (e) {
+      var r = canvas.getBoundingClientRect();
+      var scaleX = canvas.width / r.width;
+      var scaleY = canvas.height / r.height;
+      qx = (e.clientX - r.left) * scaleX;
+      qy = (e.clientY - r.top) * scaleY;
+      draw();
+    });
+
+    document.getElementById('filterModeGroup').addEventListener('click', function (e) {
+      var btn = e.target.closest('.btn');
+      if (!btn || !btn.dataset.mode) return;
+      mode = btn.dataset.mode;
+      document.querySelectorAll('#filterModeGroup .btn').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      draw();
+    });
+
+    var fk = document.getElementById('filterK');
+    var fko = document.getElementById('filterKOut');
+    fk.addEventListener('input', function () {
+      k = +fk.value;
+      fko.textContent = String(k);
+      draw();
+    });
+
+    draw();
+  })();
+
+  /* --- Hybrid fusion --- */
+  (function hybridDemo() {
+    var docs = [
+      { id: 'A', name: 'iPhone 15 Pro Max 256GB', kw: 1.0, sem: 0.72 },
+      { id: 'B', name: 'iPhone 15 silicone case', kw: 0.55, sem: 0.9 },
+      { id: 'C', name: 'Samsung Galaxy S24 Ultra', kw: 0.35, sem: 0.88 },
+      { id: 'D', name: 'USB-C charging cable', kw: 0.2, sem: 0.5 },
+      { id: 'E', name: 'Pro Max tripod mount', kw: 0.62, sem: 0.48 },
+      { id: 'F', name: 'Refurbished phone lot', kw: 0.18, sem: 0.7 },
+      { id: 'G', name: 'Screen protector 15 series', kw: 0.42, sem: 0.65 },
+      { id: 'H', name: 'AppleCare+ documentation', kw: 0.28, sem: 0.4 }
+    ];
+    var alphaEl = document.getElementById('hybridAlpha');
+    var alphaOut = document.getElementById('hybridAlphaOut');
+    var outEl = document.getElementById('hybridOut');
+
+    function rankBy(scoreFn) {
+      return docs.slice().sort(function (a, b) { return scoreFn(b) - scoreFn(a); });
+    }
+
+    function rrf() {
+      var k0 = 60;
+      var kwOrder = rankBy(function (d) { return d.kw; });
+      var semOrder = rankBy(function (d) { return d.sem; });
+      var rankMap = {};
+      docs.forEach(function (d) { rankMap[d.id] = { kw: 0, sem: 0 }; });
+      kwOrder.forEach(function (d, i) { rankMap[d.id].kw = i + 1; });
+      semOrder.forEach(function (d, i) { rankMap[d.id].sem = i + 1; });
+      return docs.slice().sort(function (a, b) {
+        var sa = 1 / (k0 + rankMap[a.id].kw) + 1 / (k0 + rankMap[a.id].sem);
+        var sb = 1 / (k0 + rankMap[b.id].kw) + 1 / (k0 + rankMap[b.id].sem);
+        return sb - sa;
+      });
+    }
+
+    function render() {
+      var a = (+alphaEl.value) / 100;
+      alphaOut.textContent = a.toFixed(2);
+      var fused = rankBy(function (d) { return a * d.kw + (1 - a) * d.sem; });
+      var rrfRanked = rrf();
+      var lines = ['Linear fusion order (high → low):'];
+      fused.forEach(function (d, i) {
+        var s = a * d.kw + (1 - a) * d.sem;
+        lines.push('  ' + (i + 1) + '. ' + d.id + '  score=' + s.toFixed(3) + '  | ' + d.name);
+      });
+      lines.push('', 'RRF order (k_rrf=60):');
+      rrfRanked.forEach(function (d, i) {
+        lines.push('  ' + (i + 1) + '. ' + d.id + '  | ' + d.name);
+      });
+      outEl.textContent = lines.join('\n');
+    }
+
+    alphaEl.addEventListener('input', render);
+    render();
+  })();
+
+  /* --- Shard viz --- */
+  (function shardViz() {
+    var mount = document.getElementById('shardViz');
+    if (!mount) return;
+    var labels = ['Shard 0', 'Shard 1', 'Shard 2', 'Shard 3'];
+    labels.forEach(function (lbl, idx) {
+      var d = document.createElement('div');
+      d.className = 'shard-node';
+      d.textContent = lbl + '\nvectors % ' + labels.length;
+      d.tabIndex = 0;
+      d.addEventListener('click', function () {
+        d.classList.toggle('hot');
+        var out = document.getElementById('shardOut');
+        if (out) out.textContent = lbl + (d.classList.contains('hot') ? ' → HOT (memory tier)' : ' → warm SSD');
+      });
+      mount.appendChild(d);
+    });
+  })();
+
+  /* --- Quiz --- */
+  (function quiz() {
+    var qs = [
+      {
+        id: 'q1',
+        text: 'Roughly how many vectors do you expect at steady state?',
+        opts: [
+          { v: 's', t: '< 100k', score: { pg: 3, ch: 3, pine: 1 } },
+          { v: 'm', t: '100k – 10M', score: { qd: 3, wv: 3, pine: 2 } },
+          { v: 'l', t: '> 10M', score: { mv: 3, pine: 2, qd: 1 } }
+        ]
+      },
+      {
+        id: 'q2',
+        text: 'Who will operate the retrieval tier in production?',
+        opts: [
+          { v: 'managed', t: 'Fully managed SaaS preferred', score: { pine: 3, mv: 2 } },
+          { v: 'k8s', t: 'Self-hosted on Kubernetes', score: { qd: 3, wv: 3, mv: 2 } },
+          { v: 'pg', t: 'No new datastore — stay in Postgres', score: { pg: 4 } }
+        ]
+      },
+      {
+        id: 'q3',
+        text: 'How complex are metadata predicates on the query path?',
+        opts: [
+          { v: 'light', t: 'Light (single tenant key or simple tag)', score: { ch: 2, pg: 2, pine: 2 } },
+          { v: 'heavy', t: 'Heavy (booleans, ranges, facets)', score: { qd: 4, wv: 3, mv: 2 } }
+        ]
+      },
+      {
+        id: 'q4',
+        text: 'Primary language/runtime for the application tier?',
+        opts: [
+          { v: 'py', t: 'Python-first prototypes', score: { ch: 3, qd: 2 } },
+          { v: 'poly', t: 'Polyglot services / JVM / Go', score: { wv: 2, mv: 2, qd: 2 } }
+        ]
+      }
+    ];
+    var mount = document.getElementById('quizMount');
+    var resBox = document.getElementById('quizResult');
+    var names = {
+      pine: 'Pinecone (managed)',
+      qd: 'Qdrant (self-host or cloud)',
+      wv: 'Weaviate (modular / GraphQL)',
+      mv: 'Milvus / Zilliz (very large scale)',
+      ch: 'Chroma (lightweight / embedded)',
+      pg: 'pgvector inside PostgreSQL'
+    };
+
+    function build() {
+      mount.innerHTML = '';
+      qs.forEach(function (q) {
+        var wrap = document.createElement('div');
+        wrap.className = 'quiz-q';
+        var p = document.createElement('p');
+        p.textContent = q.text;
+        wrap.appendChild(p);
+        q.opts.forEach(function (o) {
+          var lab = document.createElement('label');
+          lab.className = 'quiz-opt';
+          var inp = document.createElement('input');
+          inp.type = 'radio';
+          inp.name = q.id;
+          inp.value = o.v;
+          lab.appendChild(inp);
+          lab.appendChild(document.createTextNode(' ' + o.t));
+          wrap.appendChild(lab);
+        });
+        mount.appendChild(wrap);
+      });
+    }
+    build();
+
+    document.getElementById('quizScore').addEventListener('click', function () {
+      var totals = { pine: 0, qd: 0, wv: 0, mv: 0, ch: 0, pg: 0 };
+      var missing = false;
+      qs.forEach(function (q) {
+        var sel = mount.querySelector('input[name="' + q.id + '"]:checked');
+        if (!sel) missing = true;
+        else {
+          var opt = q.opts.find(function (o) { return o.v === sel.value; });
+          Object.keys(opt.score).forEach(function (k) {
+            totals[k] += opt.score[k];
+          });
+        }
+      });
+      if (missing) {
+        resBox.hidden = false;
+        resBox.textContent = 'Answer every question for a recommendation.';
+        return;
+      }
+      var ranked = Object.keys(totals).sort(function (a, b) { return totals[b] - totals[a]; });
+      var top = ranked[0];
+      var second = ranked[1];
+      var lines = [];
+      lines.push('Top pick: ' + names[top] + ' (score ' + totals[top] + ')');
+      lines.push('Runner-up: ' + names[second] + ' (score ' + totals[second] + ')');
+      lines.push('');
+      lines.push('Scores: ' + JSON.stringify(totals));
+      lines.push('');
+      lines.push('Validate with a PoC: measure recall@k with your embeddings, filter selectivity, and tail latency under replica failover.');
+      resBox.hidden = false;
+      resBox.textContent = lines.join('\n');
+    });
+
+    document.getElementById('quizReset').addEventListener('click', function () {
+      mount.querySelectorAll('input[type=radio]').forEach(function (i) { i.checked = false; });
+      resBox.hidden = true;
+    });
+  })();
+
+  /* --- Playground --- */
+  (function playground() {
+    var canvas = document.getElementById('pgCanvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var state = { pts: [] };
+
+    function sim(a, b) {
+      var dot = a.x * b.x + a.y * b.y;
+      var na = Math.sqrt(a.x * a.x + a.y * a.y);
+      var nb = Math.sqrt(b.x * b.x + b.y * b.y);
+      if (na === 0 || nb === 0) return 0;
+      return dot / (na * nb);
+    }
+
+    function draw() {
+      var qx = +document.getElementById('pgQx').value;
+      var qy = +document.getElementById('pgQy').value;
+      var cw = canvas.width;
+      var ch = canvas.height;
+      ctx.clearRect(0, 0, cw, ch);
+      ctx.fillStyle = '#0a0a0f';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.strokeStyle = '#2a2a3a';
+      for (var g = 0; g <= 10; g++) {
+        var gx = (g / 10) * cw;
+        ctx.beginPath();
+        ctx.moveTo(gx, 0);
+        ctx.lineTo(gx, ch);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, (g / 10) * ch);
+        ctx.lineTo(cw, (g / 10) * ch);
+        ctx.stroke();
+      }
+      state.pts.forEach(function (p) {
+        var px = (p.x + 1) / 2 * (cw - 20) + 10;
+        var py = (1 - (p.y + 1) / 2) * (ch - 20) + 10;
+        ctx.beginPath();
+        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.fillStyle = p.elec ? 'rgba(108,140,255,0.85)' : 'rgba(136,136,160,0.45)';
+        ctx.fill();
+      });
+      var qpx = (qx + 1) / 2 * (cw - 20) + 10;
+      var qpy = (1 - (qy + 1) / 2) * (ch - 20) + 10;
+      ctx.beginPath();
+      ctx.arc(qpx, qpy, 9, 0, Math.PI * 2);
+      ctx.fillStyle = '#f472b6';
+      ctx.fill();
+    }
+
+    function addRandom() {
+      var elec = document.getElementById('pgMeta').checked;
+      state.pts.push({
+        id: 'v_' + Math.random().toString(36).slice(2, 7),
+        x: Math.random() * 2 - 1,
+        y: Math.random() * 2 - 1,
+        elec: elec
+      });
+      draw();
+    }
+
+    function seed() {
+      state.pts = [];
+      var fixed = [
+        { id: 'doc1', x: 0.8, y: 0.1, elec: true },
+        { id: 'doc2', x: 0.75, y: 0.25, elec: true },
+        { id: 'doc3', x: -0.2, y: 0.9, elec: false },
+        { id: 'doc4', x: 0.1, y: 0.15, elec: true },
+        { id: 'doc5', x: -0.7, y: -0.3, elec: false },
+        { id: 'doc6', x: 0.4, y: -0.6, elec: true },
+        { id: 'doc7', x: 0.05, y: 0.05, elec: true },
+        { id: 'doc8', x: -0.4, y: 0.5, elec: false }
+      ];
+      fixed.forEach(function (f) { state.pts.push(f); });
+      draw();
+    }
+
+    document.getElementById('pgAdd').addEventListener('click', addRandom);
+    document.getElementById('pgSeed').addEventListener('click', seed);
+    document.getElementById('pgClear').addEventListener('click', function () {
+      state.pts = [];
+      draw();
+    });
+
+    ['pgQx', 'pgQy'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', function () {
+        document.getElementById(id + 'Out').textContent = (+document.getElementById(id).value).toFixed(2);
+        draw();
+      });
+    });
+    document.getElementById('pgK').addEventListener('input', function () {
+      document.getElementById('pgKOut').textContent = document.getElementById('pgK').value;
+    });
+    document.getElementById('pgThresh').addEventListener('input', function () {
+      var t = (+document.getElementById('pgThresh').value) / 100;
+      document.getElementById('pgThreshOut').textContent = t.toFixed(2);
+    });
+
+    document.getElementById('pgRun').addEventListener('click', function () {
+      var q = { x: +document.getElementById('pgQx').value, y: +document.getElementById('pgQy').value };
+      var k = +document.getElementById('pgK').value;
+      var thresh = (+document.getElementById('pgThresh').value) / 100;
+      var onlyE = document.getElementById('pgFilterOnly').checked;
+      var strat = document.getElementById('pgStrat').value;
+
+      var ul = document.getElementById('pgResults');
+      ul.innerHTML = '';
+      if (state.pts.length === 0) {
+        ul.innerHTML = '<li>Collection empty — seed or add vectors.</li>';
+        return;
+      }
+
+      var scored = state.pts.map(function (p) {
+        return { p: p, s: sim(q, p) };
+      });
+      var passesMeta = function (o) { return !onlyE || o.p.elec; };
+      var passesThresh = function (o) { return o.s >= thresh; };
+
+      var filteredPre = scored.filter(passesMeta);
+      filteredPre.sort(function (a, b) { return b.s - a.s; });
+      var globalSorted = scored.slice().sort(function (a, b) { return b.s - a.s; });
+
+      var result;
+      if (strat === 'pre') {
+        result = filteredPre.filter(passesThresh).slice(0, k);
+      } else if (strat === 'post') {
+        var annK = globalSorted.slice(0, k);
+        result = annK.filter(passesMeta).filter(passesThresh);
+      } else {
+        var wide = globalSorted.slice(0, Math.min(globalSorted.length, k * 3));
+        result = wide.filter(passesMeta).filter(passesThresh).slice(0, k);
+      }
+
+      result.forEach(function (o) {
+        var li = document.createElement('li');
+        li.innerHTML =
+          '<span class="tag">' +
+          o.p.id +
+          '</span> sim=' +
+          o.s.toFixed(4) +
+          (o.p.elec ? ' <span class="tag">electronics</span>' : ' <span class="tag">other</span>');
+        ul.appendChild(li);
+      });
+      var note = document.createElement('li');
+      note.style.border = 'none';
+      note.style.color = '#8888a0';
+      note.textContent =
+        'strategy=' + strat + ' · k=' + k + ' · threshold=' + thresh.toFixed(2) + ' · returned=' + result.length;
+      ul.appendChild(note);
+      draw();
+    });
+
+    seed();
+  })();
+})();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Multi-Headed Hydra — Multi-Head Attention from Theory to Code</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-alt: #181825;
+  --border: #2a2a3a;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #6c8cff;
+  --accent2: #a78bfa;
+  --accent3: #34d399;
+  --accent4: #f472b6;
+  --accent5: #fbbf24;
+  --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.7;
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 80px 0; border-bottom: 1px solid var(--border); position: relative; }
+
+.section-num {
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,140,255,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle {
+  font-size: 1.15rem;
+  color: var(--text-dim);
+  max-width: 640px;
+  margin: 0 auto 40px;
+}
+
+.stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 48px;
+}
+.stat { text-align: center; }
+.stat-val {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin: 24px 0;
+}
+.card-alt { background: var(--bg-card-alt); }
+
+.interactive-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  margin: 32px 0;
+  position: relative;
+}
+.interactive-panel h3, .interactive-panel h4 { margin-bottom: 16px; }
+
+.bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 200px; padding-top: 20px; }
+.bar-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+.bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: height 0.5s ease, background 0.3s ease;
+  min-height: 4px;
+}
+.bar-label { font-size: 0.7rem; color: var(--text-dim); text-align: center; word-break: break-all; }
+.bar-value { font-size: 0.7rem; font-family: var(--mono); color: var(--text); text-align: center; margin-bottom: 4px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--sans);
+}
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+
+.token-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+.token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.token-word { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-new { background: rgba(52,211,153,0.15); color: var(--accent3); border: 1px solid rgba(52,211,153,0.3); }
+.token-special { background: rgba(251,191,36,0.15); color: var(--accent5); border: 1px solid rgba(251,191,36,0.3); }
+.token-highlight { background: rgba(244,114,182,0.15); color: var(--accent4); border: 1px solid rgba(244,114,182,0.3); }
+.token-head1 { background: rgba(108,140,255,0.15); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+.token-head2 { background: rgba(167,139,250,0.15); color: var(--accent2); border: 1px solid rgba(167,139,250,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+canvas { border-radius: var(--radius); display: block; max-width: 100%; }
+
+.slider-container { margin: 16px 0; }
+.slider-container label { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 6px; }
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); display: inline-block; margin-left: 8px; }
+
+.callout {
+  background: rgba(108,140,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 16px 20px;
+  margin: 20px 0;
+  font-size: 0.9rem;
+}
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { background: rgba(251, 191, 36, 0.08); border-left-color: var(--accent5); }
+.callout.warn p { color: var(--text); }
+.callout.ok { background: rgba(52, 211, 153, 0.08); border-left-color: var(--accent3); }
+.callout.ok p { color: var(--text); }
+
+.qa-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.qa-box .q { font-weight: 700; color: var(--accent); margin-bottom: 12px; font-size: 0.95rem; }
+.qa-box p:last-child { margin-bottom: 0; }
+
+.formula {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 16px 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 600px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+
+.flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+.flow-step {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 24px;
+  text-align: center;
+  font-size: 0.9rem;
+  width: 100%;
+  max-width: 500px;
+  transition: all 0.3s;
+}
+.flow-step.active { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.flow-arrow { font-size: 1.2rem; color: var(--text-dim); padding: 4px 0; }
+
+.dim-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  width: 100%;
+  margin: 16px 0;
+}
+.dim-table th, .dim-table td {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.dim-table th { background: var(--bg-card-alt); color: var(--accent); font-weight: 600; }
+.dim-table td { background: var(--bg-card); color: var(--text-dim); }
+.dim-table td strong { color: var(--text); }
+
+.nav {
+  position: fixed;
+  top: 44px;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: all 0.3s;
+}
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+}
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.tag-pink { background: rgba(244,114,182,0.15); color: var(--accent4); }
+.tag-purple { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+
+.text-input, .num-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.text-input:focus, .num-input:focus { border-color: var(--accent); }
+
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+
+.code-block {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 20px 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: var(--text-dim);
+}
+.code-block .kw { color: var(--accent2); }
+.code-block .fn { color: var(--accent); }
+.code-block .str { color: var(--accent3); }
+.code-block .num { color: var(--accent5); }
+.code-block .cmt { color: #666; font-style: italic; }
+.code-block .cls { color: var(--accent4); }
+
+.output-readout {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.step-indicator {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.step-dot.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.step-dot.done { border-color: var(--accent3); color: var(--accent3); }
+
+.matrix-grid {
+  display: grid;
+  gap: 2px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  margin: 12px auto;
+}
+.matrix-cell {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  padding: 6px 4px;
+  text-align: center;
+  min-width: 36px;
+  transition: background 0.3s;
+}
+.matrix-cell.highlight { background: rgba(108,140,255,0.25); color: var(--accent); font-weight: 700; }
+.matrix-cell.masked { background: rgba(248,113,113,0.15); color: var(--danger); opacity: 0.5; }
+
+.ctrl { font-size: 0.85rem; color: var(--text-dim); display: block; margin-bottom: 8px; }
+
+@media (max-width: 600px) {
+  .stats { gap: 24px; }
+  .stat-val { font-size: 2rem; }
+  .bar-chart { height: 150px; }
+  .section { padding: 48px 0; }
+  .interactive-panel { padding: 20px; }
+  .nav-links { gap: 10px; }
+}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #2a2a3a;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
+.breadcrumb-nav .bc-current { color: #8888a0; }
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span><span class="bc-current">The Multi-Headed Hydra</span></nav>
+
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">The Multi-Headed Hydra</a>
+  <div class="nav-links">
+    <a href="#s0">Recap</a>
+    <a href="#s1">The Problem</a>
+    <a href="#s2">Ambiguity</a>
+    <a href="#s3">Multiple Perspectives</a>
+    <a href="#s4">Multi-Head Idea</a>
+    <a href="#s5">Splitting Dimensions</a>
+    <a href="#s6">Matrix Walkthrough</a>
+    <a href="#s7">Trade-offs</a>
+    <a href="#s8">Real Heads</a>
+    <a href="#s9">Math &amp; Code</a>
+    <a href="#s10">Playground</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <p style="font-family:var(--mono); font-size:0.85rem; color:var(--accent); letter-spacing:2px; margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 03</p>
+    <h1>The Multi-Headed Hydra</h1>
+    <p class="subtitle">Multi-Head Attention from Theory to Code — why one attention mechanism is not enough, how to split dimensions across heads, and the complete from-scratch implementation.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">11</span><span class="stat-label">Core Sections</span></div>
+      <div class="stat"><span class="stat-val">6</span><span class="stat-label">Interactive Demos</span></div>
+      <div class="stat"><span class="stat-val">1</span><span class="stat-label">Playground</span></div>
+    </div>
+    <p style="color: var(--text-dim); font-size: 0.9rem; max-width: 720px; margin: 0 auto;">
+      Self-attention revolutionized language modeling by letting every token attend to every other token in a sequence.
+      But a single attention mechanism can only capture <strong>one perspective</strong> at a time.
+      Multi-head attention solves this by running several parallel attention computations — each head specializing in a different relationship —
+      then merging their outputs into a richer context representation.
+      This chapter covers the intuition, every matrix multiplication with concrete dimensions,
+      and a full Python implementation from scratch.
+    </p>
+    <p style="color: var(--text-dim); font-size: 0.85rem; max-width: 680px; margin: 24px auto 0;">
+      Covers: the artist/brush ambiguity · free speech dual perspectives · 11-token matrix walkthrough (d_in=8, d_out=4, 2 heads) ·
+      BERT head 3 vs head 8 visualization · 3-token code example (B, 3, 6) · complete MultiHeadAttention class
+    </p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s0">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Recap: From Input Embeddings to Context Vectors</h2>
+    <p>Chapter 2 built single-head attention from dot products through causal masking. The limitation: a single head can only capture one type of relationship at a time.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s1">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>The Single-Perspective Problem</h2>
+    <p>The core limitation of single-head attention is structural:</p>
+    <div class="formula">A single self-attention mechanism can only capture <strong>one perspective</strong> in a given input sequence.</div>
+    <p>It cannot capture multiple perspectives simultaneously. If a sentence admits two valid interpretations, single-head attention will commit to one attention score matrix — and consequently one context vector — but not both at the same time.</p>
+    <p>A paragraph can admit multiple valid readings. A language model should represent all of them — not just the first interpretation a single attention distribution happens to favor.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>Single-Head Attention</h3>
+        <p>One attention score matrix → one context vector matrix → <strong>one perspective</strong> encoded per layer.</p>
+        <p style="margin-bottom:0;">If a user asks to summarize a document, the model summarizes only the perspective that single-head attention captured.</p>
+      </div>
+      <div class="card">
+        <h3>Multi-Head Attention</h3>
+        <p>Multiple attention score matrices → multiple context vector matrices → merged into one richer output.</p>
+        <p style="margin-bottom:0;">The model can represent multiple simultaneous interpretations, leading to richer understanding and better downstream tasks.</p>
+      </div>
+    </div>
+    <div class="qa-box">
+      <div class="q">A common question is: can't we just make the model bigger or deeper instead of adding heads?</div>
+      <p>Depth and width help, but they do not solve the structural limitation within a single attention computation. Within one Q × K<sup>T</sup> dot product, you get exactly one softmax distribution per query token. Multi-head attention adds parallel softmax distributions — each operating in its own subspace — before merging. That architectural choice is what enables simultaneous multiple perspectives at the same layer, at the same sequence position.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Where This Chapter Sits in the DeepSeek Journey</h3>
+    <p>Multi-head attention sits between causal attention and DeepSeek's later efficiency optimizations. The sequence:</p>
+    <div class="flow">
+      <div class="flow-step">Self-attention (single head, bidirectional)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Causal attention (autoregressive masking)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step active">Multi-head attention (this chapter)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Key-value cache (inference efficiency)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Multi-head latent attention (DeepSeek's modification)</div>
+    </div>
+    <p>DeepSeek later modifies this block to improve storage and compute efficiency while preserving model quality — but only after the standard formulation is clear.</p>
+
+    <div class="callout">
+      <p><strong>Modern LLMs all use multi-head attention.</strong> No production large language model uses just a single attention head. GPT, LLaMA, DeepSeek, BERT — all employ multiple heads so each can capture a different perspective on the input. The specific values of d_model and n_heads vary (GPT-2 small: d_model=768, n_heads=12; LLaMA-7B: d_model=4096, n_heads=32), but the architectural pattern is universal.</p>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s2">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Ambiguity in Language: The Artist and the Brush</h2>
+    <p>Consider this sentence:</p>
+    <div class="formula" style="font-size:1.05rem;">The artist painted the portrait of a woman with a brush.</div>
+    <p>This sentence has <strong>two valid interpretations</strong>.</p>
+    <h3 style="margin-top:28px;">Interpretation 1: The Artist Holds the Brush</h3>
+    <p>In the first reading, the artist has a brush in their hand and uses it to paint the portrait of a woman. The phrase <em>"with a brush"</em> modifies <em>how</em> the painting was done — the artist painted <strong>using</strong> a brush. The woman in the portrait does not necessarily hold a brush. The artist is the one holding the brush.</p>
+    <h3 style="margin-top:28px;">Interpretation 2: The Woman in the Portrait Holds the Brush</h3>
+    <p>In the second reading, the artist painted a portrait <strong>of a woman who has a brush in her hand</strong>. Here, <em>"with a brush"</em> modifies the woman — it is a portrait of a woman-with-a-brush. The artist may not be holding any brush at all; the brush belongs to the subject of the painting.</p>
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3><span class="tag tag-blue">Perspective A</span> Artist + Brush</h3>
+        <p>Painting <strong>a woman</strong> using a brush. The artist holds the brush. The woman in the portrait does not.</p>
+      </div>
+      <div class="card card-alt">
+        <h3><span class="tag tag-purple">Perspective B</span> Woman + Brush</h3>
+        <p>Painting <strong>of a woman with a brush</strong>. The woman in the portrait holds the brush. The artist may not.</p>
+      </div>
+    </div>
+
+    <div class="interactive-panel" id="ambigDemo">
+      <h4>Interactive · Ambiguity Explorer</h4>
+      <p style="margin-bottom:16px;">Toggle between the two interpretations and see how attention patterns change for key tokens.</p>
+      <div class="btn-group">
+        <button class="btn active" id="interpA" onclick="setInterpretation('A')">Interpretation A — Artist holds brush</button>
+        <button class="btn" id="interpB" onclick="setInterpretation('B')">Interpretation B — Woman holds brush</button>
+      </div>
+      <div class="token-row" id="sentenceTokens"></div>
+      <canvas id="ambigCanvas" width="700" height="320" style="width:100%;margin-top:16px;background:var(--bg-card-alt);"></canvas>
+      <div class="output-readout" id="ambigReadout"></div>
+    </div>
+
+    <h3 style="margin-top:28px;">How Attention Differs Between Interpretations</h3>
+    <p>Compare two attention score matrices — one for each interpretation. When <strong>woman</strong> is the query token, the highest attention scores (marked in red) tell the story:</p>
+    <p><strong>In Interpretation A (artist holds brush):</strong> The attention score between <em>woman</em> and <em>portrait</em> is high — understandable, since it is a portrait of a woman. But the attention score between <em>woman</em> and <em>brush</em> is <em>not</em> high, because the woman is not holding a brush.</p>
+    <p><strong>In Interpretation B (woman holds brush):</strong> The attention score between <em>woman</em> and <em>portrait</em> is still high. But now the attention score between <em>woman</em> and <em>brush</em> is also very high — because in this interpretation, the woman is holding a brush in her hand.</p>
+    <p>When <strong>artist</strong> is the query:</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Interpretation A:</strong> High attention between <em>artist</em> and <em>painted</em>, and high attention between <em>artist</em> and <em>brush</em> — the artist is holding the brush.</li>
+      <li><strong>Interpretation B:</strong> High attention between <em>artist</em> and <em>painted</em>, but <em>not</em> high attention between <em>artist</em> and <em>brush</em> — the artist is not holding the brush.</li>
+    </ul>
+    <p>When <strong>brush</strong> is the query:</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Interpretation A:</strong> High attention between <em>brush</em> and <em>artist</em> — the artist seems to be holding the brush.</li>
+      <li><strong>Interpretation B:</strong> High attention between <em>brush</em> and <em>portrait</em>, and high attention between <em>brush</em> and <em>woman</em> — the woman has the brush; the portrait is of a woman with a brush.</li>
+    </ul>
+    <div class="callout warn">
+      <p><strong>The core problem:</strong> In these two interpretations, the attention score matrices are completely different. There can be two entirely different attention score matrices based on which interpretation you adopt. But a single self-attention mechanism can only produce <em>one</em> of them — either the first matrix or the second — and consequently the context vector will be based on only one perspective. It cannot account for both perspectives at the same time.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Three Concrete Distinctions Between the Matrices</h3>
+    <p>When comparing the two attention score matrices side by side, three differences stand out clearly:</p>
+    <table class="dim-table">
+      <tr><th>Query Token</th><th>Interpretation A (artist holds brush)</th><th>Interpretation B (woman holds brush)</th></tr>
+      <tr><td><strong>woman</strong></td><td>High → portrait. Low → brush.</td><td>High → portrait AND brush.</td></tr>
+      <tr><td><strong>artist</strong></td><td>High → painted AND brush.</td><td>High → painted. Low → brush.</td></tr>
+      <tr><td><strong>brush</strong></td><td>High → artist.</td><td>High → portrait AND woman.</td></tr>
+    </table>
+    <p>These three distinctions are not minor numerical differences — they reflect fundamentally different parses of the sentence structure. A language model that must choose one matrix is forced to commit to one parse. A model with multiple heads can maintain both parses simultaneously in different heads, leaving the downstream layers to integrate them.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s3">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Why Multiple Perspectives Matter</h2>
+    <p>The artist-and-brush example is syntactic ambiguity, but the same structural problem appears in semantic and political language too. Consider a sentence buried in a long paragraph:</p>
+    <div class="formula">The government should regulate free speech.</div>
+    <p>This sentence admits at least two perspectives:</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>Perspective 1: Restrict</h3>
+        <p>The government should <strong>impose restrictions</strong> on free speech. Free speech should be curtailed. "Regulate" here means limit or control.</p>
+      </div>
+      <div class="card">
+        <h3>Perspective 2: Protect</h3>
+        <p>The government should <strong>protect and preserve</strong> free speech. "Regulate" here means safeguard through rules — like regulating an industry to ensure fair practice, not to shut it down.</p>
+      </div>
+    </div>
+    <p>It is not clear from the sentence alone which perspective the paragraph is referring to. If we use single-head self-attention, the model will assign only one perspective. But we actually want the attention mechanism to capture <strong>both</strong> perspectives simultaneously.</p>
+    <p>Consider the sentence in context of a longer document about constitutional law. A reader might reasonably infer the restrictive reading from surrounding paragraphs about hate speech regulation — or the protective reading from paragraphs about government overreach. A single attention distribution at this sentence's position must compress all that contextual evidence into one weight vector. Multi-head attention allows different heads to maintain different hypotheses until later layers resolve them.</p>
+    <p>The advantage of capturing both perspectives is that the model becomes richer in its understanding. When a user asks to summarize the document, we can summarize both perspectives. With single-head attention, we would summarize only one — and that is not good enough for real-world language understanding.</p>
+    <div class="callout">
+      <p><strong>The design goal:</strong> extend self-attention so a single layer can hold multiple perspectives at once.</p>
+    </div>
+    <div class="qa-box">
+      <div class="q">A common question is: does "perspective" always mean semantic ambiguity like the brush example?</div>
+      <p>Not necessarily. A perspective can be syntactic (which word attaches to which), semantic (who holds the brush), or functional (one head may pay more attention to verbs, another to hidden meaning, another to long-range dependencies). The key insight is that different subspaces of the representation can specialize in different relational patterns — and multi-head attention provides those parallel subspaces.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s4">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>From One Head to Many: The Multi-Headed Hydra</h2>
+    <p>If one self-attention mechanism can capture one perspective, the natural extension is: <strong>what if we have multiple self-attention mechanisms?</strong></p>
+    <p>Suppose we run two parallel self-attention blocks on the same input embedding matrix:</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Self-attention mechanism #1 → Context Vector Matrix #1 (Perspective 1)</li>
+      <li>Self-attention mechanism #2 → Context Vector Matrix #2 (Perspective 2)</li>
+    </ul>
+    <p>Then we <strong>merge</strong> these context vector matrices together. The final context matrix now consists of multiple perspectives — Perspective 1 from head one, Perspective 2 from head two — encoded simultaneously in the output.</p>
+    <div class="flow">
+      <div class="flow-step">Input Embedding Matrix X</div>
+      <div class="flow-arrow">↓ ↓</div>
+      <div class="two-col" style="max-width:500px;margin:0 auto;">
+        <div class="flow-step">Head 1 → Context₁</div>
+        <div class="flow-step">Head 2 → Context₂</div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step active">Merge → Final Context Matrix (multiple perspectives)</div>
+    </div>
+    <h3 style="margin-top:28px;">Why "Head"?</h3>
+    <p>This extension is called <strong>multi-head attention</strong>. The term "head" comes from the image of multiple observers — think of one self-attention block as one person with one head, looking at the sentence from one angle. Multi-head attention is like having multiple people, each with their own perspective:</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Head 1 might pay more attention to <strong>verbs</strong> in a sentence.</li>
+      <li>Head 2 might focus on the <strong>hidden meaning</strong> or syntactic attachments.</li>
+      <li>Head 3 might track <strong>entity relationships</strong> across long distances.</li>
+    </ul>
+    <p>Multiple parallel self-attention blocks aggregate multiple "heads" — the origin of the name multi-head attention.</p>
+
+    <h3 style="margin-top:28px;">Perspectives Beyond Semantics</h3>
+    <p>"Perspective" does not always mean semantic ambiguity like the brush example. Different heads can specialize in different <em>types</em> of relational structure:</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Syntactic heads</strong> — track subject-verb agreement, prepositional phrase attachments, dependency structure.</li>
+      <li><strong>Positional heads</strong> — focus on nearby tokens vs. distant tokens, capturing local vs. global context.</li>
+      <li><strong>Semantic heads</strong> — resolve ambiguity (brush interpretation, free speech interpretation).</li>
+      <li><strong>Functional heads</strong> — one head may disproportionately attend to verbs; another to punctuation or special tokens.</li>
+    </ul>
+    <p>The brush example is clearest because the two interpretations produce visibly different attention score matrices. Even in unambiguous sentences, different heads partition the relational work — which is why inspecting head specializations in pre-trained models remains an active area of research.</p>
+
+    <h3 style="margin-top:28px;">The Hydra Metaphor</h3>
+    <p>Like the mythological hydra with many heads looking in different directions, multi-head attention runs parallel heads on the same input and merges their views into one output vector.</p>
+    <div class="callout ok">
+      <p><strong>Divide and conquer:</strong> Instead of conquering the whole sentence at once with one attention distribution, we divide the representation into different parts, each head conquers a different perspective, and then we merge the results. That is the simplest way to think about multi-head attention.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Hydra Head Splitter</h4>
+      <p>Watch how a single d<sub>out</sub> dimension splits across multiple heads. Each head gets d<sub>out</sub> / n<sub>heads</sub> columns.</p>
+      <label class="ctrl">Output dimension (d<sub>out</sub>): <span class="slider-value" id="hydraDoutVal">512</span></label>
+      <input type="range" id="hydraDout" min="64" max="1024" step="64" value="512">
+      <label class="ctrl">Number of heads: <span class="slider-value" id="hydraHeadsVal">8</span></label>
+      <input type="range" id="hydraHeads" min="1" max="16" step="1" value="8">
+      <canvas id="hydraCanvas" width="700" height="180" style="width:100%;margin-top:12px;background:var(--bg-card-alt);"></canvas>
+      <div class="output-readout" id="hydraReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s5">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Splitting Dimensions Across Heads</h2>
+    <p><strong>What if we have two self-attention mechanisms instead of one?</strong> Two mechanisms means two heads — the origin of the term "multi-head." Two-head attention on the sentence:</p>
+    <div class="token-row">
+      <span class="token token-word">The</span><span class="token token-word">artist</span><span class="token token-word">painted</span><span class="token token-word">the</span><span class="token token-word">portrait</span><span class="token token-word">of</span><span class="token token-word">a</span><span class="token token-word">woman</span><span class="token token-word">with</span><span class="token token-word">a</span><span class="token token-word">brush</span>
+    </div>
+    <p>That is <strong>11 tokens</strong>. Each token is an input embedding of <strong>8 dimensions</strong> (d<sub>in</sub> = 8). The input embedding matrix X has shape <span style="font-family:var(--mono);">11 × 8</span>.</p>
+
+    <table class="dim-table">
+      <tr><th>Row</th><th>Token</th><th>Role in Ambiguity</th></tr>
+      <tr><td>0</td><td>The</td><td>Determiner</td></tr>
+      <tr><td>1</td><td>artist</td><td>Subject — holds brush in Interpretation A</td></tr>
+      <tr><td>2</td><td>painted</td><td>Main verb</td></tr>
+      <tr><td>3</td><td>the</td><td>Determiner</td></tr>
+      <tr><td>4</td><td>portrait</td><td>Direct object — of a woman</td></tr>
+      <tr><td>5</td><td>of</td><td>Preposition linking portrait → woman</td></tr>
+      <tr><td>6</td><td>a</td><td>Determiner</td></tr>
+      <tr><td>7</td><td>woman</td><td>Subject of portrait — holds brush in Interpretation B</td></tr>
+      <tr><td>8</td><td>with</td><td>Preposition introducing "with a brush" attachment</td></tr>
+      <tr><td>9</td><td>a</td><td>Determiner</td></tr>
+      <tr><td>10</td><td>brush</td><td>Ambiguous attachment — to artist or to woman</td></tr>
+    </table>
+    <p>The ambiguity hinges on whether <em>with a brush</em> attaches to the verb phrase <em>painted</em> (artist's instrument) or to the noun phrase <em>a woman</em> (woman's attribute). Different attention heads can learn to represent both attachments.</p>
+    <p>The goal of two-head attention: convert this input embedding matrix into <strong>two</strong> context vector matrices — not one — so each captures a different perspective.</p>
+
+    <h3 style="margin-top:28px;">Single-Head Baseline</h3>
+    <p>If we had just one attention head with output dimension d<sub>out</sub> = 4, we would multiply X (11×8) with trainable weight matrices W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub> — each of shape 8×4 — to get Q, K, V each of shape 11×4.</p>
+
+    <h3 style="margin-top:28px;">Splitting the Weight Matrices</h3>
+    <p>To extend to multi-head attention, we first fix two hyperparameters at the start:</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Output dimension</strong> d<sub>out</sub> = 4 (fixed — same total output size as single-head)</li>
+      <li><strong>Number of heads</strong> n<sub>heads</sub> = 2</li>
+    </ul>
+    <p>The output dimension is split among the heads. Each head gets:</p>
+    <div class="formula">head_dim = d<sub>out</sub> / n<sub>heads</sub> = 4 / 2 = 2</div>
+    <p>Instead of one W<sub>Q</sub> of shape 8×4, we now have:</p>
+    <table class="dim-table">
+      <tr><th>Matrix</th><th>Shape</th><th>Head</th></tr>
+      <tr><td>W<sub>Q1</sub></td><td>8 × 2</td><td>Head 1</td></tr>
+      <tr><td>W<sub>Q2</sub></td><td>8 × 2</td><td>Head 2</td></tr>
+      <tr><td>W<sub>K1</sub></td><td>8 × 2</td><td>Head 1</td></tr>
+      <tr><td>W<sub>K2</sub></td><td>8 × 2</td><td>Head 2</td></tr>
+      <tr><td>W<sub>V1</sub></td><td>8 × 2</td><td>Head 1</td></tr>
+      <tr><td>W<sub>V2</sub></td><td>8 × 2</td><td>Head 2</td></tr>
+    </table>
+    <p>The <strong>head dimension</strong> is the number of columns in each head's weight matrix — equal to 2 in this case. The same split happens for keys and values: W<sub>K1</sub>, W<sub>V1</sub> for head 1; W<sub>K2</sub>, W<sub>V2</sub> for head 2.</p>
+    <p>If splitting dimensions feels confusing, remember the core idea: to get two attention heads, we simply divide the query, key, and value weight matrices into two parts. We create multiple copies of W<sub>Q</sub>, W<sub>K</sub>, and W<sub>V</sub>.</p>
+
+    <h3 style="margin-top:28px;">General Formula for Any Number of Heads</h3>
+    <p>The pattern generalizes. For any model:</p>
+    <div class="formula">head_dim = d_model / n_heads = d_out / n_heads</div>
+    <p>In production LLMs:</p>
+    <table class="dim-table">
+      <tr><th>Model Config</th><th>d_model</th><th>n_heads</th><th>head_dim (d_k)</th></tr>
+      <tr><td>Our 2-head tutorial</td><td>4</td><td>2</td><td>2</td></tr>
+      <tr><td>Our code example</td><td>6</td><td>2</td><td>3</td></tr>
+      <tr><td>Standard GPT-style</td><td>512</td><td>8</td><td>64</td></tr>
+      <tr><td>BERT base</td><td>768</td><td>12</td><td>64</td></tr>
+      <tr><td>BERT (11 heads demo)</td><td>d_out</td><td>11</td><td>d_out / 11</td></tr>
+    </table>
+    <p>Critical constraint: <strong>d_out must be divisible by n_heads</strong>. You cannot split 512 into 7 equal integer parts — the architecture enforces this with an assertion in code.</p>
+    <p>Implementation note: in practice, rather than literally creating separate W<sub>Q1</sub>, W<sub>Q2</sub> matrices, we create one W<sub>Q</sub> of shape (d_in, d_out) and then <em>reshape</em> the output. Mathematically equivalent — but the reshape/view approach is what you see in every production implementation.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Head Dimension Calculator</h4>
+      <p>Compute head_dim = d_model / n_heads for any configuration. Standard DeepSeek/GPT-style models use d_model=512, n_heads=8 → d_k=64.</p>
+      <div class="two-col">
+        <div>
+          <label class="ctrl">d_model (d<sub>out</sub>): <span id="calcDmodel">512</span></label>
+          <input type="range" id="calcDmodelSlider" min="64" max="4096" step="64" value="512">
+        </div>
+        <div>
+          <label class="ctrl">n_heads: <span id="calcHeads">8</span></label>
+          <input type="range" id="calcHeadsSlider" min="1" max="64" step="1" value="8">
+        </div>
+      </div>
+      <div class="output-readout" id="calcReadout"></div>
+      <canvas id="calcCanvas" width="700" height="120" style="width:100%;margin-top:12px;background:var(--bg-card-alt);"></canvas>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s6">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>Step-by-Step Matrix Walkthrough</h2>
+    <p>Every matrix multiplication from input to final merged context vectors:</p>
+
+    <h3>Step 4: Multiple Q, K, V Matrices</h3>
+    <p>Multiply the input embedding matrix X (11×8) with each head's weight matrices:</p>
+    <table class="dim-table">
+      <tr><th>Operation</th><th>Dimensions</th><th>Result</th></tr>
+      <tr><td>X × W<sub>Q1</sub></td><td>11×8 · 8×2</td><td>Q₁ : 11×2</td></tr>
+      <tr><td>X × W<sub>Q2</sub></td><td>11×8 · 8×2</td><td>Q₂ : 11×2</td></tr>
+      <tr><td>X × W<sub>K1</sub></td><td>11×8 · 8×2</td><td>K₁ : 11×2</td></tr>
+      <tr><td>X × W<sub>K2</sub></td><td>11×8 · 8×2</td><td>K₂ : 11×2</td></tr>
+      <tr><td>X × W<sub>V1</sub></td><td>11×8 · 8×2</td><td>V₁ : 11×2</td></tr>
+      <tr><td>X × W<sub>V2</sub></td><td>11×8 · 8×2</td><td>V₂ : 11×2</td></tr>
+    </table>
+    <p>The number of rows stays 11 (one per token). The number of columns becomes 2 (the head dimension). Head 1 has Q₁, K₁, V₁. Head 2 has Q₂, K₂, V₂. We have two copies of the query, key, and value matrices — but each copy has only half the columns, because d<sub>out</sub> = 4 is fixed and split across two heads.</p>
+
+    <h3 style="margin-top:28px;">Step 5: Attention Scores Per Head</h3>
+    <p>For each head, compute attention scores via Q × K<sup>T</sup>:</p>
+    <table class="dim-table">
+      <tr><th>Head</th><th>Operation</th><th>Dimensions</th><th>Result</th></tr>
+      <tr><td>1</td><td>Q₁ × K₁<sup>T</sup></td><td>11×2 · 2×11</td><td>11×11</td></tr>
+      <tr><td>2</td><td>Q₂ × K₂<sup>T</sup></td><td>11×2 · 2×11</td><td>11×11</td></tr>
+    </table>
+    <div class="callout ok">
+      <p><strong>The beauty of multi-head attention:</strong> Although each head's Q and K have reduced dimension (2 instead of 4), the attention score matrix is still 11×11 for both heads — the same size as single-head attention. Single-head would compute 11×4 · 4×11 → 11×11. Two-head computes 11×2 · 2×11 → 11×11 twice. We get <strong>two copies</strong> of the attention score matrix, each able to capture a different perspective.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Why Attention Score Dimensions Stay n × n</h3>
+    <p>For head 1:</p>
+    <div class="formula">Q₁ (11×2) × K₁ᵀ (2×11) = Scores₁ (11×11)</div>
+    <p>The inner dimension is head_dim=2 (not d_out=4). The outer dimensions are num_tokens=11 on both sides. Matrix multiplication rule: (m×n)·(n×p) → (m×p). Here m=11, n=2, p=11. The result is always (num_tokens × num_tokens) regardless of how many heads we use or how small head_dim becomes.</p>
+    <p>With 8 heads and d_model=512: each head has head_dim=64. Q is (n_tokens×64), Kᵀ is (64×n_tokens), scores are still (n_tokens×n_tokens). Adding more heads gives more score matrices — not larger ones.</p>
+
+    <h3 style="margin-top:28px;">Step 6: Scale, Softmax, Causal Mask, Dropout</h3>
+    <p>For each head independently:</p>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Scale by √head_dim = √2</li>
+      <li>Apply softmax (each row sums to 1)</li>
+      <li>Apply causal mask: elements above the diagonal → 0 (or −∞ before softmax)</li>
+      <li>Optionally apply dropout to randomly zero attention weights</li>
+    </ol>
+    <p>Result: Head 1 attention weights (11×11) and Head 2 attention weights (11×11).</p>
+
+    <h3 style="margin-top:28px;">Causal Masking in Detail (Both Heads)</h3>
+    <p>For an 11-token causal sequence, the attention weight matrix looks like this after masking (× = masked, · = active):</p>
+    <div class="card card-alt" style="font-family:var(--mono);font-size:0.75rem;line-height:1.4;">
+      <pre style="margin:0;color:var(--text-dim);">Token:  1  2  3  4  5  6  7  8  9 10 11
+    1  ·  ×  ×  ×  ×  ×  ×  ×  ×  ×  ×
+    2  ·  ·  ×  ×  ×  ×  ×  ×  ×  ×  ×
+    3  ·  ·  ·  ×  ×  ×  ×  ×  ×  ×  ×
+    4  ·  ·  ·  ·  ×  ×  ×  ×  ×  ×  ×
+    ...
+   11  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·</pre>
+    </div>
+    <p>Token at row i can only attend to tokens at columns 1 through i. This applies identically to both head 1 and head 2 — causality is not head-specific. What differs between heads is the <em>values</em> in the allowed positions, not the mask pattern. After masking, softmax ensures each row still sums to 1 over the unmasked positions only.</p>
+    <p>Dropout (when enabled) randomly sets additional attention weights to zero during training. A dropout rate of 0.5 means roughly half the weights are zeroed each forward pass. At inference time, dropout is disabled. In our worked examples, dropout rate is 0 for simplicity.</p>
+
+    <h3 style="margin-top:28px;">Step 7: Context Vectors Per Head</h3>
+    <table class="dim-table">
+      <tr><th>Head</th><th>Operation</th><th>Dimensions</th><th>Result</th></tr>
+      <tr><td>1</td><td>AttnWeights₁ × V₁</td><td>11×11 · 11×2</td><td>Context₁ : 11×2</td></tr>
+      <tr><td>2</td><td>AttnWeights₂ × V₂</td><td>11×11 · 11×2</td><td>Context₂ : 11×2</td></tr>
+    </table>
+    <p>Each row of Context₁ is a context vector for one token from head 1's perspective. Each row of Context₂ is the same token from head 2's perspective. The context vectors are richer than input embeddings because they encode relational information.</p>
+
+    <h3 style="margin-top:28px;">What Each Context Vector Represents</h3>
+    <p>For the token <em>artist</em> (row 0 in an 11-token sequence):</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Input embedding</strong> — captures the semantic notion of "artist" plus its position. No information about <em>painted</em>, <em>portrait</em>, <em>brush</em>, etc.</li>
+      <li><strong>Context vector (head 1)</strong> — 2-dimensional vector encoding how <em>artist</em> relates to other tokens from perspective 1 (e.g., artist→painted, artist→brush).</li>
+      <li><strong>Context vector (head 2)</strong> — 2-dimensional vector encoding how <em>artist</em> relates from perspective 2 (possibly a different attachment or semantic role).</li>
+      <li><strong>Merged context vector</strong> — 4-dimensional vector [context₁ | context₂] containing both perspectives simultaneously.</li>
+    </ul>
+    <p>This is true for every token in the sequence: <em>painted</em>, <em>portrait</em>, <em>woman</em>, <em>brush</em>, and all others each get a richer merged representation.</p>
+
+    <h3 style="margin-top:28px;">Step 8: Merge (Concatenate) the Heads</h3>
+    <p>Concatenate Context₁ and Context₂ along the feature dimension:</p>
+    <div class="formula">Final Context = [Context₁ | Context₂] → shape 11×4</div>
+    <p>The left half (2 columns) is Perspective 1 (P₁) from head 1. The right half (2 columns) is Perspective 2 (P₂) from head 2. The final size is 11×4 — identical to single-head output — but now it contains <strong>two perspectives</strong> instead of one.</p>
+
+    <h3 style="margin-top:28px;">The Merge Visualized Row-by-Row</h3>
+    <p>For token <em>artist</em> (row 0):</p>
+    <div class="card card-alt" style="font-family:var(--mono);font-size:0.85rem;">
+      <p style="margin-bottom:8px;color:var(--text);">Context₁[0] = [c₁₀, c₁₁] &nbsp; ← head 1's 2-dim context for "artist"</p>
+      <p style="margin-bottom:8px;color:var(--text);">Context₂[0] = [c₂₀, c₂₁] &nbsp; ← head 2's 2-dim context for "artist"</p>
+      <p style="margin-bottom:0;color:var(--accent3);">Merged[0] = [c₁₀, c₁₁, c₂₀, c₂₁] &nbsp; ← 4-dim final context for "artist"</p>
+    </div>
+    <p>This concatenation happens for all 11 rows. If we had 8 heads with d_out=512 and head_dim=64, each row would concatenate 8 vectors of 64 dimensions each — still totaling 512. With 6 heads and d_out=6, we would merge 6 context vectors of 1 dimension each (though d_out=6, n_heads=6 gives head_dim=1, which is unusual in practice).</p>
+    <p>General merge formula for n_heads heads:</p>
+    <div class="formula">context_merged[t] = concat(head_1[t], head_2[t], ..., head_H[t]) ∈ ℝ<sup>d_out</sup></div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Matrix Flow Step-by-Step</h4>
+      <p>Click through each step of two-head attention on 11 tokens (d_in=8, d_out=4, head_dim=2).</p>
+      <div class="step-indicator" id="flowSteps"></div>
+      <canvas id="flowCanvas" width="700" height="340" style="width:100%;background:var(--bg-card-alt);"></canvas>
+      <div class="btn-group" style="margin-top:12px;">
+        <button class="btn" id="flowPrev" onclick="flowStep(-1)">← Previous</button>
+        <button class="btn" id="flowNext" onclick="flowStep(1)">Next →</button>
+      </div>
+      <div class="output-readout" id="flowReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s7">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>The Trade-Off: Perspectives vs. Expressivity</h2>
+    <p>Multi-head attention is not free. The main drawback: for each perspective, we have fewer dimensions to work with.</p>
+    <div class="comparison">
+      <div class="card">
+        <h3>Single Head (d_out=4)</h3>
+        <p>One perspective with <strong>4 dimensions</strong> of expressivity per token.</p>
+      </div>
+      <div class="card">
+        <h3>Two Heads (d_out=4)</h3>
+        <p>Two perspectives with <strong>2 dimensions each</strong>. More perspectives, less expressivity per perspective.</p>
+      </div>
+    </div>
+    <p>The dimension size for each head is effectively reduced because we split the query, key, and value weight matrices. The amount of information each head can capture in its subspace is a bit reduced — but the number of perspectives we can capture is increased.</p>
+    <p>Think of it as <strong>divide and conquer</strong>: instead of conquering the whole sentence at once with 4 dimensions of relational encoding, we divide into 2 parts of 2 dimensions each, each part specializing in a different relational pattern, then merge.</p>
+    <div class="callout warn">
+      <p><strong>Why this trade-off works:</strong> Despite reduced per-head dimension, all modern LLMs use multi-head attention. No production LLM uses just a single head. The gain from multiple simultaneous perspectives outweighs the loss of per-head expressivity — especially when d_model is large (512+) and n_heads is moderate (8–32), giving each head plenty of dimensions (d_k = 64 in the standard 512/8 configuration).</p>
+    </div>
+    <h3 style="margin-top:28px;">Storage and Compute Considerations</h3>
+    <p>Multi-head attention increases the number of attention score matrices from 1 to n_heads. During training, all heads are computed in parallel on GPU — the reshape/transpose pattern is designed exactly for this parallelization. During autoregressive inference, however, storing keys and values for every head at every layer for every previous token becomes expensive. That is the motivation for <strong>KV cache</strong> (store past K and V instead of recomputing) and eventually <strong>Multi-Head Latent Attention (MLA)</strong> — DeepSeek's compression of the KV representation in latent space.</p>
+
+    <h3 style="margin-top:28px;">The Divide-and-Conquer Principle</h3>
+    <p>The core mental model:</p>
+    <div class="card card-alt">
+      <p style="margin-bottom:12px;"><strong>Single head:</strong> One agent with d_out dimensions tries to capture every relational pattern in the sentence simultaneously. For ambiguous sentences, it must pick one interpretation.</p>
+      <p style="margin-bottom:12px;"><strong>Multi-head:</strong> n_heads agents, each with d_out/n_heads dimensions, each specialize in a different relational pattern. Ambiguous sentences can activate different patterns in different heads simultaneously.</p>
+      <p style="margin-bottom:0;"><strong>Merge:</strong> Concatenate all head outputs → same d_out total size, but now encoding n_heads perspectives instead of one.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Full Procedure Recap</h3>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Start with input embedding matrix X (11×8)</li>
+      <li>Split W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub> into two parts (8×2 each) → W<sub>Q1</sub>, W<sub>Q2</sub>, etc.</li>
+      <li>Compute Q₁, K₁, V₁ and Q₂, K₂, V₂ (each 11×2)</li>
+      <li>Compute two attention score matrices (each 11×11) — <strong>the most important step</strong></li>
+      <li>Scale, softmax, causal mask, dropout → two attention weight matrices</li>
+      <li>Multiply weights × values → Context₁ (11×2) and Context₂ (11×2)</li>
+      <li>Merge → final context matrix (11×4) with perspectives P₁ and P₂</li>
+    </ol>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s8">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Real Attention Patterns in Pre-trained Models</h2>
+    <p>Pre-trained Transformers make the theory concrete. BERT uses bidirectional attention — no causal mask — so every token can attend to tokens before and after it. Trained on large corpora, its attention heads develop meaningful specializations.</p>
+    <p>The same ambiguous sentence passes through BERT; individual heads at <strong>layer 3</strong> (the third Transformer block) are inspected. An LLM has multiple Transformer blocks (layers), and each block has multiple attention heads. "Layer 3, head 3" means the third head inside the third Transformer block.</p>
+    <p>BERT in this configuration has <strong>11 attention heads</strong> — d<sub>out</sub> is split into 11 parts, each head getting d<sub>out</sub>/11 dimensions.</p>
+
+    <h3 style="margin-top:28px;">Understanding Layer vs. Head</h3>
+    <p>Two indices appear when inspecting attention in a deep model:</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><strong>Layer</strong> (or block index) — the index of the Transformer block. Layer 3 is the third stacked block. Early layers often capture syntactic patterns; deeper layers capture more abstract semantics.</li>
+      <li><strong>Head</strong> — which attention head within that layer. Head 3 and head 8 in the same layer are two parallel attention computations on the same hidden states, but with different learned weight slices.</li>
+    </ul>
+    <p>For the brush sentence demonstration, layer=3 compares head=3 vs head=8. BERT's bidirectional attention (no causal mask) lets every token attend to tokens before and after it — unlike DeepSeek's causal decoder — which makes the ambiguity visualization cleaner: the model can directly compare <em>woman</em> and <em>brush</em> regardless of position.</p>
+
+    <h3 style="margin-top:28px;">Layer 3, Head 3: Woman → Brush</h3>
+    <p>With query token <strong>woman</strong> and head 3, the maximum attention weight goes to <strong>brush</strong>. Tracing the attention line confirms: woman attends most strongly to brush. Head 3 has latched onto Interpretation B — the woman holds a brush in her hand.</p>
+
+    <h3 style="margin-top:28px;">Layer 3, Head 8: Woman → Portrait</h3>
+    <p>At the same layer, head 8 with query <strong>woman</strong> assigns maximum attention to <strong>portrait</strong> — not brush. The attention between woman and brush is very low. Head 8 reflects Interpretation A: a portrait of a woman; the artist may simply be painting her portrait.</p>
+
+    <div class="callout ok">
+      <p><strong>Direct evidence:</strong> A pre-trained Transformer has different attention heads, and each head can uncover a different meaning. Head 3 uncovers "woman holds brush." Head 8 uncovers "portrait of a woman (artist paints with brush)." This is exactly what multi-head attention was designed to enable.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Reading the Visualization</h3>
+    <p>When hovering on the token <em>woman</em> in the attention visualization tool, a line traces to the token receiving maximum weight. For head 3, that line terminates at <em>brush</em> — confirming the attention weight plot where brush has the highest bar for the woman query row. For head 8, the line terminates at <em>portrait</em>, and the brush weight is near zero.</p>
+    <p>This does not mean head 3 is "wrong" or head 8 is "right" — both interpretations are valid for the sentence. The model maintains both hypotheses in parallel. Downstream layers and the final output projection determine which interpretation dominates for a given downstream task (question answering, summarization, etc.). The power of multi-head attention is that both hypotheses remain available in the representation rather than being collapsed prematurely.</p>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Head Attention Pattern Comparison</h4>
+      <p>Select a query token and compare attention weights between Head 3 and Head 8 (simulated from BERT-like patterns on our ambiguous sentence).</p>
+      <label class="ctrl">Query token:</label>
+      <div class="btn-group" id="queryTokenBtns"></div>
+      <div class="two-col" style="margin-top:16px;">
+        <div>
+          <h4 style="font-size:0.95rem;color:var(--accent);">Head 3</h4>
+          <canvas id="head3Canvas" width="340" height="280" style="width:100%;background:var(--bg-card-alt);"></canvas>
+        </div>
+        <div>
+          <h4 style="font-size:0.95rem;color:var(--accent2);">Head 8</h4>
+          <canvas id="head8Canvas" width="340" height="280" style="width:100%;background:var(--bg-card-alt);"></canvas>
+        </div>
+      </div>
+      <div class="output-readout" id="headCompareReadout"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s9">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2>Mathematical Implementation and From-Scratch Code</h2>
+    <p>Multi-head attention with explicit numbers, mapped to Python:</p>
+
+    <h3 style="margin-top:28px;">The Input Tensor</h3>
+    <p>Start with input embedding matrix X. In code, X always has <strong>three dimensions</strong>:</p>
+    <div class="formula">X.shape = (B, num_tokens, d_in)</div>
+    <p>Where B is batch size, num_tokens is sequence length, and d_in is the input embedding dimension.</p>
+    <p>Our worked example: <strong>3 tokens</strong>, each with <strong>6 dimensions</strong>, batch size <strong>1</strong>:</p>
+    <div class="formula">X.shape = (1, 3, 6)</div>
+    <p>Each row is one token's input embedding — the sum of token embedding plus position embedding (the "uniform" from the token's journey through the LLM architecture). Token 1 is row 0, token 2 is row 1, token 3 is row 2.</p>
+
+    <h3 style="margin-top:28px;">What Is the Input Embedding?</h3>
+    <p>Recall the journey of a token through the LLM architecture: raw text is tokenized, each token ID is looked up in an embedding table to get a token embedding, a position embedding is added (encoding where the token sits in the sequence), and the sum is the <strong>input embedding</strong> — sometimes called the token's "uniform." Every token gets its own row in the input matrix X. The three rows in our (1, 3, 6) example are three such uniforms, each a 6-dimensional vector ready to enter the attention block.</p>
+    <p>The first dimension of X — batch size B — exists because we process multiple sequences in parallel during training. One batch item is one sentence (or one training example). Two batch items means two sentences processed simultaneously, giving X shape (2, 3, 6) if both sentences have 3 tokens.</p>
+    <p>If we passed 2 batches stacked together, shape would be (2, 3, 6). With 3 batches: (3, 3, 6). The code must handle arbitrary batch size — but for clarity we use B=1.</p>
+
+    <h3 style="margin-top:28px;">Hyperparameters</h3>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>d_in = 6</li>
+      <li>d_out = 6</li>
+      <li>n_heads = 2</li>
+      <li>head_dim = d_out / n_heads = 6 / 2 = <strong>3</strong></li>
+    </ul>
+
+    <h3 style="margin-top:28px;">Step 1: Linear Projections (Q, K, V)</h3>
+    <p>Initialize trainable weight matrices W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub> — each of shape (d_in, d_out) = (6, 6). In PyTorch, this is done with <code style="font-family:var(--mono);color:var(--accent);">nn.Linear(d_in, d_out, bias=False)</code> — bias is zero, so it is pure matrix multiplication.</p>
+    <table class="dim-table">
+      <tr><th>Operation</th><th>Dimensions</th><th>Result Shape</th></tr>
+      <tr><td>X @ W<sub>Q</sub></td><td>(1,3,6) · (6,6)</td><td>queries: (1, 3, 6)</td></tr>
+      <tr><td>X @ W<sub>K</sub></td><td>(1,3,6) · (6,6)</td><td>keys: (1, 3, 6)</td></tr>
+      <tr><td>X @ W<sub>V</sub></td><td>(1,3,6) · (6,6)</td><td>values: (1, 3, 6)</td></tr>
+    </table>
+    <p>Notice: batch size and num_tokens stay the same. The last dimension changes from d_in to d_out. We have not applied multi-head splitting yet — we first compute full Q, K, V in d_out space.</p>
+
+    <h3 style="margin-top:28px;">Step 2: Reshape — Unroll d_out into (n_heads, head_dim)</h3>
+    <p>The real magic starts here. The last dimension d_out=6 is <strong>unrolled</strong> into (n_heads=2, head_dim=3):</p>
+    <div class="formula">(B, num_tokens, d_out) → (B, num_tokens, n_heads, head_dim)</div>
+    <div class="formula">(1, 3, 6) → (1, 3, 2, 3)</div>
+    <p>Visualize token 1: instead of one row with 6 columns, it now has <strong>2 rows × 3 columns</strong> — row 0 is head 1's slice, row 1 is head 2's slice. The six columns [c₁,c₂,c₃,c₄,c₅,c₆] become:</p>
+    <ul style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Head 1: [c₁, c₂, c₃]</li>
+      <li>Head 2: [c₄, c₅, c₆]</li>
+    </ul>
+    <p>In code: <code style="font-family:var(--mono);color:var(--accent);">queries.view(B, num_tokens, n_heads, head_dim)</code> — same for keys and values.</p>
+
+    <h3 style="margin-top:28px;">Step 3: Transpose — Group by Heads</h3>
+    <p>Currently grouped by tokens: (B, num_tokens, n_heads, head_dim). We need to group by heads for parallel computation:</p>
+    <div class="formula">transpose(1, 2) → (B, n_heads, num_tokens, head_dim)</div>
+    <div class="formula">(1, 3, 2, 3) → (1, 2, 3, 3)</div>
+    <p>Now head 1's Q₁, K₁, V₁ are together in one slice; head 2's Q₂, K₂, V₂ in another. This makes the dot product straightforward: q1 @ k1<sup>T</sup> and q2 @ k2<sup>T</sup> happen in parallel.</p>
+    <div class="callout">
+      <p><strong>Why transpose?</strong> If we stay grouped by tokens, head 1's data is scattered across rows (part of token 1's row, part of token 2's row, etc.). Grouping by heads puts all of q1 in one place and all of q2 in another — exactly what we need for per-head matrix multiplication.</p>
+    </div>
+
+    <h3 style="margin-top:28px;">Step 4: Attention Scores</h3>
+    <p>Multiply queries with keys transposed on the last two dimensions:</p>
+    <div class="formula">scores = queries @ keys.transpose(-2, -1)</div>
+    <table class="dim-table">
+      <tr><th>Tensor</th><th>Shape</th></tr>
+      <tr><td>queries</td><td>(1, 2, 3, 3)</td></tr>
+      <tr><td>keys<sup>T</sup></td><td>(1, 2, 3, 3) — last two dims transposed</td></tr>
+      <tr><td>scores</td><td>(1, 2, 3, 3) — B × n_heads × num_tokens × num_tokens</td></tr>
+    </table>
+    <p>Slice [0, 0, :, :] is head 1's 3×3 attention scores. Slice [0, 1, :, :] is head 2's 3×3 attention scores. Each head gets a full num_tokens × num_tokens matrix despite reduced head_dim.</p>
+
+    <h3 style="margin-top:28px;">Step 5: Causal Mask, Scale, Softmax</h3>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Create mask: elements above diagonal → −∞ (for causal attention)</li>
+      <li>Divide by √head_dim = √3 (not √d_out — each head scales by its own head dimension)</li>
+      <li>Apply softmax along the last dimension (each row sums to 1)</li>
+      <li>Optionally apply dropout (default rate 0 in our example)</li>
+    </ol>
+    <p>Attention weights shape: (1, 2, 3, 3) — same as scores, but rows are normalized probability distributions.</p>
+
+    <h3 style="margin-top:28px;">Step 6: Context Vectors Per Head</h3>
+    <div class="formula">context = attention_weights @ values</div>
+    <table class="dim-table">
+      <tr><th>Tensor</th><th>Shape</th></tr>
+      <tr><td>attention_weights</td><td>(1, 2, 3, 3)</td></tr>
+      <tr><td>values</td><td>(1, 2, 3, 3)</td></tr>
+      <tr><td>context</td><td>(1, 2, 3, 3) — B × n_heads × num_tokens × head_dim</td></tr>
+    </table>
+    <p>Row [0,0,:,:] is head 1's context vectors for all 3 tokens. Row [0,1,:,:] is head 2's.</p>
+
+    <h3 style="margin-top:28px;">Step 7: Merge Heads</h3>
+    <p>Transpose back to group by tokens: (1, 2, 3, 3) → (1, 3, 2, 3). Then merge (concatenate) the head rows for each token:</p>
+    <div class="formula">context.contiguous().view(B, num_tokens, d_out) → (1, 3, 6)</div>
+    <p>Token 1: merge head 1 context (3 values) + head 2 context (3 values) = 6 values. Same for tokens 2 and 3. Final output shape matches what single-head attention would produce — but the 6-dimensional vector now encodes two perspectives.</p>
+
+    <h3 style="margin-top:28px;">Numeric Walkthrough: Token 1's Journey Through Reshape</h3>
+    <p>Suppose token 1's query vector after linear projection is:</p>
+    <div class="formula" style="text-align:left;font-size:0.85rem;">q_token1 = [q₁, q₂, q₃, q₄, q₅, q₆] &nbsp; (6 values, d_out=6)</div>
+    <p>With n_heads=2 and head_dim=3, the reshape splits this into:</p>
+    <div class="comparison">
+      <div class="card card-alt">
+        <h3>Head 1 (row 0)</h3>
+        <p style="font-family:var(--mono);margin-bottom:0;">[q₁, q₂, q₃]</p>
+      </div>
+      <div class="card card-alt">
+        <h3>Head 2 (row 1)</h3>
+        <p style="font-family:var(--mono);margin-bottom:0;">[q₄, q₅, q₆]</p>
+      </div>
+    </div>
+    <p>Visually, the 1×6 row becomes a 2×3 block — the first half of the dimension goes to head 1, the second half to head 2. The same split applies to keys and values for every token. After transpose, all head-1 queries across all tokens sit together in tensor slice [:, 0, :, :], ready for batched matrix multiplication.</p>
+
+    <h3 style="margin-top:28px;">Why Scale by √head_dim, Not √d_out?</h3>
+    <p>In single-head attention, we divide by √d<sub>k</sub> where d<sub>k</sub> is the full key dimension. In multi-head attention, each head performs its dot product in head_dim space — so we divide by √head_dim. With head_dim=3, the scale factor is √3 ≈ 1.732. This keeps the variance of Q·K<sup>T</sup> stable during backpropagation and prevents softmax from saturating into one-hot distributions.</p>
+
+    <h3 style="margin-top:28px;">Batch Dimension: Stacking Inputs</h3>
+    <p>The code accepts batch size &gt; 1. If we stack two copies of our (3, 6) input:</p>
+    <div class="formula">x.shape = (2, 3, 6)</div>
+    <p>Every operation broadcasts over batch independently. The output is (2, 3, 6) — first batch's context vectors in output[0], second batch's in output[1]. The first dimension B flows through every reshape and transpose unchanged. This is why the forward method always starts with:</p>
+    <div class="formula" style="text-align:left;font-size:0.85rem;">B, num_tokens, d_in = x.shape</div>
+
+    <h3 style="margin-top:28px;">Complete Shape Trace for (1, 3, 6) Example</h3>
+    <p>Every intermediate tensor shape for our worked example, in execution order:</p>
+    <table class="dim-table">
+      <tr><th>#</th><th>Operation</th><th>Output Shape</th><th>Notes</th></tr>
+      <tr><td>0</td><td>Input x</td><td>(1, 3, 6)</td><td>1 batch, 3 tokens, d_in=6</td></tr>
+      <tr><td>1</td><td>W_q(x), W_k(x), W_v(x)</td><td>(1, 3, 6)</td><td>Linear: d_in→d_out, d_out=6</td></tr>
+      <tr><td>2</td><td>.view(1, 3, 2, 3)</td><td>(1, 3, 2, 3)</td><td>2 heads, head_dim=3</td></tr>
+      <tr><td>3</td><td>.transpose(1, 2)</td><td>(1, 2, 3, 3)</td><td>Grouped by 2 heads</td></tr>
+      <tr><td>4</td><td>Q @ K<sup>T</sup></td><td>(1, 2, 3, 3)</td><td>2 heads × 3×3 scores each</td></tr>
+      <tr><td>5</td><td>+ causal mask, / √3, softmax</td><td>(1, 2, 3, 3)</td><td>Attention weights, rows sum to 1</td></tr>
+      <tr><td>6</td><td>weights @ V</td><td>(1, 2, 3, 3)</td><td>Context: 2 heads × 3 tokens × head_dim</td></tr>
+      <tr><td>7</td><td>.transpose(1,2).view(1,3,6)</td><td>(1, 3, 6)</td><td>Merged final context</td></tr>
+    </table>
+    <p>Notice the symmetry: input shape (1, 3, 6) equals output shape (1, 3, 6). The multi-head machinery operates entirely in the middle — splitting, computing, merging — while preserving the external interface. This is why MultiHeadAttention is a drop-in replacement for single-head attention in the Transformer block.</p>
+
+    <h3 style="margin-top:28px;">Complete Python Implementation</h3>
+    <pre class="code-block"><span class="kw">import</span> torch
+<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
+<span class="kw">import</span> torch.nn.functional <span class="kw">as</span> F
+<span class="kw">import</span> math
+
+<span class="kw">class</span> <span class="cls">MultiHeadAttention</span>(nn.Module):
+    <span class="kw">def</span> <span class="fn">__init__</span>(self, d_in, d_out, n_heads, dropout=<span class="num">0.0</span>, causal=<span class="kw">True</span>):
+        super().__init__()
+        <span class="kw">assert</span> d_out % n_heads == <span class="num">0</span>, <span class="str">"d_out must be divisible by n_heads"</span>
+        self.d_in = d_in
+        self.d_out = d_out
+        self.n_heads = n_heads
+        self.head_dim = d_out // n_heads
+        self.causal = causal
+        self.dropout = nn.Dropout(dropout)
+
+        <span class="cmt"># Step 1: linear projections (bias=False → pure matmul)</span>
+        self.W_q = nn.Linear(d_in, d_out, bias=<span class="kw">False</span>)
+        self.W_k = nn.Linear(d_in, d_out, bias=<span class="kw">False</span>)
+        self.W_v = nn.Linear(d_in, d_out, bias=<span class="kw">False</span>)
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x):
+        B, num_tokens, d_in = x.shape
+
+        <span class="cmt"># Project to Q, K, V — shape (B, num_tokens, d_out)</span>
+        queries = self.W_q(x)
+        keys = self.W_k(x)
+        values = self.W_v(x)
+
+        <span class="cmt"># Step 2: unroll d_out → (n_heads, head_dim)</span>
+        queries = queries.view(B, num_tokens, self.n_heads, self.head_dim)
+        keys = keys.view(B, num_tokens, self.n_heads, self.head_dim)
+        values = values.view(B, num_tokens, self.n_heads, self.head_dim)
+
+        <span class="cmt"># Step 3: group by heads — (B, n_heads, num_tokens, head_dim)</span>
+        queries = queries.transpose(<span class="num">1</span>, <span class="num">2</span>)
+        keys = keys.transpose(<span class="num">1</span>, <span class="num">2</span>)
+        values = values.transpose(<span class="num">1</span>, <span class="num">2</span>)
+
+        <span class="cmt"># Step 4: attention scores — (B, n_heads, num_tokens, num_tokens)</span>
+        scores = queries @ keys.transpose(-<span class="num">2</span>, -<span class="num">1</span>)
+
+        <span class="cmt"># Step 5: causal mask + scale + softmax</span>
+        <span class="kw">if</span> self.causal:
+            mask = torch.triu(
+                torch.full((num_tokens, num_tokens), float(<span class="str">'-inf'</span>), device=x.device),
+                diagonal=<span class="num">1</span>
+            )
+            scores = scores + mask
+        scores = scores / math.sqrt(self.head_dim)
+        attn_weights = F.softmax(scores, dim=-<span class="num">1</span>)
+        attn_weights = self.dropout(attn_weights)
+
+        <span class="cmt"># Step 6: context per head — (B, n_heads, num_tokens, head_dim)</span>
+        context = attn_weights @ values
+
+        <span class="cmt"># Step 7: merge heads — (B, num_tokens, d_out)</span>
+        context = context.transpose(<span class="num">1</span>, <span class="num">2</span>).contiguous()
+        context = context.view(B, num_tokens, self.d_out)
+        <span class="kw">return</span> context
+
+
+<span class="cmt"># Example: 3 tokens × 6 dims, 2 heads, batch of 2</span>
+mha = MultiHeadAttention(d_in=<span class="num">6</span>, d_out=<span class="num">6</span>, n_heads=<span class="num">2</span>)
+x = torch.randn(<span class="num">2</span>, <span class="num">3</span>, <span class="num">6</span>)  <span class="cmt"># 2 batches stacked</span>
+out = mha(x)
+<span class="cmt"># out.shape → torch.Size([2, 3, 6])</span></pre>
+
+    <p>These roughly 25 lines of code encode the key advancement from the original Transformer (Vaswani et al., 2017). If you understand the three input dimensions (B, num_tokens, d_in), what <code style="font-family:var(--mono);">.view()</code> and <code style="font-family:var(--mono);">.transpose(1, 2)</code> do, and how they map to the handwritten matrix derivation, the implementation becomes straightforward rather than intimidating.</p>
+
+    <h3 style="margin-top:28px;">Line-by-Line Code ↔ Math Mapping</h3>
+    <table class="dim-table">
+      <tr><th>Code Line</th><th>Math Operation</th><th>Shape Transformation</th></tr>
+      <tr><td><code>B, num_tokens, d_in = x.shape</code></td><td>Unpack input tensor</td><td>—</td></tr>
+      <tr><td><code>self.W_q(x)</code></td><td>X · W<sub>Q</sub></td><td>(B,T,d_in)→(B,T,d_out)</td></tr>
+      <tr><td><code>.view(B, T, n_heads, head_dim)</code></td><td>Split d_out across heads</td><td>(B,T,d_out)→(B,T,H,d_k)</td></tr>
+      <tr><td><code>.transpose(1, 2)</code></td><td>Group by heads</td><td>(B,T,H,d_k)→(B,H,T,d_k)</td></tr>
+      <tr><td><code>queries @ keys.transpose(-2,-1)</code></td><td>Q · K<sup>T</sup> per head</td><td>(B,H,T,d_k)·(B,H,d_k,T)→(B,H,T,T)</td></tr>
+      <tr><td><code>torch.triu(..., diagonal=1)</code></td><td>Causal mask above diagonal</td><td>—</td></tr>
+      <tr><td><code>/ math.sqrt(self.head_dim)</code></td><td>Scale by √head_dim</td><td>—</td></tr>
+      <tr><td><code>F.softmax(scores, dim=-1)</code></td><td>Row-wise softmax</td><td>—</td></tr>
+      <tr><td><code>attn_weights @ values</code></td><td>Weights · V per head</td><td>(B,H,T,T)·(B,H,T,d_k)→(B,H,T,d_k)</td></tr>
+      <tr><td><code>.transpose(1,2).contiguous().view(...)</code></td><td>Merge heads</td><td>(B,H,T,d_k)→(B,T,d_out)</td></tr>
+    </table>
+    <p>The <code style="font-family:var(--mono);">.contiguous()</code> call ensures memory layout is correct before <code style="font-family:var(--mono);">.view()</code> — after transpose, tensor strides may be non-contiguous and view would fail or produce wrong results without it.</p>
+
+    <h3 style="margin-top:28px;">Mapping Code Operations to the Visual Walkthrough</h3>
+    <p>Every code operation has a direct visual counterpart from the two-head walkthrough:</p>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li><code style="font-family:var(--mono);color:var(--accent);">nn.Linear</code> → multiplying X by W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub> (Step 1 in the walkthrough above)</li>
+      <li><code style="font-family:var(--mono);color:var(--accent);">.view()</code> → splitting the 8×4 weight matrix into 8×2 + 8×2 (Step 3: split weight matrices)</li>
+      <li><code style="font-family:var(--mono);color:var(--accent);">.transpose(1,2)</code> → grouping q1,k1,v1 together and q2,k2,v2 together (Step 4: multiple Q,K,V copies)</li>
+      <li><code style="font-family:var(--mono);color:var(--accent);">queries @ keys.T</code> → q1·k1<sup>T</sup> and q2·k2<sup>T</sup> producing two 11×11 score matrices (Step 5)</li>
+      <li>mask + scale + softmax → attention weights for both heads (Step 6)</li>
+      <li><code style="font-family:var(--mono);color:var(--accent);">attn_weights @ values</code> → context matrices 11×2 for each head (Step 7)</li>
+      <li><code style="font-family:var(--mono);color:var(--accent);">.view(B, T, d_out)</code> → merge into final 11×4 context matrix (Step 8)</li>
+    </ol>
+
+    <div class="qa-box">
+      <div class="q">A common question is: why use nn.Linear instead of nn.Parameter for W_q, W_k, W_v?</div>
+      <p><code style="font-family:var(--mono);">nn.Linear</code> provides optimized weight initialization that helps during backpropagation. With <code style="font-family:var(--mono);">bias=False</code>, it is mathematically identical to a learned weight matrix multiplied by the input — exactly the X @ W<sub>Q</sub> operation from our derivation.</p>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Interactive · Reshape Visualizer</h4>
+      <p>See how (B, num_tokens, d_out) unrolls into (B, num_tokens, n_heads, head_dim) and then transposes to group by heads.</p>
+      <div class="two-col">
+        <div>
+          <label class="ctrl">num_tokens: <span id="reshapeTokens">3</span></label>
+          <input type="range" id="reshapeTokensSlider" min="2" max="6" step="1" value="3">
+        </div>
+        <div>
+          <label class="ctrl">n_heads: <span id="reshapeHeads">2</span></label>
+          <input type="range" id="reshapeHeadsSlider" min="1" max="4" step="1" value="2">
+        </div>
+      </div>
+      <canvas id="reshapeCanvas" width="700" height="260" style="width:100%;margin-top:12px;background:var(--bg-card-alt);"></canvas>
+      <div class="output-readout" id="reshapeReadout"></div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Playground: Multi-Head Attention Explorer</h2>
+    <p>Use this playground to experiment with multi-head attention dimensions and trace the full shape transformation pipeline. Adjust hyperparameters and see every intermediate tensor shape update in real time.</p>
+
+    <div class="interactive-panel">
+      <h4>Shape Pipeline Calculator</h4>
+      <div class="two-col">
+        <div>
+          <label class="ctrl">Batch size (B): <span id="pgBatch">1</span></label>
+          <input type="range" id="pgBatchSlider" min="1" max="4" step="1" value="1">
+          <label class="ctrl">num_tokens: <span id="pgTokens">3</span></label>
+          <input type="range" id="pgTokensSlider" min="2" max="11" step="1" value="3">
+          <label class="ctrl">d_in: <span id="pgDin">6</span></label>
+          <input type="range" id="pgDinSlider" min="4" max="512" step="4" value="6">
+        </div>
+        <div>
+          <label class="ctrl">d_out: <span id="pgDout">6</span></label>
+          <input type="range" id="pgDoutSlider" min="4" max="512" step="4" value="6">
+          <label class="ctrl">n_heads: <span id="pgHeads">2</span></label>
+          <input type="range" id="pgHeadsSlider" min="1" max="16" step="1" value="2">
+          <label class="ctrl">Causal mask: <input type="checkbox" id="pgCausal" checked style="margin-left:8px;"></label>
+        </div>
+      </div>
+      <div class="output-readout" id="pgPipeline" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="interactive-panel">
+      <h4>Attention Score Heatmap (Simulated)</h4>
+      <p>Simulated causal attention weights for two heads on a short sequence.</p>
+      <label class="ctrl">Sequence length: <span id="pgHeatLen">5</span></label>
+      <input type="range" id="pgHeatLenSlider" min="3" max="11" step="1" value="5">
+      <div class="two-col" style="margin-top:12px;">
+        <canvas id="pgHeat1" width="320" height="280" style="width:100%;background:var(--bg-card-alt);"></canvas>
+        <canvas id="pgHeat2" width="320" height="280" style="width:100%;background:var(--bg-card-alt);"></canvas>
+      </div>
+    </div>
+
+    <h3 style="margin-top:28px;">Quick Reference Card</h3>
+    <div class="card card-alt">
+      <table class="dim-table" style="margin:0;">
+        <tr><th>Symbol</th><th>Meaning</th><th>Example Value</th></tr>
+        <tr><td>B</td><td>Batch size</td><td>1, 2, 32, ...</td></tr>
+        <tr><td>T or n_tokens</td><td>Sequence length</td><td>3, 11, 2048, ...</td></tr>
+        <tr><td>d_in</td><td>Input embedding dimension</td><td>6, 512, 4096</td></tr>
+        <tr><td>d_out or d_model</td><td>Output/context dimension</td><td>6, 512, 4096</td></tr>
+        <tr><td>n_heads or H</td><td>Number of attention heads</td><td>2, 8, 32</td></tr>
+        <tr><td>head_dim or d_k</td><td>Dimension per head = d_out / n_heads</td><td>3, 64, 128</td></tr>
+        <tr><td>Scores shape</td><td>Per-layer attention scores</td><td>(B, H, T, T)</td></tr>
+        <tr><td>Output shape</td><td>Final context vectors</td><td>(B, T, d_out)</td></tr>
+      </table>
+    </div>
+
+    <h3 style="margin-top:28px;">Suggested Paper Exercise</h3>
+    <p>Work through the following by hand on paper:</p>
+    <ol style="color:var(--text-dim); margin:0 0 1em 1.5em;">
+      <li>Draw the input matrix X for 3 tokens and d_in=6. Label rows T1, T2, T3.</li>
+      <li>Draw W_Q as a 6×6 matrix. Show that X·W_Q produces a 3×6 query matrix.</li>
+      <li>Redraw the 3×6 query matrix as a 3×2×3 tensor (3 tokens, 2 heads, head_dim=3).</li>
+      <li>Transpose to group by heads: 2×3×3 (2 heads, 3 tokens, head_dim=3).</li>
+      <li>For head 1, compute the 3×3 attention score matrix from Q₁·K₁ᵀ (use small integer values).</li>
+      <li>Apply causal mask, scale by √3, and sketch the resulting softmax weights.</li>
+      <li>Multiply weights by V₁ to get head 1 context (3×3). Repeat mentally for head 2.</li>
+      <li>Merge both heads → final 3×6 context matrix. Circle which 3 dims came from which head.</li>
+    </ol>
+    <p>The handwritten matrices map directly to the code below.</p>
+
+    <h3 style="margin-top:28px;">Parameter Count for Multi-Head Attention</h3>
+    <p>The MultiHeadAttention module shown in this chapter has three linear projection layers (W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>), each with shape (d_in, d_out) and no bias:</p>
+    <div class="formula">Total params = 3 × d_in × d_out</div>
+    <p>For d_in=512, d_out=512: 3 × 512 × 512 = <strong>786,432</strong> parameters in the attention projections alone. Note that we do not create separate parameters per head — the head split is done via reshape on the output of shared projection matrices. All heads share the same W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub> but operate on different slices of the projected output. (Some architectures add a final output projection W<sub>O</sub> of shape (d_out, d_out), which would add d_out² more parameters — the original Transformer paper includes this, though our from-scratch implementation focuses on the core head-splitting mechanism.)</p>
+
+    <h3 style="margin-top:40px;">What Comes Next</h3>
+    <p>Next on the path to DeepSeek:</p>
+    <div class="flow">
+      <div class="flow-step active">Multi-Head Attention ✓</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Key-Value Cache (efficiency during inference)</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step">Multi-Head Latent Attention — DeepSeek's core innovation</div>
+    </div>
+    <div class="callout ok">
+      <p><strong>Chapter summary.</strong> Multi-head attention: (1) why single-head attention is limited to one perspective, (2) how to split d_model across heads, (3) the full matrix pipeline from X to merged context, (4) the PyTorch implementation with view/transpose, and (5) how real pre-trained heads specialize on ambiguous input.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Decoding DeepSeek · Chapter 03 · The Multi-Headed Hydra</p>
+  <p style="margin-top:8px;"><a href="../">← Back to Decoding DeepSeek</a> · <a href="../../">All Learning Blogs</a></p>
+  <p style="margin-top:16px;font-size:0.8rem;color:var(--text-dim);">
+    Multi-head attention · head_dim = d_model / n_heads · Parallel Q·K<sup>T</sup> per head · Concat merge · Path to KV cache &amp; MLA
+  </p>
+</footer>
+
+<script>
+// ============================================================
+// CONSTANTS & SIMULATED ATTENTION DATA
+// Derived from the ambiguous "artist/brush" sentence analysis.
+// Patterns approximate the relative attention weights described
+// in the BERT head-3 vs head-8 comparison.
+// ============================================================
+const ARTIST_TOKENS = ['The','artist','painted','the','portrait','of','a','woman','with','a','brush'];
+const ARTIST_SHORT = ['The','artist','painted','the','portrait','of','a','woman','with','a','brush'];
+
+const HEAD_COLORS = ['#6c8cff','#a78bfa','#34d399','#f472b6','#fbbf24','#f87171','#38bdf8','#fb923c',
+  '#4ade80','#e879f9','#facc15','#2dd4bf','#818cf8','#f97316','#a3e635','#c084fc'];
+
+// Attention patterns for ambiguity demo (simulated)
+const ATTN_PATTERNS = {
+  A: { // artist holds brush
+    woman: { portrait: 0.45, brush: 0.08, artist: 0.12, painted: 0.05, with: 0.10, a: 0.08, the: 0.07, of: 0.05 },
+    artist: { painted: 0.40, brush: 0.35, the: 0.08, portrait: 0.07, woman: 0.05, with: 0.03, of: 0.02 },
+    brush: { artist: 0.55, painted: 0.20, the: 0.08, with: 0.07, a: 0.05, woman: 0.03, portrait: 0.02 }
+  },
+  B: { // woman holds brush
+    woman: { portrait: 0.42, brush: 0.38, with: 0.08, a: 0.05, the: 0.04, of: 0.02, artist: 0.01 },
+    artist: { painted: 0.50, the: 0.18, portrait: 0.15, woman: 0.08, of: 0.05, brush: 0.02, with: 0.02 },
+    brush: { woman: 0.40, portrait: 0.35, with: 0.12, a: 0.08, the: 0.03, of: 0.02, artist: 0.00 }
+  }
+};
+
+// BERT-like head patterns
+const BERT_HEAD3 = {
+  woman: { brush: 0.42, with: 0.18, a: 0.12, portrait: 0.10, of: 0.08, the: 0.05, artist: 0.03, painted: 0.02 },
+  artist: { painted: 0.38, the: 0.22, portrait: 0.18, woman: 0.10, of: 0.06, with: 0.04, brush: 0.02 },
+  brush: { woman: 0.45, with: 0.20, a: 0.15, portrait: 0.10, the: 0.05, of: 0.03, artist: 0.02 }
+};
+const BERT_HEAD8 = {
+  woman: { portrait: 0.48, of: 0.18, the: 0.12, a: 0.10, artist: 0.05, painted: 0.04, with: 0.02, brush: 0.01 },
+  artist: { painted: 0.45, the: 0.20, portrait: 0.18, woman: 0.08, of: 0.05, with: 0.02, brush: 0.02 },
+  brush: { artist: 0.35, painted: 0.25, the: 0.15, with: 0.10, a: 0.08, portrait: 0.04, woman: 0.03 }
+};
+
+let currentInterp = 'A';
+let currentFlowStep = 0;
+let currentQueryToken = 'woman';
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function softmax(arr) {
+  const max = Math.max(...arr);
+  const exps = arr.map(v => Math.exp(v - max));
+  const sum = exps.reduce((a,b) => a+b, 0);
+  return exps.map(v => v / sum);
+}
+
+function drawHeatmap(ctx, matrix, labels, title, highlightPairs) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const n = matrix.length;
+  const pad = 50;
+  const cellW = (W - pad - 10) / n;
+  const cellH = (H - pad - 30) / n;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px SF Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, W/2, 16);
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const v = matrix[i][j];
+      const x = pad + j * cellW;
+      const y = 24 + i * cellH;
+      const intensity = Math.min(v * 2.5, 1);
+      ctx.fillStyle = `rgba(108,140,255,${intensity * 0.85 + 0.05})`;
+      if (j > i) ctx.fillStyle = 'rgba(248,113,113,0.12)'; // masked
+      ctx.fillRect(x, y, cellW - 2, cellH - 2);
+      if (v > 0.01 && j <= i) {
+        ctx.fillStyle = intensity > 0.5 ? '#fff' : '#8888a0';
+        ctx.font = '9px SF Mono, monospace';
+        ctx.fillText(v.toFixed(2), x + cellW/2, y + cellH/2 + 3);
+      }
+    }
+    // labels
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '9px SF Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(labels[i].slice(0,6), pad - 4, 24 + i * cellH + cellH/2 + 3);
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[i].slice(0,6), pad + i * cellW + cellW/2, H - 8);
+  }
+}
+
+function getAttnRow(tokens, queryIdx, pattern, causal=true) {
+  const n = tokens.length;
+  const row = new Array(n).fill(0.01);
+  const qToken = tokens[queryIdx].toLowerCase();
+  if (pattern[qToken]) {
+    tokens.forEach((t, j) => {
+      const key = t.toLowerCase();
+      if (pattern[qToken][key] !== undefined) row[j] = pattern[qToken][key];
+    });
+  } else {
+    row[queryIdx] = 0.5;
+    if (queryIdx > 0) row[queryIdx-1] = 0.3;
+  }
+  if (causal) for (let j = queryIdx + 1; j < n; j++) row[j] = 0;
+  const sum = row.reduce((a,b)=>a+b,0);
+  return row.map(v => v / sum);
+}
+
+// ============================================================
+// DEMO 1: AMBIGUITY EXPLORER
+// ============================================================
+function setInterpretation(which) {
+  currentInterp = which;
+  document.getElementById('interpA').classList.toggle('active', which === 'A');
+  document.getElementById('interpB').classList.toggle('active', which === 'B');
+  renderAmbigDemo();
+}
+
+function renderAmbigDemo() {
+  const tokens = ARTIST_TOKENS;
+  const row = document.getElementById('sentenceTokens');
+  row.innerHTML = tokens.map(t => `<span class="token token-word">${t}</span>`).join('');
+
+  const canvas = document.getElementById('ambigCanvas');
+  const ctx = canvas.getContext('2d');
+  const pattern = ATTN_PATTERNS[currentInterp];
+  const queries = ['woman', 'artist', 'brush'];
+  const qIndices = queries.map(q => tokens.findIndex(t => t.toLowerCase() === q));
+
+  const n = tokens.length;
+  const matrices = qIndices.map(qi => getAttnRow(tokens, qi, pattern, false));
+
+  // Draw 3 heatmaps side by side
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const subW = canvas.width / 3 - 10;
+  queries.forEach((q, idx) => {
+    const offCtx = {
+      canvas: canvas,
+      clearRect: () => {},
+      fillRect: (x,y,w,h) => ctx.fillRect(x + idx * (subW + 15), y, w, h),
+      fillText: (t,x,y) => ctx.fillText(t, x + idx * (subW + 15), y),
+      get fillStyle() { return ctx.fillStyle; },
+      set fillStyle(v) { ctx.fillStyle = v; },
+      get font() { return ctx.font; },
+      set font(v) { ctx.font = v; },
+      get textAlign() { return ctx.textAlign; },
+      set textAlign(v) { ctx.textAlign = v; }
+    };
+    // simplified bar chart per query
+    const x0 = idx * (subW + 15) + 10;
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '11px SF Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Query: ${q}`, x0 + subW/2, 20);
+    const row = matrices[idx];
+    const maxV = Math.max(...row);
+    tokens.forEach((t, j) => {
+      const barH = (row[j] / maxV) * 200;
+      const isHigh = row[j] > 0.25;
+      ctx.fillStyle = isHigh ? '#f472b6' : '#6c8cff';
+      ctx.globalAlpha = 0.3 + row[j] * 0.7;
+      ctx.fillRect(x0 + j * (subW/n), 240 - barH, subW/n - 2, barH);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#8888a0';
+      ctx.font = '8px SF Mono, monospace';
+      ctx.fillText(t.slice(0,4), x0 + j * (subW/n) + (subW/n)/2, 258);
+    });
+  });
+
+  const readout = document.getElementById('ambigReadout');
+  const topWoman = currentInterp === 'A'
+    ? 'portrait (high), brush (low)'
+    : 'brush (high), portrait (high)';
+  const topArtist = currentInterp === 'A'
+    ? 'painted + brush (both high)'
+    : 'painted (high), brush (low)';
+  const topBrush = currentInterp === 'A'
+    ? 'artist (high)'
+    : 'woman + portrait (both high)';
+  readout.innerHTML = `<strong>Interpretation ${currentInterp}:</strong> woman → ${topWoman} · artist → ${topArtist} · brush → ${topBrush}`;
+}
+
+// ============================================================
+// DEMO 2: HYDRA HEAD SPLITTER
+// ============================================================
+function renderHydra() {
+  const dout = parseInt(document.getElementById('hydraDout').value);
+  const heads = parseInt(document.getElementById('hydraHeads').value);
+  document.getElementById('hydraDoutVal').textContent = dout;
+  document.getElementById('hydraHeadsVal').textContent = heads;
+  const headDim = Math.floor(dout / heads);
+  const valid = dout % heads === 0;
+
+  const canvas = document.getElementById('hydraCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const barW = Math.min(60, (canvas.width - 40) / heads - 8);
+  const startX = (canvas.width - heads * (barW + 8)) / 2;
+
+  for (let h = 0; h < heads; h++) {
+    const x = startX + h * (barW + 8);
+    ctx.fillStyle = HEAD_COLORS[h % HEAD_COLORS.length] + '44';
+    ctx.strokeStyle = HEAD_COLORS[h % HEAD_COLORS.length];
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, 30, barW, 100);
+    ctx.strokeRect(x, 30, barW, 100);
+    ctx.fillStyle = HEAD_COLORS[h % HEAD_COLORS.length];
+    ctx.font = '11px SF Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Head ${h+1}`, x + barW/2, 22);
+    ctx.fillText(`${headDim}d`, x + barW/2, 85);
+  }
+
+  // total bar
+  ctx.fillStyle = 'rgba(108,140,255,0.2)';
+  ctx.fillRect(startX, 145, heads * (barW + 8) - 8, 20);
+  ctx.fillStyle = '#6c8cff';
+  ctx.fillText(`d_out = ${dout}`, canvas.width/2, 158);
+
+  document.getElementById('hydraReadout').innerHTML = valid
+    ? `head_dim = d_out / n_heads = ${dout} / ${heads} = <strong style="color:var(--accent3)">${headDim}</strong>. Each head gets ${headDim} columns in W_Q, W_K, W_V.`
+    : `<span style="color:var(--danger)">d_out (${dout}) must be divisible by n_heads (${heads}). Adjust sliders.</span>`;
+}
+
+document.getElementById('hydraDout').addEventListener('input', renderHydra);
+document.getElementById('hydraHeads').addEventListener('input', renderHydra);
+
+// ============================================================
+// DEMO 3: HEAD DIMENSION CALCULATOR
+// ============================================================
+function renderCalc() {
+  const dmodel = parseInt(document.getElementById('calcDmodelSlider').value);
+  const heads = parseInt(document.getElementById('calcHeadsSlider').value);
+  document.getElementById('calcDmodel').textContent = dmodel;
+  document.getElementById('calcHeads').textContent = heads;
+  const headDim = dmodel / heads;
+  const valid = dmodel % heads === 0;
+
+  document.getElementById('calcReadout').innerHTML = valid ? `
+    <div style="font-size:1.1rem;margin-bottom:8px;">head_dim = ${dmodel} / ${heads} = <strong style="color:var(--accent3)">${headDim}</strong></div>
+    <div style="color:var(--text-dim);font-size:0.85rem;">
+      W_Q shape: (${dmodel}, ${dmodel}) split → each head (${dmodel}, ${headDim})<br>
+      Q per head: (num_tokens, ${headDim}) · K<sup>T</sup>: (${headDim}, num_tokens) → scores: (num_tokens, num_tokens)
+    </div>
+  ` : `<span style="color:var(--danger)">d_model must be divisible by n_heads</span>`;
+
+  const canvas = document.getElementById('calcCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!valid) return;
+  const sliceW = canvas.width / heads;
+  for (let h = 0; h < heads; h++) {
+    ctx.fillStyle = HEAD_COLORS[h % HEAD_COLORS.length] + '55';
+    ctx.fillRect(h * sliceW + 2, 20, sliceW - 4, 80);
+    ctx.fillStyle = HEAD_COLORS[h % HEAD_COLORS.length];
+    ctx.font = '10px SF Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`H${h+1}: ${headDim}d`, h * sliceW + sliceW/2, 65);
+  }
+  ctx.fillStyle = '#8888a0';
+  ctx.fillText(`d_model = ${dmodel}`, canvas.width/2, 110);
+}
+
+document.getElementById('calcDmodelSlider').addEventListener('input', renderCalc);
+document.getElementById('calcHeadsSlider').addEventListener('input', renderCalc);
+
+// ============================================================
+// DEMO 4: MATRIX FLOW STEP BY STEP
+// ============================================================
+const FLOW_STEPS = [
+  { title: 'Input Embeddings X', desc: 'Shape: 11 × 8 (11 tokens, d_in=8). The artist painted the portrait of a woman with a brush.', shape: '11 × 8' },
+  { title: 'Split Weight Matrices', desc: 'd_out=4, n_heads=2, head_dim=2. W_Q1, W_Q2, W_K1, W_K2, W_V1, W_V2 each 8×2.', shape: '6 matrices of 8 × 2' },
+  { title: 'Compute Q, K, V per Head', desc: 'X × W_Q1 → Q₁ (11×2), X × W_Q2 → Q₂ (11×2). Same for K and V.', shape: 'Q₁,K₁,V₁ and Q₂,K₂,V₂: 11 × 2' },
+  { title: 'Attention Scores', desc: 'Q₁ × K₁ᵀ → 11×11 (head 1). Q₂ × K₂ᵀ → 11×11 (head 2). Two full attention maps!', shape: '2 × (11 × 11)' },
+  { title: 'Attention Weights', desc: 'Scale by √2, softmax, causal mask (upper triangle → 0). Dropout optional.', shape: '2 × (11 × 11)' },
+  { title: 'Context per Head', desc: 'AttnWeights₁ × V₁ → Context₁ (11×2). AttnWeights₂ × V₂ → Context₂ (11×2).', shape: '11 × 2 each' },
+  { title: 'Merge Heads', desc: 'Concatenate Context₁ and Context₂ → Final context (11×4). P₁ | P₂ perspectives merged.', shape: '11 × 4' }
+];
+
+function renderFlowSteps() {
+  const container = document.getElementById('flowSteps');
+  container.innerHTML = FLOW_STEPS.map((s, i) =>
+    `<div class="step-dot ${i === currentFlowStep ? 'active' : i < currentFlowStep ? 'done' : ''}" onclick="goFlowStep(${i})">${i+1}</div>`
+  ).join('');
+}
+
+function goFlowStep(i) { currentFlowStep = i; renderFlow(); }
+function flowStep(d) { currentFlowStep = Math.max(0, Math.min(FLOW_STEPS.length-1, currentFlowStep + d)); renderFlow(); }
+
+function renderFlow() {
+  renderFlowSteps();
+  const step = FLOW_STEPS[currentFlowStep];
+  const canvas = document.getElementById('flowCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = 'bold 14px SF Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(step.title, canvas.width/2, 30);
+  ctx.fillStyle = '#6c8cff';
+  ctx.font = '16px SF Mono, monospace';
+  ctx.fillText(step.shape, canvas.width/2, 60);
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '12px Inter, sans-serif';
+  wrapText(ctx, step.desc, canvas.width/2, 90, canvas.width - 60, 18);
+
+  // visual boxes based on step
+  const colors = ['#6c8cff','#a78bfa','#34d399','#f472b6','#fbbf24','#38bdf8','#fb923c'];
+  const nBoxes = Math.min(currentFlowStep + 1, 4);
+  for (let i = 0; i < nBoxes; i++) {
+    ctx.fillStyle = colors[i] + '33';
+    ctx.strokeStyle = colors[i];
+    ctx.lineWidth = 2;
+    const bx = 80 + i * 140;
+    ctx.fillRect(bx, 180, 100, 80);
+    ctx.strokeRect(bx, 180, 100, 80);
+    ctx.fillStyle = colors[i];
+    ctx.font = '10px SF Mono, monospace';
+    ctx.fillText(['X','W split','QKV','Scores','Weights','Ctx','Merge'][Math.min(i, 6)], bx+50, 225);
+  }
+
+  document.getElementById('flowReadout').innerHTML = `<strong>Step ${currentFlowStep+1}/${FLOW_STEPS.length}:</strong> ${step.desc}`;
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(' ');
+  let line = '';
+  let cy = y;
+  ctx.textAlign = 'center';
+  for (const word of words) {
+    const test = line + word + ' ';
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, cy);
+      line = word + ' ';
+      cy += lineHeight;
+    } else line = test;
+  }
+  ctx.fillText(line, x, cy);
+}
+
+// ============================================================
+// DEMO 5: HEAD COMPARISON (BERT-like)
+// ============================================================
+function renderHeadCompare() {
+  const tokens = ARTIST_TOKENS;
+  const btns = document.getElementById('queryTokenBtns');
+  if (!btns.dataset.init) {
+    ['woman','artist','brush','portrait','painted'].forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'btn' + (t === currentQueryToken ? ' active' : '');
+      b.textContent = t;
+      b.onclick = () => { currentQueryToken = t; btns.querySelectorAll('.btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderHeadCompare(); };
+      btns.appendChild(b);
+    });
+    btns.dataset.init = '1';
+  }
+
+  const qi = tokens.findIndex(t => t.toLowerCase() === currentQueryToken);
+  const row3 = getAttnRow(tokens, qi, BERT_HEAD3, false);
+  const row8 = getAttnRow(tokens, qi, BERT_HEAD8, false);
+
+  // build square matrices for heatmap (query row highlighted)
+  const n = tokens.length;
+  const mat3 = Array.from({length:n}, (_,i) => i === qi ? row3 : new Array(n).fill(0));
+  const mat8 = Array.from({length:n}, (_,i) => i === qi ? row8 : new Array(n).fill(0));
+
+  drawHeatmap(document.getElementById('head3Canvas').getContext('2d'), mat3, tokens, 'Head 3 — Layer 3');
+  drawHeatmap(document.getElementById('head8Canvas').getContext('2d'), mat8, tokens, 'Head 8 — Layer 3');
+
+  const top3 = tokens[row3.indexOf(Math.max(...row3))];
+  const top8 = tokens[row8.indexOf(Math.max(...row8))];
+  document.getElementById('headCompareReadout').innerHTML =
+    `Query: <strong>${currentQueryToken}</strong> · Head 3 max attention → <strong style="color:var(--accent)">${top3}</strong> · Head 8 max attention → <strong style="color:var(--accent2)">${top8}</strong>`;
+}
+
+// ============================================================
+// DEMO 6: RESHAPE VISUALIZER
+// ============================================================
+function renderReshape() {
+  const nTok = parseInt(document.getElementById('reshapeTokensSlider').value);
+  const nHeads = parseInt(document.getElementById('reshapeHeadsSlider').value);
+  const dOut = nHeads * 3; // head_dim fixed at 3 for viz
+  const headDim = 3;
+  document.getElementById('reshapeTokens').textContent = nTok;
+  document.getElementById('reshapeHeads').textContent = nHeads;
+
+  const canvas = document.getElementById('reshapeCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = '#8888a0';
+  ctx.font = '11px SF Mono, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Before: (1, ${nTok}, ${dOut}) — ${nTok} tokens × ${dOut} columns`, 20, 25);
+  ctx.fillText(`After view: (1, ${nTok}, ${nHeads}, ${headDim}) — each token has ${nHeads} rows × ${headDim} cols`, 20, 45);
+  ctx.fillText(`After transpose(1,2): (1, ${nHeads}, ${nTok}, ${headDim}) — grouped by heads`, 20, 65);
+
+  const cellW = 28, cellH = 18;
+  let y = 90;
+  for (let t = 0; t < Math.min(nTok, 4); t++) {
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '9px SF Mono, monospace';
+    ctx.fillText(`T${t+1}`, 10, y + cellH/2 + 3);
+    for (let h = 0; h < nHeads; h++) {
+      for (let d = 0; d < headDim; d++) {
+        ctx.fillStyle = HEAD_COLORS[h % HEAD_COLORS.length] + '55';
+        ctx.fillRect(40 + h * (headDim * cellW + 10) + d * cellW, y, cellW - 2, cellH);
+      }
+    }
+    y += cellH + 8;
+  }
+
+  document.getElementById('reshapeReadout').innerHTML =
+    `Token 1 columns [1..${dOut}] split → Head 1 gets cols [1..${headDim}], Head 2 gets [${headDim+1}..${headDim*2}]${nHeads>2?', ...':''}. Final merge reverses this.`;
+}
+
+document.getElementById('reshapeTokensSlider').addEventListener('input', renderReshape);
+document.getElementById('reshapeHeadsSlider').addEventListener('input', renderReshape);
+
+// ============================================================
+// PLAYGROUND
+// ============================================================
+function renderPlayground() {
+  const B = parseInt(document.getElementById('pgBatchSlider').value);
+  const T = parseInt(document.getElementById('pgTokensSlider').value);
+  let dIn = parseInt(document.getElementById('pgDinSlider').value);
+  let dOut = parseInt(document.getElementById('pgDoutSlider').value);
+  const H = parseInt(document.getElementById('pgHeadsSlider').value);
+  const causal = document.getElementById('pgCausal').checked;
+
+  document.getElementById('pgBatch').textContent = B;
+  document.getElementById('pgTokens').textContent = T;
+  document.getElementById('pgDin').textContent = dIn;
+  document.getElementById('pgDout').textContent = dOut;
+  document.getElementById('pgHeads').textContent = H;
+
+  const valid = dOut % H === 0;
+  const headDim = valid ? dOut / H : '?';
+
+  const steps = [
+    ['Input X', `(${B}, ${T}, ${dIn})`],
+    ['Q, K, V after Linear', `(${B}, ${T}, ${dOut})`],
+    ['After .view()', valid ? `(${B}, ${T}, ${H}, ${headDim})` : 'invalid — d_out % n_heads ≠ 0'],
+    ['After .transpose(1,2)', valid ? `(${B}, ${H}, ${T}, ${headDim})` : '—'],
+    ['Attention scores', valid ? `(${B}, ${H}, ${T}, ${T})` : '—'],
+    ['After causal mask', causal ? 'upper triangle → 0' : 'no mask (bidirectional)'],
+    ['Scale factor', valid ? `√${headDim} = ${Math.sqrt(headDim).toFixed(3)}` : '—'],
+    ['Context per head', valid ? `(${B}, ${H}, ${T}, ${headDim})` : '—'],
+    ['Final output', valid ? `(${B}, ${T}, ${dOut})` : '—'],
+  ];
+
+  document.getElementById('pgPipeline').innerHTML = steps.map(([name, shape]) =>
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--text-dim)">${name}</span>
+      <span style="color:var(--accent);font-family:var(--mono)">${shape}</span>
+    </div>`
+  ).join('') + (valid ? `<div style="margin-top:12px;color:var(--text-dim);font-size:0.85rem;">Trainable params (Q,K,V projections): <strong style="color:var(--accent3)">${countMHAParams(dIn, dOut).toLocaleString()}</strong></div>` : '');
+
+  renderPlaygroundHeatmaps(T, causal);
+}
+
+function renderPlaygroundHeatmaps(T, causal) {
+  const len = parseInt(document.getElementById('pgHeatLenSlider').value);
+  document.getElementById('pgHeatLen').textContent = len;
+  const labels = Array.from({length: len}, (_, i) => `t${i+1}`);
+
+  function randMatrix(n, seed) {
+    const m = Array.from({length:n}, () => new Array(n).fill(0));
+    for (let i = 0; i < n; i++) {
+      const row = Array.from({length:causal ? i+1 : n}, (_,j) => {
+        // Seeded-ish random for reproducible demo patterns
+        const v = Math.abs(Math.sin((i+1)*(j+1)*seed*1.7)) * 0.8 + (i===j ? 0.4 : 0.1);
+        return v;
+      });
+      const s = row.reduce((a,b)=>a+b,0);
+      for (let j = 0; j < row.length; j++) m[i][j] = row[j]/s;
+      // Zero future positions for causal
+      if (causal) for (let j = i+1; j < n; j++) m[i][j] = 0;
+    }
+    return m;
+  }
+
+  drawHeatmap(document.getElementById('pgHeat1').getContext('2d'), randMatrix(len, 1), labels, 'Head 1 (simulated)');
+  drawHeatmap(document.getElementById('pgHeat2').getContext('2d'), randMatrix(len, 2), labels, 'Head 2 (simulated)');
+}
+
+// Dimension validation helper used conceptually in playground
+function validateMHAConfig(dOut, nHeads) {
+  if (dOut % nHeads !== 0) {
+    return { valid: false, error: `d_out (${dOut}) must be divisible by n_heads (${nHeads})` };
+  }
+  return { valid: true, headDim: dOut / nHeads };
+}
+
+// Format shape tuple for display
+function shapeStr(...dims) {
+  return '(' + dims.join(', ') + ')';
+}
+
+// Compute total parameters in Q,K,V projections
+function countMHAParams(dIn, dOut) {
+  // Three linear layers, no bias: 3 * dIn * dOut
+  return 3 * dIn * dOut;
+}
+
+['pgBatchSlider','pgTokensSlider','pgDinSlider','pgDoutSlider','pgHeadsSlider'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderPlayground);
+});
+document.getElementById('pgCausal').addEventListener('change', renderPlayground);
+document.getElementById('pgHeatLenSlider').addEventListener('input', () => renderPlaygroundHeatmaps(
+  parseInt(document.getElementById('pgHeatLenSlider').value), document.getElementById('pgCausal').checked
+));
+
+// ============================================================
+// SCROLL: NAV + FADE-IN
+// ============================================================
+const nav = document.getElementById('nav');
+function onScroll() {
+  nav.classList.toggle('visible', window.scrollY > 400);
+  document.querySelectorAll('.fade-in').forEach(el => {
+    if (el.getBoundingClientRect().top < window.innerHeight - 80) el.classList.add('visible');
+  });
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+
+// ============================================================
+// INIT ALL DEMOS
+// ============================================================
+function initDiagnostics() {
+  const panels = document.querySelectorAll('.interactive-panel');
+  const canvases = document.querySelectorAll('canvas');
+  if (typeof console !== 'undefined' && console.debug) {
+    console.debug('[Chapter 03] Interactive panels:', panels.length, '| Canvases:', canvases.length);
+  }
+}
+
+initDiagnostics();
+renderAmbigDemo();
+renderHydra();
+renderCalc();
+renderFlow();
+renderHeadCompare();
+renderReshape();
+renderPlayground();
+onScroll();
+</script>
+
+<!-- Additional inline documentation for maintainers -->
+<!--
+  Chapter 03 Interactive Demos:
+  1. ambigDemo     — Toggle Interpretation A/B, bar chart attention for woman/artist/brush
+  2. hydraCanvas   — Visual split of d_out across n_heads
+  3. calcCanvas    — Head dimension calculator (d_model / n_heads)
+  4. flowCanvas    — 7-step matrix flow walkthrough for 11-token 2-head example
+  5. head3/8Canvas — BERT-like head 3 vs head 8 comparison heatmaps
+  6. reshapeCanvas — Tensor reshape (B,T,d_out) → (B,T,H,d_k) → (B,H,T,d_k)
+  Playground:
+  - pgPipeline     — Full shape trace calculator with sliders
+  - pgHeat1/2      — Simulated causal attention heatmaps for 2 heads
+
+  Key formulas:
+  - head_dim = d_out / n_heads
+  - scores = Q @ K.T / sqrt(head_dim)
+  - context = softmax(scores) @ V
+  - output = merge(context, dim=heads) → (B, T, d_out)
+  - End of Chapter 03 — The Multi-Headed Hydra
+  - Decoding DeepSeek
+-->
+
+
+
+
+
+</body>
+</html>

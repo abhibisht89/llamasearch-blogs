@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 13 — Distributed Training (DDP) | Advanced NLP V2</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
+  --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
+  --radius: 12px;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
+code { font-family: var(--mono); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; color: var(--accent); }
+h1,h2,h3,h4 { font-weight: 700; line-height: 1.2; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 0.5em; }
+h3 { font-size: 1.2rem; color: var(--accent); margin-bottom: 0.5em; }
+p { margin-bottom: 1em; color: var(--text-dim); }
+strong { color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+.section { padding: 72px 0; border-bottom: 1px solid var(--border); position: relative; }
+.section-num { font-size: 0.85rem; font-family: var(--mono); color: var(--accent); letter-spacing: 2px; margin-bottom: 12px; display: block; }
+.hero { min-height: 52vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 88px 24px 48px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(52,211,153,0.12) 0%, transparent 70%); pointer-events: none; }
+.hero h1 { margin-bottom: 16px; }
+.hero .subtitle { font-size: 1.1rem; color: var(--text-dim); max-width: 760px; margin: 0 auto 32px; }
+.stats { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+.stat { text-align: center; }
+.stat-val { font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent3), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block; }
+.stat-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; }
+.interactive-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin: 32px 0; position: relative; }
+.interactive-panel h3 { margin-bottom: 16px; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: var(--sans); }
+.btn:hover { border-color: var(--accent); background: rgba(108,140,255,0.1); }
+.btn.active { border-color: var(--accent); background: rgba(108,140,255,0.15); color: var(--accent); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.btn-sm { font-size: 0.75rem; padding: 4px 10px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; max-width: 320px; height: 6px; border-radius: 3px; background: var(--border); outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+.slider-value { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); margin-left: 8px; }
+.callout { background: rgba(108,140,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 20px 0; font-size: 0.9rem; }
+.callout p { margin-bottom: 0; color: var(--text); }
+.callout.warn { border-left-color: var(--accent5); background: rgba(251,191,36,0.08); }
+.callout.danger { border-left-color: var(--danger); background: rgba(248,113,113,0.08); }
+.callout.ok { border-left-color: var(--accent3); background: rgba(52,211,153,0.08); }
+.formula { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 24px; margin: 16px 0; font-family: var(--mono); font-size: 0.95rem; text-align: center; color: var(--text); overflow-x: auto; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+@media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+.comparison .card { margin: 0; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: var(--mono); }
+.tag-blue { background: rgba(108,140,255,0.15); color: var(--accent); }
+.tag-green { background: rgba(52,211,153,0.15); color: var(--accent3); }
+.fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+.fade-in.visible { opacity: 1; transform: translateY(0); }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav.visible { opacity: 1; transform: translateY(0); }
+.nav-title { font-weight: 700; font-size: 0.9rem; }
+.nav-links { display: flex; gap: 10px; overflow-x: auto; max-width: 62%; flex-wrap: wrap; justify-content: flex-end; }
+.nav-links a { font-size: 0.7rem; color: var(--text-dim); white-space: nowrap; }
+.nav-links a:hover { color: var(--accent); text-decoration: none; }
+.code-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; margin: 32px 0; }
+.code-explanation { min-width: 0; }
+.code-panel { position: sticky; top: 80px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem; }
+.code-filename { color: var(--accent); }
+.code-lines { color: var(--text-dim); }
+.code-block { padding: 16px; margin: 0; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; color: var(--text); background: transparent; }
+.code-block code { display: block; background: none; padding: 0; color: inherit; }
+.ln { display: inline-block; width: 32px; color: var(--text-dim); opacity: 0.45; text-align: right; margin-right: 14px; user-select: none; }
+.line { display: block; }
+.line.hl { background: rgba(108, 140, 255, 0.08); border-left: 2px solid var(--accent); margin-left: -16px; padding-left: 14px; }
+.line.new { background: rgba(52, 211, 153, 0.08); border-left: 2px solid var(--accent3); margin-left: -16px; padding-left: 14px; }
+.kw { color: var(--accent4); } .fn { color: var(--accent); } .arg { color: var(--accent3); } .str { color: var(--accent5); } .num { color: var(--accent3); } .cmt { color: var(--text-dim); font-style: italic; } .op { color: var(--accent2); }
+.ln.anno { cursor: pointer; color: var(--accent); opacity: 0.85; text-decoration: underline dotted; }
+.code-note { padding: 12px 16px; background: var(--bg-card-alt); border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; display: none; }
+.code-note strong { color: var(--accent); }
+.code-note.open { display: block; }
+.code-progression { margin: 28px 0; }
+.step-caption { margin-top: 12px; font-size: 0.9rem; color: var(--text-dim); font-style: italic; }
+.jupyter-cell { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); margin: 16px 0; overflow: hidden; }
+.cell-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg-card-alt); border-bottom: 1px solid var(--border); }
+.cell-label { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); }
+.out-label { color: var(--accent3); }
+.cell-output { padding: 12px 16px; border-top: 1px solid var(--border); background: rgba(52, 211, 153, 0.03); }
+.output-text { font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); margin: 0; white-space: pre-wrap; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+canvas.dchart { border-radius: var(--radius); display: block; max-width: 100%; height: auto; background: var(--bg-card-alt); border: 1px solid var(--border); width: 100%; }
+canvas.dchart-tall { height: 260px; }
+.gp-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 16px 0; }
+.gpu-chip { font-family: var(--mono); font-size: 0.72rem; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card-alt); min-width: 100px; text-align: center; }
+.gpu-chip strong { display: block; color: var(--accent3); font-size: 0.78rem; }
+.topology-grid { display: grid; gap: 8px; justify-content: center; margin: 16px 0; }
+.topology-node { border: 1px dashed var(--border); border-radius: 10px; padding: 10px; background: rgba(108,140,255,0.06); text-align: center; font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); }
+.topology-node b { color: var(--accent); display: block; margin-bottom: 6px; }
+@media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
+@media (max-width: 600px) { .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
+.footer { text-align: center; padding: 48px 24px; color: var(--text-dim); font-size: 0.85rem; }
+ol.tight { color: var(--text-dim); margin: 0 0 1em 1.25rem; }
+ol.tight li { margin: 0.35em 0; }
+.qa-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; margin: 28px 0; }
+.qa-box .q { font-weight: 700; color: var(--text); margin-bottom: 14px; font-size: 1.05rem; line-height: 1.45; }
+.qa-box p:last-child { margin-bottom: 0; }
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #111118;
+  border-bottom: 1px solid #23232f;
+  padding: 10px 24px;
+  font-size: 0.82rem;
+  color: #8888a0;
+  font-family: var(--sans);
+}
+.breadcrumb-nav a {
+  color: #6c8cff;
+  text-decoration: none;
+}
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep {
+  margin: 0 8px;
+  color: #555;
+}
+.breadcrumb-nav .bc-current {
+  color: #8888a0;
+}
+body { padding-top: 44px !important; }
+</style>
+<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Advanced NLP V2</a><span class="bc-sep">›</span><span class="bc-current">Distributed Training with DDP</span></nav>
+
+
+<nav class="nav" id="nav">
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Advanced NLP V2</a>
+  <div class="nav-links">
+    <a href="#top">Top</a>
+    <a href="#s00">00</a><a href="#s01">01</a><a href="#s02">02</a><a href="#s03">03</a><a href="#s04">04</a><a href="#s05">05</a>
+    <a href="#s06">06</a><a href="#s07">07</a><a href="#s08">08</a><a href="#s09">09</a><a href="#s10">10</a><a href="#s11">11</a><a href="#s12">12</a><a href="#s13">Play</a><a href="#s14">14</a><a href="#s15">15</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="container">
+    <h1>Distributed Training with DDP</h1>
+    <p class="subtitle">Train language models when one <code>cuda:0</code> is not enough: process groups and ranks, <code>DistributedDataParallel</code>, bucketed all-reduce with backward overlap, <code>no_sync</code> for gradient accumulation, <code>torchrun</code> across nodes, and the operational details that keep multi-GPU and multi-machine runs stable.</p>
+    <div class="stats">
+      <div class="stat"><span class="stat-val">16</span><span class="stat-label">Sections</span></div>
+      <div class="stat"><span class="stat-val">4</span><span class="stat-label">Live demos</span></div>
+      <div class="stat"><span class="stat-val">DDP</span><span class="stat-label">PyTorch core</span></div>
+    </div>
+    <p style="color:var(--text-dim);font-size:0.9rem;max-width:780px;margin:0 auto;">Effective batch size scales as <code>micro_batch × accum_steps × world_size</code>. The sections below connect <code>init_process_group</code>, <code>LOCAL_RANK</code>, <code>DistributedSampler</code>, <code>GradScaler</code>, and rank-0 checkpointing into one coherent training script you can adapt to your own models.</p>
+  </div>
+</header>
+
+<section class="section fade-in" id="s00">
+  <div class="container">
+    <span class="section-num">00</span>
+    <h2>Why go distributed?</h2>
+    <p>Large NLP workloads hit three walls: <strong>memory</strong> (activations and parameters for a single forward pass), <strong>throughput</strong> (tokens or samples per second on one device), and <strong>dataset size</strong> (iterating billions of tokens on one worker is slow). <strong>Vertical scaling</strong> buys a bigger GPU or more HBM; <strong>horizontal scaling</strong> adds devices and synchronizes them so they behave like one logical trainer.</p>
+    <p>Training on web-scale corpora with multi-billion-parameter models often exceeds one GPU’s memory, forces tiny per-device batches, and can stretch wall-clock time to impractical lengths—motivating distributed setups even when a single-device prototype works.</p>
+    <div class="comparison">
+      <div class="card"><h3>Vertical scaling</h3><p>You keep <strong>one machine</strong> (for example one GPU with <strong>4&nbsp;GB</strong> of memory) and <strong>upgrade hardware</strong>: buy a bigger GPU or more RAM. The same program that ran on the small machine usually runs on the big one with <strong>little or no code change</strong>; you may only tune hyperparameters such as batch size.</p></div>
+      <div class="card"><h3>Horizontal scaling</h3><p>You move from one machine to <strong>several machines</strong>, each with one or more GPUs, <strong>interconnected</strong> so they can run parallel training and exchange gradients. This path needs <strong>some code change</strong>, but with PyTorch’s <code>DistributedDataParallel</code> the change stays <strong>small</strong> compared to rewriting the model.</p></div>
+    </div>
+    <p>This chapter focuses on <strong>data parallelism</strong>: each rank holds a full copy of the model, sees a disjoint shard of the batch, and participates in gradient <code>all_reduce</code> so every replica applies the same update. That pattern assumes the model fits on one GPU—when it does not, you layer <strong>model parallelism</strong> (tensor or pipeline) on top.</p>
+    <div class="callout"><p>Throughout the data-parallel story below, the working assumption is the same as in large-scale practice for many teams: the model is <strong>complex but still fits on one GPU</strong>, while the <strong>training data</strong> is what makes single-machine training too slow. <strong>Data parallelism</strong> and <strong>model parallelism</strong> can be <strong>combined</strong> into a hybrid when both memory and data scale bite at once.</p></div>
+    <div class="callout ok"><p><strong>Takeaway:</strong> DDP is the default PyTorch path for “same model everywhere, split the data.” The hard parts are correct <code>sampler</code> setup, launcher env vars, and not double-counting batch size when you tune <code>learning_rate</code>.</p></div>
+
+    <h3 style="margin-top:2rem;color:var(--accent2);">When to reach for DDP first</h3>
+    <p>If <code>nvidia-smi</code> shows headroom on memory but you are CPU-bound on the dataloader, fix the pipeline (<code>num_workers</code>, <code>pin_memory</code>, storage) before multiplying GPUs. If memory is the binding constraint and a single forward pass does not fit, DDP alone will not help—you need smaller batches, activation checkpointing, or model-parallel sharding.</p>
+    <p>Once each replica fits comfortably, adding ranks increases throughput roughly with <code>world_size</code> until communication or disk I/O dominates. Measuring <code>tokens/s/GPU</code> and comparing to single-GPU baseline tells you whether scaling is healthy.</p>
+    <ul style="color:var(--text-dim);margin:0 0 1em 1.25rem;">
+      <li>Symptom: loss diverges after multi-GPU — check <code>loss</code> division vs <code>accum_steps</code>, LR scaling, and that every rank trains (no empty shards).</li>
+      <li>Symptom: hang at startup — verify <code>MASTER_ADDR</code> reachability, port not blocked, and identical code versions on all nodes.</li>
+      <li>Symptom: duplicate logs × <code>WORLD_SIZE</code> — gate prints with <code>rank == 0</code> or structured loggers that aggregate.</li>
+      <li>Symptom: OOM only in DDP — per-rank batch may equal single-GPU batch; cut <code>micro_batch</code> or raise <code>accum_steps</code>.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section fade-in" id="s01">
+  <div class="container">
+    <span class="section-num">01</span>
+    <h2>Data parallel vs model parallel</h2>
+    <div class="comparison">
+      <div class="card"><h3 style="color:var(--accent3);">Data parallel</h3><p>Replicas share weights; each <code>forward</code>/<code>backward</code> uses different examples. Gradients are reduced across ranks before <code>optimizer.step()</code>.</p></div>
+      <div class="card"><h3 style="color:var(--accent2);">Model parallel</h3><p>Layers or tensor shards live on different devices; activations cross links every step. Often combined with data parallel “groups” of shards.</p></div>
+    </div>
+    <p>Hybrid stacks (e.g. tensor parallel inside a node, data parallel across nodes) are how frontier models train; here we nail the data-parallel contract: <code>world_size</code> processes, each with <code>rank</code> in <code>[0, world_size)</code>, and collectives defined over that <strong>process group</strong>.</p>
+    <p><strong>Data parallelism</strong> in one sentence: if the full model fits on <strong>one GPU</strong>, you replicate it across servers (each with one or more GPUs). Every GPU runs forward and backward on a <strong>different subset of the data</strong> in parallel, and the processes <strong>synchronize gradients</strong> during backprop so all replicas stay identical. <strong>Model parallelism</strong> is what you use when the model <strong>does not</strong> fit: you split the network into <strong>smaller pieces</strong> (layers or shards). Each GPU owns part of the forward and backward graph for gradient descent, rather than a full copy of the model.</p>
+
+    <div class="interactive-panel" id="demo-topo">
+      <h3>Demo: GPU topology (nodes × GPUs)</h3>
+      <p style="margin-bottom:12px;">Each cell is one <code>LOCAL_RANK</code> on a machine. Global <code>RANK</code> increases across nodes. This mirrors how you reason about <code>nproc_per_node</code> and <code>nnodes</code> in <code>torchrun</code>.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:12px;">
+        <label style="color:var(--text-dim);">Nodes <input type="range" id="topo-nodes" min="1" max="4" value="2" /><span class="slider-value" id="topo-nodes-lbl">2</span></label>
+        <label style="color:var(--text-dim);">GPUs / node <input type="range" id="topo-gpu" min="1" max="8" value="4" /><span class="slider-value" id="topo-gpu-lbl">4</span></label>
+      </div>
+      <div class="topology-grid" id="topo-grid"></div>
+      <p class="step-caption" id="topo-cap"></p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s14">
+  <div class="container">
+    <span class="section-num">14</span>
+    <h2>Neural networks refresher: from SGD to gradient accumulation</h2>
+    <p><code>DistributedDataParallel</code> assumes you already understand how a single-GPU loop moves <code>.grad</code> into <code>optimizer.step()</code>. The bridge to multi-GPU is the same idea as <strong>gradient accumulation</strong> on one device: several backward passes add into <code>.grad</code> before a single step. Walking a tiny regression model makes that mechanism obvious.</p>
+
+    <h3 style="margin-top:1.5rem;color:var(--accent2);">A linear model for house prices</h3>
+    <p>Suppose you want to predict <strong>house price</strong> from two inputs: <strong>X₁</strong> = number of bedrooms, <strong>X₂</strong> = number of bathrooms. You believe the relationship is approximately <strong>linear</strong>, so the prediction is</p>
+    <div class="formula">ŷ = X₁·W₁ + X₂·W₂ + B</div>
+    <p>Training uses <strong>stochastic gradient descent</strong> to find <strong>W₁</strong>, <strong>W₂</strong>, and <strong>B</strong> that minimize the <strong>mean squared error</strong> between actual price and ŷ. In other words, you minimize loss with respect to those parameters.</p>
+
+    <h3 style="margin-top:1.75rem;color:var(--accent2);">Training loop without gradient accumulation</h3>
+    <p>For each training item you compute <code>ŷ = X₁*W₁ + X₂*W₂ + B</code>, then the loss, then <code>loss.backward()</code>. Backprop computes ∂L/∂W₁, ∂L/∂W₂, ∂L/∂B (and internal intermediate nodes in the graph). Calling <code>optimizer.step()</code> applies the usual SGD rule—written explicitly here without momentum for clarity:</p>
+    <div class="formula">W<sub>new</sub> = W<sub>old</sub> − η · ∇W</div>
+    <div class="callout"><p>The update uses a <strong>minus</strong> sign because the gradient points in the direction of <strong>steepest increase</strong> of the loss; to <strong>minimize</strong> loss you step in the opposite direction.</p></div>
+    <p>After the step, <code>optimizer.zero_grad()</code> clears gradients on every parameter (and the recorded intermediates) so the next item does not mix stale derivatives. On a conceptual level, <code>optimizer.step()</code> is the moment parameters actually move; <code>loss.backward()</code> only fills <code>.grad</code>.</p>
+
+    <h3 style="margin-top:1.75rem;color:var(--accent2);">Concrete numbers on one computation graph</h3>
+    <p>PyTorch builds a <strong>computation graph</strong>: inputs multiply by weights, the two products add with the bias to form ŷ, ŷ is compared to the target to produce the loss, and backprop applies the <strong>chain rule</strong>. For the gradient with respect to <strong>W₁</strong>, you need ∂L/∂ŷ, then ∂ŷ/∂Z₁ (where Z₁ is the contribution from the first input branch), then ∂Z₁/∂W₁—and similarly for the other weights.</p>
+    <p>Take a first training example with <strong>X₁ = 6</strong>, <strong>X₂ = 2</strong>, and <strong>target = 15</strong>. Suppose weights were initialized to <strong>W₁ = 0.773</strong>, <strong>W₂ = 0.321</strong>, and <strong>B = 0.067</strong> (typical random-style initialization). Forward pass combines these into ŷ and a scalar loss; <code>loss.backward()</code> populates ∂L/∂W₁, ∂L/∂W₂, ∂L/∂B. A second example uses <strong>X₁ = 5</strong>, <strong>X₂ = 2</strong>, <strong>target = 12</strong>, producing another forward pass, another backward, and another parameter update after <code>step()</code> and <code>zero_grad()</code>.</p>
+    <div class="callout ok"><p>With <strong>batch size one</strong>, every data item triggers a full <code>backward</code> → <code>step</code> → <code>zero_grad</code> cycle. Geometrically: each backward gives a direction in weight-space; <code>step</code> moves the weights opposite that direction; <code>zero_grad</code> clears the arrow before the next item paints a new one.</p></div>
+
+    <h3 style="margin-top:1.75rem;color:var(--accent2);">Gradient accumulation: sum gradients before stepping</h3>
+    <p>With accumulation you still run forward and <code>loss.backward()</code> every item, but you <strong>do not</strong> call <code>optimizer.step()</code> (or <code>zero_grad()</code>) after every item. Suppose you accumulate over <strong>two</strong> consecutive examples. After the first backward, gradients sit on the parameters; you skip step and zero. On the second example, another <code>backward()</code> <strong>adds</strong> to the existing <code>.grad</code> tensors instead of replacing them—that is the accumulation.</p>
+    <p>Only after the second backward do you call <code>optimizer.step()</code> once, using the <strong>sum</strong> of the two per-example gradients, then <code>zero_grad()</code>. The effective update direction is the combined signal from both examples. Gradient accumulation is not DDP-specific—it also simulates a larger batch on a single GPU when memory is tight.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s02">
+  <div class="container">
+    <span class="section-num">02</span>
+    <h2>Process group, backend, and environment</h2>
+    <p>Call <code>torch.distributed.init_process_group</code> once per process after parsing arguments. The <code>backend</code> is usually <code>"nccl"</code> for CUDA GPUs. The launcher sets <code>RANK</code> (global), <code>LOCAL_RANK</code> (on this host), <code>WORLD_SIZE</code>, and often <code>MASTER_ADDR</code> / <code>MASTER_PORT</code> for the rendezvous server.</p>
+    <p>Use <code>torch.cuda.set_device(local_rank)</code> before building tensors so each process pins to its GPU. After training, <code>destroy_process_group()</code> releases resources cleanly—omitting this in notebooks or repeated runs can leave NCCL in a bad state.</p>
+    <div class="callout warn"><p><strong>Common pitfall:</strong> Hard-coding <code>device = "cuda:0"</code> in a multi-process script. Always derive the device from <code>LOCAL_RANK</code> (or <code>int(os.environ["LOCAL_RANK"])</code>).</p></div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Minimal group init</h3>
+        <p>The highlighted lines are the contract every rank executes: same <code>backend</code>, same <code>world_size</code> implied by env, unique <code>rank</code>. <code>barrier()</code> is optional but useful before timing or logging.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train_ddp.py</span><span class="code-lines">L1–18</span></div>
+        <pre class="code-block annotated"><code><span class="line"><span class="ln">1</span><span class="kw">import</span> os</span></code>
+<code><span class="line"><span class="ln">2</span><span class="kw">import</span> torch</span></code>
+<code><span class="line"><span class="ln">3</span><span class="kw">import</span> torch.distributed <span class="kw">as</span> dist</span></code>
+<code><span class="line hl"><span class="ln">4</span>local_rank = <span class="fn">int</span>(os.environ[<span class="str">"LOCAL_RANK"</span>])</span></code>
+<code><span class="line hl"><span class="ln">5</span>torch.cuda.<span class="fn">set_device</span>(local_rank)</span></code>
+<code><span class="line hl"><span class="ln">6</span>dist.<span class="fn">init_process_group</span>(backend=<span class="str">"nccl"</span>)</span></code>
+<code><span class="line"><span class="ln">7</span>device = torch.device(<span class="str">"cuda"</span>, local_rank)</span></code>
+<code><span class="line"><span class="ln">8</span><span class="cmt"># model = MyLM().to(device)  # next: wrap with DDP</span></span></code>
+<code><span class="line"><span class="ln">9</span>dist.<span class="fn">barrier</span>()</span></code></pre>
+      </div>
+    </div>
+    <p style="margin-top:1.5rem;">It is convenient to treat the word <strong>node</strong> as interchangeable with <strong>GPU</strong> when you count processes in a cluster: if you have <strong>two</strong> machines and each has <strong>two</strong> GPUs, you have <strong>four</strong> nodes in that sense—four independent processes participating in collectives. The same training script pattern covers (a) several servers with one GPU each, (b) one server with many GPUs, and (c) several servers with multiple GPUs each; multi-machine multi-GPU is simply the most general layout.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s15">
+  <div class="container">
+    <span class="section-num">15</span>
+    <h2>The DDP loop: broadcast, local backward, reduce, and all-reduce</h2>
+    <p>At job start, model weights are created on <strong>one</strong> GPU and copied to every other process with a <strong>broadcast</strong>. After that, every rank holds the <strong>same</strong> initial parameters. Each rank then runs forward and backward on its own data shard; <code>loss.backward()</code> produces a <strong>local</strong> gradient that generally differs across ranks because the minibatches differ. Those local gradients may themselves already be the sum of several micro-batches if you accumulate on device before synchronizing.</p>
+    <p>The synchronization story matches what you would do by hand: each rank sends its gradient vector toward a designated accumulator (often described as rank <strong>0</strong> in diagrams), the partial vectors are <strong>summed</strong>—that reduction step is called <strong>reduce</strong>—and the total is then <strong>broadcast</strong> back so every rank receives the same combined gradient. Everyone applies <code>optimizer.step()</code> with that shared gradient, so all replicas stay bitwise aligned before the next round of minibatches. After the step, gradients are zeroed and the cycle repeats.</p>
+    <div class="callout ok"><p>In optimized libraries the pair “reduce then broadcast” is almost always implemented as one fused collective, <strong>all-reduce</strong>, which is faster than executing the two phases separately even though you can reason about it logically as reduce followed by broadcast.</p></div>
+    <p>In a toy picture with a single scalar weight, you might broadcast an initial value such as <strong>0.1</strong> to every rank, let each rank train on different data so local gradients differ, sum those contributions on the root, broadcast the sum, and run the optimizer so every copy ends the step with the <strong>same</strong> updated weight—as it must, or the replicas would diverge.</p>
+
+    <h3 style="margin-top:2rem;color:var(--accent2);">Point-to-point vs collective communication</h3>
+    <p><strong>Point-to-point</strong> communication is the familiar client–server pattern: one sender, one receiver per message. <strong>Collective</strong> communication names patterns where one process must talk to <strong>many</strong> others at once—the canonical deep-learning case is broadcasting initial weights to every rank, then having every rank participate in a gradient reduction.</p>
+    <p>Here is a file-sharing analogy with explicit timings. You must send a <strong>5&nbsp;MB</strong> file to <strong>seven</strong> friends. Your uplink is <strong>1&nbsp;MB/s</strong>. Sending sequentially—friend 1, then 2, through 7—takes <strong>5&nbsp;s</strong> per friend, hence <strong>7 × 5&nbsp;s = 35&nbsp;s</strong> total. You might try to “multicast” in parallel, but if the uplink cap stays <strong>1&nbsp;MB/s</strong>, the capacity splits across seven simultaneous transfers: roughly <strong>1/7&nbsp;MB/s</strong> per friend (~<strong>143&nbsp;KB/s</strong> each), and the wall-clock time to finish <strong>all seven</strong> is still on the order of <strong>35&nbsp;s</strong> because the pipe is saturated either way.</p>
+    <p>Collective <strong>broadcast</strong> uses a <strong>divide-and-conquer</strong> tree on the interconnect: you send first to a middle partner (say rank <strong>4</strong>); now ranks <strong>0</strong> and <strong>4</strong> both hold the payload and can transmit concurrently to ranks <strong>2</strong> and <strong>6</strong>; then ranks <strong>0, 2, 4, 6</strong> fan out again. In the same toy accounting, that tree schedule finishes in about <strong>15&nbsp;s</strong> instead of <strong>35&nbsp;s</strong>—not because the wire got faster, but because idle links disappear and each hop carries the full <strong>5&nbsp;MB</strong> at <strong>1&nbsp;MB/s</strong> without serializing seven separate root uploads. Real GPU clusters use the same idea: exploit bisection bandwidth and topology so weight broadcast is not a naive loop.</p>
+
+    <h3 style="margin-top:2rem;color:var(--accent2);">Reduce in logarithmic depth</h3>
+    <p>For gradient summation, imagine every rank starts with its own tensor. Pairs exchange: rank <strong>7</strong> sends to <strong>6</strong>, <strong>5</strong> to <strong>4</strong>, and so on, each receiver adding the incoming gradient to its own. The next phase combines those partial sums (for example <strong>6→4</strong> and <strong>2→0</strong>), then a final hop merges the last two partial totals on the root. In the eight-rank story you need only <strong>three</strong> stages to aggregate everything on one rank. It can be proved that, with this style of halving, communication time scales <strong>logarithmically</strong> in the number of ranks—exactly the signature you expect from divide-and-conquer reductions.</p>
+
+    <h3 style="margin-top:2rem;color:var(--accent2);">NCCL and rank IDs</h3>
+    <p>NVIDIA’s collective library <strong>NCCL</strong> (often pronounced “<strong>nickel</strong>”) assigns each participating GPU process a numeric <strong>rank</strong>. That rank is what launchers such as <code>torchrun</code> wire into <code>RANK</code> and <code>LOCAL_RANK</code> environment variables. NCCL chooses algorithms (ring, tree, hybrid) based on message sizes and hardware; you rarely implement the tree yourself, but the latency model you carry in your head should stay logarithmic for large clusters.</p>
+
+    <h3 style="margin-top:2rem;color:var(--accent2);">When a process dies: checkpointing instead of cold restart</h3>
+    <p>If a node disappears mid-run—say <strong>two GPUs out of four</strong> vanish because one machine died—the blunt fix is to reboot the whole job from scratch. That throws away every hour of optimization because you would re-draw fresh random weights and broadcast them again. The better production pattern is <strong>checkpointing</strong>: periodically write <code>state_dict</code>, optimizer state, epoch counters, and any custom scalars you need to a location every rank can read—typically <strong>shared storage</strong>—then resume from the latest checkpoint after a failure.</p>
+    <p>On restart, the “who initializes weights?” step should load from checkpoint instead of reinitializing randomly. PyTorch may pick any process as the source of truth for bootstrapping; documentation stresses that <strong>rank is not guaranteed stable across restarts</strong>—the process that was global rank <strong>0</strong> before the crash might not be rank <strong>0</strong> next time—so every node should run the same code paths and every node needs access to the shared checkpoint volume.</p>
+    <div class="callout warn"><p>Never let <strong>all</strong> ranks write the same checkpoint filename blindly: they will stomp each other’s files. Gate saves on <strong>global rank&nbsp;0</strong> (or an equivalent “main process” flag). On resume, still load the tensors on every rank before wrapping with <code>DDP</code>, and keep auxiliary metadata—Weights&nbsp;&amp;&nbsp;Biases run IDs, random seeds, step counters—inside the checkpoint so training continues coherently.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s03">
+  <div class="container">
+    <span class="section-num">03</span>
+    <h2>Code progression: single GPU → DDP → accumulation → multi-node</h2>
+    <p>Use the tabs to see how the training skeleton grows. The same <code>train_step</code> math appears throughout; what changes is wrapping, synchronization boundaries, and launcher parameters.</p>
+
+    <div class="code-progression">
+      <div class="btn-group">
+        <button type="button" class="btn active" onclick="ddpStep(this,'d1')">Single GPU</button>
+        <button type="button" class="btn" onclick="ddpStep(this,'d2')">+ DDP wrap</button>
+        <button type="button" class="btn" onclick="ddpStep(this,'d3')">+ Grad accum</button>
+        <button type="button" class="btn" onclick="ddpStep(this,'d4')">Multi-node</button>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines" id="ddpStepLabel">Step 1 of 4</span></div>
+        <pre class="code-block" id="d1"><code><span class="line"><span class="ln">1</span>model = <span class="fn">MyLM</span>().<span class="fn">to</span>(device)</span></code>
+<code><span class="line hl"><span class="ln">2</span>opt = torch.optim.<span class="fn">AdamW</span>(model.<span class="fn">parameters</span>(), lr=<span class="num">3e-4</span>)</span></code>
+<code><span class="line"><span class="ln">3</span><span class="kw">for</span> x, y <span class="kw">in</span> loader:</span></code>
+<code><span class="line"><span class="ln">4</span>    x, y = x.<span class="fn">to</span>(device), y.<span class="fn">to</span>(device)</span></code>
+<code><span class="line hl"><span class="ln">5</span>    loss = <span class="fn">model</span>(x, y)</span></code>
+<code><span class="line"><span class="ln">6</span>    loss.<span class="fn">backward</span>()</span></code>
+<code><span class="line"><span class="ln">7</span>    opt.<span class="fn">step</span>(); opt.<span class="fn">zero_grad</span>(set_to_none=<span class="kw">True</span>)</span></code></pre>
+        <pre class="code-block" id="d2" style="display:none"><code><span class="line"><span class="ln">1</span><span class="kw">from</span> torch.nn.parallel <span class="kw">import</span> DistributedDataParallel <span class="kw">as</span> DDP</span></code>
+<code><span class="line hl"><span class="ln">2</span>model = <span class="fn">DDP</span>(model, device_ids=[local_rank])</span></code>
+<code><span class="line"><span class="ln">3</span><span class="cmt"># same loop — backward triggers all-reduce of grads</span></span></code>
+<code><span class="line"><span class="ln">4</span>loss = model(x, y)  <span class="cmt"># call on wrapper</span></span></code>
+<code><span class="line"><span class="ln">5</span>loss.<span class="fn">backward</span>()</span></code>
+<code><span class="line"><span class="ln">6</span>opt.<span class="fn">step</span>(); opt.<span class="fn">zero_grad</span>(set_to_none=<span class="kw">True</span>)</span></code></pre>
+        <pre class="code-block" id="d3" style="display:none"><code><span class="line"><span class="ln">0</span><span class="kw">import</span> contextlib</span></code>
+<code><span class="line"><span class="ln">1</span>accum = <span class="num">4</span></span></code>
+<code><span class="line hl"><span class="ln">2</span><span class="kw">for</span> i, (x, y) <span class="kw">in</span> <span class="fn">enumerate</span>(loader):</span></code>
+<code><span class="line"><span class="ln">3</span>    sync = (i + <span class="num">1</span>) % accum == <span class="num">0</span></span></code>
+<code><span class="line hl"><span class="ln">4</span>    ctx = model.<span class="fn">no_sync</span>() <span class="kw">if</span> <span class="kw">not</span> sync <span class="kw">else</span> contextlib.<span class="fn">nullcontext</span>()</span></code>
+<code><span class="line"><span class="ln">5</span>    <span class="kw">with</span> ctx:</span></code>
+<code><span class="line"><span class="ln">6</span>        loss = model(x, y) / accum</span></code>
+<code><span class="line"><span class="ln">7</span>        loss.<span class="fn">backward</span>()</span></code>
+<code><span class="line"><span class="ln">8</span>    <span class="kw">if</span> sync: opt.<span class="fn">step</span>(); opt.<span class="fn">zero_grad</span>(set_to_none=<span class="kw">True</span>)</span></code></pre>
+        <pre class="code-block" id="d4" style="display:none"><code><span class="line"><span class="cmt"># Node 0:</span></span></code>
+<code><span class="line hl"><span class="ln">1</span>torchrun <span class="op">--</span>nnodes=<span class="num">2</span> <span class="op">--</span>nproc_per_node=<span class="num">4</span> <span class="op">--</span>node_rank=<span class="num">0</span> \</span></code>
+<code><span class="line"><span class="ln">2</span>  <span class="op">--</span>master_addr=<span class="str">10.0.0.10</span> <span class="op">--</span>master_port=<span class="num">29500</span> train.py</span></code>
+<code><span class="line"><span class="cmt"># Node 1: same except --node_rank=1</span></span></code>
+<code><span class="line"><span class="ln">3</span><span class="cmt"># WORLD_SIZE=8, ranks 0–3 on node0, 4–7 on node1</span></span></code></pre>
+      </div>
+      <p class="step-caption" id="ddpCap">Start from a plain loop; add <code>DDP</code>; defer sync with <code>no_sync</code>; launch with <code>torchrun</code> across hosts.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s04">
+  <div class="container">
+    <span class="section-num">04</span>
+    <h2>Annotated walkthroughs: sampler, scaler, checkpoint</h2>
+    <p>Click underlined line numbers to reveal notes. These patterns repeat in almost every DDP training script: partition indices with <code>DistributedSampler</code>, optionally scale loss for mixed precision with <code>torch.cuda.amp.GradScaler</code>, and restrict filesystem writes to <code>dist.get_rank() == 0</code>.</p>
+    <p>Typical imports for this stack are <code>torch.distributed</code>, <code>torch.nn.parallel.DistributedDataParallel</code>, <code>torch.utils.data.distributed.DistributedSampler</code>, plus <code>init_process_group</code> and <code>destroy_process_group</code>. The call that actually unblocks <code>torchrun</code> when all machines have joined is <code>init_process_group(backend="nccl")</code> (for CUDA). After training finishes, <code>destroy_process_group()</code> tears down the process group cleanly.</p>
+    <p><strong><code>LOCAL_RANK</code></strong> indexes the GPU on this host (for <code>torch.cuda.set_device</code> and per-machine UI). <strong><code>RANK</code></strong> is the global process ID across the whole job—use it when exactly one process should log, checkpoint, or initialize W&amp;B.</p>
+    <p>Because <code>DistributedDataParallel</code> with the NCCL backend targets CUDA, many training scripts <strong>disable the CPU training branch</strong> entirely when distributed mode is on: the performance model and supported features differ, and you avoid accidentally constructing tensors on the wrong device.</p>
+    <p>When the model is wrapped, external code must reach the underlying module through <code>model.module</code>—for example <code>model.module.encode(...)</code> instead of <code>model.encode(...)</code> if <code>encode</code> is a custom method on your class. The forward path you registered with <code>nn.Module</code> still runs through the wrapper, but arbitrary methods do not.</p>
+    <div class="callout"><p>Services such as <strong>Weights&nbsp;&amp;&nbsp;Biases</strong> should be initialized on <strong>global rank&nbsp;0</strong> only. If every rank tried to stream metrics simultaneously, runs would corrupt each other. The same rank gating applies to human-readable <code>tqdm</code> bars when multiple GPUs share one terminal: show one bar per machine (local rank&nbsp;0) or only on rank&nbsp;0, depending on how noisy you can tolerate the logs.</p></div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Shard the dataset per epoch</h3>
+        <p>Set <code>shuffle=False</code> on the <code>DataLoader</code> when using a sampler—shuffling belongs in <code>DistributedSampler(..., shuffle=True)</code>, not the loader. Call <code>sampler.set_epoch(epoch)</code> so each rank sees a different permutation each epoch.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train_ddp.py</span><span class="code-lines">L20–35</span></div>
+        <pre class="code-block annotated ann-block" id="ann-sampler"><code><span class="line"><span class="ln">20</span><span class="kw">from</span> torch.utils.data.distributed <span class="kw">import</span> DistributedSampler</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Construct once per dataset; one sampler object per process.">21</span>sampler = <span class="fn">DistributedSampler</span>(train_ds, shuffle=<span class="kw">True</span>)</span></code>
+<code><span class="line"><span class="ln">22</span>loader = DataLoader(train_ds, batch_size=micro_batch, sampler=sampler, shuffle=<span class="kw">False</span>)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Required: without this, shuffles repeat identically on every rank each epoch.">23</span><span class="kw">for</span> epoch <span class="kw">in</span> <span class="fn">range</span>(epochs):</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Seeds a new ordering of indices per rank for this epoch.">24</span>    sampler.<span class="fn">set_epoch</span>(epoch)</span></code></pre>
+        <div class="code-note open" id="note-sampler"><span style="color:var(--text-dim);">Click a line number above.</span></div>
+      </div>
+    </div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Mixed precision + scaler</h3>
+        <p><code>autocast</code> runs matmuls in <code>float16</code> or <code>bfloat16</code> where safe; <code>GradScaler</code> scales loss before backward to avoid underflow, then unscales before <code>clip_grad_norm_</code> and <code>step</code>.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train_ddp.py</span><span class="code-lines">L40–58</span></div>
+        <pre class="code-block annotated ann-block" id="ann-amp"><code><span class="line"><span class="ln">40</span>scaler = torch.cuda.amp.<span class="fn">GradScaler</span>()</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Forward ops may run in lower precision; loss still used for stable backward.">41</span><span class="kw">with</span> torch.cuda.amp.<span class="fn">autocast</span>(dtype=torch.bfloat16):</span></code>
+<code><span class="line"><span class="ln">42</span>    loss = model(x, y)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Scaled backward; scaler tracks per-parameter inf/nan skips.">43</span>scaler.<span class="fn">scale</span>(loss).<span class="fn">backward</span>()</span></code>
+<code><span class="line"><span class="ln">44</span>scaler.<span class="fn">step</span>(opt)</span></code>
+<code><span class="line hl"><span class="ln anno" data-note="Updates scale factor for the next iteration based on whether infs appeared.">45</span>scaler.<span class="fn">update</span>()</span></code></pre>
+        <div class="code-note open" id="note-amp"><span style="color:var(--text-dim);">Click a line number above.</span></div>
+      </div>
+    </div>
+
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Rank-0 checkpointing</h3>
+        <p>All ranks hold the same weights after each step, but only one should write <code>state_dict</code> to disk to avoid file races. Load on all ranks before wrapping with <code>DDP</code> when resuming. If you track external run IDs (for example to reconnect a W&amp;B run after a crash), persist them inside the checkpoint alongside model and optimizer state, then restore them when you reload.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">train_ddp.py</span><span class="code-lines">L70–82</span></div>
+        <pre class="code-block annotated ann-block" id="ann-ckpt"><code><span class="line hl"><span class="ln anno" data-note="Global rank 0 is the conventional single writer; use is_main_process helpers in some frameworks.">70</span><span class="kw">if</span> dist.<span class="fn">get_rank</span>() == <span class="num">0</span>:</span></code>
+<code><span class="line"><span class="ln">71</span>    ckpt = { <span class="str">"model"</span>: model.module.<span class="fn">state_dict</span>(), <span class="str">"opt"</span>: opt.<span class="fn">state_dict</span>(), <span class="str">"epoch"</span>: epoch }</span></code>
+<code><span class="line hl"><span class="ln anno" data-note=".module unwraps DDP to reach your nn.Module subclass.">72</span>    torch.<span class="fn">save</span>(ckpt, <span class="str">"checkpoint.pt"</span>)</span></code>
+<code><span class="line"><span class="ln">73</span>dist.<span class="fn">barrier</span>()  <span class="cmt"># optional: other ranks wait before continuing</span></span></code></pre>
+        <div class="code-note open" id="note-ckpt"><span style="color:var(--text-dim);">Click a line number above.</span></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:2.25rem;color:var(--accent2);">Validation without stalling every GPU</h3>
+    <p>A simple pattern runs evaluation only on <strong>global rank&nbsp;0</strong>. That is easy to code, but it implies every other rank sits in a <code>barrier</code> while rank&nbsp;0 completes validation—acceptable for small models, expensive when validation is heavy. An alternative is <strong>asynchronous validation</strong>: a separate CPU or GPU worker (or a dedicated job) watches the checkpoint directory, loads the latest <code>state_dict</code>, and evaluates while training ranks keep stepping without waiting on metrics. The trade-off is operational complexity versus higher utilization.</p>
+
+    <div class="card" style="margin-top:1.5rem;">
+      <h3 style="color:var(--accent3);margin-bottom:12px;">Integration template (checklist)</h3>
+      <ol class="tight">
+        <li>Read <code>LOCAL_RANK</code> and <code>RANK</code> from the environment; call <code>torch.cuda.set_device(local_rank)</code>.</li>
+        <li><code>init_process_group(backend="nccl")</code> before building tensors on the wrong GPU.</li>
+        <li>On <strong>global rank&nbsp;0</strong> only, initialize side services (W&amp;B, custom loggers).</li>
+        <li>Build <code>DataLoader</code> with <code>DistributedSampler</code>, <code>shuffle=False</code> on the loader, and <code>sampler.set_epoch(epoch)</code> each epoch.</li>
+        <li>Construct the model, optionally load checkpoint <strong>before</strong> the <code>DDP</code> wrap.</li>
+        <li>Wrap with <code>DDP(model, device_ids=[local_rank])</code>; use <code>model.module</code> for non-forward helpers.</li>
+        <li>Training loop unchanged except for <code>no_sync</code> windows when accumulating.</li>
+        <li>Save checkpoints on global rank&nbsp;0; store every scalar needed to resume (epoch, step, run IDs).</li>
+        <li><code>destroy_process_group()</code> when finished.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s05">
+  <div class="container">
+    <span class="section-num">05</span>
+    <h2>Effective batch size and learning-rate scaling</h2>
+    <p>If each GPU runs <code>micro_batch</code> examples per forward, you accumulate <code>accum_steps</code> times before <code>step</code>, and you have <code>world_size</code> ranks, then the <strong>optimizer</strong> sees gradients averaged over a logical batch of size <code>micro_batch × accum_steps × world_size</code>—provided you normalized loss consistently (often <code>loss / accum_steps</code> per micro-batch).</p>
+    <div class="formula">B<sub>eff</sub> = micro_batch × accum_steps × world_size</div>
+    <p>A common heuristic is <strong>linear LR scaling</strong>: multiply base LR by <code>B_eff / B_ref</code> when you scale batch size, sometimes with a <strong>warmup</strong> phase to avoid early instability. Square-root scaling is another family of rules; always validate on your task.</p>
+    <div class="two-col" style="margin-top:1.25rem;">
+      <div class="card" style="margin:0;">
+        <h4 style="color:var(--accent3);margin-bottom:8px;">Keep loss scaling consistent</h4>
+        <p style="font-size:0.88rem;margin:0;">If you average micro-batch loss with <code>loss / accum_steps</code>, the sum over micro-batches matches the gradient of the large batch. DDP averages gradients across ranks, so do not also divide by <code>world_size</code> in loss unless your framework expects it.</p>
+      </div>
+      <div class="card" style="margin:0;">
+        <h4 style="color:var(--accent4);margin-bottom:8px;">LR warmup intuition</h4>
+        <p style="font-size:0.88rem;margin:0;">Early steps have noisy estimates at large <code>B_eff</code>. Warmup ramps <code>lr</code> from a small value across hundreds or thousands of steps; cosine or linear decay afterward is common in LM pretraining recipes.</p>
+      </div>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [1]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>micro, acc, ws = <span class="num">4</span>, <span class="num">8</span>, <span class="num">32</span></span></code>
+<code><span class="line"><span class="ln">2</span>Beff = micro * acc * ws</span></code>
+<code><span class="line"><span class="ln">3</span>base_lr, Bref = <span class="num">3e-4</span>, <span class="num">256</span></span></code>
+<code><span class="line"><span class="ln">4</span>lr = base_lr * (Beff / Bref)</span></code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [1]</span><pre class="output-text">Beff = 1024
+scaled lr ≈ 0.0012  (illustrative linear rule)</pre></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s06">
+  <div class="container">
+    <span class="section-num">06</span>
+    <h2>DDP internals: hooks, buckets, all-reduce</h2>
+    <p>During <code>backward</code>, DDP registers <strong>gradient hooks</strong> on parameters. When a bucket’s gradients are ready, NCCL runs an <strong>all-reduce</strong> so every rank receives the sum (or average, depending on configuration) of that bucket. Overlap means the next backward compute can proceed while the network transfers an earlier bucket—hiding latency.</p>
+    <p>Synchronization is tied to <code>loss.backward()</code>: each rank finishes the local backward for its shard, produces ∂L/∂(parameters), and participates in the collective so every rank receives the same aggregated gradient before <code>optimizer.step()</code> applies the shared update with the local optimizer’s learning rate.</p>
+    <p>Without overlap, the timeline is painful: forward, backward, then a stretch where GPUs are mostly waiting on the network to reduce and broadcast gradients—compute sits idle. PyTorch instead exploits the <strong>layer-wise</strong> structure of backprop. You need ∂L/∂W for upper parameters only after you have traversed deeper into the graph, but early parameters’ gradients become known as soon as their subgraph is finished. The implementation can therefore start an <strong>all-reduce</strong> on an early bucket while backward is still computing later layers. As each additional bucket’s gradients materialize, launch the next reduction. By the time the final backward operations complete, much of the communication has already been overlapped with compute, shrinking end-to-end step time.</p>
+    <p>Rather than all-reducing one parameter at a time, DDP packs many gradients into <strong>buckets</strong>. When bucket <em>k</em> is full, it ships in one collective and the reduced values return together. PyTorch’s documentation recommends on the order of <strong>25&nbsp;MB</strong> per bucket: buckets that are <strong>too small</strong> multiply fixed per-message overhead; buckets that are <strong>too large</strong> delay the first network activity and under-utilize the link while later gradients are still being computed. Profiling with your real model width usually beats guessing.</p>
+    <p>Default bucket sizes are tuned for typical CNNs and Transformers; you can adjust <code>bucket_cap_mb</code> when profiling shows too many tiny messages or poor overlap. The exact schedule is implementation detail; the mental model is “streaming reductions as <code>.grad</code> appears.”</p>
+    <div class="callout"><p><strong>Gradient hooks</strong> fire per parameter or group; DDP coalesces into buckets to amortize kernel launch and NIC overhead. That is why naive “all-reduce full model after backward” is slower than DDP’s pipelined approach.</p></div>
+    <p>With gradient accumulation under DDP, wrap non-final micro-batches in <code>model.no_sync()</code> so gradients accumulate locally; on the last micro-batch, exit <code>no_sync</code> so the backward all-reduces, then call <code>optimizer.step()</code>.</p>
+
+    <div class="card" style="margin-top:2rem;">
+      <h3 style="color:var(--accent2);margin-bottom:12px;">Glossary (APIs you will type)</h3>
+      <p style="font-size:0.9rem;margin-bottom:0.75em;"><code>torch.distributed.init_process_group</code> · <code>destroy_process_group</code> · <code>dist.barrier</code> · <code>dist.get_rank</code> · <code>dist.get_world_size</code> · <code>dist.all_reduce</code> (manual use rare when DDP wraps the model).</p>
+      <p style="font-size:0.9rem;margin-bottom:0.75em;"><code>torch.nn.parallel.DistributedDataParallel</code> · <code>model.module</code> · <code>model.no_sync()</code> · <code>device_ids=[local_rank]</code> · <code>output_device</code> · <code>bucket_cap_mb</code> · <code>gradient_as_bucket_view</code>.</p>
+      <p style="font-size:0.9rem;margin-bottom:0.75em;"><code>torch.utils.data.distributed.DistributedSampler</code> · <code>set_epoch</code> · <code>DataLoader(..., shuffle=False)</code> · <code>batch_size</code> per process (micro-batch).</p>
+      <p style="font-size:0.9rem;margin-bottom:0.75em;"><code>torchrun</code> · <code>--nproc_per_node</code> · <code>--nnodes</code> · <code>--node_rank</code> · <code>--master_addr</code> · <code>--master_port</code> · <code>--rdzv_backend</code> · <code>--rdzv_endpoint</code>.</p>
+      <p style="font-size:0.9rem;margin-bottom:0.75em;"><code>LOCAL_RANK</code> · <code>RANK</code> · <code>WORLD_SIZE</code> · <code>MASTER_ADDR</code> · <code>MASTER_PORT</code> · <code>NCCL_DEBUG</code> · <code>NCCL_IB_DISABLE</code> (debug only).</p>
+      <p style="font-size:0.9rem;margin-bottom:0;"><code>torch.cuda.amp.autocast</code> · <code>GradScaler</code> · <code>scaler.scale</code> · <code>scaler.unscale_</code> · <code>torch.nn.utils.clip_grad_norm_</code> · <code>optimizer.zero_grad(set_to_none=True)</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s07">
+  <div class="container">
+    <span class="section-num">07</span>
+    <h2>Demo: all-reduce on a ring</h2>
+    <p>Many high-performance libraries implement all-reduce as a <strong>ring</strong> (or hybrid ring/tree). Each rank sends a chunk to its neighbor while receiving another chunk—bandwidth-bound regimes favor this pattern. The animation is schematic; NCCL chooses algorithms based on message size and topology.</p>
+    <div class="interactive-panel">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:12px;">
+        <label style="color:var(--text-dim);">Ranks <input type="range" id="ring-n" min="4" max="12" value="6" /><span class="slider-value" id="ring-n-lbl">6</span></label>
+        <button type="button" class="btn" id="ring-play">Play</button>
+        <button type="button" class="btn" id="ring-pause">Pause</button>
+      </div>
+      <canvas class="dchart dchart-tall" id="ring-canvas" width="800" height="280"></canvas>
+      <p class="step-caption" id="ring-cap">Highlight shows a chunk traveling around the ring; after multiple phases every rank holds the full reduced tensor.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s08">
+  <div class="container">
+    <span class="section-num">08</span>
+    <h2>Demo: gradient sync timeline (overlap)</h2>
+    <p>Backward computes layer-wise; DDP can start all-reduce on <strong>early</strong> buckets while later layers still run. Tune overlap quality in the toy chart to see exposed communication time shrink when compute and NCCL interleave well.</p>
+    <div class="interactive-panel">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;">
+        <label style="color:var(--text-dim);">Overlap quality <input type="range" id="ov-p" min="0" max="100" value="72" /><span class="slider-value" id="ov-p-lbl">72%</span></label>
+        <label style="color:var(--text-dim);">Buckets <input type="range" id="ov-b" min="1" max="6" value="3" /><span class="slider-value" id="ov-b-lbl">3</span></label>
+      </div>
+      <canvas class="dchart dchart-tall" id="ov-canvas" width="800" height="260"></canvas>
+      <p id="ov-note" style="font-family:var(--mono);font-size:0.8rem;color:var(--accent5);margin-top:10px;"></p>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s09">
+  <div class="container">
+    <span class="section-num">09</span>
+    <h2><code>torchrun</code>, rendezvous, and multi-node launch</h2>
+    <p><code>torchrun</code> replaces older <code>python -m torch.distributed.launch</code> patterns. Key flags: <code>--nproc_per_node</code> (often GPUs per machine), <code>--nnodes</code> (machine count), <code>--node_rank</code> (this host’s index), <code>--rdzv_backend</code> (for elastic jobs; static clusters often use classic <code>MASTER_ADDR</code> / <code>MASTER_PORT</code>), <code>--rdzv_endpoint</code> when using the rendezvous store.</p>
+    <ol class="tight">
+      <li>Pick a reachable <code>MASTER_ADDR</code> (head-node private IP) and free <code>MASTER_PORT</code>.</li>
+      <li>Run the <strong>same</strong> command on every node, changing only <code>--node_rank</code>.</li>
+      <li>Ensure <code>WORLD_SIZE</code> equals <code>nnodes × nproc_per_node</code> (usually set by the launcher).</li>
+    </ol>
+    <div class="code-section">
+      <div class="code-explanation">
+        <h3>Static two-node example</h3>
+        <p>Firewall rules must allow the rendezvous port between nodes. VPC security groups on AWS often default-deny; open TCP between training instances.</p>
+      </div>
+      <div class="code-panel">
+        <div class="code-header"><span class="code-filename">shell</span><span class="code-lines">launch</span></div>
+        <pre class="code-block"><code><span class="line"><span class="ln">1</span>torchrun <span class="op">--</span>standalone <span class="op">--</span>nproc_per_node=<span class="num">8</span> train.py  <span class="cmt"># single node</span></span></code>
+<code><span class="line"><span class="ln">2</span>torchrun <span class="op">--</span>nnodes=<span class="num">2</span> <span class="op">--</span>nproc_per_node=<span class="num">8</span> <span class="op">--</span>node_rank=<span class="num">0</span> \</span></code>
+<code><span class="line"><span class="ln">3</span>  <span class="op">--</span>master_addr=<span class="str">172.31.12.5</span> <span class="op">--</span>master_port=<span class="num">29500</span> train.py</span></code></pre>
+      </div>
+    </div>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [2]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span><span class="cmt"># Log excerpt after successful group init</span></span></code>
+<code><span class="line"><span class="ln">2</span>print(os.environ[<span class="str">"RANK"</span>], os.environ[<span class="str">"WORLD_SIZE"</span>])</span></code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [2]</span><pre class="output-text">3 32
+# rank 3 of 32 — e.g. 4 nodes × 8 GPUs</pre></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s10">
+  <div class="container">
+    <span class="section-num">10</span>
+    <h2>Cloud operations: AWS-style clusters and a Paperspace walkthrough</h2>
+    <p>Production teams routinely split work between “heavy cloud” (AWS, GCP, Azure) with enterprise networking and “fast path” GPU clouds that minimize clicks for experiments. Both deserve the same distributed-training discipline: private connectivity between nodes, a shared or synchronized checkpoint location, and identical container images or virtualenvs on every rank.</p>
+
+    <h3 style="margin-top:1.5rem;color:var(--accent2);">Paperspace: minimal-friction multi-node GPU lab</h3>
+    <p><strong>AWS</strong> can do everything, but standing up security groups, VPC wiring, and storage mounts takes time; it is easy to get lost in console steps before you ever launch <code>torchrun</code>. <strong>Paperspace</strong> is useful when the goal is to <strong>see distributed training work end-to-end</strong> without first becoming a cloud network engineer—though real products eventually move toward infrastructure-as-code (Docker, Kubernetes) for repeatability.</p>
+    <p>A concrete layout that matches a four-GPU, two-machine job: create a <strong>private network</strong> (call it something like <code>distributed-training</code>) and keep every resource in the <strong>same region</strong> (for example <strong>New York&nbsp;2</strong>). Provision <strong>two</strong> machines from an ML-ready image such as <strong>ML-in-a-Box</strong>, each with <strong>two GPUs</strong>—the transcript example used <strong>Multi-GPU P4000 ×2</strong> per host—<strong>50&nbsp;GB</strong> boot disks, dynamic public IPs so you can SSH in, and both interfaces attached to the private network. Add a <strong>network drive</strong> (the smallest commonly offered size is around <strong>250&nbsp;GB</strong>) also attached to that network, named for example <code>model-training-250</code>, to hold checkpoints both nodes can read.</p>
+    <p>Per-machine cost in that tier is often on the order of <strong>~$1/hour</strong>; one end-to-end experiment that runs many epochs landed around <strong>$5</strong> total in the source walkthrough—your spend will vary with runtime and list prices, but the takeaway is that a <strong>short</strong> distributed rehearsal can stay inexpensive if you tear the cluster down afterward.</p>
+    <p>On each host: update packages, install <code>net-tools</code> if you need <code>ifconfig</code> (some images occasionally hit packaging glitches such as <strong>Seahorse</strong> prompts during apt operations—follow the distro’s workaround if apt stalls). Note the machine’s <strong>private IP</strong> on the subnet, mount the network share with the vendor-supplied mount command (substitute the drive’s address, username, and password; replace any escaped characters in pasted URLs with normal slashes as the shell expects), clone the training repository (for example a project named along the lines of <strong>pytorch Transformer distributed</strong>), and <code>pip install -r requirements.txt</code>. Install and log in to <strong>Weights&nbsp;&amp;&nbsp;Biases</strong> if you want centralized curves—remember only <strong>global rank&nbsp;0</strong> should initialize the run so metrics do not collide.</p>
+    <p>PyTorch NCCL initialization frequently requires mutual hostname resolution. If ranks cannot find each other by name, add lines to <code>/etc/hosts</code> on <strong>both</strong> machines mapping the <strong>other</strong> host’s private IP to its hostname (for example <code>cuda-zero</code> and <code>cuda-one</code> in a two-node demo). Symmetric entries matter: a missing mapping on one side leaves processes waiting at the rendezvous barrier.</p>
+    <p>Pick one machine as the <strong>master</strong> for <code>MASTER_ADDR</code> (often the first box you created). In production you might front the master with a <strong>floating IP</strong> or DNS name that can be repointed if that host dies; in a minimal tutorial you often hard-code the master’s private IP for clarity. The launch command is the same script on every node; <code>torchrun</code> (the supported entry point—older docs sometimes wrote <code>torch run</code> as two words) supplies <code>RANK</code>, <code>LOCAL_RANK</code>, and <code>WORLD_SIZE</code>. You pass <code>--nnodes</code> (number of machines), <code>--nproc_per_node</code> (GPUs per machine), a per-cluster <strong>unique job identifier</strong> where the launcher expects it, <code>--master_addr</code> pointing at the master’s address, and <code>NCCL</code> as the backend for CUDA. Arguments after the training script path are forwarded to your Python entrypoint—for instance <code>--batch_size 8</code> and a <code>--model_folder</code> pointing at the <strong>mounted shared path</strong> so checkpoints land on the network drive.</p>
+    <p>When one SSH session fires the command before the other, the first process blocks until peers join—exactly the rendezvous handshake. If training starts but then stalls, double-check <code>/etc/hosts</code> on <strong>every</strong> node and verify both sides use the same ports and codebase revision.</p>
+    <div class="callout ok"><p>In a four-GPU job (two hosts × two GPUs), each process may iterate roughly <strong>910</strong> minibatches per epoch for a fixed dataset while a progress bar shows only one stream per machine for readability. Across <strong>four</strong> ranks the dataset is partitioned four ways; the global number of optimizer steps per epoch is governed by that per-rank count times the number of ranks—not “910×2” from glancing at two terminals. The important invariant is that <strong>every rank steps through its shard without overlap</strong> and all-reduce keeps weights identical.</p></div>
+    <p>Failover rehearsal: kill the master node mid-run. After NCCL tears the job down, relaunch the same <code>torchrun</code> line. With checkpoints written each epoch to shared storage from <strong>global rank&nbsp;0</strong>, reload should skip finished epochs—for example resuming at <strong>epoch&nbsp;1</strong> after epoch&nbsp;0 completed—because the loader reads the latest <code>state_dict</code> and auxiliary counters from disk. Save anything else you need to reconstruct training—global step, RNG state, W&amp;B run id—inside that checkpoint bundle.</p>
+    <div class="comparison">
+      <div class="card"><h3>Hand-provisioned VMs (Paperspace-style)</h3><p>Fast to click together for learning and prototypes; you SSH in, edit <code>/etc/hosts</code>, mount a share, and run <code>torchrun</code> twice. Good when you are not ready for Kubernetes but need real multi-node NCCL behavior.</p></div>
+      <div class="card"><h3>Orchestrated containers (Docker / k8s)</h3><p>Same training code, but images and env vars are declared once; scaling out repeats automatically. This is what you want for teams and for production, at the cost of up-front platform work.</p></div>
+    </div>
+
+    <h3 style="margin-top:2rem;color:var(--accent2);">AWS checklist (enterprise defaults)</h3>
+    <p>On <strong>EC2</strong>, prefer instances in the same placement group and enable <strong>EFA</strong> when available for lower latency between nodes. Mount <strong>FSx for Lustre</strong> or <strong>EFS</strong> if many ranks read the same dataset; local <code>NVMe</code> instance store is fastest for ephemeral staging.</p>
+    <p>Image-wise, match <code>driver</code>, <code>CUDA</code>, and <code>PyTorch</code> wheels to the GPU generation (<code>A100</code>, <code>H100</code>, <code>L4</code>, …). Container images from NVIDIA NGC or PyTorch official bundles reduce “works on my laptop” drift. For cost, use <strong>spot</strong> with checkpointing—but expect preemption; <code>barrier</code> hangs if one rank vanishes without teardown.</p>
+    <div class="callout danger"><p><strong>Security:</strong> Do not expose <code>MASTER_PORT</code> on a public interface. Keep training traffic on private subnets; use <code>Security Group</code> rules source-restricted to the cluster SG.</p></div>
+
+    <h3 style="margin-top:2rem;color:var(--accent2);">Cost and resume strategy</h3>
+    <p>Billing is usually proportional to <code>GPU-hours</code> × <code>instance_type</code> price. Checkpoint to durable object storage (<code>S3</code>, <code>GCS</code>) from rank 0 on a fixed interval so spot interruptions only lose partial work. Document the exact <code>torchrun</code> line and container digest alongside each checkpoint for reproducibility.</p>
+    <p>For multi-region redundancy, avoid splitting one training job across regions—latency kills collectives. Instead replicate finished checkpoints for inference or fine-tuning elsewhere.</p>
+  </div>
+</section>
+
+<section class="section fade-in" id="s11">
+  <div class="container">
+    <span class="section-num">11</span>
+    <h2>Data-parallel shard map (per step)</h2>
+    <p>Conceptually, global batch indices are partitioned across ranks so each <code>forward</code> uses disjoint examples. The demo below mirrors how you sanity-check <code>batch_size</code> settings against <code>world_size</code>.</p>
+    <div class="interactive-panel" id="demo-dp">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:12px;">
+        <label style="color:var(--text-dim);">GPUs (processes) <input type="range" id="dp-ngpu" min="1" max="8" value="4" /><span class="slider-value" id="dp-ngpu-lbl">4</span></label>
+        <label style="color:var(--text-dim);">Global batch <input type="range" id="dp-gbatch" min="8" max="128" step="8" value="32" /><span class="slider-value" id="dp-gbatch-lbl">32</span></label>
+      </div>
+      <div class="gp-grid" id="dp-chips"></div>
+      <p id="dp-summary" style="font-family:var(--mono);font-size:0.82rem;color:var(--accent3);margin:0;"></p>
+    </div>
+    <p style="margin-top:1.25rem;">In real code, <code>batch_size</code> in <code>DataLoader</code> is the per-process count. Global examples per optimizer step equal that times <code>world_size</code> when you step every batch. With gradient accumulation, multiply further by <code>accum_steps</code> before the next <code>optimizer.step()</code>.</p>
+    <div class="callout warn"><p><strong>Sanity check:</strong> Sum of per-rank samples across one step should match your intended global batch. Off-by-one errors in custom samplers often show up as slightly different <code>len(loader)</code> per rank—use <code>drop_last=True</code> or pad consistently.</p></div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s12">
+  <div class="container">
+    <span class="section-num">12</span>
+    <h2>Throughput logging (tokens/s)</h2>
+    <p>Benchmark scripts often divide total tokens processed by wall time across a warm-up window, subtracting <code>dist.barrier()</code> synchronized timers for fair multi-node numbers. NCCL debug flags (<code>NCCL_DEBUG=INFO</code>) help diagnose slow collectives—at the cost of log volume.</p>
+    <div class="jupyter-cell">
+      <div class="cell-header"><span class="cell-label">In [3]</span><button type="button" class="btn btn-sm" onclick="toggleOut(this)">Show Output ▼</button></div>
+      <pre class="code-block"><code><span class="line"><span class="ln">1</span>t0 = time.<span class="fn">time</span>()</span></code>
+<code><span class="line"><span class="ln">2</span><span class="kw">for</span> step, batch <span class="kw">in</span> <span class="fn">enumerate</span>(loader):</span></code>
+<code><span class="line"><span class="ln">3</span>    ...  <span class="cmt"># forward + backward + step</span></span></code>
+<code><span class="line"><span class="ln">4</span>    <span class="kw">if</span> step == <span class="num">100</span>: <span class="kw">break</span></span></code>
+<code><span class="line"><span class="ln">5</span>elapsed = time.<span class="fn">time</span>() - t0</span></code>
+<code><span class="line"><span class="ln">6</span>tok_per_s = (step * Beff * seq_len) / elapsed</span></code></pre>
+      <div class="cell-output" style="display:none;"><span class="cell-label out-label">Out [3]</span><pre class="output-text">approx 1.85e5 tokens/s  (illustrative 8×A100, FP16, 1.2B param LM)</pre></div>
+    </div>
+  </div>
+</section>
+
+<section class="section fade-in" id="s13">
+  <div class="container">
+    <span class="section-num">13</span>
+    <h2>Playground: collective arrows</h2>
+    <p>Pick an operation to visualize logical traffic patterns—<code>broadcast</code>, <code>reduce</code>, <code>all_gather</code>, <code>gather</code>, <code>scatter</code>—on <code>N</code> ranks. DDP’s hot path is <code>all_reduce</code> (logically “reduce to one copy of the sum, then broadcast that tensor”), but these primitives appear in checkpoint broadcast, validation aggregation, and custom pipelines.</p>
+    <div class="interactive-panel">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:12px;">
+        <label style="color:var(--text-dim);">N ranks <input type="range" id="pg-n" min="4" max="12" value="8" /><span class="slider-value" id="pg-n-lbl">8</span></label>
+        <label style="color:var(--text-dim);">Root <input type="range" id="pg-root" min="0" max="7" value="0" /><span class="slider-value" id="pg-root-lbl">0</span></label>
+        <label style="color:var(--text-dim);">Op
+          <select id="pg-op" style="background:var(--bg-card-alt);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-family:var(--sans);">
+            <option value="broadcast">broadcast</option>
+            <option value="reduce">reduce</option>
+            <option value="gather">gather</option>
+            <option value="scatter">scatter</option>
+          </select>
+        </label>
+      </div>
+      <canvas class="dchart dchart-tall" id="pg-canvas" width="800" height="260"></canvas>
+      <p id="pg-desc" style="font-family:var(--mono);font-size:0.78rem;color:var(--accent3);margin-top:12px;"></p>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Advanced NLP V2 · Chapter 13 · Distributed training (<code>DDP</code>, <code>torchrun</code>, accumulation)</p>
+  <p style="max-width:560px;margin:12px auto 0;font-size:0.82rem;">Built as a single self-contained page: styles and scripts are inline so you can open the file locally in any browser.</p>
+  <p style="font-size:0.75rem;margin-top:8px;opacity:0.75;">Phase 11 layout: sticky code panels, tabbed progression, annotated line numbers, and Jupyter-style cells for metrics.</p>
+</footer>
+
+<script>
+function toggleOut(btn) {
+  const cell = btn.closest('.jupyter-cell');
+  const out = cell.querySelector('.cell-output');
+  const on = out.style.display !== 'block';
+  out.style.display = on ? 'block' : 'none';
+  btn.textContent = on ? 'Hide Output ▲' : 'Show Output ▼';
+}
+
+function ddpStep(btn, id) {
+  const root = btn.closest('.code-progression');
+  root.querySelectorAll('.code-block').forEach(e => { e.style.display = 'none'; });
+  root.querySelector('#' + id).style.display = 'block';
+  root.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const caps = [
+    'Single-device loop: backward immediately updates local .grad.',
+    'DDP: last backward in a step all-reduces grads across ranks.',
+    'Accumulation: no_sync defers all-reduce until the final micro-batch.',
+    'Multi-node: torchrun sets RANK / WORLD_SIZE; repeat per host with node_rank.'
+  ];
+  const labels = ['Step 1 of 4 · Single GPU', 'Step 2 of 4 · + DDP', 'Step 3 of 4 · + Grad accum', 'Step 4 of 4 · Multi-node launch'];
+  const idx = id === 'd1' ? 0 : id === 'd2' ? 1 : id === 'd3' ? 2 : 3;
+  document.getElementById('ddpCap').textContent = caps[idx];
+  document.getElementById('ddpStepLabel').textContent = labels[idx];
+}
+
+(function bindAnnoBlocks() {
+  document.querySelectorAll('.ann-block').forEach(function (pre) {
+    const panel = pre.closest('.code-panel');
+    if (!panel) return;
+    const note = panel.querySelector('.code-note');
+    if (!note) return;
+    pre.querySelectorAll('.ln.anno').forEach(function (ln) {
+      ln.addEventListener('click', function () {
+        const t = ln.getAttribute('data-note') || '';
+        note.classList.add('open');
+        note.innerHTML = '<strong>Line ' + ln.textContent.trim() + ':</strong> ' + t;
+      });
+    });
+  });
+})();
+
+(function topoDemo() {
+  const nodesEl = document.getElementById('topo-nodes');
+  const gpuEl = document.getElementById('topo-gpu');
+  const grid = document.getElementById('topo-grid');
+  const cap = document.getElementById('topo-cap');
+  const nl = document.getElementById('topo-nodes-lbl');
+  const gl = document.getElementById('topo-gpu-lbl');
+  if (!nodesEl || !grid) return;
+  function draw() {
+    const nn = +nodesEl.value, g = +gpuEl.value;
+    nl.textContent = String(nn);
+    gl.textContent = String(g);
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = 'repeat(' + g + ', minmax(90px,1fr))';
+    let rank = 0;
+    for (let n = 0; n < nn; n++) {
+      for (let k = 0; k < g; k++) {
+        const d = document.createElement('div');
+        d.className = 'topology-node';
+        d.innerHTML = '<b>node ' + n + '</b>GPU local ' + k + '<br><span style="color:var(--accent3)">global rank ' + (rank++) + '</span>';
+        grid.appendChild(d);
+      }
+    }
+    const ws = nn * g;
+    cap.textContent = 'WORLD_SIZE = ' + ws + ' · On node n, LOCAL_RANK matches GPU index k · Global RANK enumerates all cells left-to-right, top-to-bottom.';
+  }
+  nodesEl.addEventListener('input', draw);
+  gpuEl.addEventListener('input', draw);
+  draw();
+})();
+
+(function dpShard() {
+  const dpNgpu = document.getElementById('dp-ngpu');
+  const dpGbatch = document.getElementById('dp-gbatch');
+  const chips = document.getElementById('dp-chips');
+  const summ = document.getElementById('dp-summary');
+  if (!dpNgpu) return;
+  function drawDP() {
+    const g = +dpNgpu.value, B = +dpGbatch.value;
+    document.getElementById('dp-ngpu-lbl').textContent = String(g);
+    document.getElementById('dp-gbatch-lbl').textContent = String(B);
+    const per = Math.floor(B / g), rem = B % g;
+    chips.innerHTML = '';
+    for (let i = 0; i < g; i++) {
+      const cnt = per + (i < rem ? 1 : 0);
+      const el = document.createElement('div');
+      el.className = 'gpu-chip';
+      el.innerHTML = '<strong>rank ' + i + '</strong>' + cnt + ' examples / step';
+      chips.appendChild(el);
+    }
+    summ.textContent = 'Global batch ' + B + ' · per-rank micro-batch ≈ ' + per + (rem ? ' (+1 on first ' + rem + ' ranks)' : '') + ' · DDP all-reduces grads each optimizer step';
+  }
+  dpNgpu.addEventListener('input', drawDP);
+  dpGbatch.addEventListener('input', drawDP);
+  drawDP();
+})();
+
+(function ringDemo() {
+  const c = document.getElementById('ring-canvas');
+  const nEl = document.getElementById('ring-n');
+  const nLb = document.getElementById('ring-n-lbl');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  let running = false, raf = 0, tStart = 0;
+  function drawRing(elapsedMs) {
+    const n = +nEl.value;
+    nLb.textContent = String(n);
+    const w = c.width, h = c.height;
+    ctx.clearRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.36;
+    const ang0 = -Math.PI / 2;
+    for (let i = 0; i < n; i++) {
+      const a = ang0 + (i / n) * Math.PI * 2;
+      const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+      ctx.beginPath();
+      ctx.arc(x, y, 16, 0, Math.PI * 2);
+      ctx.fillStyle = '#12121a';
+      ctx.strokeStyle = '#6c8cff';
+      ctx.lineWidth = 2;
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#e0e0e8';
+      ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+      ctx.textAlign = 'center';
+      ctx.fillText(String(i), x, y + 4);
+    }
+    ctx.textAlign = 'left';
+    const phase = running ? ((elapsedMs || 0) / 550) % n : 0;
+    const iFrom = Math.floor(phase) % n, iTo = (iFrom + 1) % n;
+    const a0 = ang0 + (iFrom / n) * Math.PI * 2, a1 = ang0 + (iTo / n) * Math.PI * 2;
+    const x0 = cx + Math.cos(a0) * R, y0 = cy + Math.sin(a0) * R;
+    const x1 = cx + Math.cos(a1) * R, y1 = cy + Math.sin(a1) * R;
+    ctx.strokeStyle = 'rgba(244,114,182,0.9)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+    const ang = Math.atan2(y1 - y0, x1 - x0);
+    const sz = 10;
+    ctx.fillStyle = '#f472b6';
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - sz * Math.cos(ang - 0.35), y1 - sz * Math.sin(ang - 0.35));
+    ctx.lineTo(x1 - sz * Math.cos(ang + 0.35), y1 - sz * Math.sin(ang + 0.35));
+    ctx.closePath();
+    ctx.fill();
+  }
+  function frame(ts) {
+    if (!running) return;
+    drawRing(ts - tStart);
+    raf = requestAnimationFrame(frame);
+  }
+  document.getElementById('ring-play').addEventListener('click', function () {
+    if (running) return;
+    running = true;
+    tStart = performance.now();
+    raf = requestAnimationFrame(frame);
+  });
+  document.getElementById('ring-pause').addEventListener('click', function () {
+    running = false;
+    cancelAnimationFrame(raf);
+    drawRing(0);
+  });
+  nEl.addEventListener('input', function () { drawRing(running ? performance.now() - tStart : 0); });
+  drawRing(0);
+})();
+
+(function overlapDemo() {
+  const ovP = document.getElementById('ov-p');
+  const ovB = document.getElementById('ov-b');
+  const ovCanvas = document.getElementById('ov-canvas');
+  const ovNote = document.getElementById('ov-note');
+  if (!ovCanvas) return;
+  const ovCtx = ovCanvas.getContext('2d');
+  function drawOv() {
+    const p = +ovP.value / 100, buckets = +ovB.value;
+    document.getElementById('ov-p-lbl').textContent = Math.round(p * 100) + '%';
+    document.getElementById('ov-b-lbl').textContent = String(buckets);
+    const w = ovCanvas.width, h = ovCanvas.height;
+    ovCtx.clearRect(0, 0, w, h);
+    const rowB = 40, rowC = 100, rowIdle = 160, tmax = w - 60;
+    ovCtx.fillStyle = '#8888a0';
+    ovCtx.font = '11px sans-serif';
+    ovCtx.fillText('Backward (compute)', 10, rowB - 8);
+    ovCtx.fillText('All-reduce buckets (comm)', 10, rowC - 8);
+    ovCtx.fillText('Exposed comm / idle', 10, rowIdle - 8);
+    const seg = tmax / (buckets + 2);
+    const backLen = seg * (buckets + 2);
+    ovCtx.fillStyle = 'rgba(108,140,255,0.45)';
+    ovCtx.fillRect(40, rowB, backLen, 22);
+    for (let i = 0; i < buckets; i++) {
+      const start = 40 + seg * (i + 1) * (1 - p * 0.35);
+      const len = seg * 0.85 * (0.5 + p);
+      ovCtx.fillStyle = 'rgba(52,211,153,0.55)';
+      ovCtx.fillRect(start, rowC, len, 22);
+      const idleW = Math.max(0, seg * (1 - p) * 0.4);
+      ovCtx.fillStyle = 'rgba(248,113,113,0.35)';
+      ovCtx.fillRect(start + len, rowIdle, idleW, 16);
+    }
+    ovNote.textContent = 'Gradient sync is interleaved with backward via buckets; stronger overlap reduces the red “exposed” segments.';
+  }
+  ovP.addEventListener('input', drawOv);
+  ovB.addEventListener('input', drawOv);
+  drawOv();
+})();
+
+(function playgroundCollectives() {
+  const pgN = document.getElementById('pg-n');
+  const pgOp = document.getElementById('pg-op');
+  const pgRoot = document.getElementById('pg-root');
+  const pgCanvas = document.getElementById('pg-canvas');
+  const pgDesc = document.getElementById('pg-desc');
+  if (!pgCanvas) return;
+  const pgCtx = pgCanvas.getContext('2d');
+  function arrow(x1, y1, x2, y2) {
+    pgCtx.beginPath();
+    pgCtx.moveTo(x1, y1);
+    pgCtx.lineTo(x2, y2);
+    pgCtx.stroke();
+    const ang = Math.atan2(y2 - y1, x2 - x1);
+    const sz = 8;
+    pgCtx.beginPath();
+    pgCtx.moveTo(x2, y2);
+    pgCtx.lineTo(x2 - sz * Math.cos(ang - 0.4), y2 - sz * Math.sin(ang - 0.4));
+    pgCtx.lineTo(x2 - sz * Math.cos(ang + 0.4), y2 - sz * Math.sin(ang + 0.4));
+    pgCtx.closePath();
+    pgCtx.fillStyle = 'rgba(167,139,250,0.9)';
+    pgCtx.fill();
+  }
+  function drawPG() {
+    const n = +pgN.value;
+    let root = +pgRoot.value;
+    if (root >= n) { pgRoot.value = String(n - 1); root = n - 1; }
+    pgRoot.max = String(n - 1);
+    document.getElementById('pg-n-lbl').textContent = String(n);
+    document.getElementById('pg-root-lbl').textContent = String(root);
+    const op = pgOp.value;
+    const w = pgCanvas.width, h = pgCanvas.height;
+    pgCtx.clearRect(0, 0, w, h);
+    const cy = h / 2, span = w - 100, x0 = 50;
+    const xs = [];
+    for (let i = 0; i < n; i++) xs.push(x0 + (i / (n - 1 || 1)) * span);
+    for (let j = 0; j < n; j++) {
+      const x = xs[j];
+      pgCtx.beginPath();
+      pgCtx.arc(x, cy, 16, 0, Math.PI * 2);
+      pgCtx.fillStyle = j === root ? 'rgba(251,191,36,0.2)' : '#12121a';
+      pgCtx.fill();
+      pgCtx.strokeStyle = j === root ? '#fbbf24' : '#6c8cff';
+      pgCtx.lineWidth = 2;
+      pgCtx.stroke();
+      pgCtx.fillStyle = '#e0e0e8';
+      pgCtx.font = '11px monospace';
+      pgCtx.textAlign = 'center';
+      pgCtx.fillText('r' + j, x, cy + 4);
+    }
+    pgCtx.textAlign = 'left';
+    pgCtx.strokeStyle = 'rgba(167,139,250,0.75)';
+    pgCtx.lineWidth = 2;
+    if (op === 'broadcast') {
+      for (let a = 0; a < n; a++) if (a !== root) arrow(pgCtx, xs[root], cy, xs[a], cy);
+      pgDesc.textContent = 'broadcast: root r' + root + ' → all ranks';
+    } else if (op === 'reduce') {
+      for (let b = 0; b < n; b++) if (b !== root) arrow(pgCtx, xs[b], cy, xs[root], cy);
+      pgDesc.textContent = 'reduce: each rank → root r' + root;
+    } else if (op === 'gather') {
+      for (let c = 0; c < n; c++) if (c !== root) arrow(pgCtx, xs[c], cy, xs[root], cy);
+      pgDesc.textContent = 'gather: all → root r' + root;
+    } else {
+      for (let d = 0; d < n; d++) if (d !== root) arrow(pgCtx, xs[root], cy, xs[d], cy);
+      pgDesc.textContent = 'scatter: root r' + root + ' → one slice per rank';
+    }
+  }
+  pgN.addEventListener('input', drawPG);
+  pgOp.addEventListener('change', drawPG);
+  pgRoot.addEventListener('input', drawPG);
+  drawPG();
+})();
+
+(function navFade() {
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', function () {
+    nav.classList.toggle('visible', window.scrollY > 320);
+  }, { passive: true });
+  const obs = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.fade-in').forEach(function (el) { obs.observe(el); });
+})();
+</script>
+</body>
+</html>
