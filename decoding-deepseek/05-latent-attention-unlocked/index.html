@@ -3,19 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Latent Attention Unlocked — Multi-Head Latent Attention from Theory to Code</title>
 <style>
 /* ===== Reset & Base ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
   --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
-  --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
+  --bg: #0a0a0f;
+  --bg-nav: rgba(10,10,15,0.92); --bg-card: #12121a; --bg-card-alt: #181825; --border: #2a2a3a;
   --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff; --accent2: #a78bfa;
   --accent3: #34d399; --accent4: #f472b6; --accent5: #fbbf24; --danger: #f87171;
   --radius: 12px;
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
   --sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
 }
+
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+
 html { scroll-behavior: smooth; }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; font-size: 16px; overflow-x: hidden; }
 h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; }
@@ -82,10 +92,10 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
 .dim-table th, .dim-table td, .data-table th, .data-table td { padding: 10px 12px; border: 1px solid var(--border); text-align: center; }
 .dim-table th, .data-table th { background: var(--bg-card-alt); color: var(--accent); font-weight: 600; }
 .dim-table td, .data-table td { background: var(--bg-card); color: var(--text-dim); }
-.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 100; background: rgba(10,10,15,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
+.nav { position: fixed; top: 44px; left: 0; right: 0; z-index: 1000; background: var(--bg-nav); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; justify-content: flex-start; align-items: center; opacity: 0; transform: translateY(-100%); transition: all 0.3s; }
 .nav.visible { opacity: 1; transform: translateY(0); }
 .nav-title { font-weight: 700; font-size: 0.9rem; }
-.nav-links { display: flex; gap: 16px; overflow-x: auto; }
+.nav-links { display: flex; gap: 16px; overflow-x: auto;  justify-content: flex-start; }
 .nav-links a { font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
 .nav-links a:hover { color: var(--accent); text-decoration: none; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
@@ -127,14 +137,24 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
 <body>
 
 <style class="breadcrumb-styles">
-.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: rgba(10, 10, 15, 0.92); backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid #2a2a3a; font-family: var(--sans); }
-.breadcrumb-nav a { color: #6c8cff; text-decoration: none; }
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--bg-nav); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; flex-wrap: nowrap; gap: 2px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; white-space: nowrap; flex-shrink: 0; }
 .breadcrumb-nav a:hover { text-decoration: underline; }
-.breadcrumb-nav .bc-sep { margin: 0 8px; color: #555; }
-.breadcrumb-nav .bc-current { color: #8888a0; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: var(--border); flex-shrink: 0; }
+.breadcrumb-nav .bc-current { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
 body { padding-top: 44px !important; }
+.theme-toggle { margin-left: auto; flex-shrink: 0; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; color: var(--text-dim); cursor: pointer; }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun { display: block; }
 </style>
-<nav class="breadcrumb-nav"><a href="https://llamasearch.dev/">The Context Window</a><span class="bc-sep">›</span><a href="../../">Learning Blogs</a><span class="bc-sep">›</span><a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span><span class="bc-current">Latent Attention Unlocked</span></nav>
+<script>(function(){ var t = localStorage.getItem('tcw-theme'); if (t === 'light') document.documentElement.setAttribute('data-theme','light'); })();</script>
+
+<nav class="breadcrumb-nav"><a href="../../">The Context Window</a><span class="bc-sep">›</span><a href="../">Decoding DeepSeek</a><span class="bc-sep">›</span><span class="bc-current">Latent Attention Unlocked</span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"><svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+</nav>
 
 <nav class="nav" id="nav">
   <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Latent Attention Unlocked</a>
@@ -143,7 +163,7 @@ body { padding-top: 44px !important; }
     <a href="#s3">Best of Both</a><a href="#s4">Latent Space</a><a href="#s5">Absorption</a>
     <a href="#s6">Inference</a><a href="#s7">Memory</a><a href="#s8">Code</a>
     <a href="#s9">Dimensions</a>    <a href="#s10">Playground</a><a href="#s-deep">Deep Dive</a><a href="#s-recap">Recap</a>
-<a href="#s-appendix">Appendix</a><a href="#s-summary">Summary</a>
+<a href="#s-summary">Summary</a>
   </div>
 </nav>
 
@@ -1191,144 +1211,10 @@ self.ln   = nn.LayerNorm(<span class="num">4</span>)             <span class="cm
   </div>
 </section>
 
-<section class="section fade-in" id="s-appendix">
-  <div class="container">
-    <span class="section-num">A</span>
-    <h2>Appendix — Complete RolessMLA Reference Implementation</h2>
-    <p>This appendix provides the full, runnable PyTorch class for the simplest MLA variant. Every line is annotated with expected tensor shapes for the toy configuration (d_model=8, n_heads=2, latent_dim=4).</p>
-
-    <div class="code-block"><span class="kw">import</span> torch
-<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
-<span class="kw">import</span> torch.nn.functional <span class="kw">as</span> F
-
-<span class="kw">class</span> <span class="cls">RolessMLA</span>(nn.Module):
-    <span class="str">"""Multi-Head Latent Attention without RoPE (simplest variant)."""</span>
-
-    <span class="kw">def</span> <span class="fn">__init__</span>(self, d_model: <span class="cls">int</span>, n_heads: <span class="cls">int</span>, latent_dim: <span class="cls">int</span>):
-        <span class="fn">super</span>().__init__()
-        <span class="kw">assert</span> d_model % n_heads == <span class="num">0</span>
-        self.d_model = d_model
-        self.n_heads = n_heads
-        self.d_h = d_model // n_heads
-        self.latent_dim = latent_dim
-
-        self.WQ = nn.Linear(d_model, d_model, bias=<span class="kw">False</span>)
-        self.WDKV = nn.Linear(d_model, latent_dim, bias=<span class="kw">False</span>)
-        self.WUK = nn.Linear(latent_dim, d_model, bias=<span class="kw">False</span>)
-        self.WUV = nn.Linear(latent_dim, d_model, bias=<span class="kw">False</span>)
-        self.WO = nn.Linear(d_model, d_model, bias=<span class="kw">False</span>)
-        self.ln = nn.LayerNorm(latent_dim)
-
-    <span class="kw">def</span> <span class="fn">_absorbed_qk</span>(self):
-        <span class="str">"""Precompute W_Q @ W_UK^T split per head → (n_heads, d_h, latent_dim)."""</span>
-        <span class="cmt"># WQ.weight: (d_model, d_model), WUK.weight: (latent_dim, d_model)</span>
-        absorbed = self.WQ.weight @ self.WUK.weight.T  <span class="cmt"># (d_model, d_model)</span>
-        <span class="cmt"># Reshape to per-head: each head takes d_h rows and latent_dim cols</span>
-        <span class="kw">return</span> absorbed.view(self.n_heads, self.d_h, self.d_model)[:, :, :self.latent_dim]
-        <span class="cmt"># Simpler approach: matmul per head after reshaping inputs</span>
-
-    <span class="kw">def</span> <span class="fn">forward</span>(self, x: torch.Tensor, kv_cache: torch.Tensor | <span class="kw">None</span> = <span class="kw">None</span>):
-        <span class="str">"""
-        Args:
-            x: (B, T, d_model) — new token(s); T=1 during single-token inference
-            kv_cache: (B, S_prev, latent_dim) — existing latent cache or None
-        Returns:
-            context: (B, T, d_model)
-            kv_cache: (B, S_total, latent_dim)
-        """</span>
-        B, T, D = x.shape
-
-        <span class="cmt"># --- Absorbed query matrix: W_Q @ W_UK^T ---</span>
-        absorbed_full = self.WQ.weight @ self.WUK.weight.T  <span class="cmt"># (D, D)</span>
-
-        <span class="cmt"># --- Update latent KV cache ---</span>
-        new_kv = self.ln(self.WDKV(x))  <span class="cmt"># (B, T, latent_dim)</span>
-        kv_cache = torch.cat([kv_cache, new_kv], dim=<span class="num">1</span>) <span class="kw">if</span> kv_cache <span class="kw">is not None</span> <span class="kw">else</span> new_kv
-        S = kv_cache.shape[<span class="num">1</span>]
-
-        <span class="cmt"># --- Per-head absorbed queries ---</span>
-        x_heads = x.view(B, T, self.n_heads, self.d_h).transpose(<span class="num">1</span>, <span class="num">2</span>)  <span class="cmt"># (B, nh, T, dh)</span>
-        abs_heads = absorbed_full.view(self.n_heads, self.d_h, D)  <span class="cmt"># (nh, dh, D)</span>
-        <span class="cmt"># Use first latent_dim columns of absorbed matrix per head</span>
-        abs_heads = abs_heads[:, :, :self.latent_dim]  <span class="cmt"># (nh, dh, latent_dim)</span>
-        q_abs = torch.einsum(<span class="str">'bhtd,hdl->bhtl'</span>, x_heads, abs_heads)  <span class="cmt"># (B, nh, T, latent_dim)</span>
-
-        <span class="cmt"># --- Attention scores: q_abs @ kv_cache^T ---</span>
-        scores = torch.matmul(q_abs, kv_cache.transpose(-<span class="num">2</span>, -<span class="num">1</span>))  <span class="cmt"># (B, nh, T, S)</span>
-        scores = scores / (self.d_h ** <span class="num">0.5</span>)
-
-        <span class="cmt"># Causal mask</span>
-        <span class="kw">if</span> T == S:
-            mask = torch.triu(torch.ones(T, S, device=x.device), diagonal=<span class="num">1</span>).bool()
-        <span class="kw">else</span>:
-            mask = torch.zeros(T, S, device=x.device).bool()
-            mask[:, :S-T] = <span class="kw">True</span>  <span class="cmt"># can attend to all cached + current</span>
-        scores = scores.masked_fill(mask.unsqueeze(<span class="num">0</span>).unsqueeze(<span class="num">0</span>), float(<span class="str">'-inf'</span>))
-        weights = F.softmax(scores, dim=-<span class="num">1</span>)
-
-        <span class="cmt"># --- Values from same cache ---</span>
-        values = self.WUV(kv_cache)  <span class="cmt"># (B, S, d_model)</span>
-        values = values.view(B, S, self.n_heads, self.d_h).transpose(<span class="num">1</span>, <span class="num">2</span>)  <span class="cmt"># (B, nh, S, dh)</span>
-
-        <span class="cmt"># --- Context ---</span>
-        context = torch.matmul(weights, values)  <span class="cmt"># (B, nh, T, dh)</span>
-        context = context.transpose(<span class="num">1</span>, <span class="num">2</span>).contiguous().view(B, T, D)
-
-        <span class="kw">return</span> context, kv_cache
-
-
-<span class="kw">def</span> <span class="fn">kv_cache_bytes</span>(mha_dims, mla_latent, seq_len, layers=<span class="num">1</span>, batch=<span class="num">1</span>, bytes_per=<span class="num">2</span>):
-    <span class="str">"""Compare MHA vs MLA cache memory."""</span>
-    mha = layers * batch * mha_dims * seq_len * <span class="num">2</span> * bytes_per  <span class="cmt"># 2 for K+V</span>
-    mla = layers * batch * mla_latent * seq_len * bytes_per
-    <span class="kw">return</span> mha, mla, mha / mla
-
-
-<span class="cmt"># --- Demo ---</span>
-<span class="kw">if</span> __name__ == <span class="str">"__main__"</span>:
-    torch.manual_seed(<span class="num">42</span>)
-    model = RolessMLA(d_model=<span class="num">8</span>, n_heads=<span class="num">2</span>, latent_dim=<span class="num">4</span>)
-
-    <span class="cmt"># Process 5 tokens to build cache</span>
-    prefix = torch.randn(<span class="num">1</span>, <span class="num">5</span>, <span class="num">8</span>)
-    _, cache = model(prefix)  <span class="cmt"># cache: (1, 5, 4)</span>
-    print(f<span class="str">"Cache after prefix: {cache.shape}"</span>)
-
-    <span class="cmt"># Single new token inference</span>
-    new_tok = torch.randn(<span class="num">1</span>, <span class="num">1</span>, <span class="num">8</span>)
-    ctx, cache = model(new_tok, cache)  <span class="cmt"># cache: (1, 6, 4)</span>
-    print(f<span class="str">"Cache after new token: {cache.shape}"</span>)
-    print(f<span class="str">"Context shape: {ctx.shape}"</span>)
-
-    mha, mla, ratio = kv_cache_bytes(mha_dims=<span class="num">512</span>, mla_latent=<span class="num">256</span>, seq_len=<span class="num">1024</span>, layers=<span class="num">32</span>)
-    print(f<span class="str">"MHA cache: {mha/1024:.1f} KB, MLA cache: {mla/1024:.1f} KB, ratio: {ratio:.1f}x"</span>)</div>
-
-    <h3 style="margin-top:28px;">Usage Notes</h3>
-    <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
-      <li>During training, the full forward pass computes K and V explicitly through C<sub>KV</sub> · W<sub>UK</sub> and C<sub>KV</sub> · W<sub>UV</sub>. Gradients flow through W<sub>DKV</sub>, W<sub>UK</sub>, and W<sub>UV</sub>.</li>
-      <li>During inference, only C<sub>KV</sub> is cached and updated. W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> is precomputed once per layer when the model is loaded.</li>
-      <li>LayerNorm on the latent vector stabilizes cache entries across long sequences.</li>
-      <li>The causal mask logic handles both prefill (T = S) and single-token decode (T = 1, S &gt; 1) modes.</li>
-      <li>For production DeepSeek-scale models, d<sub>L</sub> = 576, N = 128, H = 128, L = 61.</li>
-    </ul>
-
-    <h3 style="margin-top:28px;">Verification Checklist</h3>
-    <table class="data-table">
-      <tr><th>Check</th><th>Expected Result</th></tr>
-      <tr><td>Cache shape after N tokens</td><td>(1, N, latent_dim)</td></tr>
-      <tr><td>Attention scores for new token</td><td>(1, n_heads, 1, N) — N scores per head</td></tr>
-      <tr><td>Context vector shape</td><td>(1, 1, d_model)</td></tr>
-      <tr><td>MLA vs MHA memory (d=512, d_L=256)</td><td>~4× reduction</td></tr>
-      <tr><td>MLA vs MHA memory (DeepSeek scale)</td><td>~57× reduction</td></tr>
-      <tr><td>W_UK differs per head</td><td>True — verify via heatmap</td></tr>
-    </table>
-  </div>
-</section>
-
 <footer class="footer">
   <p>Decoding DeepSeek · Chapter 05 · Latent Attention Unlocked</p>
   <p style="margin-top:8px;">Multi-Head Latent Attention — from 400 GB KV cache to 6 GB via latent compression and the absorption trick.</p>
-  <p style="margin-top:8px;"><a href="../">← Back to Decoding DeepSeek</a> · <a href="../../">All Learning Blogs</a> · <a href="https://llamasearch.dev/">The Context Window</a></p>
+  <p style="margin-top:8px;"><a href="../">← Back to Decoding DeepSeek</a> · <a href="../../">The Context Window</a> · <a href="https://llamasearch.dev/">The Context Window</a></p>
 </footer>
 
 <script>
@@ -1786,6 +1672,9 @@ drawOpCount();
 
 // ===== COMPRESSION RATIO EXPLORER =====
 function updateCR() {
+  // This explorer was removed from the page. Skip it so later
+  // scroll reveal still runs.
+  if (!document.getElementById('crNSlider')) return;
   const N = +document.getElementById('crNSlider').value;
   const H = +document.getElementById('crHSlider').value;
   const dL = +document.getElementById('crDLSlider').value;
@@ -1827,5 +1716,18 @@ function onScroll() {
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 </script>
+<script>
+(function(){
+  var btn = document.getElementById('themeToggle');
+  var root = document.documentElement;
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) { root.removeAttribute('data-theme'); localStorage.setItem('tcw-theme','dark'); }
+    else { root.setAttribute('data-theme','light'); localStorage.setItem('tcw-theme','light'); }
+  });
+})();
+</script>
+
 </body>
 </html>
