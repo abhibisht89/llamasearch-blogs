@@ -14,5 +14,8 @@ python3 scripts/sync-chrome.py
 | `theme.js` | Theme toggle click handler (+ Utterances) |
 | `breadcrumb.css` | Breadcrumb bar + theme button shell |
 | `section-nav.css` | In-page section nav shell (`.nav` / `.nav-reveal`) |
+| `series-index.css` | Series TOC layout (hero + numbered `.blog-card` list) |
 
 Page-specific breadcrumb and section-nav *links* stay in each HTML file. Only the shell CSS is shared.
+
+Series index pages (`*/index.html` chapter lists) should match Tokens, Transformers & Truth: title, one description, flat chapter cards — no arc headers, stats, or badges. Link `series-index.css` for that chrome.
