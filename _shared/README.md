@@ -13,5 +13,6 @@ python3 scripts/sync-chrome.py
 | `theme-init.js` | Apply saved theme in `<head>` (before paint) |
 | `theme.js` | Theme toggle click handler (+ Utterances) |
 | `breadcrumb.css` | Breadcrumb bar + theme button shell |
+| `section-nav.css` | In-page section nav shell (`.nav` / `.nav-reveal`) |
 
-Page-specific breadcrumb *links* stay in each HTML file. Only the shell CSS is shared.
+Page-specific breadcrumb and section-nav *links* stay in each HTML file. Only the shell CSS is shared.

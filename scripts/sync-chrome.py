@@ -30,6 +30,7 @@ FOOTER_BLOCK = (
 THEME_INIT = '<script src="/_shared/theme-init.js"></script>\n'
 THEME_JS = '<script src="/_shared/theme.js"></script>\n'
 BREADCRUMB_CSS = '<link rel="stylesheet" href="/_shared/breadcrumb.css">\n'
+SECTION_NAV_CSS = '<link rel="stylesheet" href="/_shared/section-nav.css">\n'
 
 # Old inline early theme (several formatting variants)
 EARLY_THEME_RE = re.compile(
@@ -157,6 +158,37 @@ def sync_page(path: Path) -> bool:
         text = re.sub(r"</body>", injection + "</body>", text, count=1, flags=re.I)
     else:
         text = text + injection
+
+    # Section nav CSS: only pages with a real <nav class="nav ...">
+    def has_real_section_nav(html: str) -> bool:
+        for m in re.finditer(r"<nav([^>]*)>", html, re.I):
+            cm = re.search(r'\bclass="([^"]*)"', m.group(1))
+            if cm and "nav" in cm.group(1).split():
+                return True
+        return False
+
+    if has_real_section_nav(text):
+        if "section-nav.css" not in text:
+            if 'href="/_shared/breadcrumb.css"' in text:
+                text = text.replace(
+                    BREADCRUMB_CSS.rstrip("\n"),
+                    BREADCRUMB_CSS.rstrip("\n") + "\n" + SECTION_NAV_CSS.rstrip("\n"),
+                    1,
+                )
+            else:
+                text = re.sub(
+                    r"</head>",
+                    SECTION_NAV_CSS + "</head>",
+                    text,
+                    count=1,
+                    flags=re.I,
+                )
+    else:
+        text = re.sub(
+            r'\n?<link rel="stylesheet" href="/_shared/section-nav\.css">\n?',
+            "\n",
+            text,
+        )
 
     if text != orig:
         path.write_text(text, encoding="utf-8")
