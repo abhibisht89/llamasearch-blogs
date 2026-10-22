@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Chapter 13 — Python Gotchas: Greatest Hits | Python Under the Hood</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;--bg:#0a0a0f;
+  --bg-nav: rgba(10,10,15,0.92);--bg-card:#12121a;--bg-card-alt:#181825;--border:#2a2a3a;--text:#e0e0e8;--text-dim:#8888a0;--accent:#6c8cff;--accent2:#a78bfa;--accent3:#34d399;--danger:#f87171;--accent5:#fbbf24;--radius:12px;--mono: 'IBM Plex Mono', ui-monospace, monospace;--sans: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;}
+
+[data-theme="light"] {
+  --bg: #f5f5f8; --bg-card: #ffffff; --bg-card-alt: #ededf4;
+  --bg-nav: rgba(245,245,248,0.95); --border: #dddde8;
+  --text: #1a1a2e; --text-dim: #5a5a7a;
+  --accent: #3d5ce0; --accent2: #7040c0; --accent3: #0f9a6a;
+}
+
+html{scroll-behavior:smooth;}body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.7;font-size:16px;}
+.nav{position:sticky;top: 44px;background: var(--bg-nav);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content: flex-start; gap: 24px;z-index:100;}
+.nav-back{font-family:var(--mono);font-size:0.82rem;color:var(--text-dim);text-decoration:none;transition:color .2s;}.nav-back:hover{color:var(--accent3);}
+.nav-chapter{font-family:var(--mono);font-size:0.78rem;color:var(--accent3);}
+.hero{padding:60px 24px 48px;text-align:center;border-bottom:1px solid var(--border);position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;top:-80px;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse,rgba(248,113,113,0.08) 0%,transparent 70%);pointer-events:none;}
+.chapter-label{font-family:var(--mono);font-size:0.75rem;color:var(--danger);letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;}
+.hero h1{font-size:clamp(1.8rem,5vw,3rem);font-weight:800;margin-bottom:14px;}
+.hero h1 span{color:var(--danger);}
+.hero p{color:var(--text-dim);max-width:580px;margin:0 auto 28px;font-size:1rem;}
+.hero-meta{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;font-family:var(--mono);font-size:0.8rem;color:var(--text-dim);}.hero-meta span{color:var(--text);}
+.container{max-width:820px;margin:0 auto;padding:48px 24px 80px;}
+.question{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:20px;transition:border-color .2s;}.question:hover{border-color:#3a3a5a;}
+.q-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+.q-num{font-family:var(--mono);font-size:0.8rem;font-weight:700;color:var(--text-dim);background:var(--bg-card-alt);border:1px solid var(--border);padding:3px 10px;border-radius:6px;}
+.badge{font-family:var(--mono);font-size:0.7rem;padding:3px 10px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;}
+.badge-po{background:rgba(108,140,255,0.12);color:var(--accent);border:1px solid rgba(108,140,255,0.25);}
+.badge-mc{background:rgba(167,139,250,0.12);color:var(--accent2);border:1px solid rgba(167,139,250,0.25);}
+.badge-boss{background:rgba(248,113,113,0.12);color:var(--danger);border:1px solid rgba(248,113,113,0.25);}
+.code-block{background:#0d0d14;border:1px solid var(--border);border-radius:8px;padding:20px;font-family:var(--mono);font-size:0.88rem;line-height:1.7;color:#c9d1e8;overflow-x:auto;margin-bottom:20px;white-space:pre;}
+.kw{color:#a78bfa;}.fn{color:#6c8cff;}.str{color:#34d399;}.num{color:#fbbf24;}.cmt{color:#444466;font-style:italic;}.cls{color:#f472b6;}
+.options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.option-btn{background:var(--bg-card-alt);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-family:var(--mono);font-size:0.82rem;color:var(--text-dim);cursor:pointer;text-align:left;transition:all .2s;line-height:1.5;}
+.option-btn:hover{border-color:var(--accent);color:var(--text);}.option-btn.correct{border-color:var(--accent3);background:rgba(52,211,153,0.1);color:var(--accent3);}.option-btn.wrong{border-color:var(--danger);background:rgba(248,113,113,0.08);color:var(--danger);}
+.reveal-btn{background:transparent;border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-family:var(--mono);font-size:0.82rem;color:var(--text-dim);cursor:pointer;transition:all .2s;margin-bottom:16px;}.reveal-btn:hover{border-color:var(--accent3);color:var(--accent3);background:rgba(52,211,153,0.05);}
+.answer{display:none;background:var(--bg-card-alt);border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:20px;margin-top:4px;}.answer.visible{display:block;}
+.output-label{font-family:var(--mono);font-size:0.72rem;color:var(--accent3);text-transform:uppercase;letter-spacing:1.5px;display:block;margin-bottom:8px;}
+.output-code{background:#0a0a0f;border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-family:var(--mono);font-size:0.85rem;color:var(--accent3);white-space:pre;overflow-x:auto;margin-bottom:14px;}
+.explanation{font-size:0.9rem;color:var(--text-dim);line-height:1.7;border-top:1px solid var(--border);padding-top:14px;}.explanation strong{color:var(--text);}.explanation code{font-family:var(--mono);font-size:0.82rem;background:rgba(108,140,255,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;}
+.callout{background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-left:3px solid var(--danger);border-radius:8px;padding:16px 20px;margin:32px 0 24px;font-size:0.9rem;color:var(--text-dim);}.callout strong{color:var(--text);}
+.section-divider{font-family:var(--mono);font-size:0.72rem;color:var(--danger);letter-spacing:2px;text-transform:uppercase;margin:40px 0 20px;padding-bottom:10px;border-bottom:1px solid rgba(248,113,113,0.3);}
+.chapter-nav { display: flex; justify-content: space-between; margin-top: 0; padding-top: 20px; border-top: 1px solid var(--border); }
+.chapter-nav a{font-family:var(--mono);font-size:0.85rem;color:var(--text-dim);text-decoration:none;transition:color .2s;}.chapter-nav a:hover{color:var(--accent3);}
+.completion{background:linear-gradient(135deg,rgba(52,211,153,0.1),rgba(108,140,255,0.1));border:1px solid rgba(52,211,153,0.3);border-radius:var(--radius);padding:40px;text-align:center;margin-top:48px;}
+.completion h2{font-size:1.8rem;font-weight:800;color:var(--accent3);margin-bottom:12px;}
+.completion p{color:var(--text-dim);max-width:500px;margin:0 auto 24px;}
+.completion a{display:inline-block;background:var(--accent3);color:#000;font-family:var(--mono);font-size:0.85rem;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;transition:opacity .2s;}.completion a:hover{opacity:0.85;}
+@media(max-width:640px){.options{grid-template-columns:1fr;}.code-block{font-size:0.8rem;}}
+</style>
+<link rel="stylesheet" href="/_shared/asknex-type.css">
+</head>
+<body>
+<style class="breadcrumb-styles">
+.breadcrumb-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--bg-nav); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 12px 24px; font-size: 0.85rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; flex-wrap: nowrap; gap: 2px; font-family: var(--sans); }
+.breadcrumb-nav a { color: var(--accent); text-decoration: none; white-space: nowrap; flex-shrink: 0; }
+.breadcrumb-nav a:hover { text-decoration: underline; }
+.breadcrumb-nav .bc-sep { margin: 0 8px; color: var(--text-dim); flex-shrink: 0; }
+.breadcrumb-nav .bc-current { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+body { padding-top: 44px !important; }
+.theme-toggle { margin-left: auto; flex-shrink: 0; background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; color: var(--text-dim); cursor: pointer; }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 15px; height: 15px; fill: currentColor; }
+.icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun { display: block; }
+</style>
+<script>(function(){ var t = localStorage.getItem('tcw-theme'); if (t === 'light') document.documentElement.setAttribute('data-theme','light'); })();</script>
+<nav class="breadcrumb-nav"><a href="../../">The Context Window</a><span class="bc-sep">›</span><a href="../">Python Under the Hood</a><span class="bc-sep">›</span><span class="bc-current">Python Gotchas</span>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"><svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+</nav>
+<header class="hero">
+  <div class="chapter-label">⚡ Boss Chapter</div>
+  <h1>Python Gotchas<br><span>Greatest Hits</span></h1>
+  <p>The ultimate collection. Cross-chapter surprises, interview traps, and the questions that make experienced Python developers pause. Good luck.</p>
+  <div class="hero-meta">
+    <div>Questions: <span>20</span></div>
+    <div>Difficulty: <span>★★★★★</span></div>
+  </div>
+</header>
+<div class="container">
+  <div class="callout"><strong>Final boss rules:</strong> These are the questions most likely to appear in Python interviews and the ones that cause the most production bugs. Take your time with each one. Every wrong answer is a lesson.</div>
+
+  <div class="section-divider">Classic Gotchas</div>
+
+  <div class="question" id="q1">
+    <div class="q-header"><span class="q-num">Q 01</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block"><span class="kw">def</span> <span class="fn">f</span>(x=[]):
+    x.append(<span class="num">1</span>)
+    <span class="kw">return</span> x
+
+<span class="fn">print</span>(<span class="fn">f</span>())
+<span class="fn">print</span>(<span class="fn">f</span>())
+<span class="fn">print</span>(<span class="fn">f</span>([]))</pre>
+    <button class="reveal-btn" onclick="reveal('q1')">Show Answer</button>
+    <div class="answer" id="q1-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">[1]
+[1, 1]
+[1]</div>
+      <div class="explanation"><strong>Why?</strong> The mutable default argument trap again — the definitive Python gotcha. The default <code>[]</code> is shared across calls. First call: appends 1 → <code>[1]</code>. Second call: same list, appends 1 → <code>[1,1]</code>. Third call: explicit empty list is passed — fresh start → <code>[1]</code>.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q2">
+    <div class="q-header"><span class="q-num">Q 02</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block">funcs = [<span class="kw">lambda</span> i=i: i <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">3</span>)]
+<span class="fn">print</span>(funcs[<span class="num">0</span>]())
+<span class="fn">print</span>(funcs[<span class="num">1</span>]())
+<span class="fn">print</span>(funcs[<span class="num">2</span>]())</pre>
+    <button class="reveal-btn" onclick="reveal('q2')">Show Answer</button>
+    <div class="answer" id="q2-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">0
+1
+2</div>
+      <div class="explanation"><strong>Why?</strong> This is the FIXED version of the late-binding closure trap. <code>lambda i=i: i</code> captures the current value of <code>i</code> as a default argument at creation time. Each lambda gets its own copy of the value. Compare with <code>lambda: i</code> which would give 2, 2, 2.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q3">
+    <div class="q-header"><span class="q-num">Q 03</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block">x = <span class="num">256</span>
+y = <span class="num">256</span>
+<span class="fn">print</span>(x <span class="kw">is</span> y)
+
+x = <span class="num">257</span>
+y = <span class="num">257</span>
+<span class="fn">print</span>(x <span class="kw">is</span> y)</pre>
+    <button class="reveal-btn" onclick="reveal('q3')">Show Answer</button>
+    <div class="answer" id="q3-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">True
+False</div>
+      <div class="explanation"><strong>Why?</strong> CPython caches integers -5 to 256 as singletons. 256 is in the cache → same object. 257 is above the cache → different objects. This is a CPython implementation detail, not guaranteed by the language spec. Never use <code>is</code> to compare integers.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q4">
+    <div class="q-header"><span class="q-num">Q 04</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block"><span class="kw">class</span> <span class="cls">A</span>:
+    items = []
+
+a = <span class="cls">A</span>()
+b = <span class="cls">A</span>()
+a.items.append(<span class="num">1</span>)
+<span class="fn">print</span>(b.items)</pre>
+    <button class="reveal-btn" onclick="reveal('q4')">Show Answer</button>
+    <div class="answer" id="q4-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">[1]</div>
+      <div class="explanation"><strong>Why?</strong> Mutable class attribute trap. <code>items</code> is a class attribute — shared by ALL instances. Mutating it through <code>a</code> is visible through <code>b</code> (and through <code>A.items</code>). Fix: move to <code>__init__</code> with <code>self.items = []</code>.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q5">
+    <div class="q-header"><span class="q-num">Q 05</span><span class="badge badge-mc">Multiple Choice</span></div>
+    <pre class="code-block">a = [<span class="num">1</span>]
+b = a
+a = a + [<span class="num">2</span>]   <span class="cmt"># creates new list</span>
+<span class="fn">print</span>(b)</pre>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q5',true)">a) [1]</button>
+      <button class="option-btn" onclick="checkMC(this,'q5',false)">b) [1, 2]</button>
+      <button class="option-btn" onclick="checkMC(this,'q5',false)">c) Error</button>
+      <button class="option-btn" onclick="checkMC(this,'q5',false)">d) None</button>
+    </div>
+    <div class="answer" id="q5-answer">
+      <div class="explanation"><strong>Answer: a) [1].</strong><br><br><code>a + [2]</code> creates a new list. <code>a</code> is rebound to this new list. <code>b</code> still points to the original <code>[1]</code>. If it were <code>a += [2]</code>, the list would be mutated in-place and <code>b</code> would show <code>[1, 2]</code>. This is the crucial <code>a = a + x</code> vs <code>a += x</code> distinction.</div>
+    </div>
+  </div>
+
+  <div class="section-divider">Type Surprises</div>
+
+  <div class="question" id="q6">
+    <div class="q-header"><span class="q-num">Q 06</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block"><span class="fn">print</span>(<span class="fn">type</span>(<span class="kw">True</span>).__name__)
+<span class="fn">print</span>(<span class="kw">True</span> + <span class="kw">True</span> + <span class="kw">True</span>)
+<span class="fn">print</span>([<span class="kw">False</span>, <span class="kw">True</span>, <span class="kw">True</span>, <span class="kw">False</span>].count(<span class="kw">True</span>))
+<span class="fn">print</span>(<span class="fn">sum</span>([<span class="kw">True</span>, <span class="kw">False</span>, <span class="kw">True</span>]))</pre>
+    <button class="reveal-btn" onclick="reveal('q6')">Show Answer</button>
+    <div class="answer" id="q6-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">bool
+3
+2
+2</div>
+      <div class="explanation"><strong>Why?</strong> bool is a subclass of int. True==1, False==0. <code>True + True + True = 3</code>. <code>.count(True)</code> counts items equal to True — but also counts 1 (since True==1)! <code>sum([True,False,True])</code> is <code>1+0+1=2</code>. Counting booleans in a list with sum() is idiomatic Python.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q7">
+    <div class="q-header"><span class="q-num">Q 07</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block"><span class="fn">print</span>(<span class="num">0.1</span> + <span class="num">0.2</span>)
+<span class="fn">print</span>(<span class="num">0.1</span> + <span class="num">0.2</span> == <span class="num">0.3</span>)
+<span class="fn">print</span>(<span class="fn">round</span>(<span class="num">0.5</span>))
+<span class="fn">print</span>(<span class="fn">round</span>(<span class="num">1.5</span>))</pre>
+    <button class="reveal-btn" onclick="reveal('q7')">Show Answer</button>
+    <div class="answer" id="q7-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">0.30000000000000004
+False
+0
+2</div>
+      <div class="explanation"><strong>Why?</strong> Two classics in one. Float imprecision: 0.1+0.2 is not exactly 0.3 in binary IEEE 754. Banker's rounding: round(0.5) → 0 (rounds to even), round(1.5) → 2 (rounds to even). Python's rounding behavior shocks people coming from other languages.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q8">
+    <div class="q-header"><span class="q-num">Q 08</span><span class="badge badge-mc">Multiple Choice</span></div>
+    <pre class="code-block"><span class="fn">print</span>(<span class="kw">not</span> <span class="str">""</span>)
+<span class="fn">print</span>(<span class="kw">not</span> <span class="num">0</span>)
+<span class="fn">print</span>(<span class="kw">not</span> [])
+<span class="fn">print</span>(<span class="kw">not</span> {})
+<span class="fn">print</span>(<span class="kw">not</span> <span class="kw">None</span>)</pre>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q8',true)">a) True, True, True, True, True</button>
+      <button class="option-btn" onclick="checkMC(this,'q8',false)">b) False, False, False, False, True</button>
+      <button class="option-btn" onclick="checkMC(this,'q8',false)">c) True, True, True, True, False</button>
+      <button class="option-btn" onclick="checkMC(this,'q8',false)">d) Error on not {}</button>
+    </div>
+    <div class="answer" id="q8-answer">
+      <div class="explanation"><strong>Answer: a) All True.</strong><br><br>All these are falsy values: empty string, 0, empty list, empty dict, None. <code>not falsy</code> is always <code>True</code>. Truthiness rules: empty containers are falsy, zero values are falsy, None is falsy. Everything else is truthy.</div>
+    </div>
+  </div>
+
+  <div class="section-divider">Scope &amp; Closure Traps</div>
+
+  <div class="question" id="q9">
+    <div class="q-header"><span class="q-num">Q 09</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block">x = <span class="num">10</span>
+
+<span class="kw">def</span> <span class="fn">f</span>():
+    x += <span class="num">1</span>   <span class="cmt"># attempts to modify x</span>
+    <span class="kw">return</span> x
+
+<span class="kw">try</span>:
+    <span class="fn">print</span>(<span class="fn">f</span>())
+<span class="kw">except</span> UnboundLocalError <span class="kw">as</span> e:
+    <span class="fn">print</span>(<span class="str">"UnboundLocalError"</span>)</pre>
+    <button class="reveal-btn" onclick="reveal('q9')">Show Answer</button>
+    <div class="answer" id="q9-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">UnboundLocalError</div>
+      <div class="explanation"><strong>Why?</strong> Since <code>x += 1</code> is an assignment to <code>x</code>, Python marks <code>x</code> as local to <code>f()</code>. Then <code>x += 1</code> tries to read x (to add 1) before it's assigned → <code>UnboundLocalError</code>. To modify the global: add <code>global x</code> at the top of <code>f()</code>.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q10">
+    <div class="q-header"><span class="q-num">Q 10</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block"><span class="kw">def</span> <span class="fn">make_multiplier</span>(n):
+    <span class="kw">return</span> <span class="kw">lambda</span> x: x * n
+
+double = <span class="fn">make_multiplier</span>(<span class="num">2</span>)
+triple = <span class="fn">make_multiplier</span>(<span class="num">3</span>)
+<span class="fn">print</span>(<span class="fn">double</span>(<span class="num">5</span>))
+<span class="fn">print</span>(<span class="fn">triple</span>(<span class="num">5</span>))</pre>
+    <button class="reveal-btn" onclick="reveal('q10')">Show Answer</button>
+    <div class="answer" id="q10-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">10
+15</div>
+      <div class="explanation"><strong>Why?</strong> Each call to <code>make_multiplier</code> creates a closure that captures its own <code>n</code>. <code>double</code> closes over n=2, <code>triple</code> closes over n=3. These are different closure objects with different captured values. This works correctly because each function call creates its own scope.</div>
+    </div>
+  </div>
+
+  <div class="section-divider">Container Traps</div>
+
+  <div class="question" id="q11">
+    <div class="q-header"><span class="q-num">Q 11</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block">d = {<span class="kw">True</span>: <span class="str">"T"</span>, <span class="num">1</span>: <span class="str">"one"</span>, <span class="num">1.0</span>: <span class="str">"1.0"</span>}
+<span class="fn">print</span>(d)
+<span class="fn">print</span>(<span class="fn">len</span>(d))</pre>
+    <button class="reveal-btn" onclick="reveal('q11')">Show Answer</button>
+    <div class="answer" id="q11-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">{True: '1.0'}
+1</div>
+      <div class="explanation"><strong>Why?</strong> True, 1, and 1.0 are all equal AND have the same hash. So they are the SAME dict key. Python keeps the FIRST key (True) but overwrites the value with each subsequent assignment. Final value is "1.0" (last one wins). One key, final value from last update.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q12">
+    <div class="q-header"><span class="q-num">Q 12</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block">t = (<span class="num">1</span>, <span class="num">2</span>)
+t2 = t
+t += (<span class="num">3</span>,)
+<span class="fn">print</span>(t)
+<span class="fn">print</span>(t2)
+<span class="fn">print</span>(t <span class="kw">is</span> t2)</pre>
+    <button class="reveal-btn" onclick="reveal('q12')">Show Answer</button>
+    <div class="answer" id="q12-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">(1, 2, 3)
+(1, 2)
+False</div>
+      <div class="explanation"><strong>Why?</strong> Tuples are immutable. <code>t += (3,)</code> creates a NEW tuple and rebinds <code>t</code>. <code>t2</code> still points to the original (1,2). After the operation, <code>t is t2</code> is False — different objects. This contrasts with lists where <code>+= </code>mutates in-place.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q13">
+    <div class="q-header"><span class="q-num">Q 13</span><span class="badge badge-mc">Multiple Choice</span></div>
+    <pre class="code-block">a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+b = a
+a += [<span class="num">4</span>]   <span class="cmt"># in-place extend</span>
+<span class="fn">print</span>(b)</pre>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q13',false)">a) [1, 2, 3]</button>
+      <button class="option-btn" onclick="checkMC(this,'q13',true)">b) [1, 2, 3, 4]</button>
+      <button class="option-btn" onclick="checkMC(this,'q13',false)">c) Error</button>
+      <button class="option-btn" onclick="checkMC(this,'q13',false)">d) None</button>
+    </div>
+    <div class="answer" id="q13-answer">
+      <div class="explanation"><strong>Answer: b) [1, 2, 3, 4].</strong><br><br>For lists, <code>+=</code> calls <code>__iadd__</code> which mutates in-place. Both <code>a</code> and <code>b</code> point to the same list object. After <code>a += [4]</code>, the shared list is extended. <code>b</code> sees the change. This is the opposite of the tuple case (Q12) — lists mutate, tuples rebind.</div>
+    </div>
+  </div>
+
+  <div class="section-divider">Iteration Surprises</div>
+
+  <div class="question" id="q14">
+    <div class="q-header"><span class="q-num">Q 14</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block">a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+b = [<span class="num">4</span>, <span class="num">5</span>]
+c = [<span class="num">6</span>]
+<span class="fn">print</span>(<span class="fn">list</span>(<span class="fn">zip</span>(a, b, c)))</pre>
+    <button class="reveal-btn" onclick="reveal('q14')">Show Answer</button>
+    <div class="answer" id="q14-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">[(1, 4, 6)]</div>
+      <div class="explanation"><strong>Why?</strong> <code>zip()</code> stops at the shortest iterable. With lengths 3, 2, 1 — only 1 tuple is produced. Elements 2 and 3 from <code>a</code> and element 5 from <code>b</code> are dropped. This is a common source of silent bugs when zipping lists of different lengths.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q15">
+    <div class="q-header"><span class="q-num">Q 15</span><span class="badge badge-mc">Multiple Choice</span></div>
+    <pre class="code-block">gen = (x <span class="kw">for</span> x <span class="kw">in</span> <span class="fn">range</span>(<span class="num">10</span>))
+<span class="fn">print</span>(<span class="fn">list</span>(gen))
+<span class="fn">print</span>(<span class="fn">sum</span>(gen))</pre>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q15',false)">a) [0..9], 45</button>
+      <button class="option-btn" onclick="checkMC(this,'q15',true)">b) [0..9], 0</button>
+      <button class="option-btn" onclick="checkMC(this,'q15',false)">c) [0..9], Error</button>
+      <button class="option-btn" onclick="checkMC(this,'q15',false)">d) Error, 45</button>
+    </div>
+    <div class="answer" id="q15-answer">
+      <div class="explanation"><strong>Answer: b) [0..9], 0.</strong><br><br>After <code>list(gen)</code> exhausts the generator, <code>sum(gen)</code> sums over an already-exhausted generator, giving 0. No error — just empty. Generator exhaustion is the most common iterator trap. Always recreate a generator if you need to iterate it again.</div>
+    </div>
+  </div>
+
+  <div class="section-divider">String &amp; Comparison Traps</div>
+
+  <div class="question" id="q16">
+    <div class="q-header"><span class="q-num">Q 16</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block"><span class="fn">print</span>(<span class="str">"abc"</span> <span class="kw">is</span> <span class="str">"abc"</span>)      <span class="cmt"># literal interning</span>
+x = <span class="str">"abc"</span>
+y = <span class="str">"abc"</span>
+<span class="fn">print</span>(x <span class="kw">is</span> y)                 <span class="cmt"># variable interning</span>
+z = <span class="str">"a"</span> + <span class="str">"bc"</span>
+<span class="fn">print</span>(z <span class="kw">is</span> <span class="str">"abc"</span>)            <span class="cmt"># may vary</span></pre>
+    <button class="reveal-btn" onclick="reveal('q16')">Show Answer</button>
+    <div class="answer" id="q16-answer">
+      <div class="output-label">Output (CPython typical)</div>
+      <div class="output-code">True
+True
+True</div>
+      <div class="explanation"><strong>Why?</strong> CPython interns string literals that look like identifiers. Compile-time constant folding also makes <code>"a" + "bc"</code> become <code>"abc"</code> at compile time — interned. The results depend heavily on the Python implementation and version. The lesson: NEVER rely on string identity. Always use <code>==</code>.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q17">
+    <div class="q-header"><span class="q-num">Q 17</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block"><span class="fn">print</span>(<span class="num">1</span> < <span class="num">2</span> == <span class="num">2</span> < <span class="num">3</span>)
+<span class="fn">print</span>(<span class="kw">True</span> == <span class="num">1</span> == <span class="num">1.0</span>)
+<span class="fn">print</span>(<span class="kw">False</span> == <span class="num">0</span> == <span class="num">0.0</span>)</pre>
+    <button class="reveal-btn" onclick="reveal('q17')">Show Answer</button>
+    <div class="answer" id="q17-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">True
+True
+True</div>
+      <div class="explanation"><strong>Why?</strong> Python chained comparisons. <code>1 &lt; 2 == 2 &lt; 3</code>: (1&lt;2) and (2==2) and (2&lt;3) → all True. <code>True==1==1.0</code>: (True==1) and (1==1.0) → True and True. Chained comparisons check each consecutive pair.</div>
+    </div>
+  </div>
+
+  <div class="section-divider">Tricky Operators</div>
+
+  <div class="question" id="q18">
+    <div class="q-header"><span class="q-num">Q 18</span><span class="badge badge-po">Predict the Output</span></div>
+    <pre class="code-block"><span class="fn">print</span>(-<span class="num">1</span> % <span class="num">10</span>)
+<span class="fn">print</span>(<span class="fn">int</span>(-<span class="num">3.9</span>))
+<span class="fn">print</span>(-<span class="num">3</span> // <span class="num">2</span>)
+<span class="fn">print</span>(-<span class="num">3</span> % <span class="num">2</span>)</pre>
+    <button class="reveal-btn" onclick="reveal('q18')">Show Answer</button>
+    <div class="answer" id="q18-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">9
+-3
+-2
+1</div>
+      <div class="explanation"><strong>Why?</strong> Python's modulo/floor-division follow mathematical floor toward -∞. <code>-1 % 10 = 9</code> (not -1 like C). <code>int(-3.9) = -3</code> (truncates toward 0). <code>-3 // 2 = -2</code> (floors toward -∞, not -1). <code>-3 % 2 = 1</code> (sign matches divisor 2). All different from C behavior.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q19">
+    <div class="q-header"><span class="q-num">Q 19</span><span class="badge badge-mc">Multiple Choice</span></div>
+    <pre class="code-block"><span class="kw">def</span> <span class="fn">f</span>(x, y=<span class="kw">None</span>):
+    <span class="kw">if</span> y <span class="kw">is</span> <span class="kw">None</span>:
+        y = []
+    y.append(x)
+    <span class="kw">return</span> y
+
+<span class="fn">print</span>(<span class="fn">f</span>(<span class="num">1</span>))
+<span class="fn">print</span>(<span class="fn">f</span>(<span class="num">2</span>))
+<span class="fn">print</span>(<span class="fn">f</span>(<span class="num">3</span>, [<span class="num">10</span>]))</pre>
+    <div class="options">
+      <button class="option-btn" onclick="checkMC(this,'q19',true)">a) [1], [2], [10, 3]</button>
+      <button class="option-btn" onclick="checkMC(this,'q19',false)">b) [1], [1,2], [10,3]</button>
+      <button class="option-btn" onclick="checkMC(this,'q19',false)">c) Error</button>
+      <button class="option-btn" onclick="checkMC(this,'q19',false)">d) [1], [2], [3]</button>
+    </div>
+    <div class="answer" id="q19-answer">
+      <div class="explanation"><strong>Answer: a) [1], [2], [10, 3].</strong><br><br>This is the CORRECT pattern for mutable default arguments. Using <code>None</code> as default and creating a fresh list inside the function means each call without explicit <code>y</code> gets its own independent list. Calls are independent: [1], then [2] (fresh list), then [10] with 3 appended.</div>
+    </div>
+  </div>
+
+  <div class="question" id="q20">
+    <div class="q-header"><span class="q-num">Q 20</span><span class="badge badge-boss">Boss Question</span></div>
+    <pre class="code-block">x = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+
+<span class="kw">class</span> <span class="cls">A</span>:
+    items = x     <span class="cmt"># class attr points to x</span>
+
+x.append(<span class="num">4</span>)       <span class="cmt"># mutate x after class definition</span>
+<span class="fn">print</span>(<span class="cls">A</span>.items)</pre>
+    <button class="reveal-btn" onclick="reveal('q20')">Show Answer</button>
+    <div class="answer" id="q20-answer">
+      <div class="output-label">Output</div>
+      <div class="output-code">[1, 2, 3, 4]</div>
+      <div class="explanation"><strong>Why?</strong> <code>A.items = x</code> stores a reference to the list object <code>x</code> points to. Appending to <code>x</code> mutates the shared list object. <code>A.items</code> and <code>x</code> are the same object — any mutation is visible through both names. Class definition doesn't copy the value — it stores the reference. This is the ultimate test of reference semantics.</div>
+    </div>
+  </div>
+
+  <!-- Completion message -->
+  <div class="completion">
+    <h2>You Finished! 🎉</h2>
+    <p>You've made it through all 13 chapters and 250+ questions of Test Your Python Skills. If you got most right, you're well prepared for Python interviews and production code. Review any chapters where you struggled.</p>
+    <a href="../">← Back to Table of Contents</a>
+  </div>
+
+  <div class="chapter-nav">
+    <a href="../12-exceptions/">← Chapter 12: Exceptions</a>
+    <a href="../">Table of Contents</a>
+  </div>
+</div>
+<script>
+function reveal(id){const a=document.getElementById(id+'-answer'),b=document.querySelector('#'+id+' .reveal-btn');if(a)a.classList.add('visible');if(b)b.style.display='none';}
+function checkMC(btn,qId,correct){document.getElementById(qId).querySelectorAll('.option-btn').forEach(b=>b.style.pointerEvents='none');btn.classList.add(correct?'correct':'wrong');const a=document.getElementById(qId+'-answer');if(a)a.classList.add('visible');}
+</script>
+<script src="../14-interview-coding/codemirror-bundle.js"></script>
+<script src="../14-interview-coding/pyrunner.js"></script>
+<script src="../14-interview-coding/quiz-editor.js"></script>
+
+
+<script>
+(function(){
+  var btn = document.getElementById('themeToggle');
+  var root = document.documentElement;
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) { root.removeAttribute('data-theme'); localStorage.setItem('tcw-theme','dark'); }
+    else { root.setAttribute('data-theme','light'); localStorage.setItem('tcw-theme','light'); }
+  });
+})();
+</script>
+<link rel="stylesheet" href="/_shared/site-footer.css">
+<footer class="site-footer">
+  <div class="site-footer-inner">
+    <span class="footer-copy">© 2026 Abhishek Bisht · The Context Window</span>
+    <div class="footer-links">
+      <a href="https://github.com/abhibisht89" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/abhishekbisht89/" target="_blank" rel="noopener">LinkedIn</a>
+      <a href="https://x.com/llamasearch" target="_blank" rel="noopener">X</a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
