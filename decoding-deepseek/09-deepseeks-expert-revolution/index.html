@@ -126,6 +126,8 @@ ul.content-list li { margin-bottom: 0.45em; }
 @media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -258,7 +260,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 
     <h3 style="margin-top:28px;">The Balancing Losses — Why They Hurt</h3>
     <p>Chapter 08 defined two soft balancing losses added to L_LM:</p>
-    <div class="formula">L_total = L_LM + λ_1 · CV²(importance) + λ_2 · α · N · Σ f_i · P_i</div>
+    <div class="formula tex" data-tex="L_total = L_LM + \lambda _1 \cdot CV^2(importance) + \lambda _2 \cdot \alpha \cdot N \cdot \sum f_i \cdot P_i"></div>
     <p>Where f_i is the fraction of tokens hard-routed to expert i, and P_i is the fraction of total routing probability mass assigned to expert i. Minimizing Σ f_i · P_i encourages proportional dispatch: experts with higher importance (more probability mass) receive proportionally more tokens.</p>
 
     <p>The problem is tuning λ. Consider two failure modes:</p>
@@ -277,7 +279,7 @@ ul.content-list li { margin-bottom: 0.45em; }
     <h2>Innovation 1: Auxiliary-Loss-Free Load Balancing</h2>
     <p>The load balancing loss from Chapter 08 works — it maintains balance. But it interferes with language modeling because both losses pull the model in different directions. DeepSeek's response: <strong>remove the loss entirely</strong> and enforce balance through a dynamic <strong>bias term</strong> b_i per expert, updated each training step without contributing gradients to the main loss.</p>
 
-    <div class="formula">L_total = L_LM &nbsp;&nbsp;(no load balancing term)</div>
+    <div class="formula tex" data-tex="L_total = L_LM \;\;(no load balancing term)"></div>
 
     <p>The DeepSeek-V3 technical report states: <em>"To achieve a better trade-off between load balance and model performance, we pioneer an auxiliary-loss-free load balancing strategy to ensure load balance."</em> The mechanism is Equation 16 — compact on paper, clearest with a concrete example.</p>
 
@@ -310,10 +312,10 @@ ul.content-list li { margin-bottom: 0.45em; }
     <p>Total routed assignments = 2 + 2 + 4 = <strong>8</strong> (each token hits 2 experts).</p>
 
     <p><strong>Step 2 — Average token load per expert:</strong></p>
-    <div class="formula">avg_load = 8 / 3 = 2.67 tokens per expert</div>
+    <div class="formula tex" data-tex="avg_load = 8 / 3 = 2.67 tokens per expert"></div>
 
     <p><strong>Step 3 — Load violation</strong> (positive = underloaded, negative = overloaded):</p>
-    <div class="formula">v_i = avg_load − tokens_routed_to_expert_i</div>
+    <div class="formula tex" data-tex="v_i = avg_load - tokens_routed_to_expert_i"></div>
     <ul class="content-list">
       <li>Expert 1: 2.67 − 2 = <strong>+0.67</strong> (underloaded)</li>
       <li>Expert 2: 2.67 − 2 = <strong>+0.67</strong> (underloaded)</li>
@@ -321,7 +323,7 @@ ul.content-list li { margin-bottom: 0.45em; }
     </ul>
 
     <p><strong>Step 4 — Update bias terms.</strong> Initialize b_i = 0 for all experts. After each step:</p>
-    <div class="formula">b_i ← b_i + γ · sign(v_i)</div>
+    <div class="formula tex" data-tex="b_i \leftarrow b_i + \gamma \cdot sign(v_i)"></div>
     <p>where γ is the <strong>bias update speed</strong> (a small hyperparameter). If underloaded (v_i &gt; 0): increase bias. If overloaded (v_i &lt; 0): decrease bias.</p>
     <ul class="content-list">
       <li>Expert 1: b_1 ← b_1 + γ (underloaded → boost routing probability)</li>
@@ -330,7 +332,7 @@ ul.content-list li { margin-bottom: 0.45em; }
     </ul>
 
     <p><strong>Step 5 — Apply bias to routing scores, not gating weights.</strong> This is the critical subtlety from the V3 paper: the bias is added to affinity scores <em>before</em> top-K selection, but the gating value multiplied with the FFN output still comes from the original score s_{i,t} — not s_{i,t} + b_i.</p>
-    <div class="formula">TopK selection uses: s_{i,t} + b_i &nbsp;&nbsp;|&nbsp;&nbsp; Gating weight uses: s_{i,t} (original)</div>
+    <div class="formula tex" data-tex="\mathrm{TopK} selection uses: s_{i,t} + b_i \;\;|\;\; Gating weight uses: s_{i,t} (original)"></div>
 
     <p>Before bias adjustment, raw logits might look like:</p>
     <table class="data-table" id="logitTable">
@@ -395,7 +397,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 
     <h3 style="margin-top:28px;">DeepSeek-V3 Equation 16 — Full Specification</h3>
     <p>The V3 paper defines routing with bias as:</p>
-    <div class="formula">g′_{i,t} = s_{i,t} if (s_{i,t} + b_i) ∈ TopK({s_{j,t} + b_j}, K_r), else 0</div>
+    <div class="formula tex" data-tex="g′_{i,t} = s_{i,t} if (s_{i,t} + b_i) \in \mathrm{TopK}({s_{j,t} + b_j}, K_r), else 0"></div>
     <p>Three subtle points easy to miss when reading the paper cold:</p>
     <ol class="content-list">
       <li><strong>Bias affects selection, not weight.</strong> Top-K uses s_{i,t} + b_i. But the gating value g_{i,t} multiplied with FFN output comes from normalized s_{i,t} — the original affinity, not biased.</li>
@@ -407,7 +409,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 
     <h3 style="margin-top:28px;">Complementary Sequence-Wise Balance Loss (V3)</h3>
     <p>Equations 17–20 in the V3 paper define a lightweight fallback:</p>
-    <div class="formula">L_Bal = α · Σ_i f_i · P_i</div>
+    <div class="formula tex" data-tex="L_Bal = \alpha \cdot \sum _i f_i \cdot P_i"></div>
     <p>where f_i is the fraction of tokens in the sequence routed to expert i (hard indicator), and P_i is the mean normalized affinity. The balance factor α is assigned an <strong>extremely small value</strong> in V3 — deliberately negligible compared to L_LM. It prevents the edge case where one sequence sends all tokens to one expert, without reintroducing the full λ trade-off globally.</p>
     <p>Think of it as three layers of balancing:</p>
     <ol class="content-list">
@@ -418,7 +420,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 
     <h3 style="margin-top:28px;">Sigmoid vs Softmax Routing (V2 → V3 Change)</h3>
     <p>DeepSeek-V2 used softmax over all routed expert affinities for gating values. V3 switches to <strong>sigmoid</strong> affinity scores with normalization only among selected top-K experts:</p>
-    <div class="formula">V2: s_i = softmax(u · e_i) &nbsp;|&nbsp; V3: s_i = σ(u · e_i), then normalize top-K</div>
+    <div class="formula tex" data-tex="V2: s_i = \mathrm{softmax}(u \cdot e_i) \;|\; V3: s_i = \sigma (u \cdot e_i), then normalize top-K"></div>
     <p>Sigmoid scores are independent per expert — expert 5's score does not affect expert 12's score before top-K selection. This decouples expert affinity estimation from competition among non-selected experts, which can improve routing stability with hundreds of fine-grained experts.</p>
 
     <h3 style="margin-top:28px;">Worked Example — Three Iterations</h3>
@@ -482,7 +484,7 @@ ul.content-list li { margin-bottom: 0.45em; }
     <p>Shared experts function like an ER department — always active for every token, handling common patterns that all inputs need, while routed experts specialize.</p>
 
     <p>The final MoE output combines both paths:</p>
-    <div class="formula">h_t = u_t + Σ FFN_i^(shared)(u_t) + Σ g_{i,t} · FFN_i^(routed)(u_t)</div>
+    <div class="formula tex" data-tex="h_t = u_t + \sum FFN_i^(shared)(u_t) + \sum g_{i,t} \cdot FFN_i^(routed)(u_t)"></div>
     <p>Shared expert outputs and weighted routed expert outputs are <strong>added together</strong> (with residual connection on u_t). No extra routing weights for shared experts — they always contribute their full output.</p>
 
     <h3 style="margin-top:28px;">Weighted Summation Detail</h3>
@@ -534,7 +536,7 @@ ul.content-list li { margin-bottom: 0.45em; }
     <h3>The Fix: Split Large Experts into Smaller Ones</h3>
     <p>Fine-grained expert segmentation takes each large expert FFN and splits it into <em>m</em> smaller experts by reducing the hidden dimension by factor 1/<em>m</em>. If you had 4 large experts, you now have 4×<em>m</em> smaller ones — but total parameters and compute stay the same because each smaller expert has proportionally fewer dimensions.</p>
 
-    <div class="formula">N_experts: N → m·N &nbsp;&nbsp;|&nbsp;&nbsp; hidden_dim: d_ff → d_ff / m &nbsp;&nbsp;|&nbsp;&nbsp; total params: unchanged</div>
+    <div class="formula tex" data-tex="N_experts: N \rightarrow m\cdot N \;\;|\;\; hidden_dim: d_ff \rightarrow d_ff / m \;\;|\;\; total params: unchanged"></div>
 
     <p>Example: 4 conventional experts with hidden dim 4096 become 16 fine-grained experts with hidden dim 1024 each. Same total capacity, four times the routing slots — allowing each expert to specialize in a narrower knowledge slice.</p>
 
@@ -613,7 +615,7 @@ ul.content-list li { margin-bottom: 0.45em; }
     <h3>Node-Limited (Device-Limited) Routing</h3>
     <p>DeepSeek-V2 introduced device-limited routing; V3 carries it forward as <strong>node-limited routing</strong>. The constraint: each token is sent to at most <strong>M nodes</strong> (not all nodes in the cluster). Node selection works by summing the highest K_r/M affinity scores among experts on each node, then picking the top-M nodes by that aggregate score.</p>
 
-    <div class="formula">Each token → at most M nodes &nbsp;|&nbsp; Node score = Σ top(K_r/M) affinities on that node</div>
+    <div class="formula tex" data-tex="Each token \rightarrow at most M nodes \;|\; Node score = \sum top(K_r/M) affinities on that node"></div>
 
     <p>Why this matters: with 256 experts spread across 32 nodes, unconstrained routing could dispatch a single token's top-6 experts to 6 different nodes — six cross-node all-to-all transfers. Node-limited routing caps that at M nodes (e.g., M=4), bounding communication volume. Under this constraint, DeepSeek's DualPipe pipeline parallelism can <strong>nearly achieve full computation-communication overlap</strong> — the compute-to-communication ratio improves from a problematic ~1:1 toward efficient pipelined training.</p>
 
@@ -667,7 +669,7 @@ ul.content-list li { margin-bottom: 0.45em; }
     </ol>
     <p>For DeepSeek-V3, adding one redundant expert per EP rank costs approximately 2.4 GB of weight transfer — a one-time repacking cost that prevents sustained GPU idle time.</p>
 
-    <div class="formula">balancedness = avg_tokens_per_expert / max_tokens_per_expert → 1.0 = perfect balance</div>
+    <div class="formula tex" data-tex="balancedness = avg_tokens_per_expert / max_tokens_per_expert \rightarrow 1.0 = perfect balance"></div>
 
     <h3 style="margin-top:28px;">Expert Parallelism — How Experts Map to Hardware</h3>
     <p>In a 256-expert MoE layer with 64 GPUs (expert parallel size 64), each GPU owns 4 experts. When a batch of tokens arrives:</p>
@@ -808,18 +810,18 @@ ul.content-list li { margin-bottom: 0.45em; }
 
     <h3>Token 1 → Experts 2 and 3 (weights 0.6, 0.4)</h3>
     <p>Input vector x_1 (shape 8). Router selected Expert 2 (weight 0.6) and Expert 3 (weight 0.4).</p>
-    <div class="formula">out_1 = 0.6 · Expert_2(x_1) + 0.4 · Expert_3(x_1)</div>
+    <div class="formula tex" data-tex="out_1 = 0.6 \cdot Expert_2(x_1) + 0.4 \cdot Expert_3(x_1)"></div>
     <p>Expert_2 applies its 8→32→8 FFN to x_1, producing a (8,) vector. Same for Expert_3. The two outputs are scaled and added element-wise. Result: out_1 has shape (8,) — same as input.</p>
 
     <h3>Token 2 → Experts 1 and 3 (weights 0.5, 0.5)</h3>
-    <div class="formula">out_2 = 0.5 · Expert_1(x_2) + 0.5 · Expert_3(x_2)</div>
+    <div class="formula tex" data-tex="out_2 = 0.5 \cdot Expert_1(x_2) + 0.5 \cdot Expert_3(x_2)"></div>
     <p>Note Expert 3 handles both Token 1 and Token 2 — but with different input vectors (x_1 vs x_2) and potentially different weights (0.4 vs 0.5).</p>
 
     <h3>Token 3 → Experts 2 and 3 (weights 0.7, 0.3)</h3>
-    <div class="formula">out_3 = 0.7 · Expert_2(x_3) + 0.3 · Expert_3(x_3)</div>
+    <div class="formula tex" data-tex="out_3 = 0.7 \cdot Expert_2(x_3) + 0.3 \cdot Expert_3(x_3)"></div>
 
     <h3>Token 4 → Experts 1 and 2 (weights 0.55, 0.45)</h3>
-    <div class="formula">out_4 = 0.55 · Expert_1(x_4) + 0.45 · Expert_2(x_4)</div>
+    <div class="formula tex" data-tex="out_4 = 0.55 \cdot Expert_1(x_4) + 0.45 \cdot Expert_2(x_4)"></div>
 
     <p>Stacking: output matrix = [out_1; out_2; out_3; out_4] with shape (4, 8). Same as input (4, 8). The entire MoE layer is a drop-in FFN replacement.</p>
 
@@ -1824,6 +1826,9 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') { currentStep = Math.max(0, currentStep-1); renderStep(); }
 });
 </script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

@@ -129,6 +129,8 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
 @media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .bar-chart { height: 150px; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } .nav-links { gap: 10px; } }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 
@@ -297,7 +299,7 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
 
     <h3 style="margin-top:28px;">KV Cache Memory Formula</h3>
     <p>The KV cache is not free. Every cached key and value parameter occupies memory. For each transformer layer, the cache size is:</p>
-    <div class="formula">KV cache size = L × B × N × H × S × 2 × 2 bytes</div>
+    <div class="formula tex" data-tex="KV cache size = L \times B \times N \times H \times S \times 2 \times 2 bytes"></div>
     <p>Where:</p>
     <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
       <li><strong>L</strong> — number of transformer blocks (layers)</li>
@@ -310,7 +312,7 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
     </ul>
 
     <p>For DeepSeek-R1 or DeepSeek-V3 at scale: <strong>L = 61</strong> layers, <strong>B = 1</strong>, <strong>N = 128</strong> heads, <strong>H = 128</strong> head dimension, <strong>S = 100,000</strong> context window. Plugging into the formula:</p>
-    <div class="formula">61 × 1 × 128 × 128 × 100,000 × 2 × 2 ≈ 400 GB</div>
+    <div class="formula tex" data-tex="61 \times 1 \times 128 \times 128 \times 100,000 \times 2 \times 2 \approx 400 GB"></div>
     <p>Four hundred gigabytes — just for the KV cache. DeepSeek's actual inference costs are far lower than this naive calculation would suggest, which is direct evidence they are not using a standard MHA KV cache. They are doing something fundamentally different — and that something is MLA.</p>
 
     <div class="interactive-panel">
@@ -422,12 +424,12 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
 
     <p><strong>Step 2 — Down-projection to latent space:</strong> Instead of computing K = X · W<sub>K</sub> and V = X · W<sub>V</sub> directly, we first multiply X by W<sub>DKV</sub> — the <strong>down-projection KV matrix</strong>. The "D" means down, "KV" means this projection serves both keys and values jointly.</p>
 
-    <div class="formula">C<sub>KV</sub> = X · W<sub>DKV</sub>&nbsp;&nbsp;&nbsp;(shape: S × d<sub>L</sub>)</div>
+    <div class="formula tex" data-tex="C_{KV} = X \cdot W_{DKV}\;\;\;(shape: S \times d_{L})"></div>
 
     <p>W<sub>DKV</sub> has shape (d<sub>model</sub> × d<sub>L</sub>). If d<sub>model</sub> = 8 and d<sub>L</sub> = 4, then a (4 × 8) input produces a (4 × 4) latent matrix C<sub>KV</sub>. We went from 8 dimensions to 4 — a 2× compression per token before even considering the K/V factor.</p>
 
     <p><strong>Step 3 — Up-projection to keys and values:</strong> The latent matrix is multiplied by separate up-projection matrices:</p>
-    <div class="formula">K = C<sub>KV</sub> · W<sub>UK</sub>&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;V = C<sub>KV</sub> · W<sub>UV</sub></div>
+    <div class="formula tex" data-tex="K = C_{KV} \cdot W_{UK}\;\;\;|\;\;\;V = C_{KV} \cdot W_{UV}"></div>
     <p>W<sub>UK</sub> and W<sub>UV</sub> each have shape (d<sub>L</sub> × d<sub>model</sub>). The "U" means up-projection. Critically, these matrices are <strong>different per attention head</strong> — so reconstructed K and V differ across heads even though they share the same latent cache C<sub>KV</sub>.</p>
 
     <p><strong>Step 4 — Standard attention:</strong> Q · K<sup>T</sup> → attention scores → softmax → attention weights · V → context matrix. Everything after obtaining K and V is identical to standard multi-head attention.</p>
@@ -475,17 +477,17 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
 
     <h3 style="margin-top:28px;">Deriving the Absorbed Query</h3>
     <p>We know:</p>
-    <div class="formula">Q = X · W<sub>Q</sub>&nbsp;&nbsp;|&nbsp;&nbsp;C<sub>KV</sub> = X · W<sub>DKV</sub>&nbsp;&nbsp;|&nbsp;&nbsp;K = C<sub>KV</sub> · W<sub>UK</sub> = X · W<sub>DKV</sub> · W<sub>UK</sub></div>
+    <div class="formula tex" data-tex="Q = X \cdot W_{Q}\;\;|\;\;C_{KV} = X \cdot W_{DKV}\;\;|\;\;K = C_{KV} \cdot W_{UK} = X \cdot W_{DKV} \cdot W_{UK}"></div>
 
     <p>Attention scores are Q · K<sup>T</sup>:</p>
-    <div class="formula">Scores = (X · W<sub>Q</sub>) · (X · W<sub>DKV</sub> · W<sub>UK</sub>)<sup>T</sup></div>
-    <div class="formula">Scores = X · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> · W<sub>DKV</sub><sup>T</sup> · X<sup>T</sup></div>
+    <div class="formula tex" data-tex="Scores = (X \cdot W_{Q}) \cdot (X \cdot W_{DKV} \cdot W_{UK})^{T}"></div>
+    <div class="formula tex" data-tex="Scores = X \cdot W_{Q} \cdot W_{UK}^{T} \cdot W_{DKV}^{T} \cdot X^{T}"></div>
 
     <p>Now the crucial step. W<sub>Q</sub> and W<sub>UK</sub><sup>T</sup> are both fixed after pre-training. They never change during inference. So we can pre-multiply them into a single absorbed matrix:</p>
-    <div class="formula">W<sub>absorbed</sub> = W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup>&nbsp;&nbsp;(computed once, never cached)</div>
+    <div class="formula tex" data-tex="W_{absorbed} = W_{Q} \cdot W_{UK}^{T}\;\;(computed once, never cached)"></div>
 
     <p>For a new token x (a single row of X), the attention scores against the cached latent vectors become:</p>
-    <div class="formula">scores = (x · W<sub>absorbed</sub>) · C<sub>KV</sub><sup>T</sup></div>
+    <div class="formula tex" data-tex="scores = (x \cdot W_{absorbed}) \cdot C_{KV}^{T}"></div>
 
     <p>The <strong>absorbed query</strong> is q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup>. Compare this to standard attention where q = x · W<sub>Q</sub>. We have absorbed W<sub>UK</sub><sup>T</sup> into the query computation. No key cache needed — we multiply the absorbed query directly against the latent cache C<sub>KV</sub>.</p>
 
@@ -508,7 +510,7 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
 
     <h3 style="margin-top:28px;">Absorbing Values into the Output Projection</h3>
     <p>The same logic applies to the context vector. The values matrix is V = X · W<sub>DKV</sub> · W<sub>UV</sub> = C<sub>KV</sub> · W<sub>UV</sub>. The context vector is attention_weights · V, and eventually we multiply by the output projection W<sub>O</sub> to get logits.</p>
-    <div class="formula">Context = AttnWeights · C<sub>KV</sub> · W<sub>UV</sub>&nbsp;&nbsp;→&nbsp;&nbsp;Logits = Context · W<sub>O</sub></div>
+    <div class="formula tex" data-tex="Context = AttnWeights \cdot C_{KV} \cdot W_{UV}\;\;\rightarrow \;\;Logits = Context \cdot W_{O}"></div>
     <p>Since W<sub>UV</sub> and W<sub>O</sub> are fixed at training time, we can absorb W<sub>UV</sub> · W<sub>O</sub> into a single precomputed matrix. During inference, we use the same cached C<sub>KV</sub> to compute values (via C<sub>KV</sub> · W<sub>UV</sub>) and then weight-sum with attention weights to get the context vector for the new token.</p>
 
     <div class="callout ok"><p><strong>The absorption trick in one sentence:</strong> Because matrix multiplication is associative and W<sub>Q</sub>, W<sub>UK</sub>, W<sub>UV</sub>, W<sub>O</sub> are fixed after training, we fold the up-projection weights into the query and output paths — leaving only C<sub>KV</sub> to be cached and updated at inference time.</p></div>
@@ -669,21 +671,21 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
     <p>The choice of d<sub>L</sub> = 576 is a deliberate architectural decision. It must be large enough that the latent bottleneck preserves the information needed for high-quality language modeling, but small enough to achieve dramatic memory savings. Too small → quality collapse (like extreme compression). Too large → approaching MHA memory costs without benefit.</p>
 
     <h3 style="margin-top:28px;">Standard MHA Cache Size</h3>
-    <div class="formula">Size<sub>MHA</sub> = L × B × S × (2 × N × H) × 2 bytes</div>
+    <div class="formula tex" data-tex="Size_{MHA} = L \times B \times S \times (2 \times N \times H) \times 2 bytes"></div>
     <p>The inner 2 × N × H is: factor 2 for separate K and V caches, N × H for per-head key/value dimension.</p>
 
     <h3 style="margin-top:28px;">MLA Latent Cache Size</h3>
-    <div class="formula">Size<sub>MLA</sub> = L × B × S × d<sub>L</sub> × 2 bytes</div>
+    <div class="formula tex" data-tex="Size_{MLA} = L \times B \times S \times d_{L} \times 2 bytes"></div>
     <p>One cache instead of two. Column dimension is d<sub>L</sub> (latent dimension) instead of N × H.</p>
 
     <h3 style="margin-top:28px;">The Compression Ratio</h3>
-    <div class="formula">Reduction = (2 × N × H) / d<sub>L</sub></div>
+    <div class="formula tex" data-tex="Reduction = (2 \times N \times H) / d_{L}"></div>
 
     <p>For DeepSeek: N = 128, H = 128, so N × H = 16,384. With separate K/V caches: 2 × 128 × 128 = 32,768 effective dimensions per token. DeepSeek chose d<sub>L</sub> = 576.</p>
-    <div class="formula">Reduction = (2 × 128 × 128) / 576 = 32,768 / 576 ≈ 57×</div>
+    <div class="formula tex" data-tex="Reduction = (2 \times 128 \times 128) / 576 = 32,768 / 576 \approx 57\times"></div>
 
     <p>Starting from ~400 GB with standard MHA caching at 100K context:</p>
-    <div class="formula">400 GB / 57 ≈ 7 GB → approximately 6 GB in practice</div>
+    <div class="formula tex" data-tex="400 GB / 57 \approx 7 GB \rightarrow approximately 6 GB in practice"></div>
 
     <table class="data-table">
       <tr><th>Parameter</th><th>Standard MHA</th><th>MLA (DeepSeek)</th></tr>
@@ -1567,6 +1569,9 @@ function onScroll() {
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 </script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

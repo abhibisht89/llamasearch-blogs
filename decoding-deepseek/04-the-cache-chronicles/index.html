@@ -443,6 +443,8 @@ input[type="range"]::-webkit-slider-thumb {
 
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -538,7 +540,7 @@ input[type="range"]::-webkit-slider-thumb {
     <span class="section-num">01</span>
     <h2>Only the Last Token Matters</h2>
     <p>The KV cache rests on one fact: <strong>next-token prediction uses only the context vector of the last token in the sequence.</strong></p>
-<div class="formula">Logits shape: (num_tokens × vocab_size)</div>
+<div class="formula tex" data-tex="Logits shape: (num_tokens \times vocab_size)"></div>
 <div class="callout ok"><p><strong>Key insight:</strong> The last logits row depends only on the <strong>context vector for the last token</strong>. Prefix tokens are needed inside attention to compute that vector, but not afterward for prediction.</p></div>
 <div class="interactive-panel">
   <h4>Interactive · Logits Matrix Explorer</h4>
@@ -721,7 +723,7 @@ input[type="range"]::-webkit-slider-thumb {
     <p>Caching means <strong>storing data in memory</strong>. Every stored parameter occupies space, slows other computations, and costs money. This is the dark side of the KV cache.</p>
 <h3 style="margin-top:28px;">The KV Cache Size Formula</h3>
 <p>For one transformer layer, storing keys and values for all tokens:</p>
-<div class="formula">KV_cache_bytes = L × B × N × H × S × 2 × 2</div>
+<div class="formula tex" data-tex="KV_cache_bytes = L \times B \times N \times H \times S \times 2 \times 2"></div>
 <p>Where:</p>
 <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
 <li><strong>L</strong> = number of transformer layers</li>
@@ -763,7 +765,7 @@ input[type="range"]::-webkit-slider-thumb {
 <li>Batch size B = 128 (serving 128 concurrent users)</li>
 </ul>
 <p>KV cache = 48 × 128 × (7168/128 heads × 128 head_dim) × 1024 × 2 × 2 bytes. With N=56 heads (7168/128):</p>
-<div class="formula">48 × 128 × 56 × 128 × 1024 × 4 ≈ 180 GB</div>
+<div class="formula tex" data-tex="48 \times 128 \times 56 \times 128 \times 1024 \times 4 \approx 180 GB"></div>
 <p>180 GB of GPU memory consumed <em>just by the cache</em> — before model weights (~60 GB in FP16), activations, or gradients. This is why batch size and context length are hard limits in production serving.</p>
 <h3 style="margin-top:28px;">The Red Curve Problem</h3>
 <p>Plotting model size (x-axis) against memory (y-axis) for GPT-3 variants (Small, Medium, Large, XL):</p>
@@ -780,7 +782,7 @@ input[type="range"]::-webkit-slider-thumb {
 <p>Start with one transformer layer and one token position. Each token produces a key vector and a value vector. If we have N attention heads each with dimension H, the key vector for one token across all heads has N×H elements. Same for the value vector.</p>
 <p>For S tokens in the sequence: S × (N×H) key elements + S × (N×H) value elements = 2 × S × N × H parameters per layer per batch item.</p>
 <p>Multiply by batch size B for batched inference. Multiply by L layers. Multiply by 2 bytes (FP16). This gives:</p>
-<div class="formula">Size = L × B × N × H × S × 2 (K+V) × 2 (bytes) = L × B × N × H × S × 4 bytes</div>
+<div class="formula tex" data-tex="Size = L \times B \times N \times H \times S \times 2 (K+V) \times 2 (bytes) = L \times B \times N \times H \times S \times 4 bytes"></div>
 
 <h3 style="margin-top:28px;">Why DeepSeek Inference Is Cheap</h3>
 <p>DeepSeek's API pricing is remarkably low compared to competitors. One reason: they do not use the naive KV cache described here. Their multi-head latent attention compresses the cache dramatically while preserving quality — the problem set out above is exactly what MLA addresses in the next chapter.</p>
@@ -796,7 +798,7 @@ input[type="range"]::-webkit-slider-thumb {
 <h3 style="margin-top:28px;">Normal MHA vs. MQA</h3>
 <p>In standard multi-head attention with 4 heads, W<sub>K</sub> and W<sub>V</sub> are split per head — each head has different key/value weights (shown as different colors). The keys matrix K and values matrix V differ across heads. During inference, we must cache K and V for <strong>every head</strong>.</p>
 <p>In MQA, head 1's W<sub>K</sub> and W<sub>V</sub> are duplicated for heads 2, 3, 4. All heads share identical K and V matrices. We cache keys and values for <strong>one head only</strong>.</p>
-<div class="formula">MQA cache size = MHA cache size / N &nbsp; (N = number of heads)</div>
+<div class="formula tex" data-tex="MQA cache size = MHA cache size / N \; (N = number of heads)"></div>
 <p>For DeepSeek with 128 heads: 400 GB → <strong>~3 GB</strong>. A factor-of-128 reduction.</p>
 <p>Queries remain different per head (Q<sub>1</sub>, Q<sub>2</sub>, Q<sub>3</sub>, Q<sub>4</sub> are distinct). Only K and V are shared.</p>
 <div class="interactive-panel">
@@ -907,7 +909,7 @@ input[type="range"]::-webkit-slider-thumb {
 <li><strong>Group 2:</strong> Head 3, Head 4 — same W<sub>K</sub>, W<sub>V</sub>, same K, same V (but different from Group 1)</li>
 </ul>
 <p>With 32 heads and 8 groups: each group has 4 heads. The cache holds 8 K/V sets instead of 32 (MHA) or 1 (MQA).</p>
-<div class="formula">GQA cache size = MHA cache size × (G / N) &nbsp; where G = number of groups</div>
+<div class="formula tex" data-tex="GQA cache size = MHA cache size \times (G / N) \; where G = number of groups"></div>
 <p>DeepSeek (128 heads, 8 groups): reduction = 128/8 = <strong>16×</strong> (400 GB → ~25 GB), vs MQA's 128× (→ ~3 GB).</p>
 <h3 style="margin-top:28px;">Diversity: H3 vs H6 vs H1 vs H2</h3>
 <p>With 16 heads in 4 groups of 4:</p>
@@ -1547,6 +1549,9 @@ window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 </script>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

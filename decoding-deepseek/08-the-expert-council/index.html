@@ -465,6 +465,8 @@ ul.content-list li { margin-bottom:0.45em; }
 
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -573,7 +575,7 @@ ul.content-list li { margin-bottom:0.45em; }
     </ul>
     <p>With <strong>12 transformer blocks</strong>, the FFN alone holds roughly 4.7M × 12 ≈ <strong>56 million parameters</strong> — about 48–50 million depending on bias terms. In a full model, the FFN can account for roughly two-thirds of total parameters.</p>
 
-    <div class="formula">FFN_params(block) = 2 × d × 4d = 8d²</div>
+    <div class="formula tex" data-tex="FFN_params(block) = 2 \times d \times 4d = 8d^2"></div>
 
     <p>This parameter count directly affects <strong>training time</strong> and <strong>inference time</strong>. Every token, whether it is a comma or a verb or a proper noun, activates all 4.7M FFN parameters in every layer. Mixture of Experts optimizes this by introducing <strong>sparsity</strong>: only a subset of expert networks activate per token, reducing both pre-training compute and inference latency.</p>
 
@@ -686,8 +688,8 @@ ul.content-list li { margin-bottom:0.45em; }
 
     <h3 style="margin-top:28px;">The 64-Expert Arithmetic</h3>
     <p>Suppose each of 64 experts uses hidden dimension 128 (versus dense 3072):</p>
-    <div class="formula">Active hidden = top_k × expert_hidden = 2 × 128 = 256</div>
-    <div class="formula">Dense hidden = 4 × 768 = 3072 (for d=768)</div>
+    <div class="formula tex" data-tex="Active hidden = top_k \times expert_hidden = 2 \times 128 = 256"></div>
+    <div class="formula tex" data-tex="Dense hidden = 4 \times 768 = 3072 (for d=768)"></div>
     <p>Ratio: 3072 / 256 = <strong>12× reduction</strong> in FFN hidden-layer compute per token. This is the arithmetic that makes MoE attractive at scale — and why DeepSeek, Mistral, and Llama 4 all adopted it.</p>
 
     <h3 style="margin-top:28px;">Pre-training and Inference Benefits</h3>
@@ -842,7 +844,7 @@ ul.content-list li { margin-bottom:0.45em; }
 
     <h3>Step 4 — Routing Mechanism</h3>
     <p>Two questions per token: <strong>(1)</strong> Which k experts? <strong>(2)</strong> What weight for each? A trainable <strong>routing matrix</strong> W_r of shape (8 × 3) answers both:</p>
-    <div class="formula">ExpertSelector = X · W_r &nbsp;&nbsp;→&nbsp;&nbsp; shape (4 × 3)</div>
+    <div class="formula tex" data-tex="ExpertSelector = X \cdot W_r \;\;\rightarrow \;\; shape (4 \times 3)"></div>
     <p>Row i = token i's raw scores for each expert. Column j = expert j's scores across all tokens.</p>
 
     <h3>Step 5 — Top-k + Softmax → Expert Selector Weight Matrix</h3>
@@ -860,7 +862,7 @@ ul.content-list li { margin-bottom:0.45em; }
 
     <h3>Step 6 — Weighted Merge Per Token</h3>
     <p>For token "the" (row 1): E2 and E3 active with weights 0.6 and 0.4.</p>
-    <div class="formula">output[the] = 0.6 × ExpertOut2[row1] + 0.4 × ExpertOut3[row1]</div>
+    <div class="formula tex" data-tex="output[the] = 0.6 \times ExpertOut2[row1] + 0.4 \times ExpertOut3[row1]"></div>
     <p>For "next": 0.9 × E1[row2] + 0.1 × E3[row2]. Repeat for all tokens → final <strong>4×8</strong> matrix.</p>
 
     <h3>Step 4 Detail — Routing Matrix Dimensions</h3>
@@ -879,7 +881,7 @@ ul.content-list li { margin-bottom:0.45em; }
 
     <h3>Step 6 Detail — Merge for "next"</h3>
     <p>Expert selector says: E1 at 90%, E3 at 10%. Go to Expert Output 1 and Expert Output 3. Take row 2 from each (row 2 = "next").</p>
-    <div class="formula">output["next"] = 0.9 × ExpertOut1[2,:] + 0.1 × ExpertOut3[2,:]</div>
+    <div class="formula tex" data-tex="output[&quot;next&quot;] = 0.9 \times ExpertOut1[2,:] + 0.1 \times ExpertOut3[2,:]"></div>
     <p>Element-wise weighted sum of two 8-dimensional vectors → one 8-dimensional output vector for "next".</p>
 
     <h3>Step 7 — Output</h3>
@@ -910,15 +912,15 @@ ul.content-list li { margin-bottom:0.45em; }
     <p>The routing mechanism is the brain of MoE. Given token embedding <strong>x</strong> (a row of the input matrix), the router produces a probability distribution over experts.</p>
 
     <h3>Step A — Raw Expert Scores</h3>
-    <div class="formula">s = x · W_r + b &nbsp;&nbsp; where W_r ∈ ℝ^{d × N}, N = number of experts</div>
+    <div class="formula tex" data-tex="s = x \cdot W_r + b \;\; where W_r \in \mathbb{R}^{d \times N}, N = number of experts"></div>
     <p>Vector s has length N — one score per expert before normalization.</p>
 
     <h3>Step B — Top-k Selection</h3>
     <p>Keep the k largest scores; set all others to −∞:</p>
-    <div class="formula">s'_j = s_j if j ∈ TopK(s, k), else −∞</div>
+    <div class="formula tex" data-tex="s&#x27;_j = s_j if j \in \mathrm{TopK}(s, k), else -\infty"></div>
 
     <h3>Step C — Softmax Gating</h3>
-    <div class="formula">g_j = exp(s'_j) / Σ_i exp(s'_i)</div>
+    <div class="formula tex" data-tex="g_j = \exp(s&#x27;_j) / \sum _i \exp(s&#x27;_i)"></div>
     <p>Because exp(−∞) = 0, non-selected experts receive gate weight exactly zero. Selected experts' weights sum to 1 — interpretable as percentages.</p>
 
     <h3>Why −∞ Before Softmax?</h3>
@@ -967,16 +969,16 @@ ul.content-list li { margin-bottom:0.45em; }
 
     <h3 style="margin-top:28px;">Complete Gating Equations</h3>
     <p>For token embedding x ∈ ℝ^d and N experts, the full routing pipeline is:</p>
-    <div class="formula">s = x W_r &nbsp;&nbsp;(1 × N raw logits)</div>
-    <div class="formula">s' = TopK_mask(s, k) &nbsp;&nbsp;(non-top-k entries → −∞)</div>
-    <div class="formula">g_j = exp(s'_j) / Σ_i exp(s'_i) &nbsp;&nbsp;(gate weights, Σg = 1)</div>
-    <div class="formula">y = Σ_j g_j · Expert_j(x) &nbsp;&nbsp;(weighted expert outputs)</div>
+    <div class="formula tex" data-tex="s = x W_r \;\;(1 \times N raw logits)"></div>
+    <div class="formula tex" data-tex="s&#x27; = TopK_mask(s, k) \;\;(non-top-k entries \rightarrow -\infty )"></div>
+    <div class="formula tex" data-tex="g_j = \exp(s&#x27;_j) / \sum _i \exp(s&#x27;_i) \;\;(gate weights, \sum g = 1)"></div>
+    <div class="formula tex" data-tex="y = \sum _j g_j \cdot Expert_j(x) \;\;(weighted expert outputs)"></div>
     <p>Only experts with g_j > 0 are computed. In practice, frameworks use expert parallelism — different experts live on different GPUs — so routing decisions also determine cross-device communication patterns.</p>
 
     <h3 style="margin-top:28px;">Batch Matrix Form</h3>
     <p>For a batch of T tokens, all operations vectorize:</p>
-    <div class="formula">G = Softmax(TopK(X W_r, k)) &nbsp;&nbsp;shape (T × N)</div>
-    <div class="formula">Y = Σ_j diag(G[:,j]) · Expert_j(X) &nbsp;&nbsp;shape (T × d)</div>
+    <div class="formula tex" data-tex="G = Softmax(\mathrm{TopK}(X W_r, k)) \;\;shape (T \times N)"></div>
+    <div class="formula tex" data-tex="Y = \sum _j diag(G[:,j]) \cdot Expert_j(X) \;\;shape (T \times d)"></div>
     <p>This is how production MoE layers process thousands of tokens in parallel while maintaining sparsity per row.</p>
 
   </div>
@@ -995,7 +997,7 @@ ul.content-list li { margin-bottom:0.45em; }
 
     <h3>Expert Importance</h3>
     <p>From the expert selector weight matrix G (shape T × N, T tokens, N experts), each <strong>column j</strong> holds the probabilities of all tokens routing to expert j. Summing column j gives <strong>expert importance</strong> for expert j:</p>
-    <div class="formula">Importance_j = Σ_{t=1}^{T} G_{t,j}</div>
+    <div class="formula tex" data-tex="Importance_j = \sum _{t=1}^{T} G_{t,j}"></div>
 
     <p>Using our 4-token example:</p>
     <table class="data-table">
@@ -1011,13 +1013,13 @@ ul.content-list li { margin-bottom:0.45em; }
 
     <h3>Coefficient of Variation (CV)</h3>
     <p>Measure spread of importance values relative to their mean:</p>
-    <div class="formula">CV = σ(Importance) / μ(Importance)</div>
+    <div class="formula tex" data-tex="CV = \sigma (Importance) / \mu (Importance)"></div>
     <p>With values [1.4, 1.0, 1.6]: μ = 1.333, σ ≈ 0.249, <strong>CV ≈ 0.187</strong>.</p>
 
     <h3>Auxiliary Loss Formula</h3>
-    <div class="formula">L_aux = λ · CV² = λ · (σ / μ)²</div>
+    <div class="formula tex" data-tex="L_aux = \lambda \cdot CV^2 = \lambda \cdot (\sigma / \mu )^2"></div>
     <p>λ is a hyperparameter controlling auxiliary loss strength. Higher CV → higher penalty → router adjusts to spread tokens more evenly.</p>
-    <div class="formula">L_total = L_LM + L_aux</div>
+    <div class="formula tex" data-tex="L_total = L_LM + L_aux"></div>
 
     <div class="interactive-panel">
       <h4>Interactive · Auxiliary Loss Calculator</h4>
@@ -1093,14 +1095,14 @@ ul.content-list li { margin-bottom:0.45em; }
 
     <h3>Two Quantities Per Expert</h3>
     <p><strong>P_i</strong> — probability the router selects expert i (derived from importance, normalized):</p>
-    <div class="formula">P_i = Importance_i / T &nbsp;&nbsp; (T = number of tokens)</div>
+    <div class="formula tex" data-tex="P_i = Importance_i / T \;\; (T = number of tokens)"></div>
     <p>Example: P1 = 1.4/4 = 0.35, P2 = 1.0/4 = 0.25, P3 = 1.6/4 = 0.40. Sum = 1.</p>
 
     <p><strong>f_i</strong> — fraction of tokens actually dispatched to expert i (hard assignment: token goes to expert with highest gate weight among selected):</p>
     <p>From our weight matrix: "the"→E2, "next"→E1, "day"→E3, "is"→E1 (tie-break E1 over E3 at 0.5). So f1=2/4=0.5, f2=1/4=0.25, f3=1/4=0.25.</p>
 
     <h3>Load Balancing Loss</h3>
-    <div class="formula">L_load = α · N · Σ_i (f_i · P_i)</div>
+    <div class="formula tex" data-tex="L_load = \alpha \cdot N \cdot \sum _i (f_i \cdot P_i)"></div>
     <p>α = scaling hyperparameter, N = number of experts. Minimize Σ f_i · P_i.</p>
 
     <h3>Why f_i × P_i Works — Two Scenarios</h3>
@@ -1109,7 +1111,7 @@ ul.content-list li { margin-bottom:0.45em; }
     <p>Lower loss when distribution is uniform. Minimizing pushes both f_i and P_i toward uniformity simultaneously, aligning importance with actual routing.</p>
 
     <p>Concrete calculation with α=0.01, N=3:</p>
-    <div class="formula">L_load = 0.01 × 3 × (0.5×0.35 + 0.25×0.25 + 0.25×0.40) = 0.0101</div>
+    <div class="formula tex" data-tex="L_load = 0.01 \times 3 \times (0.5\times 0.35 + 0.25\times 0.25 + 0.25\times 0.40) = 0.0101"></div>
 
     <h3 style="margin-top:28px;">The f_i × P_i Product Explained</h3>
     <p>Why multiply fraction and probability? Compare a collapsed routing pattern against a balanced one:</p>
@@ -1118,9 +1120,9 @@ ul.content-list li { margin-bottom:0.45em; }
     <p>The product is small when both f_i and P_i are small together (uniform spread) and large when one expert dominates both metrics simultaneously.</p>
 
     <h3 style="margin-top:28px;">Formal Load Balancing Loss</h3>
-    <div class="formula">L_load = α · N · Σ_{i=1}^{N} f_i · P_i</div>
+    <div class="formula tex" data-tex="L_load = \alpha \cdot N \cdot \sum _{i=1}^{N} f_i \cdot P_i"></div>
     <p>With our example: f = [0.5, 0.25, 0.25], P = [0.35, 0.25, 0.40], N = 3, α = 0.01:</p>
-    <div class="formula">L_load = 0.01 × 3 × (0.5×0.35 + 0.25×0.25 + 0.25×0.40) = 0.03 × 0.3375 = 0.0101</div>
+    <div class="formula tex" data-tex="L_load = 0.01 \times 3 \times (0.5\times 0.35 + 0.25\times 0.25 + 0.25\times 0.40) = 0.03 \times 0.3375 = 0.0101"></div>
 
     <h3 style="margin-top:28px;">Why Minimizing Σ f_i · P_i Works</h3>
     <p>The product f_i · P_i is minimized when both factors are small and uniform. If one expert dominates (f_1→1, P_1→1), the product approaches 1.0 — maximum loss. If all experts share load equally (f_i→1/N, P_i→1/N), each product is 1/N² and the sum is N·(1/N²)=1/N — much smaller for large N.</p>
@@ -1148,7 +1150,7 @@ ul.content-list li { margin-bottom:0.45em; }
     <h2>Capacity Factor: Capping Expert Workload</h2>
     <p>Even with load balancing loss, one expert can still receive disproportionate tokens during a batch. <strong>Expert capacity</strong> is a hard guardrail limiting how many tokens any single expert processes.</p>
 
-    <div class="formula">Capacity = (tokens_per_batch × top_k) / (N_experts × capacity_factor)</div>
+    <div class="formula tex" data-tex="Capacity = (tokens_per_batch \times top_k) / (N_experts \times capacity_factor)"></div>
 
     <p>With capacity_factor = 1.0, each expert handles exactly its fair share. With 1000 tokens/batch, top_k=2, 4 experts: capacity = (1000 × 2) / (4 × 1) = <strong>500 tokens max per expert</strong>.</p>
 
@@ -1171,7 +1173,7 @@ ul.content-list li { margin-bottom:0.45em; }
     <p><strong>capacity_factor < 1.0:</strong> Stricter than fair share. Excess tokens dropped or rerouted — hurts training quality. DeepSeek-V3 explicitly avoided dropping any tokens.</p>
 
     <h3 style="margin-top:28px;">Tokens Per Batch Calculation</h3>
-    <div class="formula">tokens_per_batch = batch_size × sequence_length × top_k</div>
+    <div class="formula tex" data-tex="tokens_per_batch = batch_size \times sequence_length \times top_k"></div>
     <p>The top_k multiplier counts that each token generates k expert assignments. A batch of 32 sequences of length 512 with top_k=2: tokens_per_batch = 32 × 512 × 2 = 32,768 expert-token assignments to distribute across experts.</p>
 
     <div class="interactive-panel">
@@ -1658,63 +1660,63 @@ output["next"] = 0.9 × [0.88, 0.12, −0.45, 0.67] + 0.1 × [0.23, −0.56, 0.3
 
     <h3>1. Dense FFN Parameter Count</h3>
     <p>A 2-layer FFN with expansion ratio r (typically r=4):</p>
-    <div class="formula">W_1 ∈ ℝ^{d × rd}, &nbsp; W_2 ∈ ℝ^{rd × d}</div>
-    <div class="formula">params = d·rd + rd·d = 2rd²</div>
+    <div class="formula tex" data-tex="W_1 \in \mathbb{R}^{d \times rd}, \; W_2 \in \mathbb{R}^{rd \times d}"></div>
+    <div class="formula tex" data-tex="params = d\cdot rd + rd\cdot d = 2rd^2"></div>
     <p>For d=768, r=4: params = 2 × 4 × 768² = 2 × 4 × 589,824 = 4,718,592.</p>
 
     <h3>2. MoE Expert Parameter Count</h3>
     <p>With N experts, each with expansion ratio r_e (may be smaller than dense r):</p>
-    <div class="formula">params_MoE = N × 2r_e d²</div>
+    <div class="formula tex" data-tex="params_MoE = N \times 2r_e d^2"></div>
     <p>Active per token: k × 2r_e d². Condition for compute savings: k/N < 1 (always true) AND r_e ≤ r.</p>
 
     <h3>3. Router Logits</h3>
-    <div class="formula">s_t = x_t W_r, &nbsp; x_t ∈ ℝ^d, &nbsp; W_r ∈ ℝ^{d×N}, &nbsp; s_t ∈ ℝ^N</div>
+    <div class="formula tex" data-tex="s_t = x_t W_r, \; x_t \in \mathbb{R}^d, \; W_r \in \mathbb{R}^{d\times N}, \; s_t \in \mathbb{R}^N"></div>
     <p>For batch of T tokens: S = X W_r where X ∈ ℝ^{T×d}.</p>
 
     <h3>4. Top-k Masking</h3>
     <p>Define mask m_t ∈ {0,1}^N where m_t[j]=1 iff s_t[j] is among the k largest:</p>
-    <div class="formula">s'_t[j] = s_t[j] · m_t[j] + (−∞) · (1 − m_t[j])</div>
+    <div class="formula tex" data-tex="s&#x27;_t[j] = s_t[j] \cdot m_t[j] + (-\infty ) \cdot (1 - m_t[j])"></div>
 
     <h3>5. Softmax Gating</h3>
-    <div class="formula">G_{t,j} = exp(s'_t[j]) / Σ_i exp(s'_t[i])</div>
+    <div class="formula tex" data-tex="G_{t,j} = \exp(s&#x27;_t[j]) / \sum _i \exp(s&#x27;_t[i])"></div>
     <p>Properties: G_{t,j} ∈ [0,1], Σ_j G_{t,j} = 1, G_{t,j}=0 when m_t[j]=0.</p>
 
     <h3>6. MoE Output</h3>
-    <div class="formula">y_t = Σ_{j=1}^{N} G_{t,j} · Expert_j(x_t)</div>
+    <div class="formula tex" data-tex="y_t = \sum _{j=1}^{N} G_{t,j} \cdot Expert_j(x_t)"></div>
     <p>Only k terms in the sum are non-zero. Each Expert_j is a full FFN: Expert_j(x) = W_2^j · σ(W_1^j · x).</p>
 
     <h3>7. Expert Importance</h3>
-    <div class="formula">I_j = Σ_{t=1}^{T} G_{t,j}</div>
+    <div class="formula tex" data-tex="I_j = \sum _{t=1}^{T} G_{t,j}"></div>
     <p>Column sum of gate matrix. Measures total routing probability mass assigned to expert j across the batch/sequence.</p>
 
     <h3>8. Coefficient of Variation</h3>
-    <div class="formula">μ_I = (1/N) Σ_j I_j</div>
-    <div class="formula">σ_I = sqrt((1/N) Σ_j (I_j − μ_I)²)</div>
-    <div class="formula">CV = σ_I / μ_I</div>
-    <div class="formula">L_aux = λ · CV²</div>
+    <div class="formula tex" data-tex="\mu _I = (1/N) \sum _j I_j"></div>
+    <div class="formula tex" data-tex="\sigma _I = sqrt((1/N) \sum _j (I_j - \mu _I)^2)"></div>
+    <div class="formula tex" data-tex="CV = \sigma _I / \mu _I"></div>
+    <div class="formula tex" data-tex="L_aux = \lambda \cdot CV^2"></div>
 
     <h3>9. Router Selection Probability</h3>
-    <div class="formula">P_i = I_i / T</div>
+    <div class="formula tex" data-tex="P_i = I_i / T"></div>
     <p>Normalized importance — probability the router "prefers" expert i averaged across tokens.</p>
 
     <h3>10. Hard Assignment Fraction</h3>
-    <div class="formula">f_i = (1/T) |{t : argmax_j G_{t,j} = i among active}|</div>
+    <div class="formula tex" data-tex="f_i = (1/T) |{t : argmax_j G_{t,j} = i among active}|"></div>
     <p>Fraction of tokens where expert i receives the highest gate weight. Computed via hard assignment for load tracking.</p>
 
     <h3>11. Load Balancing Loss</h3>
-    <div class="formula">L_load = α · N · Σ_{i=1}^{N} f_i · P_i</div>
+    <div class="formula tex" data-tex="L_load = \alpha \cdot N \cdot \sum _{i=1}^{N} f_i \cdot P_i"></div>
     <p>Minimized when both f and P are uniform. Product f_i·P_i is large when one expert dominates both metrics.</p>
 
     <h3>12. Expert Capacity</h3>
-    <div class="formula">C = floor(T · k / (N · CF))</div>
+    <div class="formula tex" data-tex="C = floor(T \cdot k / (N \cdot CF))"></div>
     <p>Maximum tokens expert i can accept in this batch. Tokens beyond C are dropped or rerouted to next-best expert.</p>
 
     <h3>13. Total Training Loss</h3>
-    <div class="formula">L_total = L_LM + L_aux + L_load</div>
+    <div class="formula tex" data-tex="L_total = L_LM + L_aux + L_load"></div>
     <p>L_LM is standard cross-entropy next-token prediction. λ and α are hyperparameters typically in range [0.001, 0.1].</p>
 
     <h3>14. Active Parameter Fraction (DeepSeek-V3)</h3>
-    <div class="formula">active_ratio ≈ (k/N) × (N_moe_layers / L_total) × (r_e/r) + (non_MoE_params / total_params)</div>
+    <div class="formula tex" data-tex="active_ratio \approx (k/N) \times (N_moe_layers / L_total) \times (r_e/r) + (non_MoE_params / total_params)"></div>
     <p>Non-MoE params (attention with MLA, embeddings, output head) are always active. MoE FFN params are sparsely active. Combined: ~37B / 671B ≈ 5.5%.</p>
 
     <div class="callout"><p>These fourteen formulas are the complete mathematical toolkit for understanding vanilla MoE. DeepSeek's subsequent innovations modify routing (loss-free balancing), expert structure (fine-grained segmentation), and architecture (shared experts) — but every modification builds on this base.</p></div>
@@ -1742,7 +1744,7 @@ output["next"] = 0.9 × [0.88, 0.12, −0.45, 0.67] + 0.1 × [0.23, −0.56, 0.3
 
     <h3 style="margin-top:28px;">Expert Collapse: Formal Definition</h3>
     <p>Let u_i = I_i / Σ_j I_j be the utilization fraction of expert i. Expert collapse occurs when:</p>
-    <div class="formula">max_i(u_i) > 1 − ε for small ε (e.g., ε = 0.1)</div>
+    <div class="formula tex" data-tex="max_i(u_i) &gt; 1 - \varepsilon for small \varepsilon (e.g., \varepsilon = 0.1)"></div>
     <p>At collapse, one expert handles >90% of routing probability mass. Remaining experts are effectively dead. The model degenerates to a dense model with wasted parameter overhead from idle experts.</p>
 
     <h3 style="margin-top:28px;">Distributed Training Considerations</h3>
@@ -2162,6 +2164,9 @@ function onScroll() {
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 </script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

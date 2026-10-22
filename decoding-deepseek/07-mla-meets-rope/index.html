@@ -137,6 +137,8 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
 <link rel="stylesheet" href="/_shared/asknex-type.css">
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
 <link rel="stylesheet" href="/_shared/section-nav.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <script src="/_shared/theme-init.js"></script>
 <body>
@@ -196,7 +198,7 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <span class="section-num">01</span>
     <h2>Why Latent Attention Works — The Absorption Trick</h2>
     <p>As derived in Chapter 5, the absorption trick folds W<sub>UK</sub> into W<sub>Q</sub> (or W<sub>DQ</sub>·W<sub>UQ</sub> in DeepSeek-V3), so inference caches only the latent matrix C<sub>KV</sub> = X·W<sub>DKV</sub>. Attention scores become a dot product between an absorbed query and cached latents — no full keys stored.</p>
-    <div class="formula">Scores = (X · W<sub>DKV</sub><sup>T</sup>) · (X · W<sub>absorbed</sub>)<sup>T</sup> &nbsp;&nbsp;where&nbsp;&nbsp; W<sub>absorbed</sub> = W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup></div>
+    <div class="formula tex" data-tex="Scores = (X \cdot W_{DKV}^{T}) \cdot (X \cdot W_{absorbed})^{T} \;\;where\;\; W_{absorbed} = W_{Q} \cdot W_{UK}^{T}"></div>
     <p>During inference, only C<sub>KV</sub> is appended per token. When a new query arrives, it multiplies with the absorbed weights and dots against cached latent vectors.</p>
     <div class="callout ok"><p><strong>Key constraint for this chapter:</strong> For absorption to work, W<sub>Q</sub> and W<sub>UK</sub><sup>T</sup> must be <em>directly adjacent</em> in the matrix product chain — with nothing position-dependent between them.</p></div>
     <div class="interactive-panel">
@@ -218,13 +220,13 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <span class="section-num">02</span>
     <h2>The RoPE Incompatibility Problem</h2>
     <p>Rotary positional embedding (RoPE), introduced in the RoFormer paper and adopted by LLaMA, Mistral, and DeepSeek, operates on query and key vectors — not on token embeddings. Given a vector at position m, RoPE divides it into pairs (x<sub>1</sub>, x<sub>2</sub>), (x<sub>3</sub>, x<sub>4</sub>), … and rotates each pair by an angle that depends on position m:</p>
-    <div class="formula">R<sub>m</sub>(x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>) → (x′<sub>1</sub>, x′<sub>2</sub>, x′<sub>3</sub>, x′<sub>4</sub>)</div>
+    <div class="formula tex" data-tex="R_{m}(x_{1}, x_{2}, x_{3}, x_{4}) \rightarrow (x′_{1}, x′_{2}, x′_{3}, x′_{4})"></div>
     <p>If the original vector was [x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>], after RoPE it becomes [x′<sub>1</sub>, x′<sub>2</sub>, x′<sub>3</sub>, x′<sub>4</sub>]. The rotation angle for pair (x<sub>1</sub>, x<sub>2</sub>) at position 0 differs from the rotation for the same pair at position 5. <strong>R<sub>m</sub> is position-dependent.</strong> That is exactly what makes RoPE work — and exactly what breaks absorption.</p>
     <h3 style="margin-top:28px;">What Happens When You Naively Add RoPE</h3>
     <p>Suppose we apply RoPE to both queries and keys in MLA:</p>
-    <div class="formula">Q = R<sub>m</sub>(X · W<sub>Q</sub>) &nbsp;&nbsp;&nbsp; K = R<sub>m</sub>(X · W<sub>UK</sub> · W<sub>DKV</sub>)</div>
+    <div class="formula tex" data-tex="Q = R_{m}(X \cdot W_{Q}) \;\;\; K = R_{m}(X \cdot W_{UK} \cdot W_{DKV})"></div>
     <p>The attention product becomes:</p>
-    <div class="formula">R<sub>m_q</sub>(X · W<sub>Q</sub>) · [R<sub>m_k</sub>(X · W<sub>UK</sub> · W<sub>DKV</sub>)]<sup>T</sup></div>
+    <div class="formula tex" data-tex="R_{m_q}(X \cdot W_{Q}) \cdot [R_{m_k}(X \cdot W_{UK} \cdot W_{DKV})]^{T}"></div>
     <p>Now R<sub>m</sub> sits <em>between</em> W<sub>Q</sub> and W<sub>UK</sub><sup>T</sup>. Because R<sub>m</sub> changes with position m, we cannot fold W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> into a single constant matrix. <strong>Absorption is impossible.</strong></p>
     <div class="callout warn"><p>The DeepSeek-V2 paper states this precisely: <em>"Rotary positional encoding is incompatible with key-value compression. To be specific, rotary positional encoding is position-sensitive for both keys and queries. If we apply rotary positional encodings, W<sup>UK</sup> cannot be absorbed into W<sup>Q</sup> anymore during inference."</em></p></div>
     <h3 style="margin-top:28px;">The Consequences</h3>
@@ -257,9 +259,9 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
         <p style="margin:0;color:var(--text-dim);font-size:0.9rem;"><strong>Q<sub>R</sub></strong> — queries with RoPE applied<br><strong>K<sub>R</sub></strong> — keys with RoPE applied<br><span class="tag tag-pink">Extra compute, but small</span></p></div>
     </div>
     <p>The full query and key are formed by <strong>concatenation</strong> along the feature dimension:</p>
-    <div class="formula">Q = [Q<sub>C</sub> ; Q<sub>R</sub>] &nbsp;&nbsp;&nbsp; K = [K<sub>C</sub> ; K<sub>R</sub>]</div>
+    <div class="formula tex" data-tex="Q = [Q_{C} ; Q_{R}] \;\;\; K = [K_{C} ; K_{R}]"></div>
     <p>Attention scores decompose by the bilinearity of the dot product:</p>
-    <div class="formula">Q · K<sup>T</sup> = Q<sub>C</sub> · K<sub>C</sub><sup>T</sup> + Q<sub>R</sub> · K<sub>R</sub><sup>T</sup></div>
+    <div class="formula tex" data-tex="Q \cdot K^{T} = Q_{C} \cdot K_{C}^{T} + Q_{R} \cdot K_{R}^{T}"></div>
     <p>The first term Q<sub>C</sub> · K<sub>C</sub><sup>T</sup> involves no RoPE at all — <strong>the absorption trick applies fully</strong>. The second term Q<sub>R</sub> · K<sub>R</sub><sup>T</sup> carries all positional information. We accept extra computation for this smaller RoPE-specific subspace, but retain MLA's cache compression for the content subspace.</p>
     <div class="callout"><p>It sounds like a cheat — solve the hard problem by splitting it in two. But the split is principled: content similarity and positional alignment are different signals, and DeepSeek allocates separate capacity to each. The content path uses the full latent compression machinery; the position path uses a deliberately small D<sub>HR</sub> dimensional subspace.</p></div>
     <div class="interactive-panel">
@@ -296,12 +298,12 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <p>Input embedding matrix X has shape <strong>(4 × 8)</strong>: four tokens, eight features each.</p>
     <h3 style="margin-top:28px;">Step 1 — Latent Compression (C<sub>KV</sub>)</h3>
     <p>Project X into latent space via W<sub>DKV</sub> with shape (8 × 4):</p>
-    <div class="formula">C<sub>KV</sub> = X · W<sub>DKV</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 8) · (8 × 4) = (4 × 4)</div>
+    <div class="formula tex" data-tex="C_{KV} = X \cdot W_{DKV} \;\;\rightarrow \;\; (4 \times 8) \cdot (8 \times 4) = (4 \times 4)"></div>
     <p>This C<sub>KV</sub> matrix is the <strong>only latent cache</strong> on the content path. Its column count D<sub>C</sub> = 4 determines KV cache size per token. The dotted-box notation in the DeepSeek diagram marks C<sub>KV</sub> as "cache during inference."</p>
     <h3 style="margin-top:28px;">Step 2 — Keys and Values from Latent</h3>
     <p>Up-project C<sub>KV</sub> into key and value spaces. W<sub>UK</sub> and W<sub>UV</sub> each have shape (4 × 8) — that is (D<sub>C</sub> × D):</p>
-    <div class="formula">K<sub>C</sub> = C<sub>KV</sub> · W<sub>UK</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4) · (4 × 8) = (4 × 8)</div>
-    <div class="formula">V<sub>C</sub> = C<sub>KV</sub> · W<sub>UV</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4) · (4 × 8) = (4 × 8)</div>
+    <div class="formula tex" data-tex="K_{C} = C_{KV} \cdot W_{UK} \;\;\rightarrow \;\; (4 \times 4) \cdot (4 \times 8) = (4 \times 8)"></div>
+    <div class="formula tex" data-tex="V_{C} = C_{KV} \cdot W_{UV} \;\;\rightarrow \;\; (4 \times 4) \cdot (4 \times 8) = (4 \times 8)"></div>
     <p>W<sub>UK</sub> is <strong>different per head</strong> (not shared). K<sub>C</sub> and V<sub>C</sub> have full model dimension D = 8. No RoPE is applied anywhere on this path.</p>
     <h3 style="margin-top:28px;">Step 3 — Queries via Down-Projection and Up-Projection</h3>
     <p>DeepSeek-V3 adds a change from basic MLA: queries are not computed as X · W<sub>Q</sub> directly. Instead:</p>
@@ -333,13 +335,13 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <p>The right side of the decoupled schematic constructs <strong>new</strong> query and key matrices whose sole purpose is carrying positional information via RoPE. These are Q<sub>R</sub> and K<sub>R</sub>.</p>
     <h3 style="margin-top:28px;">Building K<sub>R</sub> — Shared Key Across Heads</h3>
     <p>Start from the same input X (4×8). Multiply by W<sub>KR</sub> with shape (8 × D<sub>HR</sub>) = (8 × 4):</p>
-    <div class="formula">K<sub>R,base</sub> = X · W<sub>KR</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 8) · (8 × 4) = (4 × 4)</div>
+    <div class="formula tex" data-tex="K_{R,base} = X \cdot W_{KR} \;\;\rightarrow \;\; (4 \times 8) \cdot (8 \times 4) = (4 \times 4)"></div>
     <p>Apply RoPE position-by-position. RoPE preserves dimension, so output remains (4 × 4). Now expand across N<sub>H</sub> = 2 heads by <strong>replicating</strong> the same rotated key for each head:</p>
-    <div class="formula">K<sub>R</sub> = expand_heads(RoPE(K<sub>R,base</sub>)) &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 8)</div>
+    <div class="formula tex" data-tex="K_{R} = expand_heads(RoPE(K_{R,base})) \;\;\rightarrow \;\; (4 \times 8)"></div>
     <p>Critical design choice from the DeepSeek paper: <em>"We use a shared key across all heads which carry the rotary positional embedding component."</em> W<sub>KR</sub> has D<sub>HR</sub> columns, not N<sub>H</sub> × D<sub>HR</sub>. If each head had its own W<sub>KR</sub>, the weight matrix would be (8 × 8) for two heads — and the cache would need N<sub>H</sub> × D<sub>HR</sub> per token instead of just D<sub>HR</sub>.</p>
     <h3 style="margin-top:28px;">Building Q<sub>R</sub> — Per-Head Queries (Not Shared)</h3>
     <p>Queries on the RoPE path reuse the down-projected C<sub>Q</sub> from the left side — the same (4×4) matrix. Multiply by W<sub>QR</sub> with shape (D<sub>C</sub>′ × N<sub>H</sub> × D<sub>HR</sub>) = (4 × 8):</p>
-    <div class="formula">Q<sub>R,pre</sub> = C<sub>Q</sub> · W<sub>QR</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4) · (4 × 8) = (4 × 8)</div>
+    <div class="formula tex" data-tex="Q_{R,pre} = C_{Q} \cdot W_{QR} \;\;\rightarrow \;\; (4 \times 4) \cdot (4 \times 8) = (4 \times 8)"></div>
     <p>Apply RoPE to get the final Q<sub>R</sub> (4×8). Unlike K<sub>R</sub>, W<sub>QR</sub> already spans all heads — its column dimension is N<sub>H</sub> × D<sub>HR</sub> = 8. <strong>Queries are not shared across heads; only the RoPE key is shared.</strong> This preserves head diversity in the positional query subspace while minimizing K<sub>R</sub> cache size.</p>
     <div class="comparison">
       <div class="card"><h3>K<sub>R</sub> (shared)</h3><p>W<sub>KR</sub>: (8 × D<sub>HR</sub>). Same rotated key replicated across heads. Cache: D<sub>HR</sub> per token.</p></div>
@@ -357,15 +359,15 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <span class="section-num">06</span>
     <h2>Concatenation, Attention Scores, and Output</h2>
     <p>With Q<sub>C</sub>, Q<sub>R</sub>, K<sub>C</sub>, K<sub>R</sub>, and V<sub>C</sub> computed, we assemble full queries and keys by concatenation along the feature axis (Equations 16–17):</p>
-    <div class="formula">Q = [Q<sub>C</sub> ; Q<sub>R</sub>] &nbsp;&nbsp; (4 × 16) &nbsp;&nbsp;&nbsp; K = [K<sub>C</sub> ; K<sub>R</sub>] &nbsp;&nbsp; (4 × 16)</div>
+    <div class="formula tex" data-tex="Q = [Q_{C} ; Q_{R}] \;\; (4 \times 16) \;\;\; K = [K_{C} ; K_{R}] \;\; (4 \times 16)"></div>
     <p>In our toy example each half is (4×8), so the concatenated dimension is 8 + 8 = 16 per token. The attention score matrix (Equation 18) decomposes:</p>
-    <div class="formula">S = Q · K<sup>T</sup> = Q<sub>C</sub>·K<sub>C</sub><sup>T</sup> + Q<sub>R</sub>·K<sub>R</sub><sup>T</sup> &nbsp;&nbsp; each term (4 × 4)</div>
+    <div class="formula tex" data-tex="S = Q \cdot K^{T} = Q_{C}\cdot K_{C}^{T} + Q_{R}\cdot K_{R}^{T} \;\; each term (4 \times 4)"></div>
     <p>First term: no RoPE → absorption applies. Second term: pure positional dot-product in the D<sub>HR</sub> subspace. Add the two (4×4) score matrices element-wise to get the final pre-softmax scores.</p>
     <h3 style="margin-top:28px;">Scaling, Softmax, and Context</h3>
     <p>Scale by √(D<sub>H</sub> + D<sub>HR</sub>) — in our example √(4 + 4) = √8. This keeps dot-product variance near 1 when query and key each have D<sub>H</sub> + D<sub>HR</sub> total dimensions split across content and RoPE parts:</p>
-    <div class="formula">Weights = softmax(S / √(D<sub>H</sub> + D<sub>HR</sub>)) &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4)</div>
+    <div class="formula tex" data-tex="Weights = \mathrm{softmax}(S / \sqrt(D_{H} + D_{HR})) \;\;\rightarrow \;\; (4 \times 4)"></div>
     <p>Multiply weights by V<sub>C</sub> (4×8) — values come only from the content path; the RoPE path contributes to <em>where</em> to attend, not <em>what</em> to retrieve:</p>
-    <div class="formula">O = Weights · V<sub>C</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (4 × 4) · (4 × 8) = (4 × 8)</div>
+    <div class="formula tex" data-tex="O = Weights \cdot V_{C} \;\;\rightarrow \;\; (4 \times 4) \cdot (4 \times 8) = (4 \times 8)"></div>
     <p>Output O passes through the output projection W<sub>O</sub> to produce logits (Equation 19, denoted u<sup>T</sup> in the paper).</p>
     <div class="interactive-panel">
       <h4>Interactive · Two-Path Attention Flow</h4>
@@ -382,21 +384,21 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <p>During autoregressive inference, prefix <em>"The next day is"</em> is already processed. The model predicts <strong>"bright"</strong> as the next token. Trace exactly what happens when "bright" enters the MLA + RoPE pipeline.</p>
     <h3 style="margin-top:28px;">Path 1 — Content (Absorption, No RoPE)</h3>
     <p>For the new token x = embed("bright") with shape (1 × 8):</p>
-    <div class="formula">q<sub>absorbed</sub> = x · W<sub>DQ</sub> · W<sub>UQ</sub> · W<sub>UK</sub><sup>T</sup> &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 4)</div>
+    <div class="formula tex" data-tex="q_{absorbed} = x \cdot W_{DQ} \cdot W_{UQ} \cdot W_{UK}^{T} \;\;\rightarrow \;\; (1 \times 4)"></div>
     <p>Compute new latent row and append to cache:</p>
-    <div class="formula">c<sub>new</sub> = x · W<sub>DKV</sub> &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 4) appended to C<sub>KV</sub>: (4×4) → (5×4)</div>
+    <div class="formula tex" data-tex="c_{new} = x \cdot W_{DKV} \;\;\rightarrow \;\; (1 \times 4) appended to C_{KV}: (4\times 4) \rightarrow (5\times 4)"></div>
     <p>Attention scores via absorption:</p>
-    <div class="formula">s<sub>1</sub> = q<sub>absorbed</sub> · C<sub>KV</sub><sup>T</sup> &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 5)</div>
+    <div class="formula tex" data-tex="s_{1} = q_{absorbed} \cdot C_{KV}^{T} \;\;\rightarrow \;\; (1 \times 5)"></div>
     <p>Five positions: The, next, day, is, bright. No key recomputation for old tokens — only one new latent row added.</p>
     <h3 style="margin-top:28px;">Path 2 — RoPE</h3>
     <p>Compute and cache new K<sub>R</sub> row:</p>
-    <div class="formula">k<sub>R,new</sub> = expand(RoPE(x · W<sub>KR</sub>)) &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 8), append to K<sub>R</sub> cache: (4×8) → (5×8)</div>
+    <div class="formula tex" data-tex="k_{R,new} = expand(RoPE(x \cdot W_{KR})) \;\;\rightarrow \;\; (1 \times 8), append to K_{R} cache: (4\times 8) \rightarrow (5\times 8)"></div>
     <p>Compute Q<sub>R</sub> for the new token (not cached — query is always fresh):</p>
-    <div class="formula">q<sub>R</sub> = RoPE(x · W<sub>DQ</sub> · W<sub>QR</sub>) &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 8)</div>
+    <div class="formula tex" data-tex="q_{R} = RoPE(x \cdot W_{DQ} \cdot W_{QR}) \;\;\rightarrow \;\; (1 \times 8)"></div>
     <p>RoPE path scores:</p>
-    <div class="formula">s<sub>2</sub> = q<sub>R</sub> · K<sub>R</sub><sup>T</sup> &nbsp;&nbsp;→&nbsp;&nbsp; (1 × 5)</div>
+    <div class="formula tex" data-tex="s_{2} = q_{R} \cdot K_{R}^{T} \;\;\rightarrow \;\; (1 \times 5)"></div>
     <h3 style="margin-top:28px;">Combine and Predict</h3>
-    <div class="formula">s = s<sub>1</sub> + s<sub>2</sub> &nbsp;&nbsp;→&nbsp;&nbsp; softmax(s / √8) · V<sub>C</sub> &nbsp;&nbsp;→&nbsp;&nbsp; context (1 × 8)</div>
+    <div class="formula tex" data-tex="s = s_{1} + s_{2} \;\;\rightarrow \;\; \mathrm{softmax}(s / \sqrt8) \cdot V_{C} \;\;\rightarrow \;\; context (1 \times 8)"></div>
     <p>Only the last token's context vector (1×8) feeds the output head for next-token prediction. Values V<sub>C</sub> recovered by V<sub>C</sub> = C<sub>KV</sub> · W<sub>UV</sub> on the updated (5×4) cache.</p>
     <div class="interactive-panel">
       <h4>Interactive · Inference Token Step</h4>
@@ -437,17 +439,17 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <span class="section-num">09</span>
     <h2>Memory Comparison — MHA vs MQA vs GQA vs MLA vs MLA+RoPE</h2>
     <p>The entire motivation chain begins with KV cache memory. Here are the formulas for cache size (16-bit / 2 bytes per element), batch B, context length S, layers L:</p>
-    <div class="formula">MHA: &nbsp; 2 × 2 × L × B × S × N × D<sub>H</sub></div>
+    <div class="formula tex" data-tex="MHA: \; 2 \times 2 \times L \times B \times S \times N \times D_{H}"></div>
     <p>The leading 2×2: one factor for K vs V, one for 2 bytes (fp16). N = number of heads, D<sub>H</sub> = head dimension.</p>
-    <div class="formula">MQA: &nbsp; 2 × 2 × L × B × S × D<sub>H</sub> &nbsp;&nbsp;(N removed — one shared K/V set)</div>
-    <div class="formula">GQA: &nbsp; 2 × 2 × L × B × S × G × D<sub>H</sub> &nbsp;&nbsp;(G groups instead of N heads)</div>
-    <div class="formula">MLA (basic): &nbsp; 2 × L × B × S × D<sub>L</sub> &nbsp;&nbsp;(one 2 gone — joint latent, no separate K/V)</div>
-    <div class="formula">MLA + RoPE: &nbsp; 2 × L × B × S × (D<sub>L</sub> + D<sub>HR</sub>)</div>
+    <div class="formula tex" data-tex="MQA: \; 2 \times 2 \times L \times B \times S \times D_{H} \;\;(N removed - one shared K/V set)"></div>
+    <div class="formula tex" data-tex="GQA: \; 2 \times 2 \times L \times B \times S \times G \times D_{H} \;\;(G groups instead of N heads)"></div>
+    <div class="formula tex" data-tex="MLA (basic): \; 2 \times L \times B \times S \times D_{L} \;\;(one 2 gone - joint latent, no separate K/V)"></div>
+    <div class="formula tex" data-tex="MLA + RoPE: \; 2 \times L \times B \times S \times (D_{L} + D_{HR})"></div>
     <p>DeepSeek's chosen dimensions: <strong>D<sub>L</sub> = 4 × D<sub>H</sub></strong> and <strong>D<sub>HR</sub> = D<sub>H</sub> / 2</strong>. Substituting:</p>
-    <div class="formula">D<sub>L</sub> + D<sub>HR</sub> = 4D<sub>H</sub> + D<sub>H</sub>/2 = 4.5 D<sub>H</sub></div>
-    <div class="formula">MHA / MLA+RoPE = (2 × N × D<sub>H</sub>) / (D<sub>L</sub> + D<sub>HR</sub>) = 2N D<sub>H</sub> / (4.5 D<sub>H</sub>) = 4N / 9</div>
+    <div class="formula tex" data-tex="D_{L} + D_{HR} = 4D_{H} + D_{H}/2 = 4.5 D_{H}"></div>
+    <div class="formula tex" data-tex="MHA / MLA+RoPE = (2 \times N \times D_{H}) / (D_{L} + D_{HR}) = 2N D_{H} / (4.5 D_{H}) = 4N / 9"></div>
     <p>With N = 128 heads (DeepSeek-V3):</p>
-    <div class="formula">4 × 128 / 9 ≈ 56.9 ≈ <strong>57×</strong> memory reduction vs MHA</div>
+    <div class="formula tex" data-tex="4 \times 128 / 9 \approx 56.9 \approx \mathbf{57\times } memory reduction vs MHA"></div>
     <p>DeepSeek's own reported numbers: KV cache per token ~860 KB (MHA) vs ~34.6 KB (MLA) — roughly <strong>25×</strong> in one comparison, <strong>6–7×</strong> in another configuration. The formula gives the asymptotic ratio; constants depend on layer count, batch, and whether MOE layers are included.</p>
     <div class="interactive-panel">
       <h4>Interactive · KV Cache Memory Comparison</h4>
@@ -492,7 +494,7 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <span class="section-num">A</span>
     <h2>RoPE Mathematics — Rotation by Position</h2>
     <p>Rotary positional embedding treats consecutive dimension pairs as coordinates in 2D planes and rotates each plane by an angle proportional to token position. For dimension pair (2i, 2i+1) at position m:</p>
-    <div class="formula">R<sub>m</sub>(x<sub>2i</sub>, x<sub>2i+1</sub>) = (x<sub>2i</sub> cos(mθ<sub>i</sub>) − x<sub>2i+1</sub> sin(mθ<sub>i</sub>), &nbsp; x<sub>2i</sub> sin(mθ<sub>i</sub>) + x<sub>2i+1</sub> cos(mθ<sub>i</sub>))</div>
+    <div class="formula tex" data-tex="R_{m}(x_{2i}, x_{2i+1}) = (x_{2i} \cos(m\theta _{i}) - x_{2i+1} \sin(m\theta _{i}), \; x_{2i} \sin(m\theta _{i}) + x_{2i+1} \cos(m\theta _{i}))"></div>
     <p>Base frequencies θ<sub>i</sub> = 10000<sup>−2i/d</sup> (standard RoPE schedule). Position m enters through mθ<sub>i</sub> — that is why R<sub>m</sub> is <em>not</em> a single constant matrix: row m of the sequence uses rotation angle mθ, row n uses nθ.</p>
     <h3 style="margin-top:28px;">Concrete Four-Dimensional Example</h3>
     <p>Vector at position 0: [x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>]. Two pairs: (x<sub>1</sub>, x<sub>2</sub>) and (x<sub>3</sub>, x<sub>4</sub>). At position 0, rotation angle is 0 for both pairs (cos 0 = 1, sin 0 = 0), so the vector is unchanged: [x′<sub>1</sub>, x′<sub>2</sub>, x′<sub>3</sub>, x′<sub>4</sub>] = [x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>, x<sub>4</sub>].</p>
@@ -512,7 +514,7 @@ ul.dim { color: var(--text-dim); margin: 0 0 1em 1.5em; }
     <p>Naive RoPE breaks this: <strong>score = R<sub>m</sub>(x · W<sub>Q</sub>) · (R<sub>k</sub>(c<sub>k</sub> · W<sub>UK</sub>))<sup>T</sup></strong>. Rotation matrices R<sub>m</sub> and R<sub>k</sub> differ per position and cannot fold into a fixed W<sub>abs</sub>.</p>
     <h3 style="margin-top:28px;">Values Recovery</h3>
     <p>Values are not absorbed into queries. After softmax weights w (1×S):</p>
-    <div class="formula">output = w · V<sub>C</sub> = w · C<sub>KV</sub> · W<sub>UV</sub></div>
+    <div class="formula tex" data-tex="output = w \cdot V_{C} = w \cdot C_{KV} \cdot W_{UV}"></div>
     <p>W<sub>UV</sub> is applied to the full cached C<sub>KV</sub> (S × D<sub>C</sub>) to get V<sub>C</sub> (S × D), then weighted by attention. The cache itself remains C<sub>KV</sub>, never full V.</p>
   </div>
 </section>
@@ -557,20 +559,20 @@ Q_R = rope(c_q @ W_QR)           <span class="cmt"># (1, 8) — different per he
     <h3 style="margin-top:28px;">Equations 1–8: Setup and Basic Projections</h3>
     <p>Define input H<sup>t</sup> (our X), dimension variables d, d<sub>c</sub>, d′<sub>c</sub>, d<sub>h</sub>, d<sup>R</sup><sub>h</sub>, n<sub>h</sub>. Introduce weight matrices W<sup>DKV</sup>, W<sup>UK</sup>, W<sup>UV</sup>, W<sup>DQ</sup>, W<sup>UQ</sup>, W<sup>KR</sup>, W<sup>QR</sup>, W<sup>O</sup>. These are the trainable parameters — none are cached at inference except the latent outputs they produce.</p>
     <h3 style="margin-top:28px;">Equations 9–11: Latent Cache and Content K/V</h3>
-    <div class="formula">c<sup>KV</sup> = H<sup>t</sup> W<sup>DKV</sup> &nbsp;(9)&nbsp;&nbsp; k<sup>C</sup> = c<sup>KV</sup> W<sup>UK</sup> &nbsp;(10)&nbsp;&nbsp; v = c<sup>KV</sup> W<sup>UV</sup> &nbsp;(11)</div>
+    <div class="formula tex" data-tex="c^{KV} = H^{t} W^{DKV} \;(9)\;\; k^{C} = c^{KV} W^{UK} \;(10)\;\; v = c^{KV} W^{UV} \;(11)"></div>
     <p>Equation 9 produces the latent cache. Equations 10–11 up-project to content keys and values. Our whiteboard steps 2–4.</p>
     <h3 style="margin-top:28px;">Equations 12–13: Content Queries</h3>
-    <div class="formula">c<sup>Q</sup> = H<sup>t</sup> W<sup>DQ</sup> &nbsp;(12)&nbsp;&nbsp; q<sup>C</sup> = c<sup>Q</sup> W<sup>UQ</sup> &nbsp;(13)</div>
+    <div class="formula tex" data-tex="c^{Q} = H^{t} W^{DQ} \;(12)\;\; q^{C} = c^{Q} W^{UQ} \;(13)"></div>
     <p>Query down-projection and up-projection. Whiteboard steps 5–6. No RoPE on q<sup>C</sup>.</p>
     <h3 style="margin-top:28px;">Equations 14–15: RoPE Queries and Keys</h3>
-    <div class="formula">q<sup>R</sup> = RoPE(c<sup>Q</sup> W<sup>QR</sup>) &nbsp;(14)&nbsp;&nbsp; k<sup>R</sup> = Expand(RoPE(H<sup>t</sup> W<sup>KR</sup>)) &nbsp;(15)</div>
+    <div class="formula tex" data-tex="q^{R} = RoPE(c^{Q} W^{QR}) \;(14)\;\; k^{R} = Expand(RoPE(H^{t} W^{KR})) \;(15)"></div>
     <p>RoPE applied after projecting into the positional subspace. Whiteboard steps 7–10. Shared key in (15), per-head queries in (14).</p>
     <h3 style="margin-top:28px;">Equations 16–18: Attention</h3>
-    <div class="formula">q = [q<sup>C</sup>; q<sup>R</sup>] &nbsp;(16)&nbsp;&nbsp; k = [k<sup>C</sup>; k<sup>R</sup>] &nbsp;(17)</div>
-    <div class="formula">o = softmax(qk<sup>T</sup> / √(d<sub>h</sub>+d<sup>R</sup><sub>h</sub>)) · v &nbsp;(18)</div>
+    <div class="formula tex" data-tex="q = [q^{C}; q^{R}] \;(16)\;\; k = [k^{C}; k^{R}] \;(17)"></div>
+    <div class="formula tex" data-tex="o = \mathrm{softmax}(qk^{T} / \sqrt(d_{h}+d^{R}_{h})) \cdot v \;(18)"></div>
     <p>Concatenate, compute scores as sum of two bilinear terms, scale, softmax, apply to content values v only. RoPE path affects attention weights, not value content directly.</p>
     <h3 style="margin-top:28px;">Equation 19: Output Projection</h3>
-    <div class="formula">u<sup>T</sup> = o W<sup>O</sup> &nbsp;(19)</div>
+    <div class="formula tex" data-tex="u^{T} = o W^{O} \;(19)"></div>
     <p>Standard output projection to residual stream / logits. Completes the attention block.</p>
     <div class="callout"><p>When you open the DeepSeek-V3 PDF and see this wall of symbols, use this mapping: <strong>left side of whiteboard = eqs 9–13</strong>, <strong>right side = eqs 14–15</strong>, <strong>concatenation + softmax = eqs 16–18</strong>. The dashed "cache" boxes in the diagram correspond to c<sup>KV</sup> from (9) and k<sup>R</sup> from (15).</p></div>
   </div>
@@ -637,10 +639,10 @@ Q_R = rope(c_q @ W_QR)           <span class="cmt"># (1, 8) — different per he
     <h2>Memory Formulas — Worked Example at DeepSeek Scale</h2>
     <p>DeepSeek-V3 uses approximately: L = 61 layers, N = 128 heads, D<sub>H</sub> = 128, D<sub>L</sub> = 512 (= 4×128), D<sub>HR</sub> = 64 (= 128/2). Context S = 100,000 tokens, batch B = 1, fp16 (2 bytes).</p>
     <h3 style="margin-top:28px;">Multi-Head Attention</h3>
-    <div class="formula">2 × 2 × L × B × S × N × D<sub>H</sub> = 4 × 61 × 100000 × 128 × 128 × 2 bytes</div>
+    <div class="formula tex" data-tex="2 \times 2 \times L \times B \times S \times N \times D_{H} = 4 \times 61 \times 100000 \times 128 \times 128 \times 2 bytes"></div>
     <p>= 4 × 61 × 10<sup>5</sup> × 16384 × 2 ≈ <strong>800 GB</strong> (order of magnitude — matches the ~860 KB/token × 10<sup>5</sup> tokens scale cited in DeepSeek materials).</p>
     <h3 style="margin-top:28px;">MLA + RoPE</h3>
-    <div class="formula">2 × L × B × S × (D<sub>L</sub> + D<sub>HR</sub>) = 2 × 61 × 10<sup>5</sup> × (512 + 64) × 2 bytes</div>
+    <div class="formula tex" data-tex="2 \times L \times B \times S \times (D_{L} + D_{HR}) = 2 \times 61 \times 10^{5} \times (512 + 64) \times 2 bytes"></div>
     <p>= 2 × 61 × 10<sup>5</sup> × 576 × 2 ≈ <strong>14 GB</strong>. Ratio ≈ 800/14 ≈ <strong>57×</strong>.</p>
     <h3 style="margin-top:28px;">Per-Token Cache Footprint</h3>
     <table class="data-table">
@@ -790,9 +792,9 @@ Q_R = rope(c_q @ W_QR)           <span class="cmt"># (1, 8) — different per he
 <h2>The 57× Formula — Full Derivation</h2>
 
 <p>Start with bytes per token per layer (fp16, batch=1):</p>
-<div class="formula">MHA: 2 (K+V) × 2 (bytes) × N × D_H = 4 N D_H</div>
-<div class="formula">MLA+RoPE: 2 (bytes) × (D_L + D_HR) = 2 (4 D_H + D_H/2) = 2 × 4.5 D_H = 9 D_H</div>
-<div class="formula">Ratio = 4 N D_H / (9 D_H) = 4N/9</div>
+<div class="formula tex" data-tex="MHA: 2 (K+V) \times 2 (bytes) \times N \times D_H = 4 N D_H"></div>
+<div class="formula tex" data-tex="MLA+RoPE: 2 (bytes) \times (D_L + D_HR) = 2 (4 D_H + D_H/2) = 2 \times 4.5 D_H = 9 D_H"></div>
+<div class="formula tex" data-tex="Ratio = 4 N D_H / (9 D_H) = 4N/9"></div>
 <p>For N=128: 512/9 ≈ 56.89. Rounding gives ~57×.</p>
 <p>The factor 9 in the denominator is (D_L + D_HR) / D_H = 4.5, times 2 bytes. The factor 4N in the numerator is 2 (K+V) × 2 (bytes) × N / (2 bytes) simplified — or equivalently 2×2×N/2 = 4N when comparing element counts.</p>
 <p>Reported 25× in DeepSeek charts includes all layers (some MoE without full attention), implementation overhead, and possibly different precision. The 57× is the pure attention-cache theoretical ratio — both numbers are correct in context.</p>
@@ -1461,6 +1463,9 @@ document.getElementById('wbDots').innerHTML = wbSteps.map((_,i) =>
   `<div class="step-dot wb-dot" data-i="${i}">${i+1}</div>`).join('');
 
 </script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

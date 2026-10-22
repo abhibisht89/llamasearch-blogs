@@ -140,6 +140,8 @@ ul.content-list li { margin-bottom: 0.45em; }
 @media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -220,7 +222,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 <h2>Why Quantization Matters for Large Language Models</h2>
 <p>Every parameter in a large language model occupies memory. Token embeddings, positional embeddings, query/key/value projection matrices, feed-forward weights, layer normalization scale and shift parameters, the output projection head — each individual scalar is stored as a number in memory, and the <strong>bit width of that representation</strong> determines how much RAM or VRAM it consumes.</p>
 <p>Think of it like building a house: the house takes up area on a plot of land. Similarly, every parameter takes up bytes in memory. A 70-billion-parameter model where each weight is stored as a 64-bit floating-point number requires:</p>
-<div class="formula">Memory (bytes) = N<sub>params</sub> × (bits per param) ÷ 8</div>
+<div class="formula tex" data-tex="Memory (bytes) = N_{params} \times (bits per param) ÷ 8"></div>
 <p>For 70B parameters at 64 bits: 70 × 10<sup>9</sup> × 64 ÷ 8 = <strong>560 GB</strong>. At FP32 (32 bits): <strong>280 GB</strong>. At FP16 (16 bits): <strong>140 GB</strong>. Halving the bit width halves the memory — and that is exactly what quantization aims to do.</p>
 
 <div class="comparison">
@@ -269,7 +271,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 <li><strong>8 exponent bits</strong> — stored in biased form. Controls the <em>dynamic range</em>: how large or small a magnitude the format can represent.</li>
 <li><strong>23 mantissa bits</strong> — also called the significand. Controls <em>precision</em>: the spacing between representable values at a given magnitude.</li>
 </ul>
-<div class="formula">value = (−1)<sup>sign</sup> × 2<sup>(exponent − bias)</sup> × (1 + mantissa)</div>
+<div class="formula tex" data-tex="value = (-1)^{sign} \times 2^{(exponent - bias)} \times (1 + mantissa)"></div>
 <p>For FP32, the bias is 127. If sign = 0, exponent field = 128 (biased), and mantissa = 0.5703125, then: (−1)<sup>0</sup> × 2<sup>(128−127)</sup> × (1 + 0.5703125) = 1 × 2 × 1.5703125 = <strong>3.140625</strong>. Close to π — the remaining error comes from mantissa truncation.</p>
 
 <h3>Full walkthrough: decoding 3.140625 from bits</h3>
@@ -367,7 +369,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 <span class="section-num">03 · THE MEMORY EQUATION</span>
 <h2>Exact Byte Calculations for Model Weights</h2>
 <p>The memory formula is simple but its implications are staggering at scale:</p>
-<div class="formula">Total weight memory (GB) = N<sub>params</sub> × bits ÷ 8 ÷ 10<sup>9</sup></div>
+<div class="formula tex" data-tex="Total weight memory (GB) = N_{params} \times bits ÷ 8 ÷ 10^{9}"></div>
 
 <table class="data-table">
 <tr><th>Model Size</th><th>FP64</th><th>FP32</th><th>FP16 / BF16</th><th>FP8</th><th>INT8</th></tr>
@@ -428,7 +430,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 <li>Scale each value into the target range: qᵢ = round(xᵢ / α × 127)</li>
 <li>Store the quantized integers {qᵢ} and the scale α</li>
 </ol>
-<div class="formula">q = round( clip(x / α, −1, 1) × 127 ) &nbsp;&nbsp;·&nbsp;&nbsp; x̂ = q / 127 × α</div>
+<div class="formula tex" data-tex="q = round( clip(x / \alpha , -1, 1) \times 127 ) \;\;\cdot \;\; x̂ = q / 127 \times \alpha"></div>
 <p>Dequantization reverses the process: multiply each stored integer by α/127 to recover an approximation x̂ of the original x. The error |x − x̂| depends on how many distinct values the target format can represent between −127 and +127.</p>
 
 <h3>Worked example</h3>
@@ -473,7 +475,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 
 <h3>Clipping and round-to-nearest</h3>
 <p>Before rounding, values are typically <strong>clipped</strong> to [−1, 1] after dividing by α. This prevents values slightly above the maximum from wrapping or producing undefined behavior. Round-to-nearest-even (banker's rounding) is the IEEE default; for quantization, simple round-to-nearest-integer suffices:</p>
-<div class="formula">q = round( clip(x / α, −1, 1) × 127 )</div>
+<div class="formula tex" data-tex="q = round( clip(x / \alpha , -1, 1) \times 127 )"></div>
 <p>The scale factor α is sometimes called the <strong>scaling factor</strong> or <strong>scale tensor</strong>. In DeepSeek's fine-grained scheme, there is one α per 128-element block — not one α per entire activation tensor. Storing these scales adds overhead: one FP32 per block. For a 256-element vector split into two blocks, that is 8 extra bytes — negligible compared to the 256 bytes saved by using FP8 instead of FP32.</p>
 
 <div class="qa-box">
@@ -518,7 +520,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 <p>Weight gradients drive the optimizer update. Any precision loss here accumulates across millions of training steps. DeepSeek keeps wgrad and master weights in FP32 throughout.</p>
 
 <h3>Weight update and master weights</h3>
-<div class="formula">W<sub>new</sub> = W<sub>master</sub> − η × (∂L/∂W) &nbsp;&nbsp;[all FP32]</div>
+<div class="formula tex" data-tex="W_{new} = W_{master} - η \times (∂L/∂W) \;\;[all FP32]"></div>
 <p>After the update, master weights are cast to BF16 for storage. When the next forward pass needs them, they are converted to FP8 on-the-fly. The FP32 master copy is the source of truth; BF16 and FP8 are ephemeral views optimized for memory and compute.</p>
 
 <h3>Sensitive modules kept at higher precision</h3>
@@ -551,8 +553,8 @@ ul.content-list li { margin-bottom: 0.45em; }
 
 <h3>Backward pass formulas in detail</h3>
 <p>For a linear layer with y = Wx, the backward pass requires two Jacobians:</p>
-<div class="formula">∂L/∂x = (∂L/∂y) · W<sup>T</sup> &nbsp;&nbsp;(dgrad — input gradient)</div>
-<div class="formula">∂L/∂W = x<sup>T</sup> · (∂L/∂y) &nbsp;&nbsp;(wgrad — weight gradient)</div>
+<div class="formula tex" data-tex="∂L/∂x = (∂L/∂y) \cdot W^{T} \;\;(dgrad - input gradient)"></div>
+<div class="formula tex" data-tex="∂L/∂W = x^{T} \cdot (∂L/∂y) \;\;(wgrad - weight gradient)"></div>
 <p>DeepSeek's precision assignments for each operand:</p>
 <table class="data-table">
 <tr><th>Tensor</th><th>Stored as</th><th>Computed as</th><th>Result stored as</th></tr>
@@ -595,7 +597,7 @@ ul.content-list li { margin-bottom: 0.45em; }
 <h3>Weight matrices: 128×128 blocks</h3>
 <p>For a 256×256 weight matrix W, DeepSeek divides it into four 128×128 blocks: W₁₁, W₁₂, W₂₁, W₂₂. Each block gets its own scale factor. If W₁₁ contains an outlier, only W₁₁'s quantization suffers. W₁₂, W₂₁, W₂₂ remain precise.</p>
 
-<div class="formula">Block size N<sub>C</sub> = 128 &nbsp;·&nbsp; α<sub>block</sub> = max(|x|) within block &nbsp;·&nbsp; q = round(x / α<sub>block</sub> × 127)</div>
+<div class="formula tex" data-tex="Block size N_{C} = 128 \;\cdot \; \alpha _{block} = max(|x|) within block \;\cdot \; q = round(x / \alpha _{block} \times 127)"></div>
 
 <p>The DeepSeek-V3 Figure 7 schematic has four distinct regions:</p>
 <ol class="content-list" style="list-style:decimal;">
@@ -1324,10 +1326,10 @@ class FP8Linear(nn.Module):
 </div>
 
 <h3>A.2 Quantization Formulas</h3>
-<div class="formula">Symmetric quantization: &nbsp; q = round( clip(x / α, −1, 1) × S )</div>
-<div class="formula">Dequantization: &nbsp; x̂ = (q / S) × α</div>
-<div class="formula">Scale factor (per-block, online): &nbsp; α = max(|x<sub>block</sub>|)</div>
-<div class="formula">S = 127 for INT8; S = 127 for FP8 E4M3 (implementation-dependent)</div>
+<div class="formula tex" data-tex="Symmetric quantization: \; q = round( clip(x / \alpha , -1, 1) \times S )"></div>
+<div class="formula tex" data-tex="Dequantization: \; x̂ = (q / S) \times \alpha"></div>
+<div class="formula tex" data-tex="Scale factor (per-block, online): \; \alpha = max(|x_{block}|)"></div>
+<div class="formula tex" data-tex="S = 127 for INT8; S = 127 for FP8 E4M3 (implementation-dependent)"></div>
 
 <h3>A.3 DeepSeek-V3 Section 3.3 Checklist</h3>
 <p>Use this checklist when reading the paper or implementing FP8 training:</p>
@@ -1794,6 +1796,9 @@ window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 </script>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">
