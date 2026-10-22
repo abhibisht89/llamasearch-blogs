@@ -123,6 +123,8 @@ table.param-table th, table.param-table td { border: 1px solid var(--border); pa
 table.param-table th { background: var(--bg-card-alt); color: var(--accent); font-family: var(--mono); font-weight: 600; }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -336,7 +338,7 @@ table.param-table th { background: var(--bg-card-alt); color: var(--accent); fon
     <p>Hugging Face’s tensors sometimes need <strong>transpose</strong> versus naive PyTorch <code>Linear</code> layouts inherited from TensorFlow. Maintain a small allowlist of keys to transpose when copying.</p>
     <p><strong>Weight tying</strong>: in GPT-2, the token embedding matrix and the LM head matrix are the <em>same storage</em> — check <code>data_ptr()</code> equality. After copying weights, enforce <code>lm_head.weight = transformer.wte.weight</code> so training matches the architecture.</p>
     <p>The Transformer paper states the design explicitly: <em>“In our model, we share the same weight matrix between the two embedding layers and the pre-softmax linear transformation, similar to [30].”</em> Intuition: if two surface forms are semantically nearby, they should sit close together in <strong>input</strong> embedding space <em>and</em> invite similar <strong>output</strong> logits. Tying enforces that symmetry instead of learning two unrelated linear maps. OpenAI’s TensorFlow reference forwards <code>wte</code> twice — bottom for embeddings, top for logits — so gradients from the classifier and from the embedding pathway <strong>sum into one shared tensor</strong>.</p>
-    <div class="formula">\text{Shared rows} \approx 50257 \times 768 \;\Rightarrow\; \sim 3.86\times 10^{7}\ \text{parameters saved }(\approx 30\text{–}35\%\ \text{of }124\text{M})</div>
+    <div class="formula tex" data-tex="\text{Shared rows} \approx 50257 \times 768 \;\Rightarrow\; \sim 3.86\times 10^{7}\ \text{parameters saved }(\approx 30\text{-}35\%\ \text{of }124\text{M})"></div>
     <div class="comparison">
       <div class="card"><h3 style="color:var(--accent3);">Why tie?</h3><p>Inductive bias that “input token space” and “output logit space” should align; also saves ~<strong>38M</strong> parameters — a large fraction of 124M.</p></div>
       <div class="card"><h3 style="color:var(--danger);">If you forget</h3><p>You train extra capacity at the classifier, diverge from the reference parameterization, and can hurt sample efficiency.</p></div>
@@ -508,7 +510,7 @@ table.param-table th { background: var(--bg-card-alt); color: var(--accent); fon
     <span class="section-num">12</span>
     <h2>Vocabulary padding: <code>50257 → 50304</code></h2>
     <p><code>50257</code> is prime-ish and awkward for GPU tiling. Rounding up to <code>50304</code> (divisible by large powers of two) aligns GEMM shapes with efficient kernels. Extra rows act like <strong>never-used tokens</strong>; optimization drives their logits down like any out-of-distribution symbol.</p>
-    <div class="formula">50304 = 50257 + 47 \quad\text{“dummy” tokens; } 50304 \bmod 64 = 0</div>
+    <div class="formula tex" data-tex="50304 = 50257 + 47 \quad\text{&quot;dummy&quot; tokens; } 50304 \bmod 64 = 0"></div>
     <div class="callout"><p><strong>Trade-off:</strong> Slightly more FLOPs and memory in the embedding / head — often still a net win when kernels avoid slow tail tiles.</p></div>
     <p>CUDA kernels tile work into multiples of <strong>16 / 32 / 64</strong>. “Ugly” dimensions force <strong>boundary</strong> micro-kernels that process ragged tails slowly. Padding vocabulary to <code>50304</code> (highly composite — divisible by <code>64</code>, <code>128</code>, etc.) aligns the huge embedding / LM-head GEMMs with fast tiles. Empirically, expect a few percent shaved off step time once everything else is optimized; on some PyTorch stacks the win can be much larger (<strong>~30%</strong> class improvements have been observed when tail tiles were especially painful) — always measure on your build.</p>
   </div>
@@ -524,7 +526,7 @@ table.param-table th { background: var(--bg-card-alt); color: var(--accent); fon
       <div class="card"><h3>Paper-faithful nuance</h3><p>GPT-3’s cosine horizon is <em>shorter</em> than the full training length — the LR sits at <code>0.1 × peak</code> for the tail. Many small-scale reproductions instead cosine all the way to the final step for simplicity.</p></div>
       <div class="card"><h3>Practical note</h3><p>Warmup lengths around <strong>715</strong> steps are mild; some practitioners use far fewer warmup steps at 124M scale without catastrophe. Treat the paper numbers as a strong default, not a uniqueness theorem.</p></div>
     </div>
-    <div class="formula">\mathrm{lr}(t) = \begin{cases} \frac{t+1}{W}\,\eta_{\max} & t < W \\ \eta_{\min} + \tfrac12(\eta_{\max}-\eta_{\min})(1+\cos\pi\frac{t-W}{T-W}) & t \ge W \end{cases}</div>
+    <div class="formula tex" data-tex="\mathrm{lr}(t) = \begin{cases} \frac{t+1}{W}\,\eta_{\max} &amp; t &lt; W \\ \eta_{\min} + \tfrac12(\eta_{\max}-\eta_{\min})(1+\cos\pi\frac{t-W}{T-W}) &amp; t \ge W \end{cases}"></div>
     <div class="interactive-panel">
       <h3>Learning rate schedule visualizer</h3>
       <p>Drag sliders — same functional form as the training section (normalized time axis).</p>
@@ -543,7 +545,7 @@ table.param-table th { background: var(--bg-card-alt); color: var(--accent); fon
     <h2>Weight decay &amp; fused AdamW</h2>
     <p>GPT-3 uses <strong>Adam</strong> with <code>β₁=0.9</code>, <code>β₂=0.95</code>, <code>ε=1e-8</code>, plus <strong>weight decay 0.1</strong> applied to “2D” parameters (weights in matmuls / embeddings), not biases or LayerNorm γ/β.</p>
     <p>In modern PyTorch, <strong>AdamW</strong> (decoupled weight decay) is the standard drop-in: treat it as the variant you want unless you are deliberately reproducing historical L2-on-gradient quirks.</p>
-    <div class="formula">w_{t+1} = w_t - \eta\, \hat m_t / (\sqrt{\hat v_t}+\epsilon) - \lambda \eta\, w_t \quad\text{(decoupled AdamW view)}</div>
+    <div class="formula tex" data-tex="w_{t+1} = w_t - \eta\, \hat m_t / (\sqrt{\hat v_t}+\epsilon) - \lambda \eta\, w_t \quad\text{(decoupled AdamW view)}"></div>
     <p>When available, <code>fused=True</code> in <code>torch.optim.AdamW</code> batches optimizer kernels — another small but free throughput win on CUDA.</p>
     <p>PyTorch historically defaulted <code>fused=False</code> for compatibility; guard with <code>inspect.signature(torch.optim.AdamW)</code> if you support older installs. A fused kernel can shave a few milliseconds per step once the model is already compile- and attention-optimized — in timed runs, dropping from ~<strong>93 ms</strong> to ~<strong>90 ms</strong> per step has been observed purely from fused AdamW on GPT-2–shaped workloads.</p>
     <p>Typical parameter accounting: on the order of <strong>~50</strong> tensors receive weight decay (matrices + embeddings) while <strong>~98</strong> small tensors (biases, LayerNorm gains) sit in the no-decay group — only ~<strong>100k</strong> parameters skip decay, the vast majority are regularized.</p>
@@ -575,7 +577,7 @@ table.param-table th { background: var(--bg-card-alt); color: var(--accent); fon
     <p>GPT-3 reports batch sizes in <strong>tokens</strong> (~0.5M). If a single forward pass only fits <code>B·T</code> tokens per GPU, accumulate <code>k</code> micro-batches before <code>optimizer.step()</code> so effective tokens per step matches the recipe.</p>
     <p>Because <code>CrossEntropyLoss</code> defaults to <strong>mean</strong> over tokens, divide each micro-batch loss by <code>k</code> before <code>backward</code> so gradients match one large batch.</p>
     <div class="callout"><p><strong>Toy sanity check (MSE):</strong> Four scalar examples with <code>MSELoss(reduction='mean')</code> produce gradients scaled by <code>1/4</code>. If you instead run four backward passes on single-example means and sum gradients, you have accidentally optimized the <strong>sum</strong> objective — gradients differ by exactly the missing normalizer. Fix: divide each micro-loss by <code>grad_accum_steps</code> (equivalently multiply the summed loss by <code>1/k</code>) so that <code>k</code> serial backwards re-create the <strong>mean</strong> over the large logical batch.</p></div>
-    <div class="formula">\text{Let } L = \frac{1}{BT}\sum_{i=1}^{BT} \ell_i.\quad \text{Micro-step } j \text{ uses } \tilde{L}_j = \frac{1}{k}\cdot \frac{1}{|\text{micro}|}\sum_{i\in \text{micro}_j} \ell_i \;\Rightarrow\; \sum_{j=1}^{k} \tilde{L}_j \text{ matches the full mean gradient.}</div>
+    <div class="formula tex" data-tex="\text{Let } L = \frac{1}{BT}\sum_{i=1}^{BT} \ell_i.\quad \text{Micro-step } j \text{ uses } \tilde{L}_j = \frac{1}{k}\cdot \frac{1}{|\text{micro}|}\sum_{i\in \text{micro}_j} \ell_i \;\Rightarrow\; \sum_{j=1}^{k} \tilde{L}_j \text{ matches the full mean gradient.}"></div>
     <p>Concrete token accounting for GPT-3-small-style settings: target <code>2^{19} = 524{,}288</code> tokens per optimizer step. With <code>B=16</code>, <code>T=1024</code>, each micro-forward processes <code>16{,}384</code> tokens, so single-GPU accumulation requires <strong>32</strong> micro-steps before <code>optimizer.step()</code>. At ~<strong>100 ms</strong> per micro-forward on a tuned A100-class GPU, that is ~<strong>3 s</strong> per optimizer step — acceptable because you are simulating an enormous logical batch.</p>
     <div class="interactive-panel">
       <h3>Batch / gradient accumulation calculator</h3>
@@ -612,7 +614,7 @@ table.param-table th { background: var(--bg-card-alt); color: var(--accent); fon
     <span class="section-num">17</span>
     <h2>Gradient clipping (<code>max_norm=1.0</code>)</h2>
     <p>After <code>loss.backward()</code>, compute the global L2 norm across all gradients. If it exceeds <code>max_norm</code>, rescale gradients uniformly so the norm equals the cap. This dampens rare explosive minibatches.</p>
-    <div class="formula">\textbf{g} \leftarrow \textbf{g} \cdot \min\left(1,\;\frac{\theta}{\|\textbf{g}\|_2}\right)</div>
+    <div class="formula tex" data-tex="\textbf{g} \leftarrow \textbf{g} \cdot \min\left(1,\;\frac{\theta}{\|\textbf{g}\|_2}\right)"></div>
     <p>Early in GPT-2 training from scratch, total gradient norms in the <strong>~30</strong> range are common, then they settle <strong>below 1.0</strong> as the model exits the “everything is wrong” regime. Sporadic spikes usually merit investigation — bad data, too-large LR, or numerical edge cases.</p>
     <div class="code-panel" style="margin-top:16px;">
       <div class="code-header"><span class="code-filename">train.py</span><span class="code-lines">L72–73 / —</span></div>
@@ -1043,6 +1045,8 @@ initThroughput();
 initPlayground();
 </script>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

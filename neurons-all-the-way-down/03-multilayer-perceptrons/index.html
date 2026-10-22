@@ -121,6 +121,8 @@ canvas { border-radius: var(--radius); display: block; max-width: 100%; height: 
 .play-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-top: 20px; }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -165,7 +167,7 @@ canvas { border-radius: var(--radius); display: block; max-width: 100%; height: 
     <span class="section-num">01</span>
     <h2>Why the table explodes</h2>
     <p>If context is a single character, there are <code>27</code> possible histories. If you use <strong>two</strong> characters, there are <code>27² = 729</code> rows. For <strong>three</strong> characters, <code>27³ = 19,683</code>. Each extra character in the context multiplies the number of distinct histories by the alphabet size.</p>
-    <div class="formula">|\text{rows}| = V^{\text{block\_size}} &nbsp; (here <code>V = 27</code>)</div>
+    <div class="formula tex" data-tex="\lvert\text{rows}\rvert = V^{\text{block\_size}} (\text{here }V=27)"></div>
     <p>Most rows get <strong>few or zero counts</strong> — sparse, unreliable estimates — while memory and lookup cost grow <strong>exponentially</strong> in context length. You need a model that shares statistical strength across similar histories instead of storing a separate count for every exact string.</p>
     <div class="interactive-panel">
       <h3>Context window vs table size</h3>
@@ -291,7 +293,7 @@ canvas { border-radius: var(--radius); display: block; max-width: 100%; height: 
     <p>Concrete shape story when <code>block_size = 3</code> and <code>n_emb = 2</code>: embeddings have shape <code>(N, 3, 2)</code>. You cannot multiply that directly by <code>W1</code> shaped <code>(6, 100)</code> — you need a <code>(N, 6)</code> layout. One route is <code>torch.cat(torch.unbind(emb, dim=1), dim=1)</code>, which generalizes to any <code>block_size</code> without hard-coding three slices. Another is <code>emb.view(N, -1)</code> or <code>view(-1, block_size * n_emb)</code>, which stacks the three 2-vectors into one row of six entries per example — the same concatenation, but usually <strong>without an extra memory allocation</strong> when the underlying tensor is already contiguous in the right order.</p>
     <p>After <code>emb_flat @ W1 + b1</code>, <code>tanh</code> squashes activations into <strong>(−1, 1)</strong>. For a batch of 32 examples and 100 hidden units, hidden activations have shape <strong>32 × 100</strong>. The bias vector has length 100; broadcasting expands it to every row so the <strong>same</strong> bias is added to each example — verify alignment (rightmost dimensions match or are 1) whenever you add.</p>
     <p>The output layer maps 100 hidden units to <strong>27</strong> logits per row; biases length 27. Manual softmax: exponentiate logits to get nonnegative “counts,” divide by the row sum so each row sums to <strong>1</strong>. On an untrained net some assigned probabilities look plausible (e.g. ~0.2 on one position) while others are tiny (e.g. ~0.07) — that spread collapses only after optimization.</p>
-    <div class="formula">\text{logits} = W_2^\top \tanh(W_1^\top \text{emb\_flat} + b_1) + b_2</div>
+    <div class="formula tex" data-tex="\text{logits} = W_2^\top \tanh(W_1^\top \text{emb\_flat} + b_1) + b_2"></div>
     <div class="interactive-panel">
       <h3>Forward pass animation</h3>
       <p>Step through the computational chain for one minibatch (conceptual shapes).</p>
@@ -313,7 +315,7 @@ canvas { border-radius: var(--radius); display: block; max-width: 100%; height: 
       </div>
       <p class="step-caption" id="fpCaption">Start: integer context tensor <code>X</code> indexes shared embedding rows.</p>
     </div>
-    <div class="formula">p_i = \frac{e^{z_i}}{\sum_j e^{z_j}} &nbsp; \text{(softmax over logits } z\text{)}</div>
+    <div class="formula tex" data-tex="p_i = \frac{e^{z_i}}{\sum_j e^{z_j}} \text{(softmax over logits } z\text{)}"></div>
     <div class="code-progression">
       <div class="btn-group">
         <button type="button" class="btn active" onclick="mlpStep(this,'mlp1')">Step 1: Shapes</button>
@@ -403,13 +405,13 @@ canvas { border-radius: var(--radius); display: block; max-width: 100%; height: 
     <span class="section-num">08</span>
     <h2>Cross-entropy loss</h2>
     <p>For each example, you want high probability on the true class <code>Y[i]</code>. The average negative log probability is the <strong>cross-entropy</strong> between a one-hot target and the softmax of logits. A manual construction: build <code>probs</code> with softmax along the class dimension, then index each row <code>i</code> at column <code>Y[i]</code> — in code, pair <code>torch.arange(0, N)</code> (or an equivalent row index) with <code>Y</code> to gather the assigned probability per example, take <code>log</code>, negate, and mean. PyTorch <code>F.cross_entropy(logits, Y)</code> implements the same scalar in one call — fused, gradient-friendly, and <strong>numerically stable</strong> (log-sum-exp shift trick internally; avoids <code>exp</code> overflow on large logits).</p>
-    <div class="formula">\mathcal{L} = -\frac{1}{N}\sum_i \log \frac{e^{z_{i,y_i}}}{\sum_j e^{z_{i,j}}}</div>
+    <div class="formula tex" data-tex="\mathcal{L} = -\frac{1}{N}\sum_i \log \frac{e^{z_{i,y_i}}}{\sum_j e^{z_{i,j}}}"></div>
     <p>Implementing “softmax, then log, then pick the label column, then mean” as separate tensor ops materializes intermediate tensors and is easy to get slightly wrong. <code>F.cross_entropy(logits, Y)</code> is the standard shortcut: same scalar loss, but forward and backward are fused and tuned.</p>
     <div class="callout warn">
       <p><strong>Numerical stability:</strong> suppose logits are <code>[-2, 3, -3, 0, 5]</code>. Exponentiating and normalizing yields a perfectly fine probability vector. If one logit becomes very negative (e.g. <code>-100</code>), <code>exp</code> underflows toward zero — still safe. If a logit becomes very positive (e.g. <code>+100</code>), <code>exp(100)</code> overflows finite floating-point range and you get <code>inf</code> / <code>nan</code> in the softmax pipeline.</p>
     </div>
     <p>Softmax is invariant to adding the <strong>same constant</strong> to every logit: subtracting <code>max(logits)</code> sends the largest entry to <strong>0</strong> and shifts the rest negative, so exponentials stay bounded. PyTorch applies that (log-sum-exp) trick inside <code>cross_entropy</code>. You can verify in a scratch cell: add <code>+1</code>, <code>+2</code>, or <code>-3</code> to all logits — the normalized probabilities do not change, even though raw exponentials would differ.</p>
-    <div class="formula">\text{softmax}(z)_i = \frac{e^{z_i - \max_j z_j}}{\sum_k e^{z_k - \max_j z_j}}</div>
+    <div class="formula tex" data-tex="\text{softmax}(z)_i = \frac{e^{z_i - \max_j z_j}}{\sum_k e^{z_k - \max_j z_j}}"></div>
     <div class="jupyter-cell">
       <div class="cell-header">
         <span class="cell-label">In [7]</span>
@@ -1102,6 +1104,8 @@ onScroll();
 
 </script>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">
