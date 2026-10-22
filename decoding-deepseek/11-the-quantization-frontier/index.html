@@ -150,22 +150,21 @@ ul.content-list li { margin-bottom: 0.45em; }
 </nav>
 
 <nav class="nav nav-reveal" id="nav">
-  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">The Quantization Frontier</a>
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Decoding DeepSeek</a>
   <div class="nav-links">
     <a href="#s0">Intro</a><a href="#s1">Why Quantize</a><a href="#s2">IEEE 754</a><a href="#s3">Memory</a>
     <a href="#s4">Quant Math</a><a href="#s5">Mixed Precision</a><a href="#s6">Fine-Grained</a>
     <a href="#s7">Accumulation</a><a href="#s8">E4M3</a><a href="#s9">Online</a>
     <a href="#s9b">Hardware</a><a href="#s9c">Paper Map</a><a href="#s10">Five Innovations</a>
     <a href="#s-connections">Pillars</a><a href="#s-impl">Implementation</a>
-    <a href="#s11">Playground</a><a href="#s-recap">Recap</a><a href="#s12">Summary</a>
-  </div>
+    <a href="#s11">Playground</a></div>
 </nav>
 
 <header class="hero" id="top">
   <div class="container">
     <span class="section-num">DECODING DEEPSEEK · CHAPTER 11</span>
     <h1>The Quantization Frontier</h1>
-    <p class="subtitle">From FP32 to DeepSeek's FP8 Revolution — how the final architectural pillar compresses memory, accelerates matrix multiplication, and preserves accuracy through five carefully engineered innovations.</p>
+    <p class="subtitle">FP32 to FP8 — DeepSeek's quantization stack.</p>
     <div class="stats">
       <div class="stat"><span class="stat-val">5</span><span class="stat-label">Innovations</span></div>
       <div class="stat"><span class="stat-val">8-bit</span><span class="stat-label">FP8 Training</span></div>
@@ -1108,76 +1107,6 @@ def fp8_gemm(W, X, NC=128):
 </div>
 </section>
 
-<section class="section fade-in" id="s12">
-<div class="container">
-<span class="section-num">12 · SUMMARY</span>
-<h2>Key Takeaways</h2>
-<ul class="content-list">
-<li><strong>Quantization</strong> reduces parameter precision from higher bit widths (FP32) to lower ones (FP8), cutting memory and accelerating compute with acceptable accuracy loss.</li>
-<li><strong>IEEE 754</strong> defines floating-point layout: 1 sign bit + exponent bits (range) + mantissa bits (precision). FP32 = 32 bits, FP16 = 16 bits, BF16 = 16 bits with FP32 range, FP8 = 8 bits in E4M3 or E5M2 variants.</li>
-<li><strong>Memory scales linearly</strong> with bit width: a 70B model needs 280 GB at FP32, 140 GB at FP16, 70 GB at FP8.</li>
-<li><strong>Quantization math</strong> uses a scale factor α = max(|x|), then q = round(x/α × 127). Outliers destroy per-tensor precision.</li>
-<li><strong>Mixed precision</strong> keeps master weights and wgrad in FP32, computes GEMM in FP8, stores activations in BF16. Sensitive modules stay at higher precision.</li>
-<li><strong>Fine-grained quantization</strong> splits tensors into 128-element (activations) or 128×128 (weights) blocks, each with its own scale factor.</li>
-<li><strong>Accumulation precision</strong> promotes partial sums from ~14-bit Tensor Core accumulators to FP32 CUDA Core registers every 128 elements.</li>
-<li><strong>E4M3 everywhere</strong> works because per-block scaling eliminates the need for E5M2's extra range.</li>
-<li><strong>Online quantization</strong> computes scale factors from current data, avoiding overflow from stale historical maxima.</li>
-</ul>
-
-<h3>Precision hierarchy — the complete picture</h3>
-<p>Think of DeepSeek's precision stack as four tiers, from highest to lowest fidelity:</p>
-<div class="flow">
-<div class="flow-step"><strong>Tier 1 — FP32:</strong> Master weights, weight gradients, optimizer moments, GEMM accumulation after promotion</div>
-<div class="flow-arrow">↓</div>
-<div class="flow-step"><strong>Tier 2 — BF16:</strong> Activation storage, weight storage, dgrad storage, sensitive module compute</div>
-<div class="flow-arrow">↓</div>
-<div class="flow-step"><strong>Tier 3 — FP8 E4M3:</strong> Bulk GEMM operand compute on Tensor Cores (forward + backward)</div>
-<div class="flow-arrow">↓</div>
-<div class="flow-step"><strong>Tier 4 — Scale factors (FP32):</strong> One α per 128-element block, stored alongside FP8 data for dequantization</div>
-</div>
-<p>Data flows down the tiers during computation (BF16 → FP8 for GEMM) and up the tiers for storage (FP32 accumulation → BF16 storage). The tiers are not a one-way street — they form a cycle synchronized with the training loop.</p>
-
-<h3>Numbers that matter</h3>
-<table class="data-table">
-<tr><th>Metric</th><th>Value</th><th>Context</th></tr>
-<tr><td>FP32 bits</td><td>32</td><td>1 sign + 8 exp + 23 mantissa</td></tr>
-<tr><td>BF16 bits</td><td>16</td><td>Same exponent range as FP32</td></tr>
-<tr><td>FP8 bits</td><td>8</td><td>E4M3: 4 exp + 3 mantissa</td></tr>
-<tr><td>Block size N<sub>C</sub></td><td>128</td><td>Activations and promotion interval</td></tr>
-<tr><td>Weight block</td><td>128×128</td><td>Weight matrix tiles</td></tr>
-<tr><td>Accumulation error (no promo)</td><td>~2%</td><td>At K=4096, ~14-bit accumulator</td></tr>
-<tr><td>Memory savings FP32→FP8</td><td>4×</td><td>32 bits → 8 bits per parameter</td></tr>
-<tr><td>DeepSeek-V3 params</td><td>671B</td><td>~37B active per token (MoE)</td></tr>
-<tr><td>FP8 weight memory</td><td>671 GB</td><td>671B × 1 byte</td></tr>
-</table>
-
-<div class="callout ok"><p>FP8 training completes the four pillars of DeepSeek-V3 — Multi-Head Latent Attention, Mixture of Experts, Multi-Token Prediction, and quantization — which together enabled pre-training a 671B-parameter model at a fraction of the cost of comparable dense models.</p></div>
-
-<h3>The DeepSeek philosophy: efficiency through integration</h3>
-<p>DeepSeek's approach across all four pillars follows a consistent pattern: take established techniques (multi-head attention, MoE, speculative decoding, mixed precision), identify the specific bottleneck (KV cache memory, load balancing, inference latency, FP8 accumulation error), and engineer a targeted fix (latent attention, aux-loss-free routing, multi-token prediction, fine-grained online FP8). Quantization is no exception. FP8 training existed as a concept; DeepSeek made it work at 671B scale by solving the outlier, accumulation, and scale-staleness problems simultaneously.</p>
-
-<h3>Implementation summary</h3>
-<p>A DeepSeek-style FP8 training stack applies the following policy:</p>
-<ul class="content-list">
-<li>Use BF16/FP32 for embeddings, attention softmax, normalization, gating, and output head</li>
-<li>Implement per-128-element block scaling with online α computation</li>
-<li>Route FP8 GEMM through Tensor Cores with FP32 promotion every 128 accumulations</li>
-<li>Keep master weights and weight gradients in FP32 throughout training</li>
-<li>Use E4M3 uniformly — do not mix E4M3 forward with E5M2 backward</li>
-</ul>
-<p>Section 3.3 of the DeepSeek-V3 paper maps directly to the sections above: Figure 6 (mixed precision) and Figure 7 (fine-grained scaling + accumulation) decode as precision labels on the y = Wx pipeline.</p>
-
-<div class="qa-box">
-<div class="q">Can these techniques be used for inference-only quantization?</div>
-<p>Yes — post-training quantization (PTQ) and quantization-aware training (QAT) apply the same scaling principles. DeepSeek's online per-block scaling is particularly useful for dynamic activation ranges during inference. The mixed precision decisions (which layers stay at BF16) transfer directly to deployment. Tools like llama.cpp, vLLM, and TensorRT-LLM implement similar per-block INT8/FP8 quantization for inference.</p>
-</div>
-</div>
-</section>
-
-
-
-
-
 <section class="section fade-in" id="s-connections">
 <div class="container">
 <span class="section-num">CONNECTIONS · DEEPSEEK ARCHITECTURE</span>
@@ -1447,58 +1376,10 @@ class FP8Linear(nn.Module):
 </div>
 </div>
 
-<h3>A.6 Key Numbers to Remember</h3>
-<table class="data-table">
-<tr><th>Number</th><th>Meaning</th></tr>
-<tr><td>32 bits</td><td>FP32 — master weights, wgrad, accumulation</td></tr>
-<tr><td>16 bits</td><td>BF16 — activation and weight storage</td></tr>
-<tr><td>8 bits</td><td>FP8 E4M3 — GEMM computation</td></tr>
-<tr><td>128</td><td>Block size N<sub>C</sub> for activations; promotion interval for accumulation</td></tr>
-<tr><td>128×128</td><td>Block size for weight matrix quantization</td></tr>
-<tr><td>127</td><td>Quantization scale maximum (INT8/FP8 symmetric)</td></tr>
-<tr><td>240</td><td>Approximate E4M3 maximum representable value</td></tr>
-<tr><td>~14 bits</td><td>Tensor Core internal accumulation precision</td></tr>
-<tr><td>~2%</td><td>GEMM error at K=4096 without FP32 promotion</td></tr>
-<tr><td>671B</td><td>DeepSeek-V3 total parameters</td></tr>
-<tr><td>70 GB</td><td>671B params at FP8 weight storage</td></tr>
-<tr><td>280 GB</td><td>70B params at FP32 weight storage</td></tr>
-</table>
 </div>
 </section>
 
 
-
-<section class="section fade-in" id="s-recap">
-<div class="container">
-<span class="section-num">FINAL RECAP</span>
-<h2>Review Questions</h2>
-<ol class="content-list" style="list-style:decimal;">
-<li>What are the three fields of an IEEE 754 floating-point number, and what does each control?</li>
-<li>How many bytes does a 70B-parameter model require at FP32, BF16, and FP8?</li>
-<li>Write the quantization formula. What is α? What happens when α is stale?</li>
-<li>In DeepSeek's forward pass, what precision are inputs stored at, computed at, and outputs stored at?</li>
-<li>Why is wgrad stored in FP32 but dgrad stored in BF16?</li>
-<li>What is the outlier problem in per-tensor quantization? How does fine-grained scaling fix it?</li>
-<li>What is N<sub>C</sub> = 128 and why does DeepSeek use that block size?</li>
-<li>What is accumulation precision? What error occurs at K=4096 without promotion?</li>
-<li>What is the difference between E4M3 and E5M2? Why does DeepSeek use E4M3 everywhere?</li>
-<li>What is the difference between online and delayed quantization?</li>
-<li>Name the five sensitive modules that DeepSeek keeps at higher precision.</li>
-<li>How do quantization, MLA, MoE, and MTP combine to make 671B training feasible?</li>
-</ol>
-<h3>Chapter statistics</h3>
-<table class="data-table">
-<tr><th>Metric</th><th>Count</th></tr>
-<tr><td>Major sections</td><td>20+</td></tr>
-<tr><td>Interactive demos</td><td>9</td></tr>
-<tr><td>DeepSeek innovations covered</td><td>5</td></tr>
-<tr><td>Float formats explained</td><td>6 (FP32, FP16, BF16, INT8, E4M3, E5M2)</td></tr>
-<tr><td>Paper sections mapped</td><td>3.3, 3.3.1, 3.3.2, 3.3.3</td></tr>
-<tr><td>Q&amp;A boxes</td><td>12+</td></tr>
-</table>
-<p>Quantization completes the infrastructure pillar of Decoding DeepSeek — alongside Multi-Head Latent Attention, Mixture of Experts, and Multi-Token Prediction, it explains how DeepSeek-V3 was built.</p>
-</div>
-</section>
 
 <nav class="chapter-next" aria-label="Chapter">
   <a class="chapter-prev" href="../10-predicting-many-futures/">← Predicting Many Futures</a>

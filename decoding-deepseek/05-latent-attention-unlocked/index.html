@@ -140,21 +140,19 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18p
 </nav>
 
 <nav class="nav nav-reveal" id="nav">
-  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Latent Attention Unlocked</a>
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Decoding DeepSeek</a>
   <div class="nav-links">
     <a href="#s0">Introduction</a><a href="#s1">KV Recap</a><a href="#s2">MQA &amp; GQA</a>
     <a href="#s3">Best of Both</a><a href="#s4">Latent Space</a><a href="#s5">Absorption</a>
     <a href="#s6">Inference</a><a href="#s7">Memory</a><a href="#s8">Code</a>
-    <a href="#s9">Dimensions</a>    <a href="#s10">Playground</a><a href="#s-deep">Deep Dive</a><a href="#s-recap">Recap</a>
-<a href="#s-summary">Summary</a>
-  </div>
+    <a href="#s9">Dimensions</a>    <a href="#s10">Playground</a></div>
 </nav>
 
 <header class="hero" id="top">
   <div class="container">
     <p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 05</p>
     <h1>Latent Attention Unlocked</h1>
-    <p class="subtitle">Multi-Head Latent Attention from Theory to Code — DeepSeek's core innovation that compresses the KV cache through low-rank latent projections while preserving multi-head diversity.</p>
+    <p class="subtitle">MLA — compress the KV cache, keep multi-head diversity.</p>
     <div class="stats">
       <div class="stat"><span class="stat-val">14</span><span class="stat-label">Core Sections</span></div>
       <div class="stat"><span class="stat-val">8</span><span class="stat-label">Interactive Demos</span></div>
@@ -1062,135 +1060,6 @@ self.ln   = nn.LayerNorm(<span class="num">4</span>)             <span class="cm
 
     <p>MLA is orthogonal to quantization — DeepSeek could further compress C<sub>KV</sub> with INT8 storage for additional savings. The latent compression is architectural, not a precision reduction hack.</p>
 
-  </div>
-</section>
-
-<section class="section fade-in" id="s-summary">
-  <div class="container">
-    <span class="section-num">∞</span>
-    <h2>Summary — The Best of Both Worlds</h2>
-
-    <p>Multi-Head Latent Attention is DeepSeek's answer to a problem that stumped the field for years: how to shrink the KV cache without making every attention head read the same keys and values.</p>
-
-    <div class="comparison">
-      <div class="card">
-        <h3>What Changed</h3>
-        <ul style="color:var(--text-dim);margin:0 0 0 1.2em;">
-          <li>Keys and values are not cached directly</li>
-          <li>Input embeddings are down-projected to latent space via W<sub>DKV</sub></li>
-          <li>Only C<sub>KV</sub> is cached — one matrix, d<sub>L</sub> columns per token</li>
-          <li>Up-projections W<sub>UK</sub>, W<sub>UV</sub> recover head-specific K and V</li>
-          <li>Absorption trick folds fixed weights into query and output paths</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>What Was Achieved</h3>
-        <ul style="color:var(--text-dim);margin:0 0 0 1.2em;">
-          <li>~57× KV cache reduction at DeepSeek scale</li>
-          <li>400 GB → ~6 GB at 100K context</li>
-          <li>Full multi-head diversity preserved</li>
-          <li>Linear compute growth in context length maintained</li>
-          <li>Low inference cost without quality collapse</li>
-        </ul>
-      </div>
-    </div>
-
-    <h3 style="margin-top:28px;">Seven Key Takeaways</h3>
-    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;line-height:2.2;">
-      <li><strong>Inference repeats work.</strong> Without caching, every new token triggers full recomputation of all prior attention states.</li>
-      <li><strong>Only the last context vector matters</strong> for next-token prediction — but computing it requires the full prefix via attention.</li>
-      <li><strong>KV cache saves compute but costs memory</strong> — growing linearly with context, reaching 400 GB at DeepSeek scale with standard MHA.</li>
-      <li><strong>MQA and GQA reduce memory by sharing K/V</strong> across heads or groups — but degrade quality by limiting head diversity.</li>
-      <li><strong>MLA compresses via latent space:</strong> C<sub>KV</sub> = X · W<sub>DKV</sub> replaces separate K and V caches with one d<sub>L</sub>-dimensional matrix per token.</li>
-      <li><strong>The absorption trick</strong> folds W<sub>UK</sub><sup>T</sup> into W<sub>Q</sub> at inference, eliminating the need to materialize or cache keys.</li>
-      <li><strong>Per-head W<sub>UK</sub> and W<sub>UV</sub></strong> ensure reconstructed K and V differ across heads — preserving MHA-quality diversity from a shared latent bottleneck.</li>
-    </ol>
-
-    <div class="callout ok"><p>Latent spaces have existed in machine learning for decades. DeepSeek's insight was applying them to the KV cache in transformer attention — compress once, reconstruct per head, absorb the rest. That single architectural move is a major reason DeepSeek models run inference at a fraction of the cost of comparable frontier models.</p></div>
-
-    
-    <h3 style="margin-top:28px;">What Comes Next</h3>
-    <p>This chapter covered the simplest MLA variant. The DeepSeek-V2/V3 architecture adds several layers on top:</p>
-    <ol style="color:var(--text-dim);margin:0 0 1em 1.5em;line-height:2;">
-      <li><strong>Rotary Positional Embeddings (RoPE)</strong> — encoding token position via rotation in embedding space</li>
-      <li><strong>Decoupled RoPE in MLA</strong> — applying RoPE separately to query and key latent paths within MLA</li>
-      <li><strong>Mixture of Experts (MoE)</strong> — sparse feed-forward layers where only a subset of experts activate per token</li>
-      <li><strong>Multi-Token Prediction</strong> — predicting multiple future tokens simultaneously for training efficiency</li>
-      <li><strong>Full DeepSeek-V3 assembly</strong> — combining MLA, MoE, and training innovations into the complete architecture</li>
-    </ol>
-    <p>Each builds on the foundation established here. If you understand C<sub>KV</sub>, the absorption trick, and the per-head up-projections, the RoPE-extended variant is a incremental modification — not a fundamentally new mechanism.</p>
-
-    <h3 style="margin-top:28px;">Prerequisites from Prior Chapters</h3>
-    <p>This chapter builds directly on:</p>
-    <ul style="color:var(--text-dim);margin:0 0 1em 1.5em;">
-      <li><strong>Chapter 02</strong> — Self-attention, Q/K/V matrices, causal masking, attention scores</li>
-      <li><strong>Chapter 03</strong> — Multi-head attention, head splitting, parallel attention computation</li>
-      <li><strong>Chapter 04</strong> — KV cache derivation, MQA, GQA, memory formulas, the 400 GB problem</li>
-    </ul>
-    <p>The novel content begins at Section 03 (Best of Both Worlds) and Section 04 (Latent Space).</p>
-
-    <p style="margin-top:24px;">The next chapter extends MLA with <strong>rotary positional embeddings</strong> — decoupled RoPE applied separately to query and key paths within the latent framework. From there, subsequent chapters cover mixture-of-experts and the full DeepSeek-V3 architecture.</p>
-
-    <h3 style="margin-top:28px;">Quick Reference Card</h3>
-    <div class="card card-alt">
-      <p style="color:var(--text);margin-bottom:12px;font-family:var(--mono);font-size:0.85rem;line-height:1.8;">
-        <strong style="color:var(--accent);">Cache:</strong> C<sub>KV</sub> = X · W<sub>DKV</sub> &nbsp;→&nbsp; shape (S × d<sub>L</sub>)<br>
-        <strong style="color:var(--accent);">Absorbed Q:</strong> q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup><br>
-        <strong style="color:var(--accent);">Scores:</strong> q<sub>abs</sub> · C<sub>KV</sub><sup>T</sup><br>
-        <strong style="color:var(--accent);">Values:</strong> C<sub>KV</sub> · W<sub>UV</sub> (computed on the fly)<br>
-        <strong style="color:var(--accent);">Context:</strong> softmax(scores/√d<sub>h</sub>) · Values<br>
-        <strong style="color:var(--accent);">Memory:</strong> L × B × S × d<sub>L</sub> × 2 bytes<br>
-        <strong style="color:var(--accent);">Reduction:</strong> (2 × N × H) / d<sub>L</sub> ≈ 57× at DeepSeek scale
-      </p>
-    </div>
-  </div>
-</section>
-
-
-
-<section class="section fade-in" id="s-glossary">
-  <div class="container">
-    <span class="section-num">★</span>
-    <h2>Glossary of MLA Terms</h2>
-    <table class="data-table" style="text-align:left;">
-      <tr><th style="width:28%">Term</th><th>Definition</th></tr>
-      <tr><td><strong>C<sub>KV</sub></strong></td><td>The latent KV cache matrix. Computed as X · W<sub>DKV</sub>. Shape (S × d<sub>L</sub>). The only matrix cached during MLA inference.</td></tr>
-      <tr><td><strong>W<sub>DKV</sub></strong></td><td>Down-projection matrix mapping d<sub>model</sub> → d<sub>L</sub>. Shared across heads. Shape (d<sub>model</sub> × d<sub>L</sub>).</td></tr>
-      <tr><td><strong>W<sub>UK</sub></strong></td><td>Up-projection from latent space to keys. Different per head. Shape (d<sub>L</sub> × d<sub>model</sub>).</td></tr>
-      <tr><td><strong>W<sub>UV</sub></strong></td><td>Up-projection from latent space to values. Different per head. Shape (d<sub>L</sub> × d<sub>model</sub>).</td></tr>
-      <tr><td><strong>d<sub>L</sub></strong></td><td>Latent dimension. Controls cache size. DeepSeek uses 576. Toy examples use 4.</td></tr>
-      <tr><td><strong>Absorption trick</strong></td><td>Pre-multiplying W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup> at inference time so keys need not be materialized or cached.</td></tr>
-      <tr><td><strong>Absorbed query</strong></td><td>q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup>. Used directly against C<sub>KV</sub> for attention scores.</td></tr>
-      <tr><td><strong>RolessMLA</strong></td><td>Simplest MLA implementation without rotary positional embeddings.</td></tr>
-      <tr><td><strong>Low-rank KV joined compression</strong></td><td>DeepSeek-V2 paper name for the simplest MLA variant covered in this chapter.</td></tr>
-      <tr><td><strong>Decoupled RoPE</strong></td><td>Advanced MLA variant applying rotary embeddings separately to query and key latent paths. Covered in a later chapter.</td></tr>
-      <tr><td><strong>Prefill vs decode</strong></td><td>Prefill processes the initial prompt (many tokens at once). Decode generates one token at a time. MLA cache updates happen during both phases.</td></tr>
-      <tr><td><strong>KV cache dark side</strong></td><td>Memory grows linearly with context length. At 100K tokens and 61 layers, standard MHA cache reaches ~400 GB for DeepSeek-scale models.</td></tr>
-    </table>
-
-    <h3 style="margin-top:28px;">Key Formulas Reference</h3>
-    <div class="formula">C<sub>KV</sub> = X · W<sub>DKV</sub></div>
-    <div class="formula">K = C<sub>KV</sub> · W<sub>UK</sub>&nbsp;&nbsp;|&nbsp;&nbsp;V = C<sub>KV</sub> · W<sub>UV</sub></div>
-    <div class="formula">q<sub>abs</sub> = x · W<sub>Q</sub> · W<sub>UK</sub><sup>T</sup></div>
-    <div class="formula">scores = q<sub>abs</sub> · C<sub>KV</sub><sup>T</sup></div>
-    <div class="formula">context = softmax(scores / √d<sub>h</sub>) · C<sub>KV</sub> · W<sub>UV</sub></div>
-    <div class="formula">Cache size<sub>MLA</sub> = L × B × S × d<sub>L</sub> × 2 bytes</div>
-    <div class="formula">Reduction = (2 × N × H) / d<sub>L</sub></div>
-
-    <h3 style="margin-top:28px;">Symbol Index</h3>
-    <table class="dim-table">
-      <tr><th>Symbol</th><th>Typical DeepSeek Value</th><th>Toy Example Value</th></tr>
-      <tr><td>L (layers)</td><td>61</td><td>1</td></tr>
-      <tr><td>N (heads)</td><td>128</td><td>2</td></tr>
-      <tr><td>H (head dim)</td><td>128</td><td>4</td></tr>
-      <tr><td>d<sub>model</sub></td><td>4096+</td><td>8</td></tr>
-      <tr><td>d<sub>L</sub> (latent)</td><td>576</td><td>4</td></tr>
-      <tr><td>S (context)</td><td>100,000</td><td>6</td></tr>
-    </table>
-
-    <div class="callout"><p>Bookmark this glossary when implementing MLA from scratch. The symbol names W<sub>DKV</sub>, W<sub>UK</sub>, and W<sub>UV</sub> follow DeepSeek's notation: D = down, U = up, KV = joint key-value path.</p></div>
-
-    <p style="font-size:0.9rem;">Related chapters: <a href="../04-the-cache-chronicles/">Chapter 04 — The Cache Chronicles</a> (KV cache, MQA, GQA prerequisites) · <a href="../06-encoding-position/">Chapter 06 — Encoding Position</a> (RoPE foundations) · <a href="../07-mla-meets-rope/">Chapter 07 — MLA Meets RoPE</a> (decoupled RoPE in MLA).</p>
   </div>
 </section>
 

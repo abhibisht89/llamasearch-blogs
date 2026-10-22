@@ -136,20 +136,19 @@ ul.content-list li { margin-bottom: 0.45em; }
 </nav>
 
 <nav class="nav nav-reveal" id="nav">
-  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">DeepSeek's Expert Revolution</a>
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Decoding DeepSeek</a>
   <div class="nav-links">
     <a href="#s0">Recap</a><a href="#s1">Loss-Free</a><a href="#s2">Shared</a><a href="#s3">Fine-Grained</a>
     <a href="#s4">Device Balance</a>    <a href="#s5">Results</a><a href="#s6">Expert Code</a><a href="#s7">Router</a>
     <a href="#s8">Sparse MoE</a><a href="#s9">Full LM</a><a href="#s-steps">7 Steps</a><a href="#s10">Playground</a><a href="#s-appendix">Appendix</a>
-<a href="#s-summary">Summary</a>
-  </div>
+</div>
 </nav>
 
 <header class="hero" id="top">
   <div class="container">
     <p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 09</p>
     <h1>DeepSeek's Expert Revolution</h1>
-    <p class="subtitle">Shared Experts, Fine-Grained Routing, and Code — three innovations that rewrote Mixture of Experts, plus a complete PyTorch implementation from scratch.</p>
+    <p class="subtitle">Shared experts, fine-grained routing — MoE the DeepSeek way.</p>
     <div class="stats">
       <div class="stat"><span class="stat-val">3</span><span class="stat-label">DeepSeek Innovations</span></div>
       <div class="stat"><span class="stat-val">63</span><span class="stat-label">Routed Experts</span></div>
@@ -1433,81 +1432,6 @@ context = torch.zeros((<span class="num">1</span>, <span class="num">1</span>), 
       <li>Shazeer et al., 2017 — <em>Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer</em></li>
       <li>Fedus et al., 2021 — <em>Switch Transformers: Scaling to Trillion Parameter Models</em></li>
     </ul>
-  </div>
-</section>
-
-<section class="section fade-in" id="s-summary">
-  <div class="container">
-    <span class="section-num">SUMMARY</span>
-    <h2>Chapter Summary</h2>
-    <table class="data-table">
-      <thead><tr><th>Innovation</th><th>Problem Solved</th><th>Mechanism</th></tr></thead>
-      <tbody>
-        <tr><td>Auxiliary-loss-free balancing</td><td>λ trade-off degrading LM quality</td><td>Dynamic bias b_i on routing scores; no extra loss term</td></tr>
-        <tr><td>Shared experts</td><td>Knowledge redundancy</td><td>Always-active experts hold common knowledge</td></tr>
-        <tr><td>Fine-grained segmentation</td><td>Knowledge hybridity</td><td>Split N experts into m·N smaller ones; same param count</td></tr>
-        <tr><td>Device-level balancing</td><td>GPU/node idle time in EP</td><td>Node-limited routing + EPLB redundant experts</td></tr>
-      </tbody>
-    </table>
-
-    <div class="qa-box">
-      <div class="q">Did DeepSeek invent Mixture of Experts?</div>
-      <p>No. MoE dates to 1991 (Jordan &amp; Jacobs). Shazeer's Switch Transformer scaled it to trillion-parameter LMs. DeepSeek's contribution is surgical: they identified three specific failure modes — the balancing loss trade-off, knowledge redundancy, knowledge hybridity — and built precise architectural fixes. Then they proved them in the DeepSeek-MoE paper with ablations showing shared experts and fine-grained segmentation each measurably improve benchmarks, and V3 showed loss-free balancing beats traditional auxiliary losses on both quality and balance.</p>
-    </div>
-
-    <p>Up next: <strong>Multi-Token Prediction</strong> — extending the prediction target to multiple future tokens per position, another DeepSeek-V3 training innovation that densifies learning signals and enables speculative decoding at inference time.</p>
-
-    <h3 style="margin-top:28px;">DeepSeek-V3 Production MoE Configuration</h3>
-    <table class="data-table">
-      <thead><tr><th>Parameter</th><th>DeepSeek-V3 Value</th><th>Notes</th></tr></thead>
-      <tbody>
-        <tr><td>Total parameters</td><td>671B</td><td>Full model including all experts</td></tr>
-        <tr><td>Active per token</td><td>37B</td><td>Only top-K experts + shared fire</td></tr>
-        <tr><td>Shared experts (N_s)</td><td>1</td><td>Always active every token</td></tr>
-        <tr><td>Routed experts (N_r)</td><td>256</td><td>Fine-grained segmentation at scale</td></tr>
-        <tr><td>Top-K routed (K_r)</td><td>8</td><td>8 of 256 selected per token</td></tr>
-        <tr><td>Affinity function</td><td>Sigmoid</td><td>V3 change from V2 softmax routing</td></tr>
-        <tr><td>Load balancing</td><td>Bias terms b_i</td><td>Auxiliary-loss-free (primary)</td></tr>
-        <tr><td>Node limit M</td><td>Restricted</td><td>Device-limited routing for EP</td></tr>
-        <tr><td>Token dropping</td><td>None</td><td>Good balance → no drops needed</td></tr>
-        <tr><td>Training GPUs</td><td>2048 × H800</td><td>FP8, DualPipe, EP + PP</td></tr>
-      </tbody>
-    </table>
-
-    <h3 style="margin-top:28px;">Formula Reference Card</h3>
-    <table class="data-table">
-      <thead><tr><th>Name</th><th>Formula</th><th>Section</th></tr></thead>
-      <tbody>
-        <tr><td>MoE output (V3)</td><td>h = u + Σ FFN_shared(u) + Σ g_i · FFN_routed_i(u)</td><td>§02</td></tr>
-        <tr><td>Affinity score</td><td>s_i = σ(u^T e_i)</td><td>§07</td></tr>
-        <tr><td>Biased top-K</td><td>Select via s_i + b_i; weight via s_i</td><td>§01</td></tr>
-        <tr><td>Bias update</td><td>b_i ← b_i + γ · sign(avg_load − count_i)</td><td>§01</td></tr>
-        <tr><td>Load violation</td><td>v_i = avg_load − tokens_to_expert_i</td><td>§01</td></tr>
-        <tr><td>Segmentation</td><td>N → m·N experts, dim → dim/m</td><td>§03</td></tr>
-        <tr><td>Node-limited</td><td>Token → ≤ M nodes by affinity sum</td><td>§04</td></tr>
-        <tr><td>Weighted merge</td><td>out_t = Σ_j g_{t,j} · Expert_j(x_t)</td><td>§08</td></tr>
-        <tr><td>Legacy load loss</td><td>L = α · N · Σ f_i · P_i</td><td>§00 (Ch.08)</td></tr>
-      </tbody>
-    </table>
-
-    <h3 style="margin-top:28px;">Glossary</h3>
-    <table class="data-table">
-      <thead><tr><th>Term</th><th>Definition</th></tr></thead>
-      <tbody>
-        <tr><td>Expert</td><td>Independent FFN (expansion-contraction) in the MoE layer</td></tr>
-        <tr><td>Router / Gate</td><td>Linear layer producing per-token expert affinity scores</td></tr>
-        <tr><td>Top-K</td><td>Select K highest-scoring experts per token; rest masked to zero</td></tr>
-        <tr><td>Shared expert</td><td>Always-active expert processing every token (DeepSeek innovation)</td></tr>
-        <tr><td>Routed expert</td><td>Sparse expert selected by top-K routing</td></tr>
-        <tr><td>Knowledge hybridity</td><td>One expert forced to learn too many diverse topics</td></tr>
-        <tr><td>Knowledge redundancy</td><td>Multiple experts learning the same common information</td></tr>
-        <tr><td>Load violation</td><td>Difference between average and actual tokens per expert</td></tr>
-        <tr><td>Expert parallelism</td><td>Sharding experts across GPUs for distributed training</td></tr>
-        <tr><td>Node-limited routing</td><td>Cap cross-node expert dispatch at M nodes per token</td></tr>
-        <tr><td>EPLB</td><td>Expert Parallel Load Balancer — inference-time GPU rebalancing</td></tr>
-        <tr><td>Capacity factor</td><td>Hard limit on tokens per expert per batch (Chapter 08)</td></tr>
-      </tbody>
-    </table>
   </div>
 </section>
 

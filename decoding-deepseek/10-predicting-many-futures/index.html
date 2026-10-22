@@ -488,20 +488,19 @@ ul.content-list li { margin-bottom:0.45em; }
 </nav>
 
 <nav class="nav nav-reveal" id="nav">
-  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Predicting Many Futures</a>
+  <a href="../" class="nav-title" style="text-decoration:none;color:inherit;">Decoding DeepSeek</a>
   <div class="nav-links">
     <a href="#s0">One Token</a><a href="#s1">MTP Intro</a><a href="#s2">Meta Paper</a><a href="#s3">Four Reasons</a>
     <a href="#s4">Choice Points</a><a href="#s5">DeepSeek MTP</a><a href="#s6">Head Ops</a><a href="#s7">Grad Flow</a>
     <a href="#s8">Speculative</a><a href="#s9">Equations</a><a href="#s10">PyTorch</a><a href="#s11">Loss</a>
-    <a href="#s12">Playground</a><a href="#s-deep">Code</a><a href="#s-appendix">Appendix</a><a href="#s-summary">Summary</a>
-  </div>
+    <a href="#s12">Playground</a><a href="#s-deep">Code</a><a href="#s-appendix">Appendix</a></div>
 </nav>
 
 <header class="hero" id="top">
   <div class="container">
     <p style="font-family:var(--mono);font-size:0.85rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px;">DECODING DEEPSEEK · CHAPTER 10</p>
     <h1>Predicting Many Futures</h1>
-    <p class="subtitle">Multi-Token Prediction from Theory to Code — why next-token prediction is limiting, how Meta's MTP paper densifies training signals, how DeepSeek's sequential prediction heads maintain a causal chain, and the full PyTorch implementation.</p>
+    <p class="subtitle">Multi-token prediction — denser training signals.</p>
     <div class="stats">
       <div class="stat"><span class="stat-val">3×</span><span class="stat-label">Inference Speedup</span></div>
       <div class="stat"><span class="stat-val">15%</span><span class="stat-label">More Code Problems</span></div>
@@ -1573,45 +1572,6 @@ W_u matrix:       (V, d)</div>
       <li>Basic PyTorch: nn.Module, forward pass, autograd</li>
     </ul>
     <p>No prior exposure to speculative decoding or the Meta MTP paper is required — this chapter builds both from first principles.</p>
-  </div>
-</section>
-
-<section class="section fade-in" id="s-summary">
-  <div class="container">
-    <span class="section-num">SUMMARY</span>
-    <h2>Putting It Together</h2>
-    <p>Multi-Token Prediction is the third pillar of DeepSeek-V3's architecture:</p>
-    <table class="data-table">
-      <thead><tr><th>Pillar</th><th>Problem Solved</th><th>Key Idea</th></tr></thead>
-      <tbody>
-        <tr><td>MLA (Ch. 05–07)</td><td>KV cache memory</td><td>Low-rank latent compression</td></tr>
-        <tr><td>MoE (Ch. 08)</td><td>FFN compute cost</td><td>Sparse expert activation</td></tr>
-        <tr><td>MTP (Ch. 10)</td><td>Sparse training signal</td><td>Multi-depth sequential prediction heads</td></tr>
-      </tbody>
-    </table>
-    <p>Built on Meta's April 2024 paper, DeepSeek's innovation is the <strong>causal chain between heads</strong> — RMSNorm, merge, project, transform, shared unembed — repeated for each depth with hidden states flowing forward. During pre-training, this densifies gradients, improves data efficiency by ~15% on coding benchmarks, sharpens planning at choice points, and optionally enables 3× inference speedup via self-speculative decoding. The implementation is compact: RMSNorm, nested loops over positions and depths, and standard cross-entropy — yet the impact on model capability is substantial.</p>
-
-    <h3>What You Should Remember</h3>
-    <ol class="content-list">
-      <li><strong>Single-token prediction</strong> gives one loss term per position; MTP gives D terms — densifying training signals by D×.</li>
-      <li><strong>Meta FAIR (April 2024)</strong> introduced MTP with independent heads; <strong>DeepSeek-V3</strong> added sequential hidden-state chaining (causal chain).</li>
-      <li>Each MTP head takes two inputs: trunk hidden state h<sup>k−1</sup> and future input embedding e<sub>i+k</sub>, merged via RMSNorm → concat → project → TRM → shared W<sub>u</sub>.</li>
-      <li>Output shape: <strong>(B, T−D, D, V)</strong>. For T=8, D=3, V=5000: (1, 5, 3, 5000).</li>
-      <li>DeepSeek uses MTP in <strong>pre-training only</strong>; default inference is single-token autoregressive decoding.</li>
-      <li>Choice points receive higher implicit loss weight via the n(n+1)/2 formula — improving planning.</li>
-      <li>Self-speculative decoding achieves ~2.5/3 acceptance on code → up to 3× speedup without a separate draft model.</li>
-    </ol>
-
-    <h3>Code Checklist</h3>
-    <ul class="content-list">
-      <li>✓ RMSNorm class with epsilon for numerical stability</li>
-      <li>✓ Outer loop: i ∈ range(T − D) — valid input positions</li>
-      <li>✓ Inner loop: k ∈ range(D) — prediction depths with causal h passing</li>
-      <li>✓ Future position: i + k + 1 (Python 0-indexing)</li>
-      <li>✓ Loss: nested loops, cross_entropy, mean over L × D terms</li>
-    </ul>
-
-    <div class="callout ok"><p>With MLA, MoE, and MTP understood, the three architectural innovations in DeepSeek-V3's core design are complete.</p></div>
   </div>
 </section>
 
