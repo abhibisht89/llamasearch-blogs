@@ -45,7 +45,7 @@ If you spot an error, a missing citation, or a misread of a paper, please open a
 |------|-------------|
 | [`index.html`](index.html) | Landing page — **The Context Window**, series cards, and release status |
 | [`the-evolving-transformer/`](the-evolving-transformer/) | **The Evolving Transformer** — one growing codebase across **9 architectural milestones**: Transformer → GPT-2 → CLIP → LLaMA → Mistral → Mixtral → DeepSeek V2/V3 → PaliGemma → Qwen3-Next |
-| [`tokens-transformers-and-truth/`](tokens-transformers-and-truth/) | **Tokens, Transformers & Truth** — 15-part language-model series |
+| [`tokens-transformers-and-truth/`](tokens-transformers-and-truth/) | **Tokens, Transformers & Truth** — 14-part language-model series |
 | [`the-transformer-deep-cuts/`](the-transformer-deep-cuts/) | **The Transformer Deep Cuts** — 26-part architecture deep dive |
 | [`neurons-all-the-way-down/`](neurons-all-the-way-down/) | **Neurons All the Way Down** — neural nets from a single neuron to GPT-2 |
 | [`finding-needles/`](finding-needles/) | **Finding Needles** — classical search through agentic retrieval |
