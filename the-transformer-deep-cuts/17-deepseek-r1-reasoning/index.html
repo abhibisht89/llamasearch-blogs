@@ -209,6 +209,8 @@ ul.tight li { margin-bottom: 0.5em; }
 code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent2); background: var(--bg-card-alt); padding: 2px 6px; border-radius: 4px; }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -249,7 +251,7 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent2)
     <h2>Language models as policies</h2>
     <p>An autoregressive language model maps a context (prompt plus tokens generated so far) to a distribution over the next token. Sampling repeatedly yields a full response. In reinforcement-learning terms, the <strong>context is the state</strong>, choosing the next token is an <strong>action</strong>, and the model’s next-token distribution is the <strong>policy</strong> <em>π<sub>θ</sub></em>.</p>
     <p>Standard pre-training maximizes likelihood on large text corpora; supervised fine-tuning nudges the model toward demonstrations. <strong>Reinforcement learning</strong> instead optimizes expected return under a <strong>reward</strong> signal: the model is encouraged to repeat actions that led to high reward and discouraged from actions tied to low reward—without necessarily providing a single gold transcript for every problem.</p>
-    <div class="formula">a<sub>t</sub> ∼ π<sub>θ</sub>(· | s<sub>t</sub>)&nbsp;&nbsp;&nbsp;trajectory τ = (s<sub>0</sub>, a<sub>0</sub>, s<sub>1</sub>, a<sub>1</sub>, …)</div>
+    <div class="formula tex" data-tex="a_t\sim\pi_{\theta}(\cdot\mid s_t),\quad\tau=(s_0,a_0,s_1,a_1,\ldots)"></div>
     <p>How DeepSeek-R1 incentivizes long, checkable reasoning.</p>
 
     <p>Using the grid-world framework from <a href="../15-rlhf-theory-and-code/">Chapter 15</a>, the same RL vocabulary applies to text: <strong>state</strong> = prompt plus generated prefix, <strong>action</strong> = next token, <strong>policy</strong> = the model’s next-token distribution. Autoregressive decoding repeats that step until you stop.</p>
@@ -304,11 +306,11 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent2)
     <h2>GRPO: Group Relative Policy Optimization</h2>
     <p>Classic PPO-style methods often train a <strong>critic</strong> or value network to estimate baselines and advantages. GRPO avoids that extra model by reusing <strong>multiple completions from the same prompt</strong> as a comparison group.</p>
     <p>For each question, sample <em>G</em> outputs <code class="inline">{o₁,…,o<sub>G</sub>}</code> from the current policy (or a frozen snapshot for off-policy reuse). A rule-based or verifier assigns a scalar reward <em>r<sub>i</sub></em> to each completion. Define group mean and standard deviation:</p>
-    <div class="formula">μ<sub>G</sub> = (1/G) Σ<sub>i</sub> r<sub>i</sub>&nbsp;&nbsp;&nbsp;σ<sub>G</sub> = sqrt( (1/G) Σ<sub>i</sub> (r<sub>i</sub> − μ<sub>G</sub>)² + ε )</div>
+    <div class="formula tex" data-tex="\mu_G=\tfrac{1}{G}\sum_i r_i,\quad\sigma_G=\sqrt{\tfrac{1}{G}\sum_i(r_i-\mu_G)^2+\varepsilon}"></div>
     <p>The <strong>group-relative advantage</strong> for completion <em>i</em> is the z-score of its reward within the batch for that prompt—so optimization depends on <em>relative</em> quality, not the raw scale of rewards:</p>
-    <div class="formula">Â<sub>i</sub> = (r<sub>i</sub> − μ<sub>G</sub>) / σ<sub>G</sub></div>
+    <div class="formula tex" data-tex="\hat{A}_i=\frac{r_i-\mu_G}{\sigma_G}"></div>
     <p>The training objective resembles clipped policy optimization: increase log-probability of tokens in completions with positive Â<sub>i</sub>, decrease those with negative Â<sub>i</sub>, with a ratio clip between old and new policy (often written with π<sub>θ</sub> / π<sub>old</sub>) to limit overly aggressive updates, plus a <strong>KL penalty</strong> toward a reference policy π<sub>ref</sub> (the initial base model) to reduce collapse and <strong>reward hacking</strong>.</p>
-    <div class="formula">J ≈ E[ clip( π<sub>θ</sub>/π<sub>old</sub>, 1−ε, 1+ε ) · Â ] − β · D<sub>KL</sub>( π<sub>θ</sub> ‖ π<sub>ref</sub> )</div>
+    <div class="formula tex" data-tex="J\approx\mathbb{E}\bigl[\mathrm{clip}(\pi_{\theta}/\pi_{\mathrm{old}},1-\varepsilon,1+\varepsilon)\cdot\hat{A}\bigr]-\beta\cdot D_{\mathrm{KL}}(\pi_{\theta}\,\|\,\pi_{\mathrm{ref}})"></div>
     <p class="callout"><strong>Intuition.</strong> If one sampled answer passes all tests and three fail, the winner gets a positive advantage without needing a learned value function to say the state was “promising” halfway through—the group supplies the baseline.</p>
 
     <h3>From expected reward to the GRPO surrogate</h3>
@@ -316,13 +318,13 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent2)
     <p>For a fixed question, one completion <em>o<sub>i</sub></em> is a sequence of tokens. The policy assigns a conditional distribution at each position; with sampling (greedy, top-<em>p</em>, or otherwise), you obtain a trajectory. The probability of the full string under the policy is the product of per-step conditional probabilities; in log space that is a <strong>sum of log-probabilities</strong> over tokens. Training signals are applied to that entire sum (weighted by advantages), which is how terminal reward shapes early tokens.</p>
     <p>Draw a question <em>q</em> from the task bank. Sample <strong>G</strong> completions <code class="inline">{o₁,…,o<sub>G</sub>}</code> from the policy (the same prompt, different stochastic draws). Score each completion with a scalar reward <em>r<sub>i</sub></em> from your verifier (rule-based in R1: tests pass, answer matches, format satisfied, etc.).</p>
     <p>Compute the mean reward of the group and a stabilized standard deviation (with a small constant <em>ε</em> to avoid division by zero when all rewards are identical):</p>
-    <div class="formula">μ<sub>G</sub> = (1/G) Σ<sub>i=1</sub><sup>G</sup> r<sub>i</sub></div>
-    <div class="formula">σ<sub>G</sub> = √( (1/G) Σ<sub>i=1</sub><sup>G</sup> (r<sub>i</sub> − μ<sub>G</sub>)² + ε )</div>
+    <div class="formula tex" data-tex="\mu_G=\frac{1}{G}\sum_{i=1}^{G}r_i"></div>
+    <div class="formula tex" data-tex="\sigma_G=\sqrt{\frac{1}{G}\sum_{i=1}^{G}(r_i-\mu_G)^2+\varepsilon}"></div>
     <p>Define the advantage of completion <em>i</em> as the z-score within the group:</p>
-    <div class="formula">Â<sub>i</sub> = (r<sub>i</sub> − μ<sub>G</sub>) / σ<sub>G</sub></div>
+    <div class="formula tex" data-tex="\hat{A}_i=\frac{r_i-\mu_G}{\sigma_G}"></div>
     <p>After this normalization, the list <code class="inline">{Â<sub>i</sub>}</code> has mean approximately <strong>0</strong> and scale comparable to a <strong>unit standard deviation</strong> across the group. What drives learning is not the raw magnitude of <em>r</em> but <strong>how much better or worse</strong> completion <em>i</em> was than its siblings on the same prompt. Two prompts with different reward scales therefore contribute comparably shaped updates—only relative quality within each group matters for the advantage sign and size.</p>
     <p>Let π<sub>θ</sub> be the policy you are updating and π<sub>old</sub> the policy that produced the stored completions (off-policy reuse). For each token <em>t</em> in completion <em>i</em>, form the ratio</p>
-    <div class="formula">ρ<sub>i,t</sub>(θ) = π<sub>θ</sub>(a<sub>i,t</sub> | s<sub>i,t</sub>) / π<sub>old</sub>(a<sub>i,t</sub> | s<sub>i,t</sub>)</div>
+    <div class="formula tex" data-tex="\rho_{i,t}(\theta)=\frac{\pi_{\theta}(a_{i,t}\mid s_{i,t})}{\pi_{\mathrm{old}}(a_{i,t}\mid s_{i,t})}"></div>
     <p>If ρ &gt; 1, the new policy has increased mass on the taken action; if ρ &lt; 1, it has decreased mass. Multiplying by Â<sub>i</sub> tells you whether that change aligns with “this completion was good” (positive advantage) or “this completion was bad” (negative advantage).</p>
     <p>To prevent huge policy jumps when the model becomes overconfident, PPO-style methods clip ρ. Writing L<sub>i,t</sub> = log π<sub>θ</sub>(a<sub>i,t</sub>|s<sub>i,t</sub>) − log π<sub>old</sub>(a<sub>i,t</sub>|s<sub>i,t</sub>), so ρ = exp(L), the surrogate uses min(ρ Â<sub>i</sub>, clip(ρ, 1−ε, 1+ε) Â<sub>i</sub>) aggregated over tokens and completions. Even when Â<sub>i</sub> is strongly positive, ρ cannot run away without bound in one update—training stays stable.</p>
     <p>Add −β · D<sub>KL</sub>(π<sub>θ</sub> ‖ π<sub>ref</sub>) with π<sub>ref</sub> the initial base model (e.g. pretrained DeepSeek-V3 before this RL stage). Without it, the policy can <strong>reward hack</strong>: imagine a politeness reward—an unconstrained model might spam “thank you” forever because that correlates with approval, abandoning factual answers. KL keeps the tuned policy close enough to a coherent LM that it still “behaves like a language model” while shifting mass toward verifiably good reasoning.</p>
@@ -850,6 +852,9 @@ const EPS = 1e-4;
 })();
 </script>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

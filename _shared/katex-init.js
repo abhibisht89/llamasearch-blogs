@@ -1,7 +1,8 @@
 /**
- * Render display math in .formula.tex blocks with KaTeX.
+ * Render math with KaTeX.
+ * - .formula.tex blocks (display); prefer data-tex over visible HTML noise
+ * - \( ... \) / \[ ... \] inline/display via auto-render when loaded
  * Pure HTML .formula blocks (sup/sub/unicode) are left alone.
- * Prefer data-tex when the visible node still has HTML noise.
  */
 (function () {
   function sourceFor(el) {
@@ -10,7 +11,7 @@
     return el.textContent || "";
   }
 
-  function renderAll() {
+  function renderFormulaTex() {
     if (typeof katex === "undefined") return;
     document.querySelectorAll(".formula.tex").forEach(function (el) {
       if (el.getAttribute("data-katex-done") === "1") return;
@@ -27,6 +28,33 @@
         console.warn("[katex-init]", err);
       }
     });
+  }
+
+  // Chapters that still embed \( ... \) / \[ ... \] in prose (e.g. Deep Cuts 24).
+  function renderDelimited() {
+    if (typeof renderMathInElement === "undefined") return;
+    if (document.documentElement.getAttribute("data-katex-auto") === "1") return;
+    try {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+        strict: "ignore",
+        // Skip already-rendered .formula.tex / code / scripts.
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"],
+        ignoredClasses: ["formula"],
+      });
+      document.documentElement.setAttribute("data-katex-auto", "1");
+    } catch (err) {
+      console.warn("[katex-init] auto-render", err);
+    }
+  }
+
+  function renderAll() {
+    renderFormulaTex();
+    renderDelimited();
   }
 
   function boot() {

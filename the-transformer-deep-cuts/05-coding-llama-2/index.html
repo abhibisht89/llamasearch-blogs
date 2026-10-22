@@ -106,6 +106,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 @media (max-width: 900px) { .code-section { grid-template-columns: 1fr; } .code-panel { position: static; } }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -184,7 +186,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
     <div class="card"><h3 style="color:var(--accent3);">Training view</h3><p>Usually pack a chunk of length <code>T</code>, mask future positions, and compute logits for every offset in one forward (no KV cache).</p></div>
     <div class="card"><h3 style="color:var(--accent2);">Inference view</h3><p>After a prompt warm-up, feed one new <code>token_id</code> per step; reuse stored <code>k_cache</code> and <code>v_cache</code> so you do not re-project old tokens.</p></div>
   </div>
-  <div class="formula">P(x_{1:L}) = ∏_{t=0}^{L-1} P(x_{t+1} | x_{≤t})</div>
+  <div class="formula tex" data-tex="P(x_{1:L})=\prod_{t=0}^{L-1}P(x_{t+1}\mid x_{\le t})"></div>
   <p>
     Training packs a length-<code>T</code> chunk with targets shifted one step: position <code>t</code> predicts token <code>t+1</code> from prefix <code>x_{≤t}</code>, and the causal mask hides future positions. Inference reuses the same conditional—one new token per forward after the prompt is cached.
   </p>
@@ -330,7 +332,7 @@ head_dim = dim // n_heads  →  128</pre></div>
   <div class="callout warn">
     <p>RoPE requires an <strong>even</strong> head dimension <code>d_h</code>. The reference uses base <code>θ = 10000</code> and often precomputes <code>2 × max_seq_len</code> rows for long prompts.</p>
   </div>
-  <div class="formula">θ_i = 10000^{-2i/d_h}, &nbsp; i = 0, …, d_h/2 − 1</div>
+  <div class="formula tex" data-tex="\theta_i=10000^{-2i/d_h},\quad i=0,\ldots,d_h/2-1"></div>
   <div class="code-section">
     <div class="code-explanation">
       <h3>Complex multiply = fused rotation</h3>
@@ -389,7 +391,7 @@ head_dim = dim // n_heads  →  128</pre></div>
     <code>RMSNorm</code> scales each token vector by the reciprocal root-mean-square of its features—no per-token mean subtraction (unlike <code>LayerNorm</code>).
     A learnable vector <code>weight</code> (often called γ) rescales after normalization; <code>eps</code> inside the sqrt avoids divide-by-zero.
   </p>
-  <div class="formula">RMS(x) = √(mean(x²) + ε) &nbsp;&nbsp;·&nbsp;&nbsp; RMSNorm(x) = (x / RMS(x)) ⊙ γ</div>
+  <div class="formula tex" data-tex="\mathrm{RMS}(x)=\sqrt{\mathrm{mean}(x^2)+\varepsilon},\quad\mathrm{RMSNorm}(x)=\frac{x}{\mathrm{RMS}(x)}\odot\gamma"></div>
   <p>
     Layer normalization, as in the original Transformer, imagines a batch of tokens where <strong>each row</strong> is one token and columns are features—say ten tokens with three features <code>(a_1,a_2,a_3)</code> per row. It computes a mean <code>\mu</code> and variance <code>\sigma^2</code> along the feature axis for each row, then standardizes: <code>(x-\mu)/\sigma</code>, giving approximately zero mean and unit variance per row before the learnable affine <code>\gamma,\beta</code>. The variance formula <code>\frac{1}{n}\sum (x_i-\mu)^2</code> explicitly needs <code>\mu</code>.
   </p>
@@ -573,7 +575,7 @@ head_dim = dim // n_heads  →  128</pre></div>
     Linear maps <code>wq</code>, <code>wk</code>, <code>wv</code> (no bias) produce <code>q</code>, <code>k</code>, <code>v</code>. View as <code>(B, n_*_heads, seqlen, head_dim)</code>, apply <code>apply_rotary_emb</code> to <code>q</code> and <code>k</code>, convert <code>freqs_cis</code> dtype/device to match.
     Scatter the new <code>k</code>, <code>v</code> into <code>cache_k</code>/<code>cache_v</code>, concatenate past via slicing, <code>repeat_kv</code> if needed, scale scores by <code>1/√head_dim</code>, apply causal mask (including padding past length), softmax, matmul <code>v</code>, merge heads, <code>wo</code> projection.
   </p>
-  <div class="formula">Attention(Q,K,V) = softmax(QK^T / √d_h + \text{mask}) V</div>
+  <div class="formula tex" data-tex="\mathrm{Attention}(Q,K,V)=\mathrm{softmax}\!\left(\frac{QK^{\mathsf{T}}}{\sqrt{d_h}}+\mathrm{mask}\right)V"></div>
   <p>
     After <code>wq/wk/wv</code>, a useful shape story for incremental decode is: <code>xq</code> becomes <code>(B,\,1,\,n_\text{heads},\,d_h)</code> then transposes to <code>(B,\,n_\text{heads},\,1,\,d_h)</code>; cached keys gather to <code>(B,\,n_\text{kv},\,T,\,d_h)</code> before <code>repeat_kv</code> aligns heads. Scores are <code>(B,\,n_\text{heads},\,1,\,T)</code>—one live query row against the whole prefix—then softmax and <code>values</code> yield a single updated contextual vector per batch row.
   </p>
@@ -631,7 +633,7 @@ torch.Size([4096, 4096])  # wo</pre></div>
     Three matrices: <code>w1</code> and <code>w3</code> map <code>dim → hidden_dim</code>, <code>w2</code> maps <code>hidden_dim → dim</code>. Forward: <code>silu(x @ w1) * (x @ w3)</code> then <code>@ w2</code>.
     Hidden width is often <code>≈ 2/3 × 4 × dim</code> times optional <code>ffn_dim_multiplier</code>, then rounded <strong>up</strong> to <code>multiple_of</code> (commonly 256) for tensor-core alignment.
   </p>
-  <div class="formula">FFN(x) = W_2 · (SiLU(x W_1) ⊙ (x W_3))</div>
+  <div class="formula tex" data-tex="\mathrm{FFN}(x)=W_2\cdot\bigl(\mathrm{SiLU}(xW_1)\odot(xW_3)\bigr)"></div>
   <p>
     The gating nonlinearity is <strong>SiLU</strong>, also called <strong>Swish</strong> with <code>β = 1</code> (same functional form as the “sigmoid-weighted linear unit”). Three weight matrices are used—<code>w1</code>, <code>w3</code> up-project, <code>w2</code> down-project—whereas the vanilla Transformer ReLU block used two matrices; the <code>2/3</code> shrink plus rounding keeps total parameter budgets comparable when researchers swap attention mechanisms.
   </p>
@@ -744,7 +746,7 @@ torch.Size([4096, 4096])  # wo</pre></div>
       Reference <code>text_completion</code> often defaults near <strong>temperature = 0.6</strong> (slightly sharper than 1.0) and <strong>top_p = 0.9</strong> (90% nucleus). Greedy is the <code>temperature → 0</code> limit in spirit; nucleus sampling is the production compromise between diversity and tail risk.
     </p>
   </div>
-  <div class="formula">\text{sorted masses e.g. } 0.44,\,0.40,\,0.06,\,0.04,\,0.03,\ldots \quad\Rightarrow\quad \text{cum: } 0.44,\,0.84,\,0.90,\,0.94,\ldots</div>
+  <div class="formula tex" data-tex="\text{sorted masses e.g. }0.44,\,0.40,\,0.06,\,0.04,\,0.03,\ldots\Rightarrow\text{cum: }0.44,\,0.84,\,0.90,\,0.94,\ldots"></div>
   <p>
     The mask <code>cumsum - sorted &gt; p</code> implements “include the token that pushes cumulative mass over the threshold.” With <code>p = 0.9</code>, cumulative hits <strong>0.84</strong> after two tokens, <strong>0.90</strong> after the third—so the third mass (<code>0.06</code>) is kept even though the running sum minus its own share dipped below the cutoff logic; subtracting <code>sorted</code> shifts inclusion correctly so the boundary token is not dropped. Zeros are applied to the tail, masses renormalized, then <code>multinomial</code> draws; <code>gather</code> maps sorted indices back to vocabulary ids.
   </p>
@@ -1225,6 +1227,9 @@ bindAnno('annAttn', 'noteAttn');
 })();
 </script>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">

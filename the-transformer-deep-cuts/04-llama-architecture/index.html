@@ -179,6 +179,8 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5)
 .comp-table .arrow { color: var(--accent3); font-weight: 700; text-align: center; }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 <link rel="stylesheet" href="/_shared/breadcrumb.css">
@@ -258,7 +260,7 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5)
   <span class="section-num">02</span>
   <h2>Pre-norm vs post-norm</h2>
   <p>In many early Transformer diagrams, layer normalization appeared <strong>after</strong> each sublayer, combined with the residual (post-norm). In LLaMA, all normalizations have been moved <strong>before</strong> every block — before the attention sublayer and before the feed-forward (pre-norm). The sublayer always sees a normalized residual stream.</p>
-  <div class="formula">x<sub>out</sub> = x + Sublayer( Norm(x) )</div>
+  <div class="formula tex" data-tex="x_{\mathrm{out}}=x+\mathrm{Sublayer}(\mathrm{Norm}(x))"></div>
   <p>Pre-norm often yields smoother optimization in deep stacks: gradients flow through the residual path more directly, while the normalized activations keep scale controlled going into attention and MLP weights. In pre-norm, <code class="inline">x<sub>out</sub> = x + branch(x)</code>, so the gradient for <code class="inline">x</code> is <strong>1 + (gradient of the branch)</strong>—a direct highway through dozens of layers. Post-norm normalizes after each sublayer, so gradients pass through more transforms at every stop; pre-norm keeps the raw residual stream intact while each branch adds a normalized correction.</p>
 </section>
 
@@ -277,7 +279,7 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5)
   <h2>Why normalize? Linear layers and internal covariate shift</h2>
   <h3>Linear layers: the building block</h3>
   <p>A linear layer (e.g. <code class="inline">nn.Linear(3, 5, bias=True)</code> in PyTorch) creates two learnable objects: a weight matrix <code class="inline">W</code> of shape <strong>(output_features × input_features)</strong> — so 5×3 here — and a bias vector <code class="inline">b</code> of length 5 (one bias per output neuron). You can think of each <strong>row</strong> of W as one neuron, with one weight per input feature.</p>
-  <div class="formula">Y = X W<sup>T</sup> + b &nbsp;&nbsp; (row-wise: each output is dot-products plus bias)</div>
+  <div class="formula tex" data-tex="Y=XW^{\mathsf{T}}+b\quad\text{(row-wise dot-products + bias)}"></div>
   <p>Given an input <code class="inline">X</code> of shape (10 items × 3 features), the output <code class="inline">Y</code> is (10 × 5). Each output element <code class="inline">Z₁</code> for item 1 is the dot product of that item’s feature row with neuron 1’s weight column, plus the bias: <code class="inline">Z₁ = (a₁·w₁ + a₂·w₂ + a₃·w₃) + b₁</code>. The key insight: <strong>the output of a neuron for an item depends only on that item’s features and the neuron’s weights</strong> — not on other items in the batch. The bias <code class="inline">b</code> is broadcast (added to every row independently via PyTorch broadcasting). After the linear layer, a <strong>non-linearity</strong> (like ReLU) is typically applied — the input to this non-linearity is called the <strong>activation</strong> of the neuron.</p>
 
   <h3>The problem: internal covariate shift</h3>
@@ -288,7 +290,7 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5)
   <span class="section-num">05</span>
   <h2>LayerNorm: mean, variance, and learnable gain</h2>
   <p><strong>Layer normalization</strong> (derived in <a href="../01-transformer-architecture-and-math/">Chapter 01</a>) computes, <em>per row</em> (per token position in a sequence batch), the mean <code class="inline">μ</code> and variance <code class="inline">σ²</code> across features, standardizes, then applies learnable <code class="inline">γ</code> and <code class="inline">β</code>. LLaMA replaces this with RMSNorm in the next section.</p>
-  <div class="formula">LN(x) = γ ⊙ (x − μ) / √(σ² + ε) + β</div>
+  <div class="formula tex" data-tex="\mathrm{LN}(x)=\gamma\odot\frac{x-\mu}{\sqrt{\sigma^2+\varepsilon}}+\beta"></div>
   <p>Variance uses the mean: <code class="inline">σ² = (1/d) ∑<sub>i</sub> (x<sub>i</sub> − μ)²</code>. Here <code class="inline">ε</code> avoids division by zero. <strong>Batch normalization</strong> differs by normalizing across the batch dimension per feature (column-wise statistics), whereas LayerNorm is row-wise — better suited to variable-length sequences in Transformers.</p>
   <div class="callout">
     <p><strong>Standardization intuition.</strong> If a scalar random variable has mean 5 and variance 36, then <code class="inline">(X − 5) / 6</code> has mean 0 and variance 1 — a standard Gaussian. This is exactly what LayerNorm does: it transforms feature distributions into zero mean and unit variance, then lets the learnable γ and β adjust as needed.</p>
@@ -303,7 +305,7 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5)
     <p><strong>The key hypothesis.</strong> The paper states: <em>“In this paper we hypothesize that the rescaling invariance is the reason for success of layer Norm, rather than the recentering invariance.”</em> In other words: it’s the <strong>division by scale</strong> (having variance ~1) that matters for stable training — not the subtraction of the mean (having mean ~0). Can we drop mean-centering entirely and still get the same benefit?</p>
   </div>
   <p>Since variance requires the mean (<code class="inline">σ² = (1/d) Σ(xᵢ − μ)²</code>), the authors needed a different statistic that doesn’t depend on μ at all. They chose the <strong>root-mean-square</strong>:</p>
-  <div class="formula">RMS(x) = √( (1/d) ∑<sub>i</sub> x<sub>i</sub>² + ε ) &nbsp;&nbsp;→&nbsp;&nbsp; RMSNorm(x) = γ ⊙ ( x / RMS(x) )</div>
+  <div class="formula tex" data-tex="\mathrm{RMS}(x)=\sqrt{\tfrac{1}{d}\sum_i x_i^2+\varepsilon},\quad\mathrm{RMSNorm}(x)=\gamma\odot\frac{x}{\mathrm{RMS}(x)}"></div>
   <p>The RMS statistic is calculated per row (per token position), just like LayerNorm — but it needs only <strong>one statistic</strong> instead of two. You just square each element, average, and take the square root. Then divide and multiply by the learnable <code class="inline">γ</code> (no <code class="inline">β</code> needed since we’re not recentering). At billion-parameter scale, applied at every layer and token position, skipping the mean saves measurable compute. In practice, RMSNorm works just as well as LayerNorm in models like LLaMA — confirming the hypothesis that rescaling invariance is what drives most of the training benefit.</p>
 
   <div class="interactive-panel">
@@ -336,7 +338,7 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5)
   <h2>RoPE (Rotary Position Embedding)</h2>
   <p><strong>RoFormer</strong>, from a Chinese research group, asked a sharp question: can we arrange the attention inner product so it <strong>depends only on the token embeddings and their relative distance</strong> (e.g. <code class="inline">m − n</code>), not on absolute indices alone?</p>
   <p>The construction often starts in <strong>complex space</strong> with a function <code class="inline">g(x<sub>m</sub>, x<sub>n</sub>, m−n)</code> and <strong>Euler&apos;s formula</strong> linking rotation to <code class="inline">e<sup>iθ</sup></code>. In two real dimensions, each pair of coordinates acts like a <strong>2×2 rotation</strong>:</p>
-  <div class="formula">x&apos; = cos(θ) · x − sin(θ) · y<br>y&apos; = sin(θ) · x + cos(θ) · y &nbsp;(≈ 2×2 rotation)</div>
+  <div class="formula tex" data-tex="\begin{aligned}x&#x27;&amp;=\cos(\theta)\,x-\sin(\theta)\,y\\y&#x27;&amp;=\sin(\theta)\,x+\cos(\theta)\,y\end{aligned}"></div>
   <p>For higher model dimensions, RoPE uses a <strong>block-sparse</strong> structure: mostly zeros with <strong>2×2 rotation blocks</strong> along the diagonal (each pair of feature dimensions gets its own angle). In efficient implementations, that becomes <strong>element-wise</strong> multiply with precomputed <strong>cos / sin</strong> vectors, plus <strong>swapped pairs</strong> scaled by sin — no need to materialize the full huge matrix.</p>
   <p>The base frequencies <code class="inline">θ<sub>i</sub></code> follow a <strong>fixed geometric series</strong>, e.g. <code class="inline">θ<sub>i</sub> = base<sup>−2i/d</sup></code> — <strong>nothing to learn</strong> in the geometry itself; the model learns how to use the resulting positional signal. Because rotations depend on <code class="inline">m − n</code>, the dot product of rotated <strong>Q</strong> and <strong>K</strong> encodes <strong>relative distance</strong>; when <code class="inline">m = n</code>, the relative angle is zero and the score is purely content-based.</p>
   <div class="callout">
@@ -448,7 +450,7 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5)
   <h2>SwiGLU feed-forward</h2>
   <p>Also from <strong>Noam Shazeer</strong> (same research line as attention variants and MQA): compare many activation choices for the Transformer FFN and find <strong>SwiGLU</strong> especially strong.</p>
   <p>The classic FFN is two matrices with a simple nonlinearity in between, e.g. <strong>W<sub>2</sub> · ReLU(W<sub>1</sub> · x)</strong>. <strong>SwiGLU</strong> uses the <strong>Swish</strong> with β=1, also called <strong>SiLU</strong> (Sigmoid Linear Unit), as a gate:</p>
-  <div class="formula">FFN<sub>SwiGLU</sub>(x) = W<sub>2</sub> ( SiLU(W<sub>1</sub>x) ⊙ (W<sub>3</sub>x) )</div>
+  <div class="formula tex" data-tex="\mathrm{FFN}_{\mathrm{SwiGLU}}(x)=W_2\bigl(\mathrm{SiLU}(W_1x)\odot(W_3x)\bigr)"></div>
   <p>There are <strong>three</strong> weight matrices; fair comparisons shrink the <strong>intermediate width</strong> so parameter and FLOP counts stay comparable to two-matrix baselines. In Shazeer&apos;s studies, SwiGLU achieves the <strong>lowest perplexity</strong> among the alternatives tested.</p>
   <div class="callout">
     <p><strong>Honest science.</strong> Shazeer et al. write: <em>&quot;We offer no explanation for the hookup of our favorite non-linearity and the gated linear unit, hoping that the benefit of the combination is yet another example of the unreasonable effectiveness of divine benevolence.&quot;</em></p>
@@ -781,6 +783,9 @@ code.inline { font-family: var(--mono); font-size: 0.88em; color: var(--accent5)
 
 </script>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">
