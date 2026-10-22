@@ -77,7 +77,7 @@ YEAR_CSS = """
   --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
   --bg-nav: rgba(10,10,15,0.92); --border: #2a2a3a;
   --text: #e0e0e8; --text-dim: #8888a0;
-  --accent: #6c8cff; --accent2: #a78bfa; --accent3: #34d399;
+  --accent: #498a9b; --accent2: #a78bfa; --accent3: #34d399;
   --radius: 14px;
   --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -111,7 +111,7 @@ body { padding-top: 44px; }
 .hero::before {
   content: ''; position: absolute; top: -200px; left: 50%;
   transform: translateX(-50%); width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(108,140,255,0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(73,138,155,0.12) 0%, transparent 70%);
   pointer-events: none;
 }
 .hero h1 {
@@ -138,13 +138,13 @@ body { padding-top: 44px; }
 }
 .blog-card:hover {
   border-color: var(--accent); transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(108,140,255,0.1); text-decoration: none;
+  box-shadow: 0 8px 30px rgba(73,138,155,0.1); text-decoration: none;
 }
 .card-num {
   font-family: var(--mono); font-size: 1.3rem; font-weight: 700;
   color: var(--accent); min-width: 48px; height: 48px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(108,140,255,0.1); border-radius: 10px; flex-shrink: 0;
+  background: rgba(73,138,155,0.1); border-radius: 10px; flex-shrink: 0;
 }
 .card-content h3 { font-size: 1.05rem; color: var(--text); margin-bottom: 4px; }
 .card-date {
@@ -212,7 +212,7 @@ html = f"""<!DOCTYPE html>
 *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 :root {{
   --bg: #0a0a0f; --bg-card: #12121a; --border: #2a2a3a;
-  --text: #e0e0e8; --text-dim: #8888a0; --accent: #6c8cff;
+  --text: #e0e0e8; --text-dim: #8888a0; --accent: #498a9b;
   --radius: 12px;
   --mono: 'SF Mono','Fira Code','Cascadia Code',monospace;
   --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
@@ -240,14 +240,14 @@ a:hover {{ text-decoration: underline; }}
 .hero::before {{
   content: ''; position: absolute; top: -200px; left: 50%;
   transform: translateX(-50%); width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(108,140,255,0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(73,138,155,0.12) 0%, transparent 70%);
   pointer-events: none;
 }}
 .hero .badge {{
   display: inline-block; font-family: var(--mono); font-size: 0.75rem;
   letter-spacing: 1.5px; text-transform: uppercase; padding: 5px 14px;
-  border-radius: 20px; background: rgba(108,140,255,0.1); color: var(--accent);
-  border: 1px solid rgba(108,140,255,0.2); margin-bottom: 18px;
+  border-radius: 20px; background: rgba(73,138,155,0.1); color: var(--accent);
+  border: 1px solid rgba(73,138,155,0.2); margin-bottom: 18px;
 }}
 .hero h1 {{
   font-size: clamp(2rem,5vw,3rem); font-weight: 800;

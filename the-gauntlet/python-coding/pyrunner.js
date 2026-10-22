@@ -71,7 +71,7 @@
     .pyr-sw-display {
       font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
       font-size: 0.78rem;
-      color: #6c8cff;
+      color: #498a9b;
       letter-spacing: 1px;
       min-width: 60px;
       text-align: center;
@@ -89,13 +89,13 @@
       line-height: 1;
     }
     .pyr-btn-timer:hover {
-      border-color: #6c8cff;
-      color: #6c8cff;
+      border-color: #498a9b;
+      color: #498a9b;
     }
     .pyr-btn-timer.active {
-      border-color: #6c8cff;
-      color: #6c8cff;
-      background: rgba(108,140,255,0.1);
+      border-color: #498a9b;
+      color: #498a9b;
+      background: rgba(73,138,155,0.1);
     }
 
     /* Buttons */
@@ -171,7 +171,7 @@
       padding: 2px 7px;
       border-radius: 4px;
     }
-    .pyr-status.loading { color: #6c8cff; background: rgba(108,140,255,0.1); }
+    .pyr-status.loading { color: #498a9b; background: rgba(73,138,155,0.1); }
     .pyr-status.success  { color: #34d399; background: rgba(52,211,153,0.1); }
     .pyr-status.error    { color: #f87171; background: rgba(248,113,113,0.1); }
 

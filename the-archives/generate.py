@@ -32,7 +32,7 @@ BASE_CSS = """
   --bg: #0a0a0f; --bg-card: #12121a; --bg-card-alt: #181825;
   --bg-nav: rgba(10,10,15,0.92); --border: #2a2a3a;
   --text: #e0e0e8; --text-dim: #8888a0;
-  --accent: #6c8cff; --accent2: #a78bfa; --accent3: #34d399;
+  --accent: #498a9b; --accent2: #a78bfa; --accent3: #34d399;
   --accent5: #fbbf24; --radius: 12px;
   --mono: 'SF Mono','Fira Code','Cascadia Code',monospace;
   --sans: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
@@ -61,7 +61,7 @@ code { font-family: var(--mono); background: var(--bg-card-alt);
        color: var(--accent); }
 pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
 blockquote { border-left: 3px solid var(--accent); padding: 12px 20px;
-             background: rgba(108,140,255,0.06); border-radius: 0 8px 8px 0;
+             background: rgba(73,138,155,0.06); border-radius: 0 8px 8px 0;
              margin: 1.2em 0; color: var(--text-dim); font-style: italic; }
 figure img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); }
 figcaption { font-size: 0.82rem; color: var(--text-dim); text-align: center; margin-top: 8px; }

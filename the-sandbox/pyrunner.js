@@ -71,7 +71,7 @@
     .pyr-sw-display {
       font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
       font-size: 0.78rem;
-      color: #6c8cff;
+      color: #498a9b;
       letter-spacing: 1px;
       min-width: 60px;
       text-align: center;
@@ -89,13 +89,13 @@
       line-height: 1;
     }
     .pyr-btn-timer:hover {
-      border-color: #6c8cff;
-      color: #6c8cff;
+      border-color: #498a9b;
+      color: #498a9b;
     }
     .pyr-btn-timer.active {
-      border-color: #6c8cff;
-      color: #6c8cff;
-      background: rgba(108,140,255,0.1);
+      border-color: #498a9b;
+      color: #498a9b;
+      background: rgba(73,138,155,0.1);
     }
 
     /* Buttons */
@@ -143,7 +143,7 @@
       align-items: center;
       justify-content: center;
     }
-    .pyr-btn-theme:hover { border-color: #6c8cff; color: #6c8cff; }
+    .pyr-btn-theme:hover { border-color: #498a9b; color: #498a9b; }
     .pyr-btn-theme svg { width: 14px; height: 14px; fill: currentColor; }
     .pyr-btn-theme .pyr-icon-sun { display: none; }
     .pyr-panel[data-editor-theme="light"] .pyr-btn-theme .pyr-icon-moon { display: none; }
@@ -153,8 +153,8 @@
       color: #5a5a7a;
     }
     .pyr-panel[data-editor-theme="light"] .pyr-btn-theme:hover {
-      border-color: #3d5ce0;
-      color: #3d5ce0;
+      border-color: #025c74;
+      color: #025c74;
     }
 
 
@@ -197,7 +197,7 @@
       padding: 2px 7px;
       border-radius: 4px;
     }
-    .pyr-status.loading { color: #6c8cff; background: rgba(108,140,255,0.1); }
+    .pyr-status.loading { color: #498a9b; background: rgba(73,138,155,0.1); }
     .pyr-status.success  { color: #34d399; background: rgba(52,211,153,0.1); }
     .pyr-status.error    { color: #f87171; background: rgba(248,113,113,0.1); }
 
@@ -245,11 +245,11 @@
     }
     .pyr-panel[data-editor-theme="light"] .pyr-btn-timer:hover,
     .pyr-panel[data-editor-theme="light"] .pyr-btn-timer.active {
-      border-color: #3d5ce0;
-      color: #3d5ce0;
+      border-color: #025c74;
+      color: #025c74;
     }
     .pyr-panel[data-editor-theme="light"] .pyr-btn-timer.active {
-      background: rgba(61,92,224,0.08);
+      background: rgba(2,92,116,0.08);
     }
     .pyr-panel[data-editor-theme="light"] .pyr-btn-clear,
     .pyr-panel[data-editor-theme="light"] .pyr-btn-reset {
@@ -388,17 +388,17 @@
       '.cm-content': { caretColor: '#1a1a2e' },
       '&.cm-focused .cm-cursor': { borderLeftColor: '#1a1a2e' },
       '&.cm-focused .cm-selectionBackground, ::selection': {
-        backgroundColor: 'rgba(61, 92, 224, 0.22)',
+        backgroundColor: 'rgba(2,92,116, 0.22)',
       },
-      '.cm-selectionBackground': { backgroundColor: 'rgba(61, 92, 224, 0.18)' },
+      '.cm-selectionBackground': { backgroundColor: 'rgba(2,92,116, 0.18)' },
       '.cm-gutters': {
         backgroundColor: '#eef0f6',
         color: '#6a6a80',
         border: 'none',
         borderRight: '1px solid #dddde8',
       },
-      '.cm-activeLine': { backgroundColor: 'rgba(61, 92, 224, 0.06)' },
-      '.cm-activeLineGutter': { backgroundColor: 'rgba(61, 92, 224, 0.06)' },
+      '.cm-activeLine': { backgroundColor: 'rgba(2,92,116, 0.06)' },
+      '.cm-activeLineGutter': { backgroundColor: 'rgba(2,92,116, 0.06)' },
     }, { dark: false });
   }
 
