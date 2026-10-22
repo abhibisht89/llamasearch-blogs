@@ -166,6 +166,8 @@ td { color: var(--text-dim); }
 @media (max-width: 600px) { .stats { gap: 24px; } .stat-val { font-size: 2rem; } .section { padding: 48px 0; } .interactive-panel { padding: 20px; } }
 </style>
 <link rel="stylesheet" href="/_shared/asknex-type.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="/_shared/katex-formula.css">
 </head>
 <body>
 
@@ -238,9 +240,7 @@ td { color: var(--text-dim); }
     <p>Recall the LLM-as-agent framing from the prior lecture: prompt <code>X</code>, completion <code>Y</code>, policy <code>π<sub>θ</sub></code> (the LLM itself), token-level actions, sparse outcome reward at the end. PPO plugs directly into this — but at a steep cost.</p>
 
     <p>The PPO clipped surrogate (from Ch.09–10) limits how far the policy can move per update:</p>
-    <div class="formula">
-      L<sup>PPO</sup> = E[ min(ρ<sub>θ</sub>·A, &nbsp; clip(ρ<sub>θ</sub>, 1−ε, 1+ε)·A) ]
-    </div>
+    <div class="formula tex" data-tex="L^{\mathrm{PPO}} = E[ min(\rho _{\theta }\cdot A, \; \mathrm{clip}(\rho _{\theta }, 1-\varepsilon , 1+\varepsilon )\cdot A) ]"></div>
     <p>That part is kept in GRPO. The expensive part is computing <code>A</code>.</p>
 
     <p>For each prompt, PPO:</p>
@@ -253,9 +253,7 @@ td { color: var(--text-dim); }
 
     <p>That is <strong>four models in memory</strong>: policy, reference, reward, and value. The value model exists because advantage compares "how good was this completion?" against "what does the policy normally get?" — and that baseline requires estimating expected return, which PPO learns with a critic.</p>
 
-    <div class="formula">
-      A(s, a) = Q(s, a) − V<sup>π</sup>(s) &nbsp;&nbsp;// PPO needs V to compute advantage
-    </div>
+    <div class="formula tex" data-tex="A(s,a)=Q(s,a)-V^{\pi}(s)"></div>
 
     <p>PPO succeeded for RLHF (ChatGPT-style alignment), but researchers noticed the same pain point: training two large networks (policy + critic) on every step consumes enormous GPU memory. For billion-parameter LLMs, the critic is not a small add-on — it is often another full-sized transformer.</p>
 
@@ -332,9 +330,7 @@ Prompt X ──► π<sub>θ</sub> ──► one completion Y
       </tbody>
     </table>
     <p>Token-level policy probability for autoregressive models:</p>
-    <div class="formula">
-      π<sub>θ</sub>(Y | X) = ∏<sub>t=1</sub><sup>|Y|</sup> π<sub>θ</sub>(y<sub>t</sub> | X, y<sub>1:t−1</sub>)
-    </div>
+    <div class="formula tex" data-tex="\pi _{\theta }(Y | X) = \prod _{t=1}^{|Y|} \pi _{\theta }(y_{t} | X, y_{1:t-1})"></div>
     <p>GRPO applies the same clipped update at each token, weighted by the <em>completion-level</em> advantage Â<sub>i</sub> (outcome supervision) or step-level advantages (process supervision).</p>
   </div>
 </section>
@@ -381,10 +377,7 @@ Prompt X ──► π<sub>θ</sub> ──► sample Y<sub>1</sub>, Y<sub>2</sub>
       </tbody>
     </table>
     <p>Group statistics: mean = (1+0+0+0)/4 = <strong>0.25</strong>, std ≈ <strong>0.433</strong>. Normalized advantages:</p>
-    <div class="formula">
-      Â<sub>1</sub> = (1 − 0.25) / 0.433 ≈ <strong>+1.73</strong> &nbsp;→ reinforce &nbsp;&nbsp;|&nbsp;&nbsp;
-      Â<sub>2,3,4</sub> = (0 − 0.25) / 0.433 ≈ <strong>−0.58</strong> &nbsp;→ penalize
-    </div>
+    <div class="formula tex" data-tex="\hat{A}_{1} = (1 - 0.25) / 0.433 \approx \mathbf{+1.73} \;\rightarrow reinforce \;\;|\;\; \hat{A}_{2,3,4} = (0 - 0.25) / 0.433 \approx \mathbf{-0.58} \;\rightarrow penalize"></div>
     <p>Only the correct completion beats the group average — exactly the signal PPO would need a critic to approximate. GRPO gets it from four extra rollouts.</p>
   </div>
 </section>
@@ -398,9 +391,7 @@ Prompt X ──► π<sub>θ</sub> ──► sample Y<sub>1</sub>, Y<sub>2</sub>
     <h2>Normalize Rewards Within the Group</h2>
     <p>For each prompt, collect rewards <code>r<sub>1</sub>, …, r<sub>G</sub></code>. GRPO defines the advantage of sample <code>i</code> by subtracting the group mean and dividing by the group standard deviation:</p>
 
-    <div class="formula">
-      Â<sub>i</sub> = ( r<sub>i</sub> − mean(r<sub>1</sub>, …, r<sub>G</sub>) ) / ( std(r<sub>1</sub>, …, r<sub>G</sub>) + ε )
-    </div>
+    <div class="formula tex" data-tex="\hat{A}_{i} = ( r_{i} - mean(r_{1}, \ldots , r_{G}) ) / ( std(r_{1}, \ldots , r_{G}) + \varepsilon )"></div>
 
     <p>When <code>std = 0</code> (all rewards identical — e.g. all wrong on a hard problem), implementations add a small <code>ε</code> or skip the update. The normalization serves two roles:</p>
     <ul style="margin-left:1.2em;color:var(--text-dim);margin-bottom:1em;">
@@ -410,9 +401,7 @@ Prompt X ──► π<sub>θ</sub> ──► sample Y<sub>1</sub>, Y<sub>2</sub>
 
     <p>Classical advantage: <code>A = Q − V</code>. In outcome-supervised GRPO with one terminal reward per completion, <code>Q</code> is just <code>r<sub>i</sub></code> and <code>V</code> is approximated by the group mean. Same math, different estimator.</p>
 
-    <div class="formula">
-      A<sub>i</sub> ≈ r<sub>i</sub> − (1/G) Σ<sub>j=1</sub><sup>G</sup> r<sub>j</sub> &nbsp;&nbsp;before normalization
-    </div>
+    <div class="formula tex" data-tex="A_{i} \approx r_{i} - (1/G) \sum _{j=1}^{G} r_{j} \;\;before normalization"></div>
 
     <!-- Interactive: advantage normalization calculator -->
     <div class="interactive-panel" id="calc-panel">
@@ -437,38 +426,26 @@ Prompt X ──► π<sub>θ</sub> ──► sample Y<sub>1</sub>, Y<sub>2</sub>
     <h2>Same Clipping as PPO, Different Advantage</h2>
     <p>GRPO keeps PPO's trust-region clipping on the probability ratio — the innovation is entirely in how Â is computed. The per-sample surrogate (for completion <code>i</code>, token <code>t</code>) uses the ratio between new and old policy:</p>
 
-    <div class="formula">
-      ρ<sub>θ</sub>(Y<sub>i</sub> | X) = π<sub>θ</sub>(Y<sub>i</sub> | X) / π<sub>θ<sub>old</sub></sub>(Y<sub>i</sub> | X)
-    </div>
+    <div class="formula tex" data-tex="\rho_{\theta}(Y_i\mid X)=\frac{\pi_{\theta}(Y_i\mid X)}{\pi_{\theta_{\mathrm{old}}}(Y_i\mid X)}"></div>
 
     <p>For autoregressive LLMs, this factorizes over tokens: <code>π<sub>θ</sub>(Y|X) = ∏<sub>t</sub> π<sub>θ</sub>(y<sub>t</sub> | X, y<sub>&lt;t</sub>)</code>.</p>
 
-    <div class="formula">
-      L<sup>CLIP</sup><sub>i</sub> = min( ρ<sub>θ</sub> · Â<sub>i</sub>, &nbsp; clip(ρ<sub>θ</sub>, 1−ε, 1+ε) · Â<sub>i</sub> )
-    </div>
+    <div class="formula tex" data-tex="L^{CLIP}_{i} = min( \rho _{\theta } \cdot \hat{A}_{i}, \; \mathrm{clip}(\rho _{\theta }, 1-\varepsilon , 1+\varepsilon ) \cdot \hat{A}_{i} )"></div>
 
     <p>GRPO adds a <strong>KL penalty</strong> to the reference policy (PPO for LLM alignment often relied on clipping alone; GRPO explicitly penalizes drift from <code>π<sub>ref</sub></code>):</p>
 
-    <div class="formula">
-      KL(π<sub>θ</sub> || π<sub>ref</sub>) = E<sub>X,Y</sub> [ log π<sub>θ</sub>(Y|X) − log π<sub>ref</sub>(Y|X) ]
-    </div>
+    <div class="formula tex" data-tex="\mathrm{KL}(\pi _{\theta } || \pi _{ref}) = E_{X,Y} [ \log \pi _{\theta }(Y|X) - \log \pi _{ref}(Y|X) ]"></div>
 
     <p>The full GRPO objective averages over the group:</p>
 
-    <div class="formula">
-      L<sub>GRPO</sub> = (1/G) Σ<sub>i=1</sub><sup>G</sup> L<sup>CLIP</sup><sub>i</sub> &nbsp;−&nbsp; β · KL(π<sub>θ</sub> || π<sub>ref</sub>)
-    </div>
+    <div class="formula tex" data-tex="L_{GRPO} = (1/G) \sum _{i=1}^{G} L^{CLIP}_{i} \;-\; \beta \cdot \mathrm{KL}(\pi _{\theta } || \pi _{ref})"></div>
 
     <p>Maximize <code>L<sub>GRPO</sub></code> (or minimize its negative). Hyperparameters: clip ε ≈ 0.2 (same as PPO), KL coefficient β tuned for stability, group size G ≈ 8–64+.</p>
 
     <h3 style="margin-top:28px;">Token-Level Surrogate (LLM Form)</h3>
     <p>When written for language models, the inner sum runs over output tokens. For sample <code>i</code> and token <code>t</code>:</p>
-    <div class="formula">
-      ρ<sub>θ,t</sub> = π<sub>θ</sub>(y<sub>i,t</sub> | X, y<sub>i,&lt;t</sub>) / π<sub>θ<sub>old</sub></sub>(y<sub>i,t</sub> | X, y<sub>i,&lt;t</sub>)
-    </div>
-    <div class="formula">
-      L<sup>CLIP</sup><sub>i</sub> = Σ<sub>t</sub> min( ρ<sub>θ,t</sub> · Â<sub>i</sub>, &nbsp; clip(ρ<sub>θ,t</sub>, 1−ε, 1+ε) · Â<sub>i</sub> )
-    </div>
+    <div class="formula tex" data-tex="\rho_{\theta,t}=\frac{\pi_{\theta}(y_{i,t}\mid X,y_{i,&lt;t})}{\pi_{\theta_{\mathrm{old}}}(y_{i,t}\mid X,y_{i,&lt;t})}"></div>
+    <div class="formula tex" data-tex="L^{CLIP}_{i} = \sum _{t} min( \rho _{\theta ,t} \cdot \hat{A}_{i}, \; \mathrm{clip}(\rho _{\theta ,t}, 1-\varepsilon , 1+\varepsilon ) \cdot \hat{A}_{i} )"></div>
     <p>Positive Â<sub>i</sub> pushes token probabilities up (if ρ is within clip); negative Â<sub>i</sub> pushes them down — the same "climb or descend the mountain" intuition from PPO, but the direction comes from group rank instead of GAE.</p>
 
     <div class="callout pink">
@@ -923,6 +900,9 @@ Base LLM (π<sub>ref</sub>)
   renderGroup();
 })();
 </script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script defer src="/_shared/katex-init.js"></script>
 <script src="/_shared/theme.js"></script>
 <!-- tcw:footer -->
 <link rel="stylesheet" href="/_shared/site-footer.css">
